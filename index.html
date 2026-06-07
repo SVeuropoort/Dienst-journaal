@@ -2912,12 +2912,15 @@
           <button onclick="vsDatumStap(1)" style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:7px 11px;cursor:pointer;font-size:14px;">&#8594;</button>
           <button onclick="wisselPunctualityDatum(document.getElementById('vs-datum').value)"
             style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:13px;font-weight:700;white-space:nowrap;">
-            &#x1F50D; Laden
+            Laden
           </button>
         </div>
       </div>
-      <div style="display:flex;gap:8px;align-items:flex-end;">
-
+      <div style="display:flex;gap:8px;align-items:flex-end;margin-left:auto;">
+        <button id="vs-lock-btn" onclick="toggleVsLock()" title="Vergrendelen / Ontgrendelen"
+          style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:16px;font-weight:700;">
+          &#x1F512;
+        </button>
       </div>
       <div id="vs-status" style="font-size:12px;color:var(--success);opacity:0;transition:opacity 0.4s;margin-left:auto;align-self:flex-end;padding-bottom:2px;">&#10003; Opgeslagen</div>
     </div>
@@ -3759,7 +3762,6 @@
       </div>
       <div style="padding:0 16px 8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
         <button onclick="slaPortoOp()" style="background:#003366;color:#fff;border:none;border-radius:5px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;">&#x1F4BE; Porto Opslaan</button>
-        <button onclick="debugPorto()" style="background:#666;color:#fff;border:none;border-radius:5px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;">&#x1F50D; Debug</button>
         <span id="porto-saved-lbl" style="font-size:11px;color:#1a7a40;opacity:0;transition:opacity 0.5s;margin-left:8px;">&#x2713; Opgeslagen in cloud</span>
       </div>
 
@@ -9215,6 +9217,38 @@ function wisselPunctualityDatum(dateStr) {
     if (dp && dp.value !== dateStr) dp.value = dateStr;
   }
   window.wisselPunctualityDatum = wisselPunctualityDatum;
+
+  function isVandaag(dateStr) {
+    var today = new Date();
+    var d = today.getFullYear() + '-' +
+      String(today.getMonth()+1).padStart(2,'0') + '-' +
+      String(today.getDate()).padStart(2,'0');
+    return dateStr === d;
+  }
+  function setVsLock(locked) {
+    window._vsLocked = locked;
+    var btn = document.getElementById('vs-lock-btn');
+    var inputs = document.querySelectorAll('#view-punctuality .tijden-input, #view-punctuality .units-input, #view-punctuality .units-opmerking-input, #view-punctuality .sjor-input, #view-punctuality textarea, #view-punctuality input[type="text"], #view-punctuality input[type="time"]');
+    if (locked) {
+      if (btn) { btn.innerHTML = '&#x1F512;'; btn.title = 'Klik om te ontgrendelen'; btn.style.background = '#c0392b'; }
+      inputs.forEach(function(i){ i.readOnly = true; i.style.opacity = '0.6'; i.style.cursor = 'not-allowed'; });
+    } else {
+      if (btn) { btn.innerHTML = '&#x1F513;'; btn.title = 'Klik om te vergrendelen'; btn.style.background = '#27ae60'; }
+      inputs.forEach(function(i){ i.readOnly = false; i.style.opacity = ''; i.style.cursor = ''; });
+    }
+  }
+  function toggleVsLock() { setVsLock(!window._vsLocked); }
+  var _origWisselPunct = wisselPunctualityDatum;
+  wisselPunctualityDatum = function(dateStr) {
+    _origWisselPunct(dateStr);
+    setTimeout(function(){ setVsLock(!isVandaag(dateStr)); }, 50);
+  };
+  window.wisselPunctualityDatum = wisselPunctualityDatum;
+  setTimeout(function(){
+    var vsDp = document.getElementById('vs-datum');
+    var dateStr = vsDp ? vsDp.value : '';
+    setVsLock(dateStr ? !isVandaag(dateStr) : false);
+  }, 300);
 
     window.laadVaarschema = function laadVaarschema() {
     var vsDp = document.getElementById('vs-datum');
