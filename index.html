@@ -1,14 +1,13 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html id="dj-html" style="visibility:hidden" lang="nl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Dienst Journaal Europoort</title>
 
 <!-- PWA -->
-<link rel="manifest" href="data:application/manifest+json;base64,eyJuYW1lIjogIkRpZW5zdCBKb3VybmFhbCBFdXJvcG9vcnQiLCAic2hvcnRfbmFtZSI6ICJESiBFdXJvcG9vcnQiLCAiZGVzY3JpcHRpb24iOiAiU3RlbmEgTGluZSBFdXJvcG9vcnQgVGVybWluYWwgLSBEaWVuc3QgSm91cm5hYWwiLCAic3RhcnRfdXJsIjogIi4iLCAiZGlzcGxheSI6ICJzdGFuZGFsb25lIiwgImJhY2tncm91bmRfY29sb3IiOiAiIzAwMzM2NiIsICJ0aGVtZV9jb2xvciI6ICIjMDAzMzY2IiwgIm9yaWVudGF0aW9uIjogImxhbmRzY2FwZSIsICJpY29ucyI6IFt7InNyYyI6ICJkYXRhOmltYWdlL3N2Zyt4bWw7YmFzZTY0LFBITjJaeUI0Yld4dWN6MGlhSFIwY0RvdkwzZDNkeTUzTXk1dmNtY3ZNakF3TUM5emRtY2lJSFpwWlhkQ2IzZzlJakFnTUNBeE9USWdNVGt5SWo0S0lDQThjbVZqZENCM2FXUjBhRDBpTVRreUlpQm9aV2xuYUhROUlqRTVNaUlnY25nOUlqSTBJaUJtYVd4c1BTSWpNREF6TXpZMklpOCtDaUFnUEhSbGVIUWdlRDBpT1RZaUlIazlJakV3TUNJZ1ptOXVkQzFtWVcxcGJIazlJa0Z5YVdGc0lpQm1iMjUwTFhOcGVtVTlJall3SWlCbWIyNTBMWGRsYVdkb2REMGlZbTlzWkNJZ1ptbHNiRDBpZDJocGRHVWlJSFJsZUhRdFlXNWphRzl5UFNKdGFXUmtiR1VpSUdSdmJXbHVZVzUwTFdKaGMyVnNhVzVsUFNKdGFXUmtiR1VpUGxOTVBDOTBaWGgwUGdvZ0lEeHlaV04wSUhnOUlqSXdJaUI1UFNJeE5EQWlJSGRwWkhSb1BTSXhOVElpSUdobGFXZG9kRDBpT0NJZ2NuZzlJalFpSUdacGJHdzlJaU5sT0dFd01qQWlMejRLUEM5emRtYysiLCAic2l6ZXMiOiAiMTkyeDE5MiIsICJ0eXBlIjogImltYWdlL3N2Zyt4bWwifSwgeyJzcmMiOiAiZGF0YTppbWFnZS9zdmcreG1sO2Jhc2U2NCxQSE4yWnlCNGJXeHVjejBpYUhSMGNEb3ZMM2QzZHk1M015NXZjbWN2TWpBd01DOXpkbWNpSUhacFpYZENiM2c5SWpBZ01DQXhPVElnTVRreUlqNEtJQ0E4Y21WamRDQjNhV1IwYUQwaU1Ua3lJaUJvWldsbmFIUTlJakU1TWlJZ2NuZzlJakkwSWlCbWFXeHNQU0lqTURBek16WTJJaTgrQ2lBZ1BIUmxlSFFnZUQwaU9UWWlJSGs5SWpFd01DSWdabTl1ZEMxbVlXMXBiSGs5SWtGeWFXRnNJaUJtYjI1MExYTnBlbVU5SWpZd0lpQm1iMjUwTFhkbGFXZG9kRDBpWW05c1pDSWdabWxzYkQwaWQyaHBkR1VpSUhSbGVIUXRZVzVqYUc5eVBTSnRhV1JrYkdVaUlHUnZiV2x1WVc1MExXSmhjMlZzYVc1bFBTSnRhV1JrYkdVaVBsTk1QQzkwWlhoMFBnb2dJRHh5WldOMElIZzlJakl3SWlCNVBTSXhOREFpSUhkcFpIUm9QU0l4TlRJaUlHaGxhV2RvZEQwaU9DSWdjbmc5SWpRaUlHWnBiR3c5SWlObE9HRXdNakFpTHo0S1BDOXpkbWMrIiwgInNpemVzIjogIjUxMng1MTIiLCAidHlwZSI6ICJpbWFnZS9zdmcreG1sIn1dfQ==">
+<link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#003366">
-<link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxOTIgMTkyIj4KICA8cmVjdCB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgcng9IjI0IiBmaWxsPSIjMDAzMzY2Ii8+CiAgPHRleHQgeD0iOTYiIHk9IjEwMCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjYwIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPlNMPC90ZXh0PgogIDxyZWN0IHg9IjIwIiB5PSIxNDAiIHdpZHRoPSIxNTIiIGhlaWdodD0iOCIgcng9IjQiIGZpbGw9IiNlOGEwMjAiLz4KPC9zdmc+">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Dienst Journaal">
@@ -2623,19 +2622,54 @@
   function voegAccutolRij()   { var tb=document.getElementById('accutol-tbody');   if(!tb)return; tb.insertAdjacentHTML('beforeend',maakRij(tb.rows.length+1)); slaPortoOp(); }
 
 </script>
-
+<style>
+#dj-login{position:fixed;inset:0;background:#001830;z-index:99999;display:none;align-items:center;justify-content:center;flex-direction:column;gap:20px;font-family:Arial,sans-serif;}
+</style>
 <script>
-if ('serviceWorker' in navigator && location.protocol !== 'blob:') {
-  try {
-    var swCode = 'self.addEventListener("install",function(e){self.skipWaiting()});self.addEventListener("activate",function(e){e.waitUntil(clients.claim())});self.addEventListener("fetch",function(e){e.respondWith(fetch(e.request).catch(function(){return new Response("Offline",{headers:{"Content-Type":"text/plain"}})}))});';
-    var blob = new Blob([swCode], {type: 'application/javascript'});
-    var swUrl = URL.createObjectURL(blob);
-    navigator.serviceWorker.register(swUrl).catch(function(){});
-  } catch(e) {}
-}
-</script>
-</head>
+(function(){
+  var ok = sessionStorage.getItem('dj_auth')==='1';
+  if(ok){ document.getElementById('dj-html').style.visibility='visible'; }
+})();
+</script></head>
 <body>
+<div id="dj-login">
+  <div style="text-align:center;">
+    <div style="font-size:48px;">&#x1F6A2;</div>
+    <div style="color:#fff;font-size:26px;font-weight:800;letter-spacing:2px;margin-top:8px;">DIENST JOURNAAL</div>
+    <div style="color:rgba(255,255,255,0.5);font-size:12px;letter-spacing:3px;margin-top:4px;">STENA LINE EUROPOORT</div>
+  </div>
+  <div style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:32px 40px;width:300px;">
+    <div style="color:rgba(255,255,255,0.7);font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">Wachtwoord</div>
+    <input type="password" id="dj-ww" placeholder="Wachtwoord..." style="width:100%;padding:12px;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:rgba(255,255,255,0.1);color:#fff;font-size:15px;outline:none;box-sizing:border-box;margin-bottom:10px;">
+    <div id="dj-err" style="color:#ff6b6b;font-size:12px;margin-bottom:8px;display:none;">Onjuist wachtwoord.</div>
+    <button id="dj-btn" style="width:100%;padding:12px;background:#e8a020;border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;">INLOGGEN</button>
+  </div>
+</div>
+<script>
+(function(){
+  var login = document.getElementById('dj-login');
+  var html  = document.getElementById('dj-html');
+  if(sessionStorage.getItem('dj_auth')==='1'){
+    html.style.visibility='visible';
+    login.style.display='none';
+  } else {
+    login.style.display='flex';
+    html.style.visibility='visible';
+    setTimeout(function(){ document.getElementById('dj-ww').focus(); }, 100);
+  }
+  function djLogin(){
+    if(document.getElementById('dj-ww').value==='SVeuropoort2026'){
+      sessionStorage.setItem('dj_auth','1');
+      login.style.display='none';
+    } else {
+      document.getElementById('dj-err').style.display='block';
+      document.getElementById('dj-ww').value='';
+    }
+  }
+  document.getElementById('dj-btn').addEventListener('click', djLogin);
+  document.getElementById('dj-ww').addEventListener('keydown', function(e){ if(e.key==='Enter') djLogin(); });
+})();
+</script>
 <div id="fs-banner" onclick="_doFullscreen()" style="position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#003366;color:#fff;text-align:center;padding:10px;font-size:13px;cursor:pointer;font-family:Arial,sans-serif;">
   &#x26F6; Tik hier om volledig scherm te openen
 </div>
@@ -2663,7 +2697,6 @@ if ('serviceWorker' in navigator && location.protocol !== 'blob:') {
       &#x2191; Opslaan
     </button>
     <span id="sync-status" style="font-size:11px;color:rgba(255,255,255,0.8);opacity:0;transition:opacity 0.4s;white-space:nowrap;"></span>
-    <button id="pwa-install-btn" title="Installeer als app" onclick="installPWA()" style="display:none;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;font-size:13px;padding:6px 12px;border-radius:4px;cursor:pointer;font-weight:700;">&#x2B07; Installeren</button>
     <button onclick="openCloudInst()" title="Cloud instellingen" style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);color:#fff;font-size:16px;padding:6px 10px;border-radius:4px;cursor:pointer;">⚙️</button>
   </div>
 </header>
@@ -4516,47 +4549,7 @@ function submitForm() {
     +'<button onclick="window.print()" style="background:#003366;color:#fff;border:none;padding:10px 20px;font-size:13px;font-weight:700;border-radius:5px;cursor:pointer">&#128438; PDF opslaan</button>'
     +'<button onclick="window.close()" style="background:#888;color:#fff;border:none;padding:10px 20px;font-size:13px;border-radius:5px;cursor:pointer">Sluiten</button>'
     +'</div></div>'
-    +'
-<!-- LOGIN SCHERM -->
-<div id="login-overlay" style="display:flex;position:fixed;inset:0;background:#001830;z-index:99999;align-items:center;justify-content:center;flex-direction:column;gap:20px;">
-  <div style="text-align:center;margin-bottom:10px;">
-    <div style="font-size:48px;">🚢</div>
-    <div style="color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:800;letter-spacing:2px;margin-top:8px;">DIENST JOURNAAL</div>
-    <div style="color:rgba(255,255,255,0.5);font-size:13px;letter-spacing:3px;text-transform:uppercase;">Stena Line Europoort</div>
-  </div>
-  <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:32px 40px;width:320px;">
-    <div style="color:rgba(255,255,255,0.7);font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">Wachtwoord</div>
-    <input type="password" id="login-ww" placeholder="Voer wachtwoord in..." onkeydown="if(event.key==='Enter')checkLogin()" style="width:100%;padding:12px 16px;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:rgba(255,255,255,0.08);color:#fff;font-size:15px;outline:none;box-sizing:border-box;margin-bottom:12px;">
-    <div id="login-err" style="color:#ff6b6b;font-size:12px;margin-bottom:10px;display:none;">Onjuist wachtwoord. Probeer opnieuw.</div>
-    <button onclick="checkLogin()" style="width:100%;padding:12px;background:#e8a020;border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:1px;">INLOGGEN</button>
-  </div>
-  <div style="color:rgba(255,255,255,0.3);font-size:11px;">Port Operations · Europoort Terminal</div>
-</div>
-
-<script>
-  // Check sessie bij laden
-  (function(){
-    if(sessionStorage.getItem('dj_auth') === '1') {
-      document.getElementById('login-overlay').style.display = 'none';
-    }
-  })();
-
-  function checkLogin() {
-    var ww = document.getElementById('login-ww').value;
-    var err = document.getElementById('login-err');
-    if(ww === 'SVeuropoort2026') {
-      sessionStorage.setItem('dj_auth', '1');
-      document.getElementById('login-overlay').style.display = 'none';
-      err.style.display = 'none';
-    } else {
-      err.style.display = 'block';
-      document.getElementById('login-ww').value = '';
-      document.getElementById('login-ww').focus();
-    }
-  }
-</script>
-
-</body></html>';
+    +'</body></html>';
 
   var w = window.open('', '_blank', 'width=820,height=940');
   if (w) { w.document.write(html); w.document.close(); setTimeout(function(){ w.print(); }, 600); }
@@ -5562,7 +5555,7 @@ function buildStats(){
     <div class="si"><span class="dot" style="background:#c0392b"></span><span class="lbl">Trucks av.:</span><span class="val">${allAvTrucks.size}</span></div>
     <div class="si"><span class="dot" style="background:#c0392b"></span><span class="lbl">CF laden av.:</span><span class="val">${avCFTrucks + avIMMTrucks}</span></div>`;
 
-  var _sbar=document.getElementById('sbar'); if(!_sbar) return; _sbar.innerHTML=`
+  document.getElementById('sbar').innerHTML=`
     <span style="font-weight:700;color:#1a2a4a;font-size:11px;white-space:nowrap;">${fmtDate(planDate)}</span>
     <div style="display:flex;align-items:center;gap:6px;background:#e8f0fb;border:2px solid #1a4a8a;border-radius:7px;padding:4px 10px;">
       <span style="font-size:11px;font-weight:800;color:#1a4a8a;text-transform:uppercase;letter-spacing:1px;margin-right:4px;">🌅 OCHTEND</span>
@@ -12960,29 +12953,6 @@ function navWerkoverdracht(label, btn) {
     if(typeof renderKPI==='function') renderKPI();
   }
   function closeStdBezetting(){ document.getElementById('std-bez-overlay').style.display='none'; }
-
-  // PWA Install
-  var _pwaPrompt = null;
-  window.addEventListener('beforeinstallprompt', function(e) {
-    e.preventDefault();
-    _pwaPrompt = e;
-    var btn = document.getElementById('pwa-install-btn');
-    if (btn) btn.style.display = 'inline-flex';
-  });
-  function installPWA() {
-    if (!_pwaPrompt) return;
-    _pwaPrompt.prompt();
-    _pwaPrompt.userChoice.then(function(result) {
-      _pwaPrompt = null;
-      var btn = document.getElementById('pwa-install-btn');
-      if (btn) btn.style.display = 'none';
-    });
-  }
-  window.addEventListener('appinstalled', function() {
-    var btn = document.getElementById('pwa-install-btn');
-    if (btn) btn.style.display = 'none';
-    showSyncStatus('App geinstalleerd!', 'ok');
-  });
 
 </script>
 
