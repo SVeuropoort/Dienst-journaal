@@ -5628,13 +5628,18 @@ function ddm(id){
   return `<select class="psel" data-pfx="${pfx}" data-key="${id}" data-meren="true" style="background:#fff" onchange="setP('${id}',this.value)"><option value=""></option>${opts}</select>`;
 }
 
-// Get names already selected in non-meren positions of a panel
+// Get names already selected in non-meren positions of a panel (excluding truck positions)
 function getPlacedNames(pfx){
   const names=[];
   Object.entries(pos).forEach(([k,v])=>{
-    if(v && getKeyPfx(k)===pfx && !isMerenKey(k)) names.push(v);
+    if(v && getKeyPfx(k)===pfx && !isMerenKey(k) && !isTruckKey(k)) names.push(v);
   });
   return names;
+}
+
+// Is this key a truck position?
+function isTruckKey(k){
+  return k.indexOf('_tr_') !== -1;
 }
 
 // Is this key a Meren position?
