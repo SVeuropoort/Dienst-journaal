@@ -2630,8 +2630,53 @@
   var ok = sessionStorage.getItem('dj_auth')==='1';
   if(ok){ document.getElementById('dj-html').style.visibility='visible'; }
 })();
-</script></head>
+</script>
+<!-- Google Translate -->
+<script type="text/javascript">
+function googleTranslateElementInit() {
+  new google.translate.TranslateElement({
+    pageLanguage: 'nl',
+    includedLanguages: 'nl,en,sv',
+    layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+    autoDisplay: false
+  }, 'google_translate_element');
+}
+</script>
+<script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+<style>
+#google_translate_element {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 999999;
+  background: #003366;
+  border-radius: 8px;
+  padding: 4px 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+#google_translate_element select {
+  background: #003366;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+}
+#google_translate_element .goog-te-gadget-simple {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+}
+.goog-te-banner-frame { display: none !important; }
+.goog-te-menu-value span { color: #fff !important; }
+body { top: 0 !important; }
+</style>
+</head>
 <body>
+<div id="google_translate_element"></div>
 <div id="dj-login">
   <div style="text-align:center;">
     <div style="font-size:48px;">&#x1F6A2;</div>
