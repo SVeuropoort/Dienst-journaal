@@ -2736,7 +2736,7 @@ body { top: 0 !important; }
   <div style="display:flex;align-items:center;gap:10px;padding:0 20px;">
 
     <button onclick="cloudLaden()" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;padding:8px 16px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:6px;">
-      &#x2193; Ophalen (Google Drive)
+      &#x2193; Ophalen
     </button>
     <button onclick="cloudOpslaan(true)" style="background:var(--accent);border:none;color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;padding:8px 16px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:6px;">
       &#x2191; Opslaan
@@ -4390,6 +4390,8 @@ window.addEventListener('resize', () => {
     <div style="display:flex;gap:8px">
       <button onclick="openCertModal()" title="Certificeringen beheren"
         style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:16px;">&#x2699;&#xFE0F;</button>
+      <button onclick="openVerjModal()" title="Verjaardagen beheren"
+        style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:16px;">&#x1F382;</button>
     </div>
   </div>
 
@@ -5289,7 +5291,18 @@ function updateCertCell(key, name) {
   if (!sel) return;
   const wrap = sel.closest('.cert-wrap');
   if (!wrap) return;
-  // Update badges
+  // Update verjaardags badge
+  var existing = wrap.querySelector('.verj-badge');
+  if (existing) existing.remove();
+  if (name && typeof isVerjaardag === 'function' && isVerjaardag(name)) {
+    var span = document.createElement('span');
+    span.className = 'verj-badge';
+    span.style.cssText = 'font-size:14px;margin-right:4px;';
+    span.title = 'Vandaag jarig!';
+    span.textContent = '🎂';
+    wrap.insertBefore(span, sel);
+  }
+  // Update cert badges
   let badgeDiv = wrap.querySelector('.cert-badges');
   const list = getCertList(name);
   const html = name ? certBadgesHtml(name) : '';
@@ -5305,6 +5318,24 @@ function updateCertCell(key, name) {
 }
 
 function refreshAllCertCells() {
+  // Ververs ook verjaardagsbadges
+  document.querySelectorAll('.cert-wrap').forEach(function(wrap) {
+    var existing = wrap.querySelector('.verj-badge');
+    if (existing) existing.remove();
+    var sel = wrap.querySelector('select');
+    if (!sel) return;
+    var naam = sel.value;
+    if (naam && typeof isVerjaardag === 'function' && isVerjaardag(naam)) {
+      var span = document.createElement('span');
+      span.className = 'verj-badge';
+      span.style.cssText = 'font-size:14px;margin-right:4px;';
+      span.title = 'Vandaag jarig!';
+      span.textContent = '🎂';
+      var sel = wrap.querySelector('select');
+      if (sel) wrap.insertBefore(span, sel);
+      else wrap.appendChild(span);
+    }
+  });
   Object.entries(pos).forEach(([k, name]) => {
     if (name) updateCertCell(k, name);
   });
@@ -5366,7 +5397,8 @@ function dd(id, pool, cls=''){
   });
   const bg = selBg(sv, pool);
   const _cbadges = certBadgesHtml(sv);
-  return `<div class="cert-wrap" style="background:${bg}"><select class="psel${cls?' '+cls:''}" data-pfx="${pfx}" data-key="${id}" style="background:${bg}" onchange="setP('${id}',this.value)"><option value=""></option>${opts}</select>${_cbadges}</div>`;
+  const _verjBadge = (sv && typeof isVerjaardag === 'function' && isVerjaardag(sv)) ? '<span style="font-size:14px;margin-left:2px;" title="Vandaag jarig!">🎂</span>' : '';
+  return `<div class="cert-wrap" style="background:${bg}">${_verjBadge}<select class="psel${cls?' '+cls:''}" data-pfx="${pfx}" data-key="${id}" style="background:${bg}" onchange="setP('${id}',this.value)"><option value=""></option>${opts}</select>${_cbadges}</div>`;
 }
 
 // Determine which panel a position-key belongs to
@@ -6446,6 +6478,118 @@ function resetCerts() {
 
 // Cloud sync bridge - called from savePos/saveFullState
 function autoCloudOpslaan(){ if(window.autoCloudOpslaan) window.autoCloudOpslaan(); }
+
+// ── VERJAARDAGEN ──
+const VERJ_KEY = 'dj_verjaardagen_v1';
+
+function getVerjaardagen() {
+  try { return JSON.parse(localStorage.getItem(VERJ_KEY) || '{}'); } catch(e) { return {}; }
+}
+function saveVerjaardagen(data) {
+  localStorage.setItem(VERJ_KEY, JSON.stringify(data));
+}
+function _extractAchternaam(naam) {
+  if (!naam) return '';
+  var s = naam.trim();
+  // "Achternaam, V." -> "Achternaam"
+  if (s.indexOf(',') > 0) s = s.split(',')[0].trim();
+  // "R.A. Groenewegen" -> verwijder initialen vooraan (letters gevolgd door punt)
+  s = s.replace(/^([A-Za-z]+\.\s*)+/, '').trim();
+  // "van den Berg" blijft intact, "Richard Groenewegen" wordt "Richard Groenewegen"
+  // Pak het laatste woord als achternaam-kern voor matching
+  var parts = s.split(/\s+/);
+  // Geef de laatste twee woorden terug (voor "van den Berg" -> "den Berg")
+  return parts.slice(-2).join(' ').toLowerCase();
+}
+
+function isVerjaardag(naam) {
+  if (!naam) return false;
+  var data = getVerjaardagen();
+  var today = new Date();
+  var dag = today.getDate();
+  var maand = today.getMonth() + 1;
+
+  // Haal achternaam op (laatste woord na eventuele initialen)
+  function achternaam(s) {
+    s = s.trim();
+    if (s.indexOf(',') > 0) s = s.split(',')[0].trim();
+    // Verwijder initialen vooraan: "R.A." of "V." etc.
+    s = s.replace(/^([A-Za-z]{1,3}\.\s*)+/, '').trim();
+    // Pak laatste woord als achternaam
+    var words = s.split(/\s+/);
+    return words[words.length - 1].toLowerCase();
+  }
+
+  var an = achternaam(naam);
+
+  for (var key in data) {
+    var e = data[key];
+    if (!e || !e.dag || !e.maand) continue;
+    if (parseInt(e.dag) !== dag || parseInt(e.maand) !== maand) continue;
+    // Exacte naam match
+    if (key === naam) return true;
+    // Achternaam match
+    if (an && achternaam(key) === an) return true;
+  }
+  return false;
+}
+
+function openVerjModal() {
+  var data = getVerjaardagen();
+  // Hardcoded namen als fallback (uit MEDEWERKERS array)
+  var _fallbackNamen = ["M. Adamu", "A. Ahmetagic", "R. Bakker", "V. van den Berg", "J. Blokland", "L.G.N. Bosveld", "R. Brooshooft", "C. Burger", "D.J.A. Dambruck", "J.C.M.T.H. Dammers", "R.F. Duvel", "A.E. Erad", "H.E. Erad", "R. Forman", "S.G. Flater", "W. van Geffen", "H.C.W. Goedegebuure", "R.A. Groenewegen", "A. Gijbels", "S. van der Helden", "A.A. Rodgers", "D. Mastenbroek", "H. Karagül", "H. Karagul", "M. Kievit", "D Stoutjesdijk", "K. Krullaars", "J. de Kruyk", "S. Laaij", "R.R.T Lauwers", "M.J. van Lieburg", "P. van der Lichte", "D. van Linschoten", "M. van Marsbergen", "S.N.A. van der Meer", "G.R. Mol", "R. Molendijk", "G van der Sluis", "R. Ottenhoff", "H. Ozdemir", "M.F. Punselie", "J. van Reenen", "N.E.J. Rietdijk", "S.F. Rimon", "Rodgers, A.A.,'83", "V.O. Schipper", "S Soekhoe", "G. Voormeeren", "G.H.M. Verwaal", "M. de Visser", "N. van der Waarde", "P.H.M. Waardenburg", "J. Wiegmans", "R. Wubben", "K.A. Zandijk", "M. Zoeteman", "J. Zijlstra"];
+  var medewerkers = window._MEDEWERKERS
+    ? window._MEDEWERKERS
+    : (typeof MEDEWERKERS !== 'undefined' ? MEDEWERKERS : _fallbackNamen.map(function(n){ return {naam:n}; }));
+  // Als medewerkers leeg is, gebruik fallback
+  if (!medewerkers || medewerkers.length === 0) {
+    medewerkers = _fallbackNamen.map(function(n){ return {naam:n}; });
+  }
+  var tbody = document.getElementById('verj-tbody');
+  tbody.innerHTML = '';
+  medewerkers.forEach(function(m) {
+    var entry = data[m.naam] || { dag: '', maand: '' };
+    var jaardagSuffix = isVerjaardag(m.naam) ? ' 🎂' : '';
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td style="padding:6px 10px;font-size:13px;color:#003366;font-weight:600;">' + m.naam + jaardagSuffix + '</td>' +
+      '<td style="padding:4px 8px;"><input type="number" min="1" max="31" placeholder="Dag" value="' + (entry.dag||'') + '" ' +
+        'data-naam="' + m.naam.replace(/"/g,'&quot;') + '" data-type="dag" ' +
+        'style="width:60px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;font-size:13px;text-align:center;"></td>' +
+      '<td style="padding:4px 8px;"><input type="number" min="1" max="12" placeholder="Mnd" value="' + (entry.maand||'') + '" ' +
+        'data-naam="' + m.naam.replace(/"/g,'&quot;') + '" data-type="maand" ' +
+        'style="width:60px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;font-size:13px;text-align:center;"></td>';
+    tbody.appendChild(tr);
+  });
+  document.getElementById('verj-overlay').style.display = 'flex';
+}
+
+function closeVerjModal() {
+  document.getElementById('verj-overlay').style.display = 'none';
+}
+
+function saveVerjModal() {
+  var data = {};
+  document.querySelectorAll('#verj-tbody input').forEach(function(inp) {
+    var naam = inp.getAttribute('data-naam');
+    var type = inp.getAttribute('data-type');
+    if (!data[naam]) data[naam] = { dag: '', maand: '' };
+    data[naam][type] = inp.value.trim();
+  });
+  // Sla alleen op als dag EN maand ingevuld zijn
+  var filtered = {};
+  for (var naam in data) {
+    if (data[naam].dag && data[naam].maand) {
+      filtered[naam] = data[naam];
+    }
+  }
+  saveVerjaardagen(filtered);
+  var msg = document.getElementById('verj-saved-msg');
+  if (msg) { msg.style.opacity = '1'; setTimeout(function(){ msg.style.opacity='0'; }, 2000); }
+  closeVerjModal();
+  // Refresh planning zodat 🎂 icoontjes bijgewerkt worden
+  if (typeof refreshAllCertCells === 'function') refreshAllCertCells();
+}
 </script>
 <!-- ARCHIVE MODAL -->
 <div style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:300;align-items:center;justify-content:center" id="archOverlay">
@@ -7003,6 +7147,7 @@ let MEDEWERKERS = [
   {&quot;mannr&quot;:798930,&quot;naam&quot;:&quot;M. Zoeteman&quot;,&quot;groep&quot;:&quot;C1&quot;,&quot;km&quot;:38},
   {&quot;mannr&quot;:799970,&quot;naam&quot;:&quot;J. Zijlstra&quot;,&quot;groep&quot;:&quot;C2&quot;,&quot;km&quot;:19}
 ];
+  window._MEDEWERKERS = MEDEWERKERS;
 
 let MEDEWERKERS_HVH = [
   {&quot;mannr&quot;:700606,&quot;naam&quot;:&quot;S Adanc&quot;,&quot;groep&quot;:&quot;C1&quot;,&quot;km&quot;:0},
@@ -12608,6 +12753,39 @@ function navWerkoverdracht(label, btn) {
     <div style="padding:14px 24px;border-top:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">
       <button onclick="matReset()" style="background:#f0f0f0;color:#555;border:none;border-radius:6px;padding:10px 16px;cursor:pointer;font-size:13px;">&#x21BA; Standaard herstellen</button>
       <button onclick="matOpslaan()" style="background:#27ae60;color:#fff;border:none;border-radius:6px;padding:10px 28px;cursor:pointer;font-size:14px;font-weight:700;">&#x1F4BE; Opslaan</button>
+    </div>
+  </div>
+</div>
+
+<!-- VERJAARDAGEN MODAL -->
+<div id="verj-overlay" onclick="if(event.target===this)closeVerjModal()"
+  style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9000;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:12px;width:480px;max-width:96vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,0.35);">
+    <div style="background:#003366;color:#fff;padding:16px 20px;border-radius:12px 12px 0 0;display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:800;letter-spacing:1px;">&#x1F382; VERJAARDAGEN</span>
+      <button onclick="closeVerjModal()" style="background:rgba(255,255,255,0.15);border:none;color:#fff;border-radius:6px;padding:5px 11px;cursor:pointer;font-size:17px;">&#x2715;</button>
+    </div>
+    <div style="padding:10px 16px;background:#f0f4ff;border-bottom:1px solid #dde;">
+      <span style="font-size:12px;color:#555;">Vul dag en maand in per medewerker. Op de verjaardag verschijnt automatisch een 🎂 icoontje in de planning.</span>
+    </div>
+    <div style="overflow-y:auto;flex:1;padding:8px 16px;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr style="background:#f8f9fa;">
+            <th style="padding:8px 10px;font-size:12px;color:#003366;text-align:left;font-family:'Barlow Condensed',sans-serif;letter-spacing:1px;text-transform:uppercase;">Naam</th>
+            <th style="padding:8px 10px;font-size:12px;color:#003366;text-align:center;font-family:'Barlow Condensed',sans-serif;letter-spacing:1px;text-transform:uppercase;">Dag</th>
+            <th style="padding:8px 10px;font-size:12px;color:#003366;text-align:center;font-family:'Barlow Condensed',sans-serif;letter-spacing:1px;text-transform:uppercase;">Maand</th>
+          </tr>
+        </thead>
+        <tbody id="verj-tbody"></tbody>
+      </table>
+    </div>
+    <div style="padding:14px 20px;border-top:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">
+      <span id="verj-saved-msg" style="color:#27ae60;font-size:13px;font-weight:600;opacity:0;transition:opacity 0.4s;">&#10003; Opgeslagen</span>
+      <div style="display:flex;gap:8px;">
+        <button onclick="closeVerjModal()" style="background:#eee;color:#555;border:none;border-radius:6px;padding:10px 16px;cursor:pointer;font-size:13px;">Annuleren</button>
+        <button onclick="saveVerjModal()" style="background:#27ae60;color:#fff;border:none;border-radius:6px;padding:10px 24px;cursor:pointer;font-size:14px;font-weight:700;">&#x1F4BE; Opslaan</button>
+      </div>
     </div>
   </div>
 </div>
