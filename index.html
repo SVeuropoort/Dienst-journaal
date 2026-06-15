@@ -4315,12 +4315,13 @@ window.addEventListener('resize', () => {
 
   // AUTO CLOUD SYNC - debounced
   var _autoSaveTimer = null;
-  window.autoCloudOpslaan = function autoCloudOpslaan() {
+  window._doCloudOpslaan = function() {
     if (_autoSaveTimer) clearTimeout(_autoSaveTimer);
     _autoSaveTimer = setTimeout(function() {
       cloudOpslaan();
     }, 2000);
   };
+  window.autoCloudOpslaan = window._doCloudOpslaan;
 
 
 
@@ -6480,7 +6481,7 @@ function resetCerts() {
 }
 
 // Cloud sync bridge - called from savePos/saveFullState
-function autoCloudOpslaan(){ if(window.autoCloudOpslaan) window.autoCloudOpslaan(); }
+function autoCloudOpslaan(){ if(window._doCloudOpslaan) window._doCloudOpslaan(); }
 
 // ── VERJAARDAGEN ──
 const VERJ_KEY = 'dj_verjaardagen_v1';
@@ -6844,6 +6845,2508 @@ document.getElementById('archOverlay').addEventListener('click',function(e){
     </div>
 
   </div>
+
+
+
+  <!-- ===== SCHADE FORMULIER ===== -->
+  <div id="view-schade" class="view">
+    <div class="page-header">
+      <div>
+        <div class="red-rule"></div>
+        <h1>Schade Formulier</h1>
+      </div>
+    </div>
+    <!-- Tabs -->
+    <div style="display:flex;gap:0;border-bottom:2px solid #003366;margin-bottom:0;">
+      <button id="schade-tab-1" onclick="switchSchadeTab(1)"
+        style="padding:10px 24px;border:none;background:#003366;color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;border-radius:6px 6px 0 0;">
+        &#x1F6A2; Stena Eigendommen
+      </button>
+      <button id="schade-tab-2" onclick="switchSchadeTab(2)"
+        style="padding:10px 24px;border:none;background:#e8eef5;color:#003366;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;border-radius:6px 6px 0 0;margin-left:4px;">
+        &#x1F1EA;&#x1F1FA; Europees Schadeformulier
+      </button>
+    </div>
+    <!-- Tab panels -->
+    <div id="schade-panel-1" style="width:100%;height:calc(100vh - 160px);">
+      <iframe style="width:100%;height:100%;border:none;" srcdoc="<!DOCTYPE html>
+<html lang=&quot;nl&quot;>
+<head>
+<meta charset=&quot;UTF-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;>
+<title>Schade rapport aan Stenaline eigendommen</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&amp;family=DM+Serif+Display&amp;display=swap');
+
+  :root {
+    --red: #c0392b;
+    --dark: #1a1a2e;
+    --mid: #2c2c54;
+    --light: #f7f8fa;
+    --border: #dde1e9;
+    --text: #2d2d2d;
+    --muted: #7a7a8a;
+    --white: #ffffff;
+    --shadow: 0 2px 16px rgba(0,0,0,0.08);
+    --warn-bg: #fff8f0;
+    --warn-border: #e67e22;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: #eef0f5;
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ---- Header ---- */
+  .header {
+    background: var(--dark);
+    padding: 20px 0 16px;
+    text-align: center;
+    border-bottom: 4px solid var(--red);
+  }
+  .header-icon { font-size: 2.2rem; line-height: 1; }
+  .header-title {
+    color: white;
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.45rem;
+    margin-top: 8px;
+  }
+  .header-sub {
+    color: rgba(255,255,255,0.5);
+    font-size: 0.8rem;
+    margin-top: 3px;
+    letter-spacing: 0.06em;
+  }
+
+  /* ---- Lang bar ---- */
+  .lang-bar {
+    background: var(--mid);
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px;
+  }
+  .lang-btn {
+    background: transparent;
+    border: 1.5px solid rgba(255,255,255,0.3);
+    color: white;
+    padding: 4px 14px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.2s;
+  }
+  .lang-btn.active, .lang-btn:hover { background: var(--red); border-color: var(--red); }
+
+  /* ---- Stepper ---- */
+  .stepper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0;
+    padding: 20px 16px 4px;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  .step-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    position: relative;
+  }
+  .step-item:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    width: 100%;
+    height: 2px;
+    background: var(--border);
+    z-index: 0;
+  }
+  .step-item.done:not(:last-child)::after { background: var(--red); }
+  .step-dot {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: white;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--muted);
+    position: relative;
+    z-index: 1;
+    transition: all 0.3s;
+  }
+  .step-item.active .step-dot { border-color: var(--red); background: var(--red); color: white; }
+  .step-item.done .step-dot { border-color: var(--red); background: var(--red); color: white; }
+  .step-label {
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-top: 5px;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .step-item.active .step-label { color: var(--red); font-weight: 600; }
+
+  /* ---- Form wrap ---- */
+  .form-wrap {
+    max-width: 760px;
+    margin: 20px auto 60px;
+    padding: 0 16px;
+  }
+
+  /* ---- Card ---- */
+  .card {
+    background: var(--white);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    padding: 36px 40px;
+    margin-bottom: 20px;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid var(--border);
+  }
+  .card-header .badge {
+    background: var(--red);
+    color: white;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    margin-top: 4px;
+    letter-spacing: 0.04em;
+  }
+  .card-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.35rem;
+    color: var(--dark);
+    line-height: 1.2;
+  }
+  .card-subtitle {
+    font-size: 0.83rem;
+    color: var(--muted);
+    margin-top: 4px;
+    line-height: 1.5;
+  }
+
+  .section-heading {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--red);
+    margin: 28px 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-heading::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ---- Fields ---- */
+  .field-group { margin-bottom: 20px; }
+
+  label {
+    display: block;
+    font-size: 0.87rem;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  label .req { color: var(--red); margin-left: 2px; }
+  label .opt { color: var(--muted); font-weight: 300; font-size: 0.79rem; margin-left: 4px; }
+
+  input[type=&quot;text&quot;], input[type=&quot;tel&quot;], input[type=&quot;email&quot;],
+  input[type=&quot;date&quot;], input[type=&quot;time&quot;],
+  select, textarea {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.93rem;
+    color: var(--text);
+    background: var(--white);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+    appearance: none;
+  }
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--red);
+    box-shadow: 0 0 0 3px rgba(192,57,43,0.1);
+  }
+  select {
+    background-image: url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237a7a8a' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E&quot;);
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 36px;
+  }
+  textarea { resize: vertical; min-height: 90px; }
+
+  .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+
+  /* ---- Radio group ---- */
+  .radio-group {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .radio-option {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    cursor: pointer;
+    padding: 9px 18px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    user-select: none;
+  }
+  .radio-option:hover { border-color: var(--red); }
+  .radio-option input[type=&quot;radio&quot;] { accent-color: var(--red); width: 16px; height: 16px; }
+  .radio-option.selected { border-color: var(--red); background: #fdf4f3; color: var(--red); font-weight: 500; }
+
+  /* ---- Conditional blocks ---- */
+  .conditional {
+    display: none;
+    border-left: 3px solid var(--red);
+    padding-left: 20px;
+    margin-top: 16px;
+    animation: fadeIn 0.25s ease;
+  }
+  .conditional.visible { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+
+  /* ---- Upload zone ---- */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    background: var(--light);
+    display: block;
+  }
+  .upload-zone:hover { border-color: var(--red); background: #fdf5f5; }
+  .upload-zone input { display: none; }
+  .upload-icon { font-size: 1.8rem; margin-bottom: 6px; }
+  .upload-zone p { font-size: 0.84rem; color: var(--muted); }
+  .file-list { margin-top: 8px; font-size: 0.82rem; color: var(--muted); }
+  .file-tag {
+    display: inline-block;
+    background: #eef0f5;
+    border-radius: 4px;
+    padding: 2px 8px;
+    margin: 2px;
+  }
+
+  /* ---- Sketch canvas ---- */
+  .sketch-wrap {
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: white;
+    position: relative;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    cursor: crosshair;
+    touch-action: none;
+  }
+  .canvas-tools {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 10px;
+    background: var(--light);
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .color-btn {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+  .color-btn:hover, .color-btn.active { transform: scale(1.2); border-color: var(--dark); }
+  .tool-sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+  .canvas-label { font-size: 0.75rem; color: var(--muted); flex: 1; }
+
+  /* ---- Signature ---- */
+  .sig-wrap {
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: white;
+  }
+  .sig-name-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--light);
+    border-bottom: 1px solid var(--border);
+  }
+  .sig-name-row label { margin: 0; font-size: 0.82rem; white-space: nowrap; }
+  .sig-name-row input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-size: 0.88rem;
+    padding: 4px 6px;
+    border-bottom: 1.5px solid var(--border);
+    border-radius: 0;
+    outline: none;
+  }
+  .sig-name-row input:focus { border-color: var(--red); }
+
+  /* ---- Buttons ---- */
+  .nav-row {
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    margin-top: 28px;
+  }
+  .btn-prev {
+    background: white;
+    color: var(--muted);
+    border: 1.5px solid var(--border);
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.93rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-prev:hover { border-color: var(--red); color: var(--red); }
+  .btn-next {
+    background: var(--red);
+    color: white;
+    border: none;
+    padding: 12px 32px;
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.93rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    margin-left: auto;
+  }
+  .btn-next:hover { background: #a93226; transform: translateY(-1px); }
+
+  .info-box {
+    background: var(--warn-bg);
+    border: 1.5px solid var(--warn-border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-size: 0.85rem;
+    color: #7d4a10;
+    line-height: 1.6;
+    margin-bottom: 22px;
+  }
+
+  .email-preview {
+    background: var(--light);
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.88rem;
+    color: var(--muted);
+    margin-bottom: 22px;
+  }
+  .email-preview span { color: var(--red); font-weight: 500; }
+
+  @media (max-width: 600px) {
+    .card { padding: 22px 18px; }
+    .row-2, .row-3 { grid-template-columns: 1fr; }
+    .stepper { gap: 0; }
+    .step-label { font-size: 0.62rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class=&quot;header&quot;>
+  <div class=&quot;header-icon&quot;>⚠️</div>
+  <div class=&quot;header-title&quot; data-i18n=&quot;title&quot;>Schade rapport aan Stenaline eigendommen</div>
+  <div class=&quot;header-sub&quot;>MI003 / MI002</div>
+</div>
+
+<!-- Language bar -->
+<div class=&quot;lang-bar&quot;>
+  <button class=&quot;lang-btn active&quot; onclick=&quot;setLang('nl',this)&quot;>Nederlands</button>
+  <button class=&quot;lang-btn&quot; onclick=&quot;setLang('en',this)&quot;>English (UK)</button>
+</div>
+
+<!-- Stepper -->
+<div class=&quot;stepper&quot; id=&quot;stepper&quot;>
+  <div class=&quot;step-item active&quot; id=&quot;si0&quot;><div class=&quot;step-dot&quot;>1</div><div class=&quot;step-label&quot; data-i18n=&quot;step_rapport&quot;>Rapport</div></div>
+  <div class=&quot;step-item&quot; id=&quot;si1&quot;><div class=&quot;step-dot&quot;>2</div><div class=&quot;step-label&quot; data-i18n=&quot;step_incident&quot;>Incident</div></div>
+  <div class=&quot;step-item&quot; id=&quot;si2&quot;><div class=&quot;step-dot&quot;>3</div><div class=&quot;step-label&quot; data-i18n=&quot;step_extern&quot;>Externe partij</div></div>
+  <div class=&quot;step-item&quot; id=&quot;si3&quot;><div class=&quot;step-dot&quot;>4</div><div class=&quot;step-label&quot; data-i18n=&quot;step_getuigen&quot;>Getuigen</div></div>
+</div>
+
+<div class=&quot;form-wrap&quot;>
+
+  <!-- ======== STEP 0: Intro &amp; Kopie e-mail ======== -->
+  <div class=&quot;step-panel&quot; id=&quot;panel0&quot;>
+    <div class=&quot;card&quot;>
+      <div class=&quot;card-header&quot;>
+        <div>
+          <div class=&quot;card-title&quot; data-i18n=&quot;title&quot;>Schade rapport aan Stenaline eigendommen</div>
+          <div style=&quot;font-size:0.78rem;color:var(--red);font-weight:600;margin-top:3px;&quot;>MI003 / MI002</div>
+        </div>
+      </div>
+      <div class=&quot;info-box&quot;>
+        📋 <strong data-i18n=&quot;info_title&quot;>Incidenten formulier MI002 en MI003</strong><span data-i18n=&quot;info_isps&quot;> conform ISPS plan.</span><br>
+        <span data-i18n=&quot;info_body&quot;>Indien er een incident heeft plaatsgevonden waarbij eigendommen van Stena Line BV beschadigd zijn geraakt, dient de dienstdoende Supervisor stevedoring, dienstdoende beveiliger of OTS/OFS medewerker een Schaderapport Stena Line eigendommen (formulier MI002/MI003) op te maken.</span><br><br>
+        <span data-i18n=&quot;info_pdf&quot;>Na het invullen van alle stappen kan het formulier als </span><strong data-i18n=&quot;info_pdf_bold&quot;>PDF worden gedownload</strong><span data-i18n=&quot;info_pdf_end&quot;> via de knop op de laatste pagina.</span>
+      </div>
+
+      <div class=&quot;nav-row&quot;>
+        <div></div>
+        <button class=&quot;btn-next&quot; onclick=&quot;goStep(1)&quot; data-i18n=&quot;btn_next&quot;>Volgende →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== STEP 1: Rapport opgemaakt door ======== -->
+  <div class=&quot;step-panel&quot; id=&quot;panel1&quot; style=&quot;display:none;&quot;>
+    <div class=&quot;card&quot;>
+      <div class=&quot;card-header&quot;>
+        <div>
+          <div class=&quot;card-title&quot; data-i18n=&quot;title&quot;>Schade rapport aan Stenaline eigendommen</div>
+          <div style=&quot;font-size:0.78rem;color:var(--red);font-weight:600;margin-top:3px;&quot;>MI003 / MI002</div>
+        </div>
+      </div>
+
+      <div class=&quot;section-heading&quot; data-i18n=&quot;sec_rapport&quot;>Rapport opgemaakt door</div>
+
+      <div class=&quot;field-group&quot;>
+        <label data-i18n-label=&quot;lbl_terminal&quot;>Terminal <span class=&quot;req&quot;>*</span></label>
+        <select id=&quot;terminal&quot;>
+          <option value=&quot;&quot;>Selecteer</option>
+          <option>Europoort</option>
+          <option>Hoek van Holland</option>
+          <option>Immingham</option>
+        </select>
+      </div>
+
+      <div class=&quot;field-group&quot;>
+        <label data-i18n-label=&quot;lbl_naam&quot;>Naam <span class=&quot;req&quot;>*</span></label>
+        <div class=&quot;row-2&quot;>
+          <input type=&quot;text&quot; id=&quot;reporterFirst&quot; placeholder=&quot;Voornaam&quot; data-i18n-ph=&quot;ph_voornaam&quot;>
+          <input type=&quot;text&quot; id=&quot;reporterLast&quot; placeholder=&quot;Achternaam&quot; data-i18n-ph=&quot;ph_achternaam&quot;>
+        </div>
+      </div>
+
+      <div class=&quot;field-group&quot;>
+        <label data-i18n-label=&quot;lbl_datum&quot;>Datum / tijd incident <span class=&quot;req&quot;>*</span></label>
+        <div class=&quot;row-2&quot;>
+          <input type=&quot;date&quot; id=&quot;incidentDate&quot;>
+          <div class=&quot;row-2&quot; style=&quot;gap:8px;&quot;>
+            <input type=&quot;time&quot; id=&quot;incidentTime&quot; placeholder=&quot;Tijd&quot;>
+          </div>
+        </div>
+      </div>
+
+      <div class=&quot;field-group&quot;>
+        <label data-i18n-label=&quot;lbl_oorzaak&quot;>Oorzaak / omschrijving van het incident <span class=&quot;req&quot;>*</span></label>
+        <textarea id=&quot;cause&quot; rows=&quot;4&quot; placeholder=&quot;Beschrijf de oorzaak en omstandigheden van het incident...&quot; data-i18n-ph=&quot;ph_oorzaak&quot;></textarea>
+      </div>
+
+      <div class=&quot;field-group&quot;>
+        <label data-i18n-label=&quot;lbl_schade_stena&quot;>Omschrijving schade: Stena Line eigendommen <span class=&quot;req&quot;>*</span></label>
+        <textarea id=&quot;damageDesc&quot; rows=&quot;4&quot; placeholder=&quot;Beschrijf de schade aan Stena Line eigendommen...&quot; data-i18n-ph=&quot;ph_schade_stena&quot;></textarea>
+      </div>
+
+      <!-- Situatieschets -->
+      <div class=&quot;field-group&quot;>
+        <label data-i18n-label=&quot;lbl_schets&quot;>Situatie schets <span class=&quot;opt&quot;>(optioneel)</span></label>
+        <div class=&quot;sketch-wrap&quot;>
+          <canvas id=&quot;sketchCanvas&quot; height=&quot;220&quot;></canvas>
+          <div class=&quot;canvas-tools&quot;>
+            <span class=&quot;canvas-label&quot;>Teken een situatieschets:</span>
+            <div class=&quot;color-btn active&quot; style=&quot;background:#1a1a2e;&quot; data-color=&quot;#1a1a2e&quot; onclick=&quot;setColor(this)&quot;></div>
+            <div class=&quot;color-btn&quot; style=&quot;background:#c0392b;&quot; data-color=&quot;#c0392b&quot; onclick=&quot;setColor(this)&quot;></div>
+            <div class=&quot;color-btn&quot; style=&quot;background:#2980b9;&quot; data-color=&quot;#2980b9&quot; onclick=&quot;setColor(this)&quot;></div>
+            <div class=&quot;color-btn&quot; style=&quot;background:#27ae60;&quot; data-color=&quot;#27ae60&quot; onclick=&quot;setColor(this)&quot;></div>
+            <div class=&quot;tool-sep&quot;></div>
+            <button class=&quot;btn-prev&quot; style=&quot;padding:4px 12px;font-size:0.78rem;&quot; onclick=&quot;clearSketch()&quot; data-i18n=&quot;btn_wissen&quot;>Wissen</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Foto Stena -->
+      <div class=&quot;field-group&quot;>
+        <label data-i18n-label=&quot;lbl_foto&quot;>Wil je een foto toevoegen? <span class=&quot;req&quot;>*</span></label>
+        <div class=&quot;radio-group&quot; id=&quot;photoStenaGroup&quot;>
+          <label class=&quot;radio-option&quot; onclick=&quot;toggleRadio(this,'photoStena','ja',showPhotoStena)&quot;>
+            <input type=&quot;radio&quot; name=&quot;photoStena&quot; value=&quot;ja&quot;><span data-i18n=&quot;opt_ja&quot;> Ja</span>
+          </label>
+          <label class=&quot;radio-option&quot; onclick=&quot;toggleRadio(this,'photoStena','nee',showPhotoStena)&quot;>
+            <input type=&quot;radio&quot; name=&quot;photoStena&quot; value=&quot;nee&quot;><span data-i18n=&quot;opt_nee&quot;> Nee</span>
+          </label>
+        </div>
+        <div class=&quot;conditional&quot; id=&quot;photoStenaUpload&quot;>
+          <div style=&quot;margin-top:12px;&quot;>
+            <label class=&quot;upload-zone&quot; for=&quot;photoStenaFile&quot;>
+              <div class=&quot;upload-icon&quot;>📷</div>
+              <p data-i18n=&quot;upload_foto&quot;>Klik of sleep foto's hier naartoe</p>
+              <input type=&quot;file&quot; id=&quot;photoStenaFile&quot; accept=&quot;image/*&quot; multiple onchange=&quot;handleUpload(this,'photoStenaFileList')&quot;>
+            </label>
+            <div class=&quot;file-list&quot; id=&quot;photoStenaFileList&quot;></div>
+          </div>
+        </div>
+      </div>
+
+      <div class=&quot;nav-row&quot;>
+        <button class=&quot;btn-prev&quot; onclick=&quot;goStep(0)&quot; data-i18n=&quot;btn_prev&quot;>← Vorige</button>
+        <button class=&quot;btn-next&quot; onclick=&quot;goStep(2)&quot; data-i18n=&quot;btn_next&quot;>Volgende →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== STEP 2: Externe partij ======== -->
+  <div class=&quot;step-panel&quot; id=&quot;panel2&quot; style=&quot;display:none;&quot;>
+    <div class=&quot;card&quot;>
+
+      <div class=&quot;field-group&quot;>
+        <label data-i18n-label=&quot;lbl_extern_q&quot;>Is er een externe partij betrokken bij het incident? <span class=&quot;req&quot;>*</span></label>
+        <div class=&quot;radio-group&quot;>
+          <label class=&quot;radio-option&quot; onclick=&quot;toggleRadio(this,'extParty','ja',showExtParty)&quot;>
+            <input type=&quot;radio&quot; name=&quot;extParty&quot; value=&quot;ja&quot;><span data-i18n=&quot;opt_ja&quot;> Ja</span>
+          </label>
+          <label class=&quot;radio-option&quot; onclick=&quot;toggleRadio(this,'extParty','nee',showExtParty)&quot;>
+            <input type=&quot;radio&quot; name=&quot;extParty&quot; value=&quot;nee&quot;><span data-i18n=&quot;opt_nee&quot;> Nee</span>
+          </label>
+        </div>
+      </div>
+
+      <div class=&quot;conditional&quot; id=&quot;extPartySection&quot;>
+        <div class=&quot;section-heading&quot; data-i18n=&quot;sec_extern&quot;>Externe betrokken partij</div>
+
+        <div class=&quot;field-group&quot;>
+          <label data-i18n-label=&quot;lbl_klant&quot;>Klant / bedrijfsnaam <span class=&quot;req&quot;>*</span></label>
+          <input type=&quot;text&quot; id=&quot;clientName&quot; placeholder=&quot;Naam van klant of bedrijf&quot; data-i18n-ph=&quot;ph_klant&quot;>
+        </div>
+
+        <div class=&quot;field-group&quot;>
+          <label data-i18n-label=&quot;lbl_boeking&quot;>Stena Line boeking referentie <span class=&quot;opt&quot;>(optioneel)</span></label>
+          <input type=&quot;text&quot; id=&quot;bookingRef&quot; placeholder=&quot;bv. SL-2026-XXXXX&quot;>
+        </div>
+
+        <div class=&quot;row-2&quot;>
+          <div class=&quot;field-group&quot;>
+            <label data-i18n-label=&quot;lbl_unit&quot;>Unit nummer <span class=&quot;req&quot;>*</span></label>
+            <input type=&quot;text&quot; id=&quot;unitNr&quot; placeholder=&quot;bv. TL-123456&quot;>
+          </div>
+          <div class=&quot;field-group&quot;>
+            <label data-i18n-label=&quot;lbl_chauffeur&quot;>Chauffeur <span class=&quot;req&quot;>*</span></label>
+            <input type=&quot;text&quot; id=&quot;driverName&quot; placeholder=&quot;Naam chauffeur&quot; data-i18n-ph=&quot;ph_chauffeur&quot;>
+          </div>
+        </div>
+
+        <div class=&quot;field-group&quot;>
+          <label data-i18n-label=&quot;lbl_kenteken&quot;>Kenteken truck <span class=&quot;opt&quot;>(optioneel)</span></label>
+          <input type=&quot;text&quot; id=&quot;licensePlate&quot; placeholder=&quot;bv. AB-123-CD&quot;>
+        </div>
+
+        <div class=&quot;field-group&quot;>
+          <label data-i18n-label=&quot;lbl_groenekaart&quot;>Kopie groene kaart <span class=&quot;opt&quot;>(optioneel)</span></label>
+          <label class=&quot;upload-zone&quot; for=&quot;greenCard&quot;>
+            <div class=&quot;upload-icon&quot;>🗂️</div>
+            <p data-i18n=&quot;upload_bestand&quot;>Sleep het bestand hier naartoe of klik om te bladeren</p>
+            <input type=&quot;file&quot; id=&quot;greenCard&quot; accept=&quot;image/*,.pdf&quot; onchange=&quot;handleUpload(this,'greenCardList')&quot;>
+          </label>
+          <div class=&quot;file-list&quot; id=&quot;greenCardList&quot;></div>
+        </div>
+
+        <div class=&quot;field-group&quot;>
+          <label data-i18n-label=&quot;lbl_rijbewijs&quot;>Kopie rijbewijs <span class=&quot;opt&quot;>(optioneel)</span></label>
+          <label class=&quot;upload-zone&quot; for=&quot;driverLicense&quot;>
+            <div class=&quot;upload-icon&quot;>🪪</div>
+            <p data-i18n=&quot;upload_bestand&quot;>Sleep het bestand hier naartoe of klik om te bladeren</p>
+            <input type=&quot;file&quot; id=&quot;driverLicense&quot; accept=&quot;image/*,.pdf&quot; onchange=&quot;handleUpload(this,'driverLicenseList')&quot;>
+          </label>
+          <div class=&quot;file-list&quot; id=&quot;driverLicenseList&quot;></div>
+        </div>
+
+        <div class=&quot;field-group&quot;>
+          <label data-i18n-label=&quot;lbl_schade_klant&quot;>Omschrijving schade: klant eigendom <span class=&quot;req&quot;>*</span></label>
+          <textarea rows=&quot;3&quot; placeholder=&quot;Beschrijf de schade aan klant eigendommen...&quot; data-i18n-ph=&quot;ph_schade_klant&quot;></textarea>
+        </div>
+
+        <div class=&quot;field-group&quot;>
+          <label data-i18n-label=&quot;lbl_foto_klant&quot;>Wil je een foto toevoegen (klant eigendom)? <span class=&quot;req&quot;>*</span></label>
+          <div class=&quot;radio-group&quot;>
+            <label class=&quot;radio-option&quot; onclick=&quot;toggleRadio(this,'photoClient','ja',showPhotoClient)&quot;>
+              <input type=&quot;radio&quot; name=&quot;photoClient&quot; value=&quot;ja&quot;><span data-i18n=&quot;opt_ja&quot;> Ja</span>
+            </label>
+            <label class=&quot;radio-option&quot; onclick=&quot;toggleRadio(this,'photoClient','nee',showPhotoClient)&quot;>
+              <input type=&quot;radio&quot; name=&quot;photoClient&quot; value=&quot;nee&quot;><span data-i18n=&quot;opt_nee&quot;> Nee</span>
+            </label>
+          </div>
+          <div class=&quot;conditional&quot; id=&quot;photoClientUpload&quot;>
+            <div style=&quot;margin-top:12px;&quot;>
+              <label class=&quot;upload-zone&quot; for=&quot;photoClientFile&quot;>
+                <div class=&quot;upload-icon&quot;>📷</div>
+                <p data-i18n=&quot;upload_foto&quot;>Klik of sleep foto's hier naartoe</p>
+                <input type=&quot;file&quot; id=&quot;photoClientFile&quot; accept=&quot;image/*&quot; multiple onchange=&quot;handleUpload(this,'photoClientFileList')&quot;>
+              </label>
+              <div class=&quot;file-list&quot; id=&quot;photoClientFileList&quot;></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class=&quot;nav-row&quot;>
+        <button class=&quot;btn-prev&quot; onclick=&quot;goStep(1)&quot; data-i18n=&quot;btn_prev&quot;>← Vorige</button>
+        <button class=&quot;btn-next&quot; onclick=&quot;goStep(3)&quot; data-i18n=&quot;btn_next&quot;>Volgende →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== STEP 3: Getuigen, Politie, Letsel &amp; Handtekeningen ======== -->
+  <div class=&quot;step-panel&quot; id=&quot;panel3&quot; style=&quot;display:none;&quot;>
+    <div class=&quot;card&quot;>
+
+      <!-- Getuigen -->
+      <div class=&quot;field-group&quot;>
+        <label data-i18n-label=&quot;lbl_getuigen_q&quot;>Zijn er ooggetuigen? <span class=&quot;req&quot;>*</span></label>
+        <div class=&quot;radio-group&quot;>
+          <label class=&quot;radio-option&quot; onclick=&quot;toggleRadio(this,'witnesses','ja',showWitnesses)&quot;>
+            <input type=&quot;radio&quot; name=&quot;witnesses&quot; value=&quot;ja&quot;><span data-i18n=&quot;opt_ja&quot;> Ja</span>
+          </label>
+          <label class=&quot;radio-option&quot; onclick=&quot;toggleRadio(this,'witnesses','nee',showWitnesses)&quot;>
+            <input type=&quot;radio&quot; name=&quot;witnesses&quot; value=&quot;nee&quot;><span data-i18n=&quot;opt_nee&quot;> Nee</span>
+          </label>
+        </div>
+      </div>
+
+      <div class=&quot;conditional&quot; id=&quot;witnessSection&quot;>
+        <div class=&quot;section-heading&quot; data-i18n=&quot;sec_getuigen&quot;>Ooggetuigen</div>
+
+        <div class=&quot;field-group&quot;>
+          <label data-i18n-label=&quot;lbl_getuige_naam&quot;>Naam getuige <span class=&quot;req&quot;>*</span></label>
+          <input type=&quot;text&quot; id=&quot;witnessName&quot; placeholder=&quot;Naam ooggetuige&quot; data-i18n-ph=&quot;ph_getuige_naam&quot;>
+        </div>
+        <div class=&quot;field-group&quot;>
+          <label data-i18n-label=&quot;lbl_getuige_bedrijf&quot;>Bedrijfsnaam <span class=&quot;req&quot;>*</span></label>
+          <input type=&quot;text&quot; id=&quot;witnessCo&quot; placeholder=&quot;Bedrijfsnaam getuige&quot; data-i18n-ph=&quot;ph_getuige_bedrijf&quot;>
+        </div>
+        <div class=&quot;field-group&quot;>
+          <label data-i18n-label=&quot;lbl_telefoon&quot;>Telefoonnummer <span class=&quot;req&quot;>*</span></label>
+          <input type=&quot;tel&quot; id=&quot;witnessPhone&quot; placeholder=&quot;bv. +31 6 12345678&quot; data-i18n-ph=&quot;ph_telefoon&quot;>
+        </div>
+      </div>
+
+      <!-- Politie -->
+      <div class=&quot;section-heading&quot; style=&quot;margin-top:28px;&quot; data-i18n=&quot;sec_politie&quot;>Politie / Marechaussee</div>
+
+      <div class=&quot;field-group&quot;>
+        <label data-i18n-label=&quot;lbl_politie_q&quot;>Is de Politie / Marechaussee aanwezig geweest? <span class=&quot;req&quot;>*</span></label>
+        <div class=&quot;radio-group&quot;>
+          <label class=&quot;radio-option&quot; onclick=&quot;toggleRadio(this,'police','ja',showPolice)&quot;>
+            <input type=&quot;radio&quot; name=&quot;police&quot; value=&quot;ja&quot;><span data-i18n=&quot;opt_ja&quot;> Ja</span>
+          </label>
+          <label class=&quot;radio-option&quot; onclick=&quot;toggleRadio(this,'police','nee',showPolice)&quot;>
+            <input type=&quot;radio&quot; name=&quot;police&quot; value=&quot;nee&quot;><span data-i18n=&quot;opt_nee&quot;> Nee</span>
+          </label>
+        </div>
+      </div>
+
+      <div class=&quot;conditional&quot; id=&quot;policeReport&quot;>
+        <div class=&quot;field-group&quot; style=&quot;margin-top:12px;&quot;>
+          <label data-i18n-label=&quot;lbl_politierapport_q&quot;>Is er een politierapport opgemaakt? <span class=&quot;req&quot;>*</span></label>
+          <div class=&quot;radio-group&quot;>
+            <label class=&quot;radio-option&quot; onclick=&quot;toggleRadio(this,'policeRep','ja',null)&quot;>
+              <input type=&quot;radio&quot; name=&quot;policeRep&quot; value=&quot;ja&quot;><span data-i18n=&quot;opt_ja&quot;> Ja</span>
+            </label>
+            <label class=&quot;radio-option&quot; onclick=&quot;toggleRadio(this,'policeRep','nee',null)&quot;>
+              <input type=&quot;radio&quot; name=&quot;policeRep&quot; value=&quot;nee&quot;><span data-i18n=&quot;opt_nee&quot;> Nee</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Letsel -->
+      <div class=&quot;section-heading&quot; style=&quot;margin-top:28px;&quot; data-i18n=&quot;sec_letsel&quot;>Letsel</div>
+
+      <div class=&quot;field-group&quot;>
+        <label data-i18n-label=&quot;lbl_letsel_q&quot;>Is er sprake van letsel? <span class=&quot;req&quot;>*</span></label>
+        <div class=&quot;radio-group&quot;>
+          <label class=&quot;radio-option&quot; onclick=&quot;toggleRadio(this,'injury','ja',showInjury)&quot;>
+            <input type=&quot;radio&quot; name=&quot;injury&quot; value=&quot;ja&quot;><span data-i18n=&quot;opt_ja&quot;> Ja</span>
+          </label>
+          <label class=&quot;radio-option&quot; onclick=&quot;toggleRadio(this,'injury','nee',showInjury)&quot;>
+            <input type=&quot;radio&quot; name=&quot;injury&quot; value=&quot;nee&quot;><span data-i18n=&quot;opt_nee&quot;> Nee</span>
+          </label>
+        </div>
+      </div>
+
+      <div class=&quot;conditional&quot; id=&quot;injurySection&quot;>
+        <div class=&quot;field-group&quot; style=&quot;margin-top:12px;&quot;>
+          <label data-i18n-label=&quot;lbl_letsel_naam&quot;>(Letsel) Naam betrokkene <span class=&quot;req&quot;>*</span></label>
+          <div class=&quot;row-2&quot;>
+            <input type=&quot;text&quot; id=&quot;injuredFirst&quot; placeholder=&quot;Voornaam&quot; data-i18n-ph=&quot;ph_voornaam&quot;>
+            <input type=&quot;text&quot; id=&quot;injuredLast&quot; placeholder=&quot;Achternaam&quot; data-i18n-ph=&quot;ph_achternaam&quot;>
+          </div>
+        </div>
+      </div>
+
+      <!-- Handtekeningen -->
+      <div class=&quot;section-heading&quot; style=&quot;margin-top:32px;&quot; data-i18n=&quot;sec_handtekening&quot;>Handtekeningen</div>
+
+      <div class=&quot;field-group&quot;>
+        <label data-i18n-label=&quot;lbl_sig_stena&quot;>Handtekening Stena Line <span class=&quot;req&quot;>*</span></label>
+        <div class=&quot;sig-wrap&quot;>
+          <div class=&quot;sig-name-row&quot;>
+            <label>Naam:</label>
+            <input type=&quot;text&quot; id=&quot;sigStenaName&quot; placeholder=&quot;Volledige naam&quot; data-i18n-ph=&quot;ph_volledige_naam&quot;>
+          </div>
+          <canvas id=&quot;sigStena&quot; height=&quot;140&quot;></canvas>
+        </div>
+        <div style=&quot;display:flex;justify-content:flex-end;margin-top:6px;&quot;>
+          <button class=&quot;btn-prev&quot; style=&quot;padding:4px 12px;font-size:0.78rem;&quot; onclick=&quot;clearCanvas('sigStena')&quot; data-i18n=&quot;btn_wissen&quot;>Wissen</button>
+        </div>
+      </div>
+
+      <div class=&quot;field-group&quot;>
+        <label data-i18n-label=&quot;lbl_sig_klant&quot;>Handtekening Klant <span class=&quot;req&quot;>*</span></label>
+        <div class=&quot;sig-wrap&quot;>
+          <div class=&quot;sig-name-row&quot;>
+            <label>Naam:</label>
+            <input type=&quot;text&quot; id=&quot;sigClientName&quot; placeholder=&quot;Volledige naam&quot; data-i18n-ph=&quot;ph_volledige_naam&quot;>
+          </div>
+          <canvas id=&quot;sigClient&quot; height=&quot;140&quot;></canvas>
+        </div>
+        <div style=&quot;display:flex;justify-content:flex-end;margin-top:6px;&quot;>
+          <button class=&quot;btn-prev&quot; style=&quot;padding:4px 12px;font-size:0.78rem;&quot; onclick=&quot;clearCanvas('sigClient')&quot; data-i18n=&quot;btn_wissen&quot;>Wissen</button>
+        </div>
+      </div>
+
+      <div class=&quot;nav-row&quot;>
+        <button class=&quot;btn-prev&quot; onclick=&quot;goStep(2)&quot; data-i18n=&quot;btn_prev&quot;>← Vorige</button>
+        <button class=&quot;btn-next&quot; style=&quot;background:#1a7a3c;display:flex;align-items:center;gap:8px;&quot; onclick=&quot;generatePDF()&quot; id=&quot;pdfBtn&quot;>
+          <svg width=&quot;16&quot; height=&quot;16&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot;><path d=&quot;M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z&quot;/><polyline points=&quot;14 2 14 8 20 8&quot;/><line x1=&quot;12&quot; y1=&quot;12&quot; x2=&quot;12&quot; y2=&quot;18&quot;/><line x1=&quot;9&quot; y1=&quot;15&quot; x2=&quot;15&quot; y2=&quot;15&quot;/></svg>
+          <span data-i18n=&quot;btn_pdf&quot;>PDF downloaden</span>
+        </button>
+      </div>
+
+      <p style=&quot;text-align:center;font-size:0.78rem;color:var(--muted);margin-top:14px;&quot;>
+        <span data-i18n=&quot;footer&quot;>Stena Line Europoort Terminal — Elbeweg 91, 3198LC Europoort-Rotterdam</span>
+      </p>
+    </div>
+  </div>
+
+</div><!-- /form-wrap -->
+
+<script>
+// ---- Step navigation ----
+const totalSteps = 4;
+let currentStep = 0;
+
+function goStep(n) {
+  for (let i = 0; i < totalSteps; i++) {
+    document.getElementById('panel' + i).style.display = 'none';
+  }
+  currentStep = n;
+  document.getElementById('panel' + n).style.display = '';
+  updateStepper(n);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function updateStepper(n) {
+  for (let i = 0; i < totalSteps; i++) {
+    const el = document.getElementById('si' + i);
+    el.classList.remove('active', 'done');
+    if (i < n) el.classList.add('done');
+    else if (i === n) el.classList.add('active');
+  }
+}
+
+// ---- Radio helpers ----
+function toggleRadio(label, name, val, callback) {
+  document.querySelectorAll(`input[name=&quot;${name}&quot;]`).forEach(r => {
+    r.closest('.radio-option').classList.remove('selected');
+  });
+  label.classList.add('selected');
+  label.querySelector('input').checked = true;
+  if (callback) callback(val === 'ja');
+}
+
+function showExtParty(show) {
+  document.getElementById('extPartySection').classList.toggle('visible', show);
+}
+function showWitnesses(show) {
+  document.getElementById('witnessSection').classList.toggle('visible', show);
+}
+function showPolice(show) {
+  document.getElementById('policeReport').classList.toggle('visible', show);
+}
+function showInjury(show) {
+  document.getElementById('injurySection').classList.toggle('visible', show);
+}
+function showPhotoStena(show) {
+  document.getElementById('photoStenaUpload').classList.toggle('visible', show);
+}
+function showPhotoClient(show) {
+  document.getElementById('photoClientUpload').classList.toggle('visible', show);
+}
+
+// ---- File upload ----
+// Store file data URLs for PDF embedding
+const uploadedFiles = {};
+
+function handleUpload(input, listId) {
+  const list = document.getElementById(listId);
+  list.innerHTML = Array.from(input.files).map(f =>
+    `<span class=&quot;file-tag&quot;>📎 ${f.name}</span>`
+  ).join('');
+  // Read first image file for PDF embedding
+  const imageFile = Array.from(input.files).find(f => f.type.startsWith('image/'));
+  if (imageFile) {
+    const reader = new FileReader();
+    reader.onload = e => { uploadedFiles[listId] = e.target.result; };
+    reader.readAsDataURL(imageFile);
+  }
+}
+
+// ---- Language / i18n ----
+const translations = {
+  nl: {
+    title: 'Schade rapport aan Stenaline eigendommen',
+    step_rapport: 'Rapport', step_incident: 'Incident',
+    step_extern: 'Externe partij', step_getuigen: 'Getuigen',
+    info_title: 'Incidenten formulier MI002 en MI003',
+    info_isps: ' conform ISPS plan.',
+    info_body: 'Indien er een incident heeft plaatsgevonden waarbij eigendommen van Stena Line BV beschadigd zijn geraakt, dient de dienstdoende Supervisor stevedoring, dienstdoende beveiliger of OTS/OFS medewerker een Schaderapport Stena Line eigendommen (formulier MI002/MI003) op te maken.',
+    info_pdf: 'Na het invullen van alle stappen kan het formulier als ',
+    info_pdf_bold: 'PDF worden gedownload',
+    info_pdf_end: ' via de knop op de laatste pagina.',
+    btn_next: 'Volgende →', btn_prev: '← Vorige',
+    btn_wissen: 'Wissen', btn_pdf: 'PDF downloaden',
+    sec_rapport: 'Rapport opgemaakt door',
+    sec_extern: 'Externe betrokken partij',
+    sec_getuigen: 'Ooggetuigen',
+    sec_politie: 'Politie / Marechaussee',
+    sec_letsel: 'Letsel',
+    sec_handtekening: 'Handtekeningen',
+    lbl_terminal: 'Terminal', lbl_naam: 'Naam',
+    lbl_datum: 'Datum / tijd incident',
+    lbl_oorzaak: 'Oorzaak / omschrijving van het incident',
+    lbl_schade_stena: 'Omschrijving schade: Stena Line eigendommen',
+    lbl_schets: 'Situatie schets',
+    lbl_foto: 'Wil je een foto toevoegen?',
+    lbl_extern_q: 'Is er een externe partij betrokken bij het incident?',
+    lbl_klant: 'Klant / bedrijfsnaam',
+    lbl_boeking: 'Stena Line boeking referentie',
+    lbl_unit: 'Unit nummer', lbl_chauffeur: 'Chauffeur',
+    lbl_kenteken: 'Kenteken truck',
+    lbl_groenekaart: 'Kopie groene kaart',
+    lbl_rijbewijs: 'Kopie rijbewijs',
+    lbl_schade_klant: 'Omschrijving schade: klant eigendom',
+    lbl_foto_klant: 'Wil je een foto toevoegen (klant eigendom)?',
+    lbl_getuigen_q: 'Zijn er ooggetuigen?',
+    lbl_getuige_naam: 'Naam getuige',
+    lbl_getuige_bedrijf: 'Bedrijfsnaam',
+    lbl_telefoon: 'Telefoonnummer',
+    lbl_politie_q: 'Is de Politie / Marechaussee aanwezig geweest?',
+    lbl_politierapport_q: 'Is er een politierapport opgemaakt?',
+    lbl_letsel_q: 'Is er sprake van letsel?',
+    lbl_letsel_naam: '(Letsel) Naam betrokkene',
+    lbl_sig_stena: 'Handtekening Stena Line',
+    lbl_sig_klant: 'Handtekening Klant',
+    opt_ja: ' Ja', opt_nee: ' Nee',
+    upload_foto: &quot;Klik of sleep foto's hier naartoe&quot;,
+    upload_bestand: 'Sleep het bestand hier naartoe of klik om te bladeren',
+    footer: 'Stena Line Europoort Terminal — Elbeweg 91, 3198LC Europoort-Rotterdam',
+    ph_voornaam: 'Voornaam', ph_achternaam: 'Achternaam',
+    ph_getuige_naam: 'Naam ooggetuige',
+    ph_getuige_bedrijf: 'Bedrijfsnaam getuige',
+    ph_volledige_naam: 'Volledige naam',
+    ph_oorzaak: 'Beschrijf de oorzaak en omstandigheden van het incident...',
+    ph_schade_stena: 'Beschrijf de schade aan Stena Line eigendommen...',
+    ph_schade_klant: 'Beschrijf de schade aan klant eigendommen...',
+    ph_klant: 'Naam van klant of bedrijf',
+    ph_chauffeur: 'Naam chauffeur',
+    ph_telefoon: 'bv. +31 6 12345678',
+  },
+  en: {
+    title: 'Damage report Stenaline property',
+    step_rapport: 'Report', step_incident: 'Incident',
+    step_extern: 'External party', step_getuigen: 'Witnesses',
+    info_title: 'Incident form MI002 and MI003',
+    info_isps: ' in accordance with the ISPS plan.',
+    info_body: 'If an incident has occurred in which Stena Line BV property has been damaged, the on-duty Stevedoring Supervisor, on-duty security officer or OTS/OFS employee must complete a Damage Report Stena Line Property (form MI002/MI003).',
+    info_pdf: 'After completing all steps, the form can be ',
+    info_pdf_bold: 'downloaded as a PDF',
+    info_pdf_end: ' using the button on the last page.',
+    btn_next: 'Next →', btn_prev: '← Previous',
+    btn_wissen: 'Clear', btn_pdf: 'Download PDF',
+    sec_rapport: 'Report completed by',
+    sec_extern: 'External party involved',
+    sec_getuigen: 'Eyewitnesses',
+    sec_politie: 'Police / Military Police',
+    sec_letsel: 'Injury',
+    sec_handtekening: 'Signatures',
+    lbl_terminal: 'Terminal', lbl_naam: 'Name',
+    lbl_datum: 'Date / time of incident',
+    lbl_oorzaak: 'Cause / description of the incident',
+    lbl_schade_stena: 'Damage description: Stena Line property',
+    lbl_schets: 'Situation sketch',
+    lbl_foto: 'Do you want to add a photo?',
+    lbl_extern_q: 'Is an external party involved in the incident?',
+    lbl_klant: 'Customer / company name',
+    lbl_boeking: 'Stena Line booking reference',
+    lbl_unit: 'Unit number', lbl_chauffeur: 'Driver',
+    lbl_kenteken: 'Truck licence plate',
+    lbl_groenekaart: 'Copy of green card',
+    lbl_rijbewijs: 'Copy of driving licence',
+    lbl_schade_klant: 'Damage description: customer property',
+    lbl_foto_klant: 'Do you want to add a photo (customer property)?',
+    lbl_getuigen_q: 'Are there any eyewitnesses?',
+    lbl_getuige_naam: 'Witness name',
+    lbl_getuige_bedrijf: 'Company name',
+    lbl_telefoon: 'Phone number',
+    lbl_politie_q: 'Was the Police / Military Police present?',
+    lbl_politierapport_q: 'Was a police report made?',
+    lbl_letsel_q: 'Is there any injury involved?',
+    lbl_letsel_naam: '(Injury) Name of person involved',
+    lbl_sig_stena: 'Signature Stena Line',
+    lbl_sig_klant: 'Signature Customer',
+    opt_ja: ' Yes', opt_nee: ' No',
+    upload_foto: 'Click or drag photos here',
+    upload_bestand: 'Drag the file here or click to browse',
+    footer: 'Stena Line Europoort Terminal — Elbeweg 91, 3198LC Europoort-Rotterdam',
+    ph_voornaam: 'First name', ph_achternaam: 'Last name',
+    ph_getuige_naam: 'Eyewitness name',
+    ph_getuige_bedrijf: 'Witness company name',
+    ph_volledige_naam: 'Full name',
+    ph_oorzaak: 'Describe the cause and circumstances of the incident...',
+    ph_schade_stena: 'Describe the damage to Stena Line property...',
+    ph_schade_klant: 'Describe the damage to customer property...',
+    ph_klant: 'Customer or company name',
+    ph_chauffeur: 'Driver name',
+    ph_telefoon: 'e.g. +44 7700 900000',
+  }
+};
+
+let currentLang = 'nl';
+
+function setLang(lang, btn) {
+  currentLang = lang;
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  applyTranslations(lang);
+}
+
+function applyTranslations(lang) {
+  const t = translations[lang];
+  if (!t) return;
+
+  // data-i18n: set textContent
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (t[key] !== undefined) el.textContent = t[key];
+  });
+
+  // data-i18n-label: labels contain a req/opt span — update only the text node
+  document.querySelectorAll('[data-i18n-label]').forEach(el => {
+    const key = el.getAttribute('data-i18n-label');
+    if (t[key] === undefined) return;
+    // First text node of the label
+    for (const node of el.childNodes) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        node.textContent = t[key] + ' ';
+        break;
+      }
+    }
+  });
+
+  // data-i18n-ph: input/textarea placeholders
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+    const key = el.getAttribute('data-i18n-ph');
+    if (t[key] !== undefined) el.placeholder = t[key];
+  });
+
+  // Page title
+  document.title = t.title;
+
+  // html lang attribute
+  document.documentElement.lang = lang;
+
+  // Terminal select options
+  // (these stay the same in both languages — proper nouns)
+
+  // Update req/opt spans text based on language
+  document.querySelectorAll('.req').forEach(el => el.textContent = '*');
+  document.querySelectorAll('.opt').forEach(el => {
+    el.textContent = lang === 'nl' ? '(optioneel)' : '(optional)';
+  });
+}
+
+// ---- Sketch canvas ----
+let sketchCtx, sketchColor = '#1a1a2e', sketchDrawing = false, sketchLast = {};
+
+function initSketch() {
+  const canvas = document.getElementById('sketchCanvas');
+  canvas.width = canvas.offsetWidth || 680;
+  canvas.height = 220;
+  sketchCtx = canvas.getContext('2d');
+  sketchCtx.fillStyle = '#fff';
+  sketchCtx.fillRect(0, 0, canvas.width, canvas.height);
+  sketchCtx.strokeStyle = sketchColor;
+  sketchCtx.lineWidth = 2.5;
+  sketchCtx.lineCap = 'round';
+
+  const getP = (e) => {
+    const r = canvas.getBoundingClientRect();
+    const t = e.touches ? e.touches[0] : e;
+    return { x: (t.clientX - r.left) * (canvas.width / r.width), y: (t.clientY - r.top) * (canvas.height / r.height) };
+  };
+
+  canvas.addEventListener('mousedown', e => { sketchDrawing = true; sketchLast = getP(e); });
+  canvas.addEventListener('mousemove', e => {
+    if (!sketchDrawing) return;
+    const p = getP(e);
+    sketchCtx.strokeStyle = sketchColor;
+    sketchCtx.beginPath(); sketchCtx.moveTo(sketchLast.x, sketchLast.y); sketchCtx.lineTo(p.x, p.y); sketchCtx.stroke();
+    sketchLast = p;
+  });
+  canvas.addEventListener('mouseup', () => sketchDrawing = false);
+  canvas.addEventListener('mouseleave', () => sketchDrawing = false);
+
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); sketchDrawing = true; sketchLast = getP(e); }, { passive: false });
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (!sketchDrawing) return;
+    const p = getP(e);
+    sketchCtx.strokeStyle = sketchColor;
+    sketchCtx.beginPath(); sketchCtx.moveTo(sketchLast.x, sketchLast.y); sketchCtx.lineTo(p.x, p.y); sketchCtx.stroke();
+    sketchLast = p;
+  }, { passive: false });
+  canvas.addEventListener('touchend', () => sketchDrawing = false);
+}
+
+function setColor(btn) {
+  document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  sketchColor = btn.dataset.color;
+}
+
+function clearSketch() {
+  const c = document.getElementById('sketchCanvas');
+  sketchCtx.clearRect(0, 0, c.width, c.height);
+  sketchCtx.fillStyle = '#fff';
+  sketchCtx.fillRect(0, 0, c.width, c.height);
+}
+
+// ---- Signature canvases ----
+const sigStates = {};
+
+function initSig(id) {
+  const canvas = document.getElementById(id);
+  canvas.width = canvas.offsetWidth || 680;
+  const ctx = canvas.getContext('2d');
+  ctx.strokeStyle = '#1a1a2e';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  sigStates[id] = { ctx, drawing: false, last: {} };
+
+  const getP = (e) => {
+    const r = canvas.getBoundingClientRect();
+    const t = e.touches ? e.touches[0] : e;
+    return { x: (t.clientX - r.left) * (canvas.width / r.width), y: (t.clientY - r.top) * (canvas.height / r.height) };
+  };
+
+  canvas.addEventListener('mousedown', e => { sigStates[id].drawing = true; sigStates[id].last = getP(e); });
+  canvas.addEventListener('mousemove', e => {
+    const s = sigStates[id];
+    if (!s.drawing) return;
+    const p = getP(e);
+    s.ctx.beginPath(); s.ctx.moveTo(s.last.x, s.last.y); s.ctx.lineTo(p.x, p.y); s.ctx.stroke();
+    s.last = p;
+  });
+  canvas.addEventListener('mouseup', () => sigStates[id].drawing = false);
+  canvas.addEventListener('mouseleave', () => sigStates[id].drawing = false);
+
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); sigStates[id].drawing = true; sigStates[id].last = getP(e); }, { passive: false });
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    const s = sigStates[id];
+    if (!s.drawing) return;
+    const p = getP(e);
+    s.ctx.beginPath(); s.ctx.moveTo(s.last.x, s.last.y); s.ctx.lineTo(p.x, p.y); s.ctx.stroke();
+    s.last = p;
+  }, { passive: false });
+  canvas.addEventListener('touchend', () => sigStates[id].drawing = false);
+}
+
+function clearCanvas(id) {
+  const c = document.getElementById(id);
+  sigStates[id].ctx.clearRect(0, 0, c.width, c.height);
+}
+
+// ---- Helper: get radio value ----
+function getRadio(name) {
+  const el = document.querySelector(`input[name=&quot;${name}&quot;]:checked`);
+  return el ? el.value : '—';
+}
+
+// ---- PDF Generation ----
+function loadJsPDF(callback) {
+  if (window.jspdf) { callback(); return; }
+  const s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+  s.onload = callback;
+  s.onerror = () => alert('Kon jsPDF bibliotheek niet laden. Controleer je internetverbinding.');
+  document.head.appendChild(s);
+}
+
+function generatePDF() {
+  const btn = document.getElementById('pdfBtn');
+  btn.innerHTML = '⏳ Bezig...';
+  btn.disabled = true;
+
+  loadJsPDF(() => {
+    setTimeout(() => {
+    try {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+      const PW = 210, PH = 297;
+      const ML = 15, MR = 15, MT = 15;
+      const CW = PW - ML - MR;
+      let y = MT;
+
+      // ---- Colors ----
+      const RED   = [192, 57,  43];
+      const DARK  = [26,  26,  46];
+      const LIGHT = [247, 248, 250];
+      const MUTED = [120, 120, 138];
+      const WHITE = [255, 255, 255];
+      const GREEN = [26,  122, 60];
+
+      // ---- Helpers ----
+      function checkPage(needed = 10) {
+        if (y + needed > PH - 15) {
+          doc.addPage();
+          y = MT;
+          drawPageHeader();
+        }
+      }
+
+      function drawPageHeader() {
+        doc.setFillColor(...DARK);
+        doc.rect(0, 0, PW, 12, 'F');
+        doc.setFontSize(7);
+        doc.setTextColor(...WHITE);
+        doc.setFont('helvetica', 'bold');
+        doc.text('STENA LINE — SCHADE RAPPORT MI002/MI003', ML, 8);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Pagina ${doc.internal.getCurrentPageInfo().pageNumber}`, PW - MR, 8, { align: 'right' });
+      }
+
+      function sectionHeader(title) {
+        checkPage(14);
+        doc.setFillColor(...DARK);
+        doc.rect(ML, y, CW, 7, 'F');
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...WHITE);
+        doc.text(title.toUpperCase(), ML + 3, y + 5);
+        y += 10;
+      }
+
+      function field(label, value, halfWidth = false, xOffset = 0) {
+        const fw = halfWidth ? CW / 2 - 2 : CW;
+        const fh = 14;
+        checkPage(fh + 2);
+        const fx = ML + xOffset;
+
+        doc.setFillColor(...LIGHT);
+        doc.roundedRect(fx, y, fw, fh, 1, 1, 'F');
+        doc.setDrawColor(...[221, 225, 233]);
+        doc.roundedRect(fx, y, fw, fh, 1, 1, 'S');
+
+        doc.setFontSize(6.5);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...MUTED);
+        doc.text(label, fx + 3, y + 4.5);
+
+        doc.setFontSize(9);
+        doc.setFont('helvetica', value &amp;&amp; value !== '—' ? 'bold' : 'normal');
+        if (value &amp;&amp; value !== '—') doc.setTextColor(...DARK); else doc.setTextColor(...MUTED);
+        const displayVal = value || '—';
+        const lines = doc.splitTextToSize(displayVal, fw - 6);
+        doc.text(lines[0], fx + 3, y + 10.5);
+        y += fh + 2;
+      }
+
+      function fieldPair(label1, val1, label2, val2) {
+        const fh = 14;
+        checkPage(fh + 2);
+        const fw = CW / 2 - 2;
+
+        // Left
+        doc.setFillColor(...LIGHT);
+        doc.roundedRect(ML, y, fw, fh, 1, 1, 'F');
+        doc.setDrawColor(...[221, 225, 233]);
+        doc.roundedRect(ML, y, fw, fh, 1, 1, 'S');
+        doc.setFontSize(6.5); doc.setFont('helvetica','normal'); doc.setTextColor(...MUTED);
+        doc.text(label1, ML + 3, y + 4.5);
+        doc.setFontSize(9); doc.setFont('helvetica', val1 &amp;&amp; val1!=='—' ? 'bold':'normal');
+        doc.setTextColor(...DARK);
+        doc.text(val1 || '—', ML + 3, y + 10.5);
+
+        // Right
+        const rx = ML + fw + 4;
+        doc.setFillColor(...LIGHT);
+        doc.roundedRect(rx, y, fw, fh, 1, 1, 'F');
+        doc.roundedRect(rx, y, fw, fh, 1, 1, 'S');
+        doc.setFontSize(6.5); doc.setFont('helvetica','normal'); doc.setTextColor(...MUTED);
+        doc.text(label2, rx + 3, y + 4.5);
+        doc.setFontSize(9); doc.setFont('helvetica', val2 &amp;&amp; val2!=='—' ? 'bold':'normal');
+        doc.setTextColor(...DARK);
+        doc.text(val2 || '—', rx + 3, y + 10.5);
+
+        y += fh + 2;
+      }
+
+      function textArea(label, value) {
+        checkPage(22);
+        const lines = doc.splitTextToSize(value || '—', CW - 6);
+        const fh = Math.max(18, lines.length * 5 + 8);
+        checkPage(fh + 2);
+
+        doc.setFillColor(...LIGHT);
+        doc.roundedRect(ML, y, CW, fh, 1, 1, 'F');
+        doc.setDrawColor(...[221, 225, 233]);
+        doc.roundedRect(ML, y, CW, fh, 1, 1, 'S');
+
+        doc.setFontSize(6.5); doc.setFont('helvetica','normal'); doc.setTextColor(...MUTED);
+        doc.text(label, ML + 3, y + 4.5);
+
+        doc.setFontSize(8.5); doc.setFont('helvetica', value ? 'normal' : 'italic');
+        if (value) doc.setTextColor(...DARK); else doc.setTextColor(...MUTED);
+        doc.text(lines, ML + 3, y + 10);
+        y += fh + 2;
+      }
+
+      function yesNoBadge(label, value) {
+        checkPage(12);
+        doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(...DARK);
+        doc.text(label + ':', ML, y + 4);
+        if (value &amp;&amp; value !== '—') {
+          const isJa = value.toLowerCase() === 'ja';
+          doc.setFillColor(...(isJa ? GREEN : RED));
+          doc.roundedRect(ML + 80, y, 18, 6, 1, 1, 'F');
+          doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(...WHITE);
+          doc.text(value.toUpperCase(), ML + 89, y + 4.3, { align: 'center' });
+        }
+        y += 10;
+      }
+
+      function embedCanvas(canvasId, label, maxH = 40) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+        const imgData = canvas.toDataURL('image/png');
+        checkPage(maxH + 10);
+        doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(...MUTED);
+        doc.text(label, ML, y + 4);
+        y += 6;
+        const aspect = canvas.width / canvas.height;
+        const imgW = Math.min(CW, 120);
+        const imgH = imgW / aspect;
+        doc.setDrawColor(...[221,225,233]);
+        doc.rect(ML, y, imgW, imgH);
+        doc.addImage(imgData, 'PNG', ML, y, imgW, imgH);
+        y += imgH + 4;
+      }
+
+      function embedPhoto(dataUrl, label) {
+        if (!dataUrl) return;
+        checkPage(50);
+        doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(...MUTED);
+        doc.text(label, ML, y + 4);
+        y += 6;
+        try {
+          doc.addImage(dataUrl, 'JPEG', ML, y, 80, 50);
+          y += 54;
+        } catch(e) {}
+      }
+
+      function spacer(h = 4) { y += h; }
+
+      // ========== START PDF ==========
+
+      // Title page header
+      doc.setFillColor(...DARK);
+      doc.rect(0, 0, PW, 30, 'F');
+      doc.setFillColor(...RED);
+      doc.rect(0, 30, PW, 2, 'F');
+
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...WHITE);
+      doc.text('Schade Rapport', ML, 13);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Stena Line Eigendommen', ML, 20);
+      doc.setFontSize(8);
+      doc.setTextColor(...[192,57,43]);
+      // draw red badge inline
+      doc.setFillColor(...RED);
+      doc.roundedRect(PW - MR - 26, 7, 26, 8, 1.5, 1.5, 'F');
+      doc.setTextColor(...WHITE);
+      doc.setFontSize(7);
+      doc.setFont('helvetica','bold');
+      doc.text('MI002 / MI003', PW - MR - 13, 12, { align: 'center' });
+
+      // Timestamp
+      doc.setFontSize(7);
+      doc.setFont('helvetica','normal');
+      doc.setTextColor(...WHITE);
+      const now = new Date();
+      doc.text(`Gegenereerd: ${now.toLocaleDateString('nl-NL')} ${now.toLocaleTimeString('nl-NL')}`, ML, 27);
+
+      y = 38;
+
+      // ---- SECTION 1: Rapportage ----
+      sectionHeader('1. Rapportage');
+
+      // ---- SECTION 2: Rapport opgemaakt door ----
+      sectionHeader('2. Rapport opgemaakt door');
+
+      field('Terminal', document.getElementById('terminal').value);
+      fieldPair(
+        'Voornaam', document.getElementById('reporterFirst').value,
+        'Achternaam', document.getElementById('reporterLast').value
+      );
+      fieldPair(
+        'Datum incident', document.getElementById('incidentDate').value,
+        'Tijdstip', document.getElementById('incidentTime').value
+      );
+      spacer(2);
+
+      textArea('Oorzaak / omschrijving van het incident', document.getElementById('cause').value);
+      textArea('Omschrijving schade: Stena Line eigendommen', document.getElementById('damageDesc').value);
+      spacer(2);
+
+      // Situatieschets
+      embedCanvas('sketchCanvas', 'Situatie schets', 45);
+
+      // Foto Stena
+      yesNoBadge('Foto toegevoegd (Stena Line)', getRadio('photoStena'));
+      if (uploadedFiles['photoStenaFileList']) {
+        embedPhoto(uploadedFiles['photoStenaFileList'], 'Foto — Stena Line eigendom');
+      }
+      spacer(4);
+
+      // ---- SECTION 3: Externe partij ----
+      sectionHeader('3. Externe betrokken partij');
+
+      yesNoBadge('Externe partij betrokken', getRadio('extParty'));
+
+      if (getRadio('extParty') === 'ja') {
+        spacer(2);
+        field('Klant / bedrijfsnaam', document.getElementById('clientName').value);
+        fieldPair(
+          'Boeking referentie', document.getElementById('bookingRef').value,
+          'Unit nummer', document.getElementById('unitNr').value
+        );
+        fieldPair(
+          'Chauffeur', document.getElementById('driverName').value,
+          'Kenteken truck', document.getElementById('licensePlate').value
+        );
+        textArea('Omschrijving schade: klant eigendom', document.querySelector('#extPartySection textarea') ? document.querySelector('#extPartySection textarea').value : '');
+        yesNoBadge('Foto toegevoegd (klant eigendom)', getRadio('photoClient'));
+        if (uploadedFiles['photoClientFileList']) {
+          embedPhoto(uploadedFiles['photoClientFileList'], 'Foto — Klant eigendom');
+        }
+      }
+      spacer(4);
+
+      // ---- SECTION 4: Getuigen &amp; Politie ----
+      sectionHeader('4. Getuigen, Politie &amp; Letsel');
+
+      yesNoBadge('Ooggetuigen aanwezig', getRadio('witnesses'));
+      if (getRadio('witnesses') === 'ja') {
+        spacer(2);
+        field('Naam getuige', document.getElementById('witnessName').value);
+        fieldPair(
+          'Bedrijfsnaam', document.getElementById('witnessCo').value,
+          'Telefoonnummer', document.getElementById('witnessPhone').value
+        );
+      }
+      spacer(2);
+
+      yesNoBadge('Politie / Marechaussee aanwezig', getRadio('police'));
+      if (getRadio('police') === 'ja') {
+        yesNoBadge('Politierapport opgemaakt', getRadio('policeRep'));
+      }
+      spacer(2);
+
+      yesNoBadge('Sprake van letsel', getRadio('injury'));
+      if (getRadio('injury') === 'ja') {
+        fieldPair(
+          'Voornaam betrokkene', document.getElementById('injuredFirst').value,
+          'Achternaam betrokkene', document.getElementById('injuredLast').value
+        );
+      }
+      spacer(4);
+
+      // ---- SECTION 5: Handtekeningen ----
+      sectionHeader('5. Handtekeningen');
+
+      field('Naam Stena Line ondertekenaar', document.getElementById('sigStenaName').value);
+      embedCanvas('sigStena', 'Handtekening Stena Line', 35);
+      spacer(4);
+      field('Naam klant ondertekenaar', document.getElementById('sigClientName').value);
+      embedCanvas('sigClient', 'Handtekening Klant', 35);
+      spacer(6);
+
+      // ---- Footer on last page ----
+      checkPage(12);
+      doc.setFillColor(...DARK);
+      doc.rect(0, PH - 12, PW, 12, 'F');
+      doc.setFontSize(6.5);
+      doc.setFont('helvetica','normal');
+      doc.setTextColor(...WHITE);
+      doc.text('Stena Line Europoort Terminal — Elbeweg 91, 3198LC Europoort-Rotterdam', PW / 2, PH - 5.5, { align: 'center' });
+
+      // Page headers on all pages
+      const totalPages = doc.internal.getNumberOfPages();
+      for (let i = 2; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.setFillColor(...DARK);
+        doc.rect(0, 0, PW, 10, 'F');
+        doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(...WHITE);
+        doc.text('STENA LINE — SCHADE RAPPORT MI002/MI003', ML, 7);
+        doc.setFont('helvetica','normal');
+        doc.text(`Pagina ${i} / ${totalPages}`, PW - MR, 7, { align: 'right' });
+        // footer
+        doc.setFillColor(...DARK);
+        doc.rect(0, PH - 10, PW, 10, 'F');
+        doc.setFontSize(6.5);
+        doc.text('Stena Line Europoort Terminal — Elbeweg 91, 3198LC Europoort-Rotterdam', PW / 2, PH - 3.5, { align: 'center' });
+      }
+
+      // Generate filename with date and reporter name
+      const reporter = (document.getElementById('reporterFirst').value + '_' + document.getElementById('reporterLast').value).replace(/\s+/g,'_') || 'onbekend';
+      const dateStr = document.getElementById('incidentDate').value || new Date().toISOString().split('T')[0];
+      const filename = `Schaderapport_${dateStr}_${reporter}.pdf`;
+
+      doc.save(filename);
+
+    } catch(err) {
+      console.error(err);
+      alert('Fout bij PDF genereren: ' + err.message);
+    }
+
+    btn.innerHTML = `<svg width=&quot;16&quot; height=&quot;16&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot;><path d=&quot;M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z&quot;/><polyline points=&quot;14 2 14 8 20 8&quot;/><line x1=&quot;12&quot; y1=&quot;12&quot; x2=&quot;12&quot; y2=&quot;18&quot;/><line x1=&quot;9&quot; y1=&quot;15&quot; x2=&quot;15&quot; y2=&quot;15&quot;/></svg> PDF downloaden`;
+    btn.disabled = false;
+  }, 50);
+  }); // end loadJsPDF
+}
+
+// ---- Init ----
+window.addEventListener('load', () => {
+  initSketch();
+  initSig('sigStena');
+  initSig('sigClient');
+});
+window.addEventListener('resize', () => {
+  initSketch();
+  initSig('sigStena');
+  initSig('sigClient');
+});
+</script>
+</body>
+</html>
+"></iframe>
+    </div>
+    <div id="schade-panel-2" style="display:none;width:100%;height:calc(100vh - 160px);">
+      <iframe style="width:100%;height:100%;border:none;" srcdoc="<!DOCTYPE html>
+<html lang=&quot;nl&quot;>
+<head>
+<meta charset=&quot;UTF-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;>
+<title>Europees Schadeformulier</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&amp;display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --blue: #003399;
+    --blue-light: #e8ecf8;
+    --yellow: #FFD700;
+    --border: #333;
+    --border-light: #999;
+    --bg: #fff;
+    --section-bg: #d6e0f5;
+    --font: 'Inter', Arial, sans-serif;
+    --fs: 8.5pt;
+    --fs-sm: 7.5pt;
+    --fs-xs: 6.5pt;
+  }
+
+  body {
+    font-family: var(--font);
+    font-size: var(--fs);
+    background: #ccc;
+    color: #000;
+  }
+
+  /* ── Print button (screen only) ── */
+  .print-bar {
+    background: var(--blue);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .print-bar h1 { color: white; font-size: 1rem; font-weight: 600; }
+  .print-bar .stars { color: var(--yellow); font-size: 1.1rem; letter-spacing: 2px; }
+  .btn-print {
+    background: var(--yellow);
+    color: var(--blue);
+    border: none;
+    padding: 9px 22px;
+    font-family: var(--font);
+    font-size: 0.88rem;
+    font-weight: 700;
+    border-radius: 5px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    transition: background 0.2s;
+  }
+  .btn-print:hover { background: #e6c200; }
+
+  /* ── Page wrapper ── */
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 16px auto;
+    background: white;
+    padding: 6mm 6mm 6mm 6mm;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    font-size: var(--fs);
+    line-height: 1.3;
+  }
+
+  /* ── Header ── */
+  .form-header {
+    display: flex;
+    align-items: stretch;
+    border: 2px solid var(--border);
+    margin-bottom: 2mm;
+  }
+  .eu-emblem {
+    background: var(--blue);
+    color: var(--yellow);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3mm 4mm;
+    min-width: 22mm;
+    text-align: center;
+  }
+  .eu-emblem .eu-stars { font-size: 10pt; letter-spacing: 3px; line-height: 1.6; }
+  .eu-emblem .eu-label { color: white; font-size: 6pt; font-weight: 700; margin-top: 2mm; letter-spacing: 0.5px; text-transform: uppercase; }
+  .header-title-block {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 2mm 4mm;
+    border-left: 2px solid var(--border);
+    border-right: 2px solid var(--border);
+  }
+  .header-title-block h1 {
+    font-size: 13pt;
+    font-weight: 700;
+    color: var(--blue);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .header-title-block p {
+    font-size: 7pt;
+    color: #555;
+    margin-top: 1mm;
+  }
+  .header-date-block {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 2mm 3mm;
+    min-width: 38mm;
+  }
+  .header-date-block label { font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; color: #555; }
+  .date-fields { display: flex; gap: 1mm; margin-top: 1mm; }
+  .date-fields .dfield { display: flex; flex-direction: column; align-items: center; }
+  .date-fields .dfield span { font-size: 6pt; color: #888; }
+  .date-fields input {
+    width: 9mm;
+    text-align: center;
+    border: 1px solid var(--border);
+    font-size: var(--fs);
+    font-family: var(--font);
+    padding: 1mm;
+    background: #fffde7;
+  }
+  .date-fields .sep { align-self: center; font-weight: 700; padding-top: 3mm; }
+  .header-ref { margin-top: 2mm; }
+  .header-ref input { width: 100%; border: 1px solid var(--border); padding: 1mm 2mm; font-size: var(--fs); font-family: var(--font); background: #fffde7; }
+
+  /* ── Generic input/textarea styles ── */
+  input[type=&quot;text&quot;], input[type=&quot;tel&quot;], input[type=&quot;email&quot;], textarea, select {
+    font-family: var(--font);
+    font-size: var(--fs);
+    border: 1px solid var(--border);
+    padding: 0.8mm 1.5mm;
+    width: 100%;
+    background: #fffde7;
+    resize: none;
+    line-height: 1.3;
+  }
+  input[type=&quot;text&quot;]:focus, input[type=&quot;tel&quot;]:focus, textarea:focus, select:focus {
+    outline: 2px solid var(--blue);
+    background: #fff;
+  }
+  input[type=&quot;checkbox&quot;] { width: 3.5mm; height: 3.5mm; cursor: pointer; accent-color: var(--blue); }
+
+  /* ── Two-column main layout ── */
+  .main-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    border: 2px solid var(--border);
+    margin-bottom: 2mm;
+  }
+  .col-a { border-right: 2px solid var(--border); }
+  .col-b {}
+
+  /* ── Section ── */
+  .section {
+    border-bottom: 1.5px solid var(--border);
+  }
+  .section:last-child { border-bottom: none; }
+  .section-header {
+    background: var(--blue);
+    color: white;
+    font-weight: 700;
+    font-size: var(--fs-sm);
+    padding: 1mm 2mm;
+    display: flex;
+    align-items: center;
+    gap: 2mm;
+  }
+  .section-header .num {
+    background: var(--yellow);
+    color: var(--blue);
+    border-radius: 50%;
+    width: 4.5mm;
+    height: 4.5mm;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 6.5pt;
+    font-weight: 800;
+    flex-shrink: 0;
+  }
+  .section-body { padding: 1.5mm 2mm; }
+
+  /* ── Field row ── */
+  .frow { margin-bottom: 1.5mm; }
+  .frow label { display: block; font-size: var(--fs-xs); font-weight: 600; color: #444; text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 0.5mm; }
+  .frow-inline { display: flex; gap: 1.5mm; margin-bottom: 1.5mm; align-items: flex-end; }
+  .frow-inline .frow { flex: 1; margin-bottom: 0; }
+  .frow-inline .frow.w2 { flex: 2; }
+  .frow-inline .frow.w3 { flex: 3; }
+
+  /* ── Checkbox list ── */
+  .cb-list { display: flex; flex-direction: column; gap: 0.8mm; padding: 1mm 0; }
+  .cb-item { display: flex; align-items: flex-start; gap: 2mm; font-size: var(--fs-sm); }
+  .cb-item input { margin-top: 0.3mm; flex-shrink: 0; }
+  .cb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5mm 2mm; }
+
+  /* ── Circumstances section (full width) ── */
+  .circumstances {
+    border: 2px solid var(--border);
+    border-top: none;
+    margin-bottom: 2mm;
+  }
+  .circ-header {
+    background: var(--blue);
+    color: white;
+    font-weight: 700;
+    font-size: var(--fs-sm);
+    padding: 1mm 2mm;
+    display: flex;
+    align-items: center;
+    gap: 2mm;
+  }
+  .circ-body { padding: 1.5mm 2mm; }
+  .circ-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 4mm; }
+  .circ-col-header {
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    color: var(--blue);
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border-light);
+    padding-bottom: 0.5mm;
+    margin-bottom: 1mm;
+    display: flex;
+    align-items: center;
+    gap: 2mm;
+  }
+  .circ-col-header .voertuig-letter {
+    background: var(--blue);
+    color: white;
+    width: 5mm; height: 5mm;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 7pt; font-weight: 800;
+  }
+  .circ-items { display: grid; grid-template-columns: 1fr 1fr; gap: 0 3mm; }
+  .circ-item {
+    display: grid;
+    grid-template-columns: 5mm auto 5mm;
+    align-items: center;
+    gap: 1mm;
+    border-bottom: 0.5px solid #ddd;
+    padding: 0.7mm 0;
+    font-size: var(--fs-sm);
+  }
+  .circ-item .nr { font-size: 6pt; color: #888; text-align: right; }
+  .circ-item .txt { }
+  .circ-item input[type=&quot;checkbox&quot;] { justify-self: center; }
+
+  /* ── Sketch area ── */
+  .sketch-section {
+    border: 2px solid var(--border);
+    border-top: none;
+    margin-bottom: 2mm;
+    page-break-inside: avoid;
+  }
+  .sketch-header {
+    background: var(--blue);
+    color: white;
+    font-weight: 700;
+    font-size: var(--fs-sm);
+    padding: 1mm 2mm;
+    display: flex; align-items: center; gap: 2mm;
+  }
+  .sketch-body {
+    padding: 2mm;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3mm;
+  }
+  .sketch-canvas-wrap {
+    border: 1.5px solid var(--border);
+    background: white;
+    position: relative;
+  }
+  .sketch-canvas-wrap canvas {
+    display: block;
+    width: 100%;
+    cursor: crosshair;
+    touch-action: none;
+  }
+  .sketch-tools {
+    display: flex;
+    gap: 2mm;
+    padding: 1mm;
+    background: #f5f5f5;
+    border-top: 1px solid #ddd;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .sketch-tools button {
+    font-size: 6pt;
+    padding: 1mm 2mm;
+    border: 1px solid #999;
+    background: white;
+    cursor: pointer;
+    font-family: var(--font);
+    border-radius: 2px;
+  }
+  .sketch-tools button:hover { background: #e0e0e0; }
+  .sketch-legend { font-size: var(--fs-xs); color: #555; }
+  .sketch-legend p { margin-bottom: 1mm; }
+  .sketch-legend ul { padding-left: 3mm; }
+  .sketch-legend ul li { margin-bottom: 0.5mm; }
+
+  /* ── Remarks / signature row ── */
+  .bottom-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2mm;
+    border: 2px solid var(--border);
+    border-top: none;
+    margin-bottom: 2mm;
+  }
+  .bottom-cell { padding: 1.5mm 2mm; border-right: 1.5px solid var(--border); }
+  .bottom-cell:last-child { border-right: none; }
+  .sig-canvas-wrap { border: 1px solid var(--border); background: white; margin-top: 1mm; }
+  .sig-canvas-wrap canvas { display: block; width: 100%; cursor: crosshair; touch-action: none; }
+
+  /* ── Notice bar ── */
+  .notice {
+    background: var(--blue-light);
+    border: 1.5px solid var(--blue);
+    border-top: none;
+    font-size: var(--fs-xs);
+    padding: 1.5mm 2mm;
+    color: var(--blue);
+    line-height: 1.5;
+    text-align: center;
+  }
+
+  /* ── PRINT STYLES ── */
+  @media print {
+    .print-bar { display: none !important; }
+    body { background: white; }
+    .page {
+      width: 100%;
+      margin: 0;
+      padding: 6mm;
+      box-shadow: none;
+      font-size: 7.5pt;
+    }
+    input, textarea, select {
+      background: white !important;
+      border: 1px solid #666 !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .sketch-tools, .sketch-legend { display: none; }
+    .section-header, .circ-header, .sketch-header, .eu-emblem,
+    .header-title-block h1, .print-bar { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    canvas { display: block !important; }
+    @page { margin: 8mm; size: A4; }
+  }
+
+  @media screen and (max-width: 220mm) {
+    .page { width: 100%; }
+    .main-cols, .circ-items, .bottom-row { grid-template-columns: 1fr; }
+    .col-a { border-right: none; border-bottom: 2px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+
+<!-- Print bar -->
+<div class=&quot;print-bar&quot;>
+  <div>
+    <div class=&quot;stars&quot;>★ ★ ★ ★ ★ ★</div>
+    <h1>Europees Schadeformulier</h1>
+  </div>
+  <button class=&quot;btn-print&quot; onclick=&quot;window.print()&quot;>
+    🖨️ Afdrukken / Opslaan als PDF
+  </button>
+</div>
+
+<div class=&quot;page&quot;>
+
+  <!-- ═══ HEADER ═══ -->
+  <div class=&quot;form-header&quot;>
+    <div class=&quot;eu-emblem&quot;>
+      <div class=&quot;eu-stars&quot;>★★★<br>★★★★★<br>★★★</div>
+      <div class=&quot;eu-label&quot;>Europees<br>formulier</div>
+    </div>
+    <div class=&quot;header-title-block&quot;>
+      <h1>Europees Schadeformulier</h1>
+      <p>Verklaring van Verkeersongeval — te gebruiken als bewijs van het voorval. Geen erkenning van aansprakelijkheid.</p>
+    </div>
+    <div class=&quot;header-date-block&quot;>
+      <label>Datum van het ongeval</label>
+      <div class=&quot;date-fields&quot;>
+        <div class=&quot;dfield&quot;><span>dag</span><input type=&quot;text&quot; maxlength=&quot;2&quot; placeholder=&quot;dd&quot; style=&quot;width:8mm&quot;></div>
+        <div class=&quot;sep&quot;>/</div>
+        <div class=&quot;dfield&quot;><span>mnd</span><input type=&quot;text&quot; maxlength=&quot;2&quot; placeholder=&quot;mm&quot; style=&quot;width:8mm&quot;></div>
+        <div class=&quot;sep&quot;>/</div>
+        <div class=&quot;dfield&quot;><span>jaar</span><input type=&quot;text&quot; maxlength=&quot;4&quot; placeholder=&quot;jjjj&quot; style=&quot;width:12mm&quot;></div>
+      </div>
+      <div class=&quot;header-ref&quot; style=&quot;margin-top:2mm;&quot;>
+        <label style=&quot;font-size:6pt;font-weight:600;color:#555;text-transform:uppercase;&quot;>Tijdstip</label>
+        <div style=&quot;display:flex;gap:1mm;align-items:center;&quot;>
+          <input type=&quot;text&quot; maxlength=&quot;2&quot; placeholder=&quot;uu&quot; style=&quot;width:10mm;text-align:center&quot;>
+          <span style=&quot;font-weight:700&quot;>:</span>
+          <input type=&quot;text&quot; maxlength=&quot;2&quot; placeholder=&quot;mm&quot; style=&quot;width:10mm;text-align:center&quot;>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ LOCATION ═══ -->
+  <div style=&quot;border:2px solid var(--border);border-top:none;padding:1.5mm 2mm;margin-bottom:0;display:grid;grid-template-columns:2fr 1fr 1fr;gap:2mm;&quot;>
+    <div class=&quot;frow&quot; style=&quot;margin:0&quot;>
+      <label>Plaats van het ongeval (gemeente, straat, nr.)</label>
+      <input type=&quot;text&quot; placeholder=&quot;&quot;>
+    </div>
+    <div class=&quot;frow&quot; style=&quot;margin:0&quot;>
+      <label>Land</label>
+      <input type=&quot;text&quot; placeholder=&quot;&quot;>
+    </div>
+    <div class=&quot;frow&quot; style=&quot;margin:0&quot;>
+      <label>Gewonden (ook licht letsel)?</label>
+      <div style=&quot;display:flex;gap:3mm;margin-top:1mm;&quot;>
+        <label style=&quot;display:flex;align-items:center;gap:1mm;font-size:var(--fs-sm);text-transform:none;font-weight:400;&quot;><input type=&quot;radio&quot; name=&quot;gewonden&quot; value=&quot;ja&quot;> Ja</label>
+        <label style=&quot;display:flex;align-items:center;gap:1mm;font-size:var(--fs-sm);text-transform:none;font-weight:400;&quot;><input type=&quot;radio&quot; name=&quot;gewonden&quot; value=&quot;nee&quot;> Nee</label>
+      </div>
+    </div>
+  </div>
+
+  <div style=&quot;border:2px solid var(--border);border-top:none;padding:1.5mm 2mm;margin-bottom:0;display:grid;grid-template-columns:2fr 1fr 1.5fr;gap:2mm;&quot;>
+    <div class=&quot;frow&quot; style=&quot;margin:0&quot;>
+      <label>Materiële schade aan andere voertuigen dan A en B?</label>
+      <div style=&quot;display:flex;gap:3mm;margin-top:1mm;&quot;>
+        <label style=&quot;display:flex;align-items:center;gap:1mm;font-size:var(--fs-sm);text-transform:none;font-weight:400;&quot;><input type=&quot;radio&quot; name=&quot;matschade&quot; value=&quot;ja&quot;> Ja</label>
+        <label style=&quot;display:flex;align-items:center;gap:1mm;font-size:var(--fs-sm);text-transform:none;font-weight:400;&quot;><input type=&quot;radio&quot; name=&quot;matschade&quot; value=&quot;nee&quot;> Nee</label>
+      </div>
+    </div>
+    <div class=&quot;frow&quot; style=&quot;margin:0&quot;>
+      <label>Getuigen (naam, adres, tel.)</label>
+      <input type=&quot;text&quot; placeholder=&quot;&quot;>
+    </div>
+    <div class=&quot;frow&quot; style=&quot;margin:0&quot;>
+      <label>&amp;nbsp;</label>
+      <input type=&quot;text&quot; placeholder=&quot;&quot;>
+    </div>
+  </div>
+
+  <!-- ═══ MAIN TWO-COLUMN ═══ -->
+  <div class=&quot;main-cols&quot; style=&quot;border-top:2px solid var(--border);margin-top:2mm;&quot;>
+
+    <!-- ── COLUMN A ── -->
+    <div class=&quot;col-a&quot;>
+
+      <!-- Header A -->
+      <div style=&quot;background:var(--blue);color:white;font-weight:800;font-size:10pt;padding:1.5mm 2mm;text-align:center;letter-spacing:1px;&quot;>
+        VOERTUIG A
+      </div>
+
+      <!-- 1. Verzekerde -->
+      <div class=&quot;section&quot;>
+        <div class=&quot;section-header&quot;><span class=&quot;num&quot;>1</span> Verzekerde (naam en voornaam of bedrijfsnaam)</div>
+        <div class=&quot;section-body&quot;>
+          <div class=&quot;frow&quot;><label>Naam</label><input type=&quot;text&quot;></div>
+          <div class=&quot;frow-inline&quot;>
+            <div class=&quot;frow w2&quot;><label>Adres</label><input type=&quot;text&quot;></div>
+            <div class=&quot;frow&quot;><label>Postcode</label><input type=&quot;text&quot; style=&quot;width:18mm&quot;></div>
+          </div>
+          <div class=&quot;frow-inline&quot;>
+            <div class=&quot;frow w2&quot;><label>Woonplaats</label><input type=&quot;text&quot;></div>
+            <div class=&quot;frow&quot;><label>Land</label><input type=&quot;text&quot; style=&quot;width:14mm&quot;></div>
+          </div>
+          <div class=&quot;frow-inline&quot;>
+            <div class=&quot;frow&quot;><label>Telefoon</label><input type=&quot;tel&quot;></div>
+            <div class=&quot;frow&quot;><label>E-mail</label><input type=&quot;email&quot;></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Voertuig -->
+      <div class=&quot;section&quot;>
+        <div class=&quot;section-header&quot;><span class=&quot;num&quot;>2</span> Voertuig</div>
+        <div class=&quot;section-body&quot;>
+          <div class=&quot;frow-inline&quot;>
+            <div class=&quot;frow w2&quot;><label>Merk / Type</label><input type=&quot;text&quot;></div>
+            <div class=&quot;frow&quot;><label>Kenteken</label><input type=&quot;text&quot;></div>
+          </div>
+          <div class=&quot;frow-inline&quot;>
+            <div class=&quot;frow&quot;><label>Land van kenteken</label><input type=&quot;text&quot; style=&quot;width:14mm&quot;></div>
+            <div class=&quot;frow w2&quot;><label>Land eerste inschrijving</label><input type=&quot;text&quot;></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Verzekering -->
+      <div class=&quot;section&quot;>
+        <div class=&quot;section-header&quot;><span class=&quot;num&quot;>3</span> Verzekeringmaatschappij</div>
+        <div class=&quot;section-body&quot;>
+          <div class=&quot;frow&quot;><label>Naam maatschappij</label><input type=&quot;text&quot;></div>
+          <div class=&quot;frow-inline&quot;>
+            <div class=&quot;frow w2&quot;><label>Polisnummer</label><input type=&quot;text&quot;></div>
+            <div class=&quot;frow&quot;><label>Groene kaart nr.</label><input type=&quot;text&quot;></div>
+          </div>
+          <div class=&quot;frow-inline&quot;>
+            <div class=&quot;frow&quot;><label>Geldig van</label><input type=&quot;text&quot; placeholder=&quot;dd/mm/jjjj&quot;></div>
+            <div class=&quot;frow&quot;><label>Geldig tot</label><input type=&quot;text&quot; placeholder=&quot;dd/mm/jjjj&quot;></div>
+          </div>
+          <div class=&quot;frow&quot;><label>Agentschap / Makelaar (naam, adres, telefoon)</label><input type=&quot;text&quot;></div>
+          <div class=&quot;frow&quot; style=&quot;margin-top:1mm;&quot;>
+            <label style=&quot;font-size:var(--fs-xs);font-weight:600;color:#444;text-transform:uppercase;&quot;>Dekt de schade?</label>
+            <div style=&quot;display:flex;gap:3mm;margin-top:0.5mm;&quot;>
+              <label style=&quot;display:flex;align-items:center;gap:1mm;font-size:var(--fs-sm);&quot;><input type=&quot;radio&quot; name=&quot;dektA&quot; value=&quot;ja&quot;> Ja</label>
+              <label style=&quot;display:flex;align-items:center;gap:1mm;font-size:var(--fs-sm);&quot;><input type=&quot;radio&quot; name=&quot;dektA&quot; value=&quot;nee&quot;> Nee</label>
+              <label style=&quot;display:flex;align-items:center;gap:1mm;font-size:var(--fs-sm);&quot;><input type=&quot;radio&quot; name=&quot;dektA&quot; value=&quot;onbekend&quot;> Onbekend</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Bestuurder -->
+      <div class=&quot;section&quot;>
+        <div class=&quot;section-header&quot;><span class=&quot;num&quot;>4</span> Bestuurder (naam en voornaam)</div>
+        <div class=&quot;section-body&quot;>
+          <div class=&quot;frow&quot;><label>Naam</label><input type=&quot;text&quot;></div>
+          <div class=&quot;frow-inline&quot;>
+            <div class=&quot;frow w2&quot;><label>Adres</label><input type=&quot;text&quot;></div>
+            <div class=&quot;frow&quot;><label>Postcode</label><input type=&quot;text&quot; style=&quot;width:18mm&quot;></div>
+          </div>
+          <div class=&quot;frow-inline&quot;>
+            <div class=&quot;frow w2&quot;><label>Woonplaats</label><input type=&quot;text&quot;></div>
+            <div class=&quot;frow&quot;><label>Land</label><input type=&quot;text&quot; style=&quot;width:14mm&quot;></div>
+          </div>
+          <div class=&quot;frow-inline&quot;>
+            <div class=&quot;frow&quot;><label>Telefoon</label><input type=&quot;tel&quot;></div>
+            <div class=&quot;frow&quot;><label>Geboortedatum</label><input type=&quot;text&quot; placeholder=&quot;dd/mm/jjjj&quot;></div>
+          </div>
+          <div class=&quot;frow-inline&quot;>
+            <div class=&quot;frow w2&quot;><label>Rijbewijsnummer</label><input type=&quot;text&quot;></div>
+            <div class=&quot;frow&quot;><label>Categorie</label><input type=&quot;text&quot; style=&quot;width:14mm&quot;></div>
+          </div>
+          <div class=&quot;frow-inline&quot;>
+            <div class=&quot;frow&quot;><label>Geldig tot</label><input type=&quot;text&quot; placeholder=&quot;dd/mm/jjjj&quot;></div>
+            <div class=&quot;frow&quot;><label>Afgegeven door (land)</label><input type=&quot;text&quot;></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Schade voertuig A -->
+      <div class=&quot;section&quot;>
+        <div class=&quot;section-header&quot;><span class=&quot;num&quot;>5</span> Zichtbare schade aan voertuig A</div>
+        <div class=&quot;section-body&quot;>
+          <textarea rows=&quot;3&quot; placeholder=&quot;Beschrijf de zichtbare schade...&quot;></textarea>
+        </div>
+      </div>
+
+      <!-- 6. Opmerkingen A -->
+      <div class=&quot;section&quot; style=&quot;border-bottom:none;&quot;>
+        <div class=&quot;section-header&quot;><span class=&quot;num&quot;>6</span> Opmerkingen</div>
+        <div class=&quot;section-body&quot;>
+          <textarea rows=&quot;3&quot; placeholder=&quot;Eventuele opmerkingen bestuurder A...&quot;></textarea>
+        </div>
+      </div>
+
+    </div><!-- /col-a -->
+
+    <!-- ── COLUMN B ── -->
+    <div class=&quot;col-b&quot;>
+
+      <!-- Header B -->
+      <div style=&quot;background:#555;color:white;font-weight:800;font-size:10pt;padding:1.5mm 2mm;text-align:center;letter-spacing:1px;&quot;>
+        VOERTUIG B
+      </div>
+
+      <!-- 1. Verzekerde B -->
+      <div class=&quot;section&quot;>
+        <div class=&quot;section-header&quot; style=&quot;background:#555;&quot;><span class=&quot;num&quot; style=&quot;background:white;color:#555;&quot;>1</span> Verzekerde (naam en voornaam of bedrijfsnaam)</div>
+        <div class=&quot;section-body&quot;>
+          <div class=&quot;frow&quot;><label>Naam</label><input type=&quot;text&quot;></div>
+          <div class=&quot;frow-inline&quot;>
+            <div class=&quot;frow w2&quot;><label>Adres</label><input type=&quot;text&quot;></div>
+            <div class=&quot;frow&quot;><label>Postcode</label><input type=&quot;text&quot; style=&quot;width:18mm&quot;></div>
+          </div>
+          <div class=&quot;frow-inline&quot;>
+            <div class=&quot;frow w2&quot;><label>Woonplaats</label><input type=&quot;text&quot;></div>
+            <div class=&quot;frow&quot;><label>Land</label><input type=&quot;text&quot; style=&quot;width:14mm&quot;></div>
+          </div>
+          <div class=&quot;frow-inline&quot;>
+            <div class=&quot;frow&quot;><label>Telefoon</label><input type=&quot;tel&quot;></div>
+            <div class=&quot;frow&quot;><label>E-mail</label><input type=&quot;email&quot;></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Voertuig B -->
+      <div class=&quot;section&quot;>
+        <div class=&quot;section-header&quot; style=&quot;background:#555;&quot;><span class=&quot;num&quot; style=&quot;background:white;color:#555;&quot;>2</span> Voertuig</div>
+        <div class=&quot;section-body&quot;>
+          <div class=&quot;frow-inline&quot;>
+            <div class=&quot;frow w2&quot;><label>Merk / Type</label><input type=&quot;text&quot;></div>
+            <div class=&quot;frow&quot;><label>Kenteken</label><input type=&quot;text&quot;></div>
+          </div>
+          <div class=&quot;frow-inline&quot;>
+            <div class=&quot;frow&quot;><label>Land van kenteken</label><input type=&quot;text&quot; style=&quot;width:14mm&quot;></div>
+            <div class=&quot;frow w2&quot;><label>Land eerste inschrijving</label><input type=&quot;text&quot;></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Verzekering B -->
+      <div class=&quot;section&quot;>
+        <div class=&quot;section-header&quot; style=&quot;background:#555;&quot;><span class=&quot;num&quot; style=&quot;background:white;color:#555;&quot;>3</span> Verzekeringmaatschappij</div>
+        <div class=&quot;section-body&quot;>
+          <div class=&quot;frow&quot;><label>Naam maatschappij</label><input type=&quot;text&quot;></div>
+          <div class=&quot;frow-inline&quot;>
+            <div class=&quot;frow w2&quot;><label>Polisnummer</label><input type=&quot;text&quot;></div>
+            <div class=&quot;frow&quot;><label>Groene kaart nr.</label><input type=&quot;text&quot;></div>
+          </div>
+          <div class=&quot;frow-inline&quot;>
+            <div class=&quot;frow&quot;><label>Geldig van</label><input type=&quot;text&quot; placeholder=&quot;dd/mm/jjjj&quot;></div>
+            <div class=&quot;frow&quot;><label>Geldig tot</label><input type=&quot;text&quot; placeholder=&quot;dd/mm/jjjj&quot;></div>
+          </div>
+          <div class=&quot;frow&quot;><label>Agentschap / Makelaar (naam, adres, telefoon)</label><input type=&quot;text&quot;></div>
+          <div class=&quot;frow&quot; style=&quot;margin-top:1mm;&quot;>
+            <label style=&quot;font-size:var(--fs-xs);font-weight:600;color:#444;text-transform:uppercase;&quot;>Dekt de schade?</label>
+            <div style=&quot;display:flex;gap:3mm;margin-top:0.5mm;&quot;>
+              <label style=&quot;display:flex;align-items:center;gap:1mm;font-size:var(--fs-sm);&quot;><input type=&quot;radio&quot; name=&quot;dektB&quot; value=&quot;ja&quot;> Ja</label>
+              <label style=&quot;display:flex;align-items:center;gap:1mm;font-size:var(--fs-sm);&quot;><input type=&quot;radio&quot; name=&quot;dektB&quot; value=&quot;nee&quot;> Nee</label>
+              <label style=&quot;display:flex;align-items:center;gap:1mm;font-size:var(--fs-sm);&quot;><input type=&quot;radio&quot; name=&quot;dektB&quot; value=&quot;onbekend&quot;> Onbekend</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Bestuurder B -->
+      <div class=&quot;section&quot;>
+        <div class=&quot;section-header&quot; style=&quot;background:#555;&quot;><span class=&quot;num&quot; style=&quot;background:white;color:#555;&quot;>4</span> Bestuurder (naam en voornaam)</div>
+        <div class=&quot;section-body&quot;>
+          <div class=&quot;frow&quot;><label>Naam</label><input type=&quot;text&quot;></div>
+          <div class=&quot;frow-inline&quot;>
+            <div class=&quot;frow w2&quot;><label>Adres</label><input type=&quot;text&quot;></div>
+            <div class=&quot;frow&quot;><label>Postcode</label><input type=&quot;text&quot; style=&quot;width:18mm&quot;></div>
+          </div>
+          <div class=&quot;frow-inline&quot;>
+            <div class=&quot;frow w2&quot;><label>Woonplaats</label><input type=&quot;text&quot;></div>
+            <div class=&quot;frow&quot;><label>Land</label><input type=&quot;text&quot; style=&quot;width:14mm&quot;></div>
+          </div>
+          <div class=&quot;frow-inline&quot;>
+            <div class=&quot;frow&quot;><label>Telefoon</label><input type=&quot;tel&quot;></div>
+            <div class=&quot;frow&quot;><label>Geboortedatum</label><input type=&quot;text&quot; placeholder=&quot;dd/mm/jjjj&quot;></div>
+          </div>
+          <div class=&quot;frow-inline&quot;>
+            <div class=&quot;frow w2&quot;><label>Rijbewijsnummer</label><input type=&quot;text&quot;></div>
+            <div class=&quot;frow&quot;><label>Categorie</label><input type=&quot;text&quot; style=&quot;width:14mm&quot;></div>
+          </div>
+          <div class=&quot;frow-inline&quot;>
+            <div class=&quot;frow&quot;><label>Geldig tot</label><input type=&quot;text&quot; placeholder=&quot;dd/mm/jjjj&quot;></div>
+            <div class=&quot;frow&quot;><label>Afgegeven door (land)</label><input type=&quot;text&quot;></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Schade voertuig B -->
+      <div class=&quot;section&quot;>
+        <div class=&quot;section-header&quot; style=&quot;background:#555;&quot;><span class=&quot;num&quot; style=&quot;background:white;color:#555;&quot;>5</span> Zichtbare schade aan voertuig B</div>
+        <div class=&quot;section-body&quot;>
+          <textarea rows=&quot;3&quot; placeholder=&quot;Beschrijf de zichtbare schade...&quot;></textarea>
+        </div>
+      </div>
+
+      <!-- 6. Opmerkingen B -->
+      <div class=&quot;section&quot; style=&quot;border-bottom:none;&quot;>
+        <div class=&quot;section-header&quot; style=&quot;background:#555;&quot;><span class=&quot;num&quot; style=&quot;background:white;color:#555;&quot;>6</span> Opmerkingen</div>
+        <div class=&quot;section-body&quot;>
+          <textarea rows=&quot;3&quot; placeholder=&quot;Eventuele opmerkingen bestuurder B...&quot;></textarea>
+        </div>
+      </div>
+
+    </div><!-- /col-b -->
+  </div><!-- /main-cols -->
+
+  <!-- ═══ OMSTANDIGHEDEN ═══ -->
+  <div class=&quot;circumstances&quot;>
+    <div class=&quot;circ-header&quot;>
+      <span class=&quot;num&quot; style=&quot;background:var(--yellow);color:var(--blue);border-radius:50%;width:4.5mm;height:4.5mm;display:flex;align-items:center;justify-content:center;font-size:6.5pt;font-weight:800;&quot;>7</span>
+      Omstandigheden van het ongeval — kruis de toepasselijke vakjes aan (zelfde vakje voor A en B)
+    </div>
+    <div class=&quot;circ-body&quot;>
+      <div class=&quot;circ-cols&quot;>
+        <div>
+          <div class=&quot;circ-col-header&quot;><span class=&quot;voertuig-letter&quot;>A</span> Voertuig A</div>
+        </div>
+        <div>
+          <div class=&quot;circ-col-header&quot;><span class=&quot;voertuig-letter&quot; style=&quot;background:#555;&quot;>B</span> Voertuig B</div>
+        </div>
+      </div>
+      <div class=&quot;circ-items&quot;>
+        <!-- Left column = A checkboxes, Right column = B checkboxes, interleaved -->
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circA1&quot;><span class=&quot;txt&quot;>Stond geparkeerd / stilstaand</span><span class=&quot;nr&quot;>1</span></div>
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circB1&quot;><span class=&quot;txt&quot;>Stond geparkeerd / stilstaand</span><span class=&quot;nr&quot;>1</span></div>
+
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circA2&quot;><span class=&quot;txt&quot;>Vertrok vanuit parkeerplaats / stapte in</span><span class=&quot;nr&quot;>2</span></div>
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circB2&quot;><span class=&quot;txt&quot;>Vertrok vanuit parkeerplaats / stapte in</span><span class=&quot;nr&quot;>2</span></div>
+
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circA3&quot;><span class=&quot;txt&quot;>Verliet parkeerplaats / reed weg</span><span class=&quot;nr&quot;>3</span></div>
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circB3&quot;><span class=&quot;txt&quot;>Verliet parkeerplaats / reed weg</span><span class=&quot;nr&quot;>3</span></div>
+
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circA4&quot;><span class=&quot;txt&quot;>Verliet een parkeerterrein / privéweg</span><span class=&quot;nr&quot;>4</span></div>
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circB4&quot;><span class=&quot;txt&quot;>Verliet een parkeerterrein / privéweg</span><span class=&quot;nr&quot;>4</span></div>
+
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circA5&quot;><span class=&quot;txt&quot;>Reed een parkeerterrein / privéweg op</span><span class=&quot;nr&quot;>5</span></div>
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circB5&quot;><span class=&quot;txt&quot;>Reed een parkeerterrein / privéweg op</span><span class=&quot;nr&quot;>5</span></div>
+
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circA6&quot;><span class=&quot;txt&quot;>Reed een rotonde op</span><span class=&quot;nr&quot;>6</span></div>
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circB6&quot;><span class=&quot;txt&quot;>Reed een rotonde op</span><span class=&quot;nr&quot;>6</span></div>
+
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circA7&quot;><span class=&quot;txt&quot;>Reed in de rondte (rotonde)</span><span class=&quot;nr&quot;>7</span></div>
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circB7&quot;><span class=&quot;txt&quot;>Reed in de rondte (rotonde)</span><span class=&quot;nr&quot;>7</span></div>
+
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circA8&quot;><span class=&quot;txt&quot;>Reed achteruit</span><span class=&quot;nr&quot;>8</span></div>
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circB8&quot;><span class=&quot;txt&quot;>Reed achteruit</span><span class=&quot;nr&quot;>8</span></div>
+
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circA9&quot;><span class=&quot;txt&quot;>Reed op de verkeerde weghelft</span><span class=&quot;nr&quot;>9</span></div>
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circB9&quot;><span class=&quot;txt&quot;>Reed op de verkeerde weghelft</span><span class=&quot;nr&quot;>9</span></div>
+
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circA10&quot;><span class=&quot;txt&quot;>Wisselde van rijstrook</span><span class=&quot;nr&quot;>10</span></div>
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circB10&quot;><span class=&quot;txt&quot;>Wisselde van rijstrook</span><span class=&quot;nr&quot;>10</span></div>
+
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circA11&quot;><span class=&quot;txt&quot;>Sloeg rechtsaf</span><span class=&quot;nr&quot;>11</span></div>
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circB11&quot;><span class=&quot;txt&quot;>Sloeg rechtsaf</span><span class=&quot;nr&quot;>11</span></div>
+
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circA12&quot;><span class=&quot;txt&quot;>Sloeg linksaf</span><span class=&quot;nr&quot;>12</span></div>
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circB12&quot;><span class=&quot;txt&quot;>Sloeg linksaf</span><span class=&quot;nr&quot;>12</span></div>
+
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circA13&quot;><span class=&quot;txt&quot;>Reed achteruit of nam een keer</span><span class=&quot;nr&quot;>13</span></div>
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circB13&quot;><span class=&quot;txt&quot;>Reed achteruit of nam een keer</span><span class=&quot;nr&quot;>13</span></div>
+
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circA14&quot;><span class=&quot;txt&quot;>Haalde in / passeerde</span><span class=&quot;nr&quot;>14</span></div>
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circB14&quot;><span class=&quot;txt&quot;>Haalde in / passeerde</span><span class=&quot;nr&quot;>14</span></div>
+
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circA15&quot;><span class=&quot;txt&quot;>Naderde een gelijkwaardige kruising van rechts</span><span class=&quot;nr&quot;>15</span></div>
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circB15&quot;><span class=&quot;txt&quot;>Naderde een gelijkwaardige kruising van rechts</span><span class=&quot;nr&quot;>15</span></div>
+
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circA16&quot;><span class=&quot;txt&quot;>Had geen voorrang (bord of licht)</span><span class=&quot;nr&quot;>16</span></div>
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circB16&quot;><span class=&quot;txt&quot;>Had geen voorrang (bord of licht)</span><span class=&quot;nr&quot;>16</span></div>
+
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circA17&quot;><span class=&quot;txt&quot;>Had rood licht genegeerd</span><span class=&quot;nr&quot;>17</span></div>
+        <div class=&quot;circ-item&quot;><input type=&quot;checkbox&quot; name=&quot;circB17&quot;><span class=&quot;txt&quot;>Had rood licht genegeerd</span><span class=&quot;nr&quot;>17</span></div>
+      </div>
+
+      <!-- Totaal aangevinkt -->
+      <div style=&quot;display:grid;grid-template-columns:1fr 1fr;gap:3mm;margin-top:2mm;border-top:1px solid var(--border-light);padding-top:1.5mm;&quot;>
+        <div style=&quot;display:flex;align-items:center;gap:2mm;font-size:var(--fs-sm);&quot;>
+          <span style=&quot;font-weight:600;&quot;>Totaal aangevinkt voertuig A:</span>
+          <input type=&quot;text&quot; style=&quot;width:12mm;text-align:center;&quot; readonly id=&quot;totalA&quot;>
+        </div>
+        <div style=&quot;display:flex;align-items:center;gap:2mm;font-size:var(--fs-sm);&quot;>
+          <span style=&quot;font-weight:600;&quot;>Totaal aangevinkt voertuig B:</span>
+          <input type=&quot;text&quot; style=&quot;width:12mm;text-align:center;&quot; readonly id=&quot;totalB&quot;>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SITUATIESCHETS ═══ -->
+  <div class=&quot;sketch-section&quot;>
+    <div class=&quot;sketch-header&quot;>
+      <span style=&quot;background:var(--yellow);color:var(--blue);border-radius:50%;width:4.5mm;height:4.5mm;display:flex;align-items:center;justify-content:center;font-size:6.5pt;font-weight:800;flex-shrink:0;&quot;>8</span>
+      Situatieschets bij het ongeval — geef de rijrichting aan, de positie van de voertuigen bij het ongeval en de straatnamen
+    </div>
+    <div class=&quot;sketch-body&quot;>
+      <div>
+        <div class=&quot;sketch-canvas-wrap&quot;>
+          <canvas id=&quot;sketchCanvas&quot; height=&quot;160&quot;></canvas>
+          <div class=&quot;sketch-tools&quot;>
+            <button onclick=&quot;setSketchColor('#003399')&quot; style=&quot;background:#003399;color:white;width:18px;height:18px;padding:0;&quot;>A</button>
+            <button onclick=&quot;setSketchColor('#555555')&quot; style=&quot;background:#555;color:white;width:18px;height:18px;padding:0;&quot;>B</button>
+            <button onclick=&quot;setSketchColor('#000000')&quot; style=&quot;background:#000;color:white;width:18px;height:18px;padding:0;&quot;>✏</button>
+            <button onclick=&quot;setSketchColor('#c0392b')&quot; style=&quot;background:#c0392b;color:white;width:18px;height:18px;padding:0;&quot;> </button>
+            <button onclick=&quot;setSketchColor('#ffffff');setLineWidth(12)&quot;>✱ wis</button>
+            <button onclick=&quot;clearSketch()&quot;>Alles wissen</button>
+          </div>
+        </div>
+      </div>
+      <div class=&quot;sketch-legend&quot;>
+        <p><strong>Aanwijzingen voor de schets:</strong></p>
+        <ul>
+          <li>Teken de weg / kruising met rijstroken</li>
+          <li>Geef de rijrichting aan met pijlen</li>
+          <li>Markeer voertuig A (blauw) en voertuig B (grijs)</li>
+          <li>Markeer de aanrijdingsplaats met een <strong>X</strong></li>
+          <li>Geef straatnamen / verkeersborden aan</li>
+        </ul>
+        <div style=&quot;margin-top:2mm;font-size:6pt;color:#888;&quot;>
+          Schets wordt meegedrukt bij afdrukken.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ HANDTEKENINGEN ═══ -->
+  <div class=&quot;bottom-row&quot; style=&quot;border:2px solid var(--border);border-top:none;&quot;>
+    <div class=&quot;bottom-cell&quot;>
+      <div style=&quot;font-size:var(--fs-xs);font-weight:700;color:var(--blue);text-transform:uppercase;margin-bottom:1mm;&quot;>Ondertekening bestuurder A</div>
+      <div style=&quot;font-size:6pt;color:#666;margin-bottom:1mm;&quot;>De ondertekenaars verklaren dat bovenstaande informatie juist is. Ondertekening houdt geen erkenning van aansprakelijkheid in.</div>
+      <div class=&quot;sig-canvas-wrap&quot;><canvas id=&quot;sigA&quot; height=&quot;60&quot;></canvas></div>
+      <div style=&quot;margin-top:1mm;font-size:6pt;color:#888;display:flex;justify-content:space-between;&quot;>
+        <span>Naam: <input type=&quot;text&quot; style=&quot;width:50mm;border:none;border-bottom:1px solid #999;background:transparent;font-size:6pt;&quot;></span>
+        <button onclick=&quot;clearCanvas('sigA')&quot; style=&quot;font-size:6pt;border:1px solid #999;padding:0.5mm 2mm;background:white;cursor:pointer;&quot;>Wissen</button>
+      </div>
+    </div>
+    <div class=&quot;bottom-cell&quot;>
+      <div style=&quot;font-size:var(--fs-xs);font-weight:700;color:#555;text-transform:uppercase;margin-bottom:1mm;&quot;>Ondertekening bestuurder B</div>
+      <div style=&quot;font-size:6pt;color:#666;margin-bottom:1mm;&quot;>De ondertekenaars verklaren dat bovenstaande informatie juist is. Ondertekening houdt geen erkenning van aansprakelijkheid in.</div>
+      <div class=&quot;sig-canvas-wrap&quot;><canvas id=&quot;sigB&quot; height=&quot;60&quot;></canvas></div>
+      <div style=&quot;margin-top:1mm;font-size:6pt;color:#888;display:flex;justify-content:space-between;&quot;>
+        <span>Naam: <input type=&quot;text&quot; style=&quot;width:50mm;border:none;border-bottom:1px solid #999;background:transparent;font-size:6pt;&quot;></span>
+        <button onclick=&quot;clearCanvas('sigB')&quot; style=&quot;font-size:6pt;border:1px solid #999;padding:0.5mm 2mm;background:white;cursor:pointer;&quot;>Wissen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ NOTICE ═══ -->
+  <div class=&quot;notice&quot;>
+    Dit formulier dient zo spoedig mogelijk, en in ieder geval binnen 5 werkdagen, te worden ingediend bij uw verzekeringsmaatschappij of agent.
+    Elke partij behoudt één exemplaar. Aanvullende mededelingen en vorderingen dienen bij uw maatschappij of agent te worden ingediend.
+  </div>
+
+</div><!-- /page -->
+
+<script>
+// ── Sketch canvas ──
+let sketchCtx, sketchColor = '#003399', sketchLineWidth = 2, sketchDrawing = false, sketchLast = {};
+
+function initSketch() {
+  const c = document.getElementById('sketchCanvas');
+  c.width = c.offsetWidth || 340;
+  sketchCtx = c.getContext('2d');
+  sketchCtx.fillStyle = '#fff';
+  sketchCtx.fillRect(0, 0, c.width, c.height);
+  // Grid lines for sketch aid
+  sketchCtx.strokeStyle = '#e8ecf8';
+  sketchCtx.lineWidth = 0.5;
+  for (let x = 20; x < c.width; x += 20) { sketchCtx.beginPath(); sketchCtx.moveTo(x,0); sketchCtx.lineTo(x,c.height); sketchCtx.stroke(); }
+  for (let y = 20; y < c.height; y += 20) { sketchCtx.beginPath(); sketchCtx.moveTo(0,y); sketchCtx.lineTo(c.width,y); sketchCtx.stroke(); }
+
+  const getP = e => {
+    const r = c.getBoundingClientRect();
+    const t = e.touches ? e.touches[0] : e;
+    return { x: (t.clientX-r.left)*(c.width/r.width), y: (t.clientY-r.top)*(c.height/r.height) };
+  };
+  c.addEventListener('mousedown', e => { sketchDrawing=true; sketchLast=getP(e); });
+  c.addEventListener('mousemove', e => {
+    if (!sketchDrawing) return;
+    const p = getP(e);
+    sketchCtx.strokeStyle = sketchColor; sketchCtx.lineWidth = sketchLineWidth;
+    sketchCtx.lineCap = 'round';
+    sketchCtx.beginPath(); sketchCtx.moveTo(sketchLast.x, sketchLast.y); sketchCtx.lineTo(p.x, p.y); sketchCtx.stroke();
+    sketchLast = p;
+  });
+  c.addEventListener('mouseup', () => sketchDrawing=false);
+  c.addEventListener('mouseleave', () => sketchDrawing=false);
+  c.addEventListener('touchstart', e => { e.preventDefault(); sketchDrawing=true; sketchLast=getP(e); }, {passive:false});
+  c.addEventListener('touchmove', e => {
+    e.preventDefault(); if(!sketchDrawing) return;
+    const p = getP(e);
+    sketchCtx.strokeStyle=sketchColor; sketchCtx.lineWidth=sketchLineWidth; sketchCtx.lineCap='round';
+    sketchCtx.beginPath(); sketchCtx.moveTo(sketchLast.x,sketchLast.y); sketchCtx.lineTo(p.x,p.y); sketchCtx.stroke();
+    sketchLast=p;
+  }, {passive:false});
+  c.addEventListener('touchend', () => sketchDrawing=false);
+}
+
+function setSketchColor(c) { sketchColor=c; sketchLineWidth = (c==='#ffffff'?12:2); }
+function setLineWidth(w) { sketchLineWidth=w; }
+function clearSketch() {
+  const c = document.getElementById('sketchCanvas');
+  sketchCtx.clearRect(0,0,c.width,c.height);
+  sketchCtx.fillStyle='#fff'; sketchCtx.fillRect(0,0,c.width,c.height);
+}
+
+// ── Signature canvases ──
+const sigStates = {};
+function initSig(id) {
+  const c = document.getElementById(id);
+  c.width = c.offsetWidth || 320;
+  const ctx = c.getContext('2d');
+  ctx.strokeStyle='#000'; ctx.lineWidth=1.5; ctx.lineCap='round';
+  sigStates[id] = { ctx, drawing:false, last:{} };
+  const getP = e => {
+    const r=c.getBoundingClientRect(); const t=e.touches?e.touches[0]:e;
+    return { x:(t.clientX-r.left)*(c.width/r.width), y:(t.clientY-r.top)*(c.height/r.height) };
+  };
+  c.addEventListener('mousedown', e=>{sigStates[id].drawing=true;sigStates[id].last=getP(e);});
+  c.addEventListener('mousemove', e=>{
+    const s=sigStates[id]; if(!s.drawing) return;
+    const p=getP(e); s.ctx.beginPath(); s.ctx.moveTo(s.last.x,s.last.y); s.ctx.lineTo(p.x,p.y); s.ctx.stroke(); s.last=p;
+  });
+  c.addEventListener('mouseup',()=>sigStates[id].drawing=false);
+  c.addEventListener('mouseleave',()=>sigStates[id].drawing=false);
+  c.addEventListener('touchstart',e=>{e.preventDefault();sigStates[id].drawing=true;sigStates[id].last=getP(e);},{passive:false});
+  c.addEventListener('touchmove',e=>{
+    e.preventDefault(); const s=sigStates[id]; if(!s.drawing) return;
+    const p=getP(e); s.ctx.beginPath(); s.ctx.moveTo(s.last.x,s.last.y); s.ctx.lineTo(p.x,p.y); s.ctx.stroke(); s.last=p;
+  },{passive:false});
+  c.addEventListener('touchend',()=>sigStates[id].drawing=false);
+}
+function clearCanvas(id) {
+  const c=document.getElementById(id); sigStates[id].ctx.clearRect(0,0,c.width,c.height);
+}
+
+// ── Auto-count checkboxes ──
+function updateTotals() {
+  let a=0,b=0;
+  for(let i=1;i<=17;i++){
+    if(document.querySelector(`input[name=&quot;circA${i}&quot;]`)?.checked) a++;
+    if(document.querySelector(`input[name=&quot;circB${i}&quot;]`)?.checked) b++;
+  }
+  document.getElementById('totalA').value = a;
+  document.getElementById('totalB').value = b;
+}
+document.querySelectorAll('input[type=&quot;checkbox&quot;]').forEach(cb => cb.addEventListener('change', updateTotals));
+
+// ── Init ──
+window.addEventListener('load', () => {
+  initSketch(); initSig('sigA'); initSig('sigB'); updateTotals();
+});
+window.addEventListener('resize', () => { initSketch(); initSig('sigA'); initSig('sigB'); });
+</script>
+</body>
+</html>
+"></iframe>
+    </div>
+  </div>
+
+  <script>
+  function switchSchadeTab(n) {
+    document.getElementById('schade-panel-1').style.display = n===1 ? 'block' : 'none';
+    document.getElementById('schade-panel-2').style.display = n===2 ? 'block' : 'none';
+    document.getElementById('schade-tab-1').style.background = n===1 ? '#003366' : '#e8eef5';
+    document.getElementById('schade-tab-1').style.color = n===1 ? '#fff' : '#003366';
+    document.getElementById('schade-tab-2').style.background = n===2 ? '#003366' : '#e8eef5';
+    document.getElementById('schade-tab-2').style.color = n===2 ? '#fff' : '#003366';
+  }
+  </script>
 
   <!-- ===== MAANDAFSLUITING ===== -->
   <div id="view-maandafsluiting" class="view">
@@ -12406,7 +14909,8 @@ if(_sfrEd) _sfrEd.addEventListener('keypress', function(e){if(e.key==='Enter')ca
   <button onclick="navTo('planning','TO DO LIST',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x2705; To Do List</button>
   <button onclick="navTo('archief','KPI DASHBOARD',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x1F4CA; KPI Dashboard</button>
   <button onclick="navTo('maandafsluiting','MAANDAFSLUITING',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x1F4C8; Maandafsluiting &#x1F512;</button>
-  <button onclick="navTo('aowdash','AOW & SFR',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:none;color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x1F4B0; AOW &amp; SFR</button>
+  <button onclick="navTo('aowdash','AOW & SFR',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x1F4B0; AOW &amp; SFR</button>
+  <button onclick="navTo('schade','SCHADE FORMULIER',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:none;color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x1F4CB; Schade Formulier</button>
 </div>
 
 <script>
