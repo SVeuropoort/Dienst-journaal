@@ -2674,6 +2674,26 @@ function googleTranslateElementInit() {
 .goog-te-menu-value span { color: #fff !important; }
 body { top: 0 !important; }
 </style>
+<script>
+// Blokkeer sneltoetsen die broncode/devtools openen
+document.addEventListener('keydown', function(e) {
+  // Ctrl+U (broncode), Ctrl+Shift+I/J/C (devtools), F12
+  if (
+    (e.ctrlKey && e.key === 'u') ||
+    (e.ctrlKey && e.key === 'U') ||
+    (e.ctrlKey && e.shiftKey && ['i','I','j','J','c','C'].includes(e.key)) ||
+    e.key === 'F12'
+  ) {
+    e.preventDefault();
+    return false;
+  }
+});
+// Blokkeer rechtermuisklik
+document.addEventListener('contextmenu', function(e) {
+  e.preventDefault();
+  return false;
+});
+</script>
 </head>
 <body>
 <div id="google_translate_element"></div>
