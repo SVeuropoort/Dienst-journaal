@@ -9795,7 +9795,9 @@ function parsePayroll(wb) {
 
 // ── Berekening ────────────────────────────────────────────────────────────────
 function bereken(payroll) {
-  return MEDEWERKERS.map(p => {
+  // Combineer Europoort + Hoek van Holland medewerkers
+  const alleMedewerkers = [...MEDEWERKERS, ...MEDEWERKERS_HVH];
+  return alleMedewerkers.map(p => {
     const sal    = getSalaris(p.groep);
     const mutVal = getMutatie(p.groep);
     const pw = payroll[p.mannr] || {};
@@ -9896,7 +9898,15 @@ function exportExcel() {
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement(&quot;a&quot;);
   a.href     = url;
-  a.download = `Maandafsluiting_${maandNaam}_${jaar}_Europoort.xls`;
+  // Bepaal terminal op basis van aanwezige medewerkers in resultaten
+  const hvhNummers = new Set(MEDEWERKERS_HVH.map(m => m.mannr));
+  const epNummers  = new Set(MEDEWERKERS.map(m => m.mannr));
+  const heeftHvH   = res.some(r => hvhNummers.has(r.mannr));
+  const heeftEp    = res.some(r => epNummers.has(r.mannr));
+  let terminal = 'Europoort';
+  if (heeftHvH && !heeftEp)  terminal = 'Hoek_van_Holland';
+  if (heeftHvH && heeftEp)   terminal = 'Europoort_en_Hoek_van_Holland';
+  a.download = `Maandafsluiting_${maandNaam}_${jaar}_${terminal}.xls`;
   a.click();
   URL.revokeObjectURL(url);
 }
