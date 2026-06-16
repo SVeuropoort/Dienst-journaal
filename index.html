@@ -2784,6 +2784,7 @@ document.addEventListener('contextmenu', function(e) {
     <span id="sync-status" style="font-size:11px;color:rgba(255,255,255,0.8);opacity:0;transition:opacity 0.4s;white-space:nowrap;"></span>
     <button onclick="openCloudInst()" title="Cloud instellingen" style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);color:#fff;font-size:16px;padding:6px 10px;border-radius:4px;cursor:pointer;">⚙️</button>
     <button onclick="wisselTerminal()" title="Wissel terminal" style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;padding:6px 12px;border-radius:4px;cursor:pointer;">&#x21C4; Wissel</button>
+    <button onclick="debugSupabase()" title="Debug" style="background:rgba(255,100,0,0.3);border:1px solid rgba(255,100,0,0.5);color:#fff;font-size:11px;padding:6px 10px;border-radius:4px;cursor:pointer;">🔍 Debug</button>
   </div>
 </header>
 
@@ -4508,6 +4509,17 @@ window.addEventListener('resize', () => {
       if (!rows || rows.length === 0) {
         var t = sessionStorage.getItem('dj_terminal') || 'EP';
         showSyncStatus('✓ ' + (t === 'HVH' ? 'Hoek van Holland' : 'Europoort') + ' – lege start', 'ok');
+        // Maak meteen een lege rij aan in Supabase voor deze terminal
+        try {
+          await fetch(SB_URL + '/rest/v1/' + SB_TABLE, {
+            method: 'POST',
+            headers: {
+              'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY,
+              'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates'
+            },
+            body: JSON.stringify({ id: getSBRowId(), data: {} })
+          });
+        } catch(e2) { console.warn('Kon lege rij niet aanmaken:', e2); }
         setTimeout(function(){ location.reload(); }, 1000);
         _syncBezig = false;
         return;
@@ -4579,10 +4591,19 @@ window.addEventListener('resize', () => {
             }
           }
           if (!rows || !rows[0] || !rows[0].data) {
-            // Geen data = nieuwe terminal (bijv. HVH), stil doorgaan
+            // Geen data = nieuwe terminal (bijv. HVH), maak lege rij aan
+            try {
+              await fetch(SB_URL + '/rest/v1/' + SB_TABLE, {
+                method: 'POST',
+                headers: {
+                  'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY,
+                  'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates'
+                },
+                body: JSON.stringify({ id: _rowId, data: {} })
+              });
+            } catch(e2) { console.warn('Kon lege rij niet aanmaken:', e2); }
             sessionStorage.setItem('_cloudGeladen', '1');
             showSyncStatus('', 'ok');
-            _syncBezig = false;
             return;
           }
           if (typeof setSyncData === 'function') setSyncData(rows[0].data);
@@ -15606,6 +15627,30 @@ function navWerkoverdracht(label, btn) {
     }
     alert(msg);
   }
+
+  async function debugSupabase() {
+    var msg = 'Terminal: ' + (sessionStorage.getItem('dj_terminal')||'EP') + '\n';
+    msg += 'SB Row ID: ' + getSBRowId() + '\n\n';
+    msg += 'localStorage HVH keys:\n';
+    for(var i=0; i<localStorage.length; i++){
+      var k = localStorage.key(i);
+      if(k && k.startsWith('HVH_')) msg += '  ' + k + '\n';
+    }
+    msg += '\nlocalStorage EP_dagplan keys:\n';
+    for(var i=0; i<localStorage.length; i++){
+      var k = localStorage.key(i);
+      if(k && k.startsWith('EP_dagplan')) msg += '  ' + k + '\n';
+    }
+    try {
+      var resp = await fetch(SB_URL + '/rest/v1/' + SB_TABLE + '?select=id', {
+        headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
+      });
+      var rows = await resp.json();
+      msg += '\nSupabase rijen: ' + rows.map(function(r){return r.id;}).join(', ');
+    } catch(e) { msg += '\nSupabase fout: ' + e.message; }
+    alert(msg);
+  }
+  window.debugSupabase = debugSupabase;
 
   var STD_BEZ_KEY = 'std_bezetting_v1';
   function getStdBezetting(){ try{ return JSON.parse(localStorage.getItem(STD_BEZ_KEY)||'{}'); }catch(e){ return {}; } }
