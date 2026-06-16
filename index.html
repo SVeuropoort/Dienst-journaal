@@ -13089,39 +13089,71 @@ async function laadWeer() {
     var cC=document.getElementById('kpi-chart-card'),cW=document.getElementById('kpi-charts-wrap');
     if(cC&&cW){
       var normen2=getKpiNormen();
-      var colStats=_TC.map(function(kolom,ci){
-        var bin=0,buit=0,gn=0,normT=null,normM=0,hasN=false;
+      // Bouw stats PER ROUTE × KOLOM zodat aantallen exact overeenkomen met "Buiten normen" tabel
+      var colStats=[];
+      _TC.forEach(function(kolom,ci){
         _RT.forEach(function(route,ri){
-          var nv=normen2[route+'_'+ci],nm2=(nv&&nv.tijd)?_t2m(nv.tijd):null,mg=(nv&&nv.marge)?parseInt(nv.marge):0;
-          if(nm2!==null&&!hasN){normT=nv.tijd;normM=mg;hasN=true;}
-          entries.forEach(function(e){var rij=(e.tijden||[])[ri];if(!rij)return;var t=(rij.tijden||[])[ci];if(!t)return;var tM=_t2m(t);if(tM===null)return;if(nm2===null){gn++;return;}if(tM<=nm2+mg)bin++;else buit++;});
+          var bin=0,buit=0,gn=0,leeg=0,normT=null,normM=0,hasN=false;
+          var nv=normen2[route+'_'+ci];
+          if(nv&&nv.tijd){normT=nv.tijd;normM=nv.marge?parseInt(nv.marge):0;hasN=true;}
+          entries.forEach(function(e){
+            var _d=e.datum?e.datum.split('/'):[],_isWE=false;
+            if(_d.length===3){var _wd=new Date(parseInt(_d[2]),parseInt(_d[1])-1,parseInt(_d[0]));_isWE=_wd.getDay()===0||_wd.getDay()===6;}
+            var rij=(e.tijden||[])[ri];
+            if(!rij){leeg++;return;}
+            var t=(rij.tijden||[])[ci];
+            if(!t){leeg++;return;}
+            var tM=_t2m(t);
+            if(tM===null){leeg++;return;}
+            // gebruik weekend-norm indien beschikbaar
+            var _nk=route+'_'+ci+(_isWE&&normen2[route+'_'+ci+'_we']?'_we':'');
+            var nv2=normen2[_nk]||normen2[route+'_'+ci];
+            if(!nv2||!nv2.tijd){gn++;}
+            else{var nm2=_t2m(nv2.tijd),mg2=nv2.marge?parseInt(nv2.marge):0;if(tM<=nm2+mg2)bin++;else buit++;}
+          });
+          if(bin+buit+gn+leeg>0)
+            colStats.push({kolom:kolom,route:route,bin:bin,buit:buit,gn:gn,leeg:leeg,normT:normT,normM:normM,hasN:hasN});
         });
-        return{kolom:kolom,bin:bin,buit:buit,gn:gn,normT:normT,normM:normM,hasN:hasN};
-      }).filter(function(s){return(s.bin+s.buit+s.gn)>0;});
+      });
 
+      colStats=colStats.filter(function(s){return s.hasN;});
       if(!colStats.length){cC.style.display='none';}
       else{
         cC.style.display='block';
         cW.innerHTML=colStats.map(function(s){
-          var tot=s.bin+s.buit+(s.gn||0);
-          var pct=s.hasN?(tot>0?Math.round(s.bin/tot*100):0):null;
+          var tot=s.bin+s.buit+(s.gn||0)+s.leeg; // altijd = entries.length → cirkel = 100%
+          var ingevuld=s.bin+s.buit+(s.gn||0);
+          var pct=s.hasN?(ingevuld>0?Math.round(s.bin/ingevuld*100):0):null;
           var ok=!s.hasN||pct>=80;
           var kc=!s.hasN?'#3498db':pct>=80?'#1a7a40':pct>=60?'#e67e22':'#c0392b';
-          var segs=s.hasN?[s.bin>0?{l:'Op tijd',v:s.bin,c:'#27ae60'}:null,s.buit>0?{l:'Te laat',v:s.buit,c:'#e74c3c'}:null].filter(Boolean):[s.gn>0?{l:'Ingevuld',v:s.gn,c:'#3498db'}:null].filter(Boolean);
-          var R=80,cx=130,cy=120,W=260,H=280,cum=-90,paths='',lbls='';
-          segs.forEach(function(seg){
-            var sw=(seg.v/tot)*360,r1=cum*Math.PI/180,r2=(cum+sw)*Math.PI/180;
+          var segs=s.hasN
+            ?[s.bin>0?{l:'Op tijd',v:s.bin,c:'#27ae60'}:null,
+              s.buit>0?{l:'Te laat',v:s.buit,c:'#e74c3c'}:null,
+              s.leeg>0?{l:'Niet ingevuld',v:s.leeg,c:'#cccccc'}:null].filter(Boolean)
+            :[s.gn>0?{l:'Ingevuld',v:s.gn,c:'#3498db'}:null,
+              s.leeg>0?{l:'Niet ingevuld',v:s.leeg,c:'#cccccc'}:null].filter(Boolean);
+          var R=60,cx=100,cy=90,W=200,H=210,cum=-90,paths='',lbls='',totDeg=0;
+          segs.forEach(function(seg,si){
+            // laatste segment krijgt resterende graden → geen witte naad
+            var sw=si===segs.length-1?(360-totDeg):Math.round(seg.v/tot*3600)/10;
+            totDeg+=sw;
+            var r1=cum*Math.PI/180,r2=(cum+sw)*Math.PI/180;
             var x1=cx+R*Math.cos(r1),y1=cy+R*Math.sin(r1),x2=cx+R*Math.cos(r2),y2=cy+R*Math.sin(r2);
             if(sw>=359.9){paths+='<circle cx="'+cx+'" cy="'+cy+'" r="'+R+'" fill="'+seg.c+'"/>';}
             else{paths+='<path d="M'+cx+','+cy+' L'+x1.toFixed(1)+','+y1.toFixed(1)+' A'+R+','+R+' 0 '+(sw>180?1:0)+',1 '+x2.toFixed(1)+','+y2.toFixed(1)+' Z" fill="'+seg.c+'" stroke="#fff" stroke-width="2"/>';}
             var mr=(cum+sw/2)*Math.PI/180,lx=cx+(R+26)*Math.cos(mr),ly=cy+(R+26)*Math.sin(mr),anch=lx>cx?'start':'end',sp=Math.round(seg.v/tot*100);
-            lbls+='<line x1="'+(cx+R*Math.cos(mr)).toFixed(1)+'" y1="'+(cy+R*Math.sin(mr)).toFixed(1)+'" x2="'+(cx+(R+18)*Math.cos(mr)).toFixed(1)+'" y2="'+(cy+(R+18)*Math.sin(mr)).toFixed(1)+'" stroke="#666" stroke-width="1.2"/><text x="'+lx.toFixed(1)+'" y="'+(ly-4).toFixed(1)+'" text-anchor="'+anch+'" font-size="10" font-weight="700" fill="'+seg.c+'">'+sp+'%</text><text x="'+lx.toFixed(1)+'" y="'+(ly+8).toFixed(1)+'" text-anchor="'+anch+'" font-size="9" fill="#555">'+seg.l+'</text>';
+            lbls+='<line x1="'+(cx+R*Math.cos(mr)).toFixed(1)+'" y1="'+(cy+R*Math.sin(mr)).toFixed(1)+'" x2="'+(cx+(R+18)*Math.cos(mr)).toFixed(1)+'" y2="'+(cy+(R+18)*Math.sin(mr)).toFixed(1)+'" stroke="#666" stroke-width="1.2"/><text x="'+lx.toFixed(1)+'" y="'+(ly-4).toFixed(1)+'" text-anchor="'+anch+'" font-size="8" font-weight="700" fill="'+seg.c+'">'+sp+'%</text><text x="'+lx.toFixed(1)+'" y="'+(ly+7).toFixed(1)+'" text-anchor="'+anch+'" font-size="7" fill="#555">'+seg.l+'</text>';
             cum+=sw;
           });
-          var cp=pct!==null?pct+'%':tot+'x', cl=!s.hasN?'Geen norm':(ok?'&#x2713; KPI OK':'&#x2717; AANDACHT');
-          var donut='<circle cx="'+cx+'" cy="'+cy+'" r="'+(R-24)+'" fill="#fff" stroke="#eee" stroke-width="1"/><text x="'+cx+'" y="'+(cy-7)+'" text-anchor="middle" font-size="20" font-weight="800" fill="'+kc+'">'+cp+'</text><text x="'+cx+'" y="'+(cy+10)+'" text-anchor="middle" font-size="9" font-weight="600" fill="'+kc+'">'+cl+'</text>';
-          var leg=segs.map(function(seg){return '<span style="font-size:11px;color:'+seg.c+';font-weight:700;"><svg width="12" height="12" style="vertical-align:middle;margin-right:3px;"><circle cx="6" cy="6" r="5" fill="'+seg.c+'"/></svg>'+seg.l+' ('+seg.v+')</span>';}).join(' &nbsp;');
-          return '<div style="background:#fff;border:2px solid '+(ok?'#1a7a40':'#c0392b')+';border-radius:12px;padding:14px 10px 10px;box-shadow:0 3px 12px rgba(0,0,0,0.1);display:flex;flex-direction:column;align-items:center;"><div style="font-size:12px;font-weight:700;color:#003366;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;text-align:center;">'+s.kolom+'</div><svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">'+paths+donut+lbls+'</svg><div style="font-size:10px;color:#999;margin-top:2px;">'+(s.hasN?'norm '+s.normT+(s.normM?'&#177;'+s.normM+'m':'')+'  &#x2022;  ':'')+tot+' meetpunten</div><div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;justify-content:center;">'+leg+'</div></div>';
+          var cp=pct!==null?pct+'%':ingevuld+'x', cl=!s.hasN?'Geen norm':(ok?'&#x2713; KPI OK':'&#x2717; AANDACHT');
+          var donut='<circle cx="'+cx+'" cy="'+cy+'" r="'+(R-24)+'" fill="#fff" stroke="#eee" stroke-width="1"/><text x="'+cx+'" y="'+(cy-7)+'" text-anchor="middle" font-size="15" font-weight="800" fill="'+kc+'">'+cp+'</text><text x="'+cx+'" y="'+(cy+8)+'" text-anchor="middle" font-size="8" font-weight="600" fill="'+kc+'">'+cl+'</text>';
+          var leg=segs.map(function(seg){return '<span style="font-size:9px;color:'+seg.c+';font-weight:700;"><svg width="12" height="12" style="vertical-align:middle;margin-right:3px;"><circle cx="6" cy="6" r="5" fill="'+seg.c+'"/></svg>'+seg.l+' ('+seg.v+')</span>';}).join(' &nbsp;');
+          return '<div style="background:#fff;border:2px solid '+(ok?'#1a7a40':'#c0392b')+';border-radius:10px;padding:8px 6px 8px;box-shadow:0 3px 12px rgba(0,0,0,0.1);display:flex;flex-direction:column;align-items:center;">'+
+            '<div style="font-size:10px;font-weight:700;color:#003366;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:1px;text-align:center;">'+s.kolom+'</div>'+
+            '<div style="font-size:9px;color:#888;font-weight:600;margin-bottom:2px;">'+s.route+'</div>'+
+            '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">'+paths+donut+lbls+'</svg>'+
+            '<div style="font-size:9px;color:#999;margin-top:1px;">'+(s.hasN?'norm '+s.normT+(s.normM?'&#177;'+s.normM+'m':'')+'  &#x2022;  ':'')+tot+' meetpunten</div>'+
+            '<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;justify-content:center;">'+leg+'</div></div>';
         }).join('');
       }
     }
