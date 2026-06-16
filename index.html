@@ -2848,6 +2848,61 @@ document.addEventListener('contextmenu', function(e) {
       <div id="getijden-error" style="display:none;padding:12px;background:var(--accent-soft);border-radius:4px;color:var(--accent);font-size:13px;margin-top:12px;"></div>
     </div>
 
+  
+  <!-- Scheepzoeker -->
+  <div class="marinetraffic-bar" style="margin-top:18px;flex-wrap:wrap;gap:10px;">
+    <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:220px;">
+      <span style="font-size:18px;">&#x1F6F3;</span>
+      <div style="flex:1;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div style="font-weight:700;font-size:13px;letter-spacing:0.5px;">&#x1F6F3; SCHIP ZOEKEN (VesselFinder)</div>
+          <button onclick="openScheepzoekModal()" title="Snelkoppelingen beheren"
+            style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:14px;line-height:1;">&#x2699;&#xFE0F;</button>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <input type="text" id="mt-search-input" placeholder="Scheepsnaam of MMSI..."
+            style="flex:1;padding:7px 10px;border:none;border-radius:6px;font-size:13px;background:rgba(255,255,255,0.15);color:#fff;outline:none;"
+            onkeydown="if(event.key==='Enter')openMarineTraffic()" />
+          <button onclick="openMarineTraffic()"
+            style="background:#fff;color:#0d4f6e;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:13px;font-weight:700;white-space:nowrap;">
+            &#x1F50D; Zoeken
+          </button>
+        </div>
+      </div>
+    </div>
+    <div id="scheepzoeker-snelkoppelingen" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;width:100%;">
+      <!-- dynamisch gevuld via renderScheepSnelkoppelingen() -->
+    </div>
+  </div>
+
+  <!-- Scheepzoeker Modal -->
+  <div id="scheepzoeker-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:14px;width:min(520px,95vw);max-height:85vh;overflow-y:auto;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,0.25);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+        <h2 style="margin:0;font-size:17px;color:#0d3b52;">&#x2699;&#xFE0F; Snelkoppelingen beheren</h2>
+        <button onclick="closeScheepzoekModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#666;line-height:1;">&times;</button>
+      </div>
+
+      <!-- Lijst bestaande schepen -->
+      <div id="scheep-lijst" style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px;"></div>
+
+      <!-- Nieuw schip toevoegen -->
+      <div style="border-top:1px solid #e8ecef;padding-top:16px;">
+        <div style="font-weight:700;font-size:13px;color:#0d3b52;margin-bottom:10px;">+ Nieuw schip toevoegen</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <input id="nieuw-schip-naam" placeholder="Naam (bijv. Hollandica)" maxlength="30"
+            style="flex:1;min-width:120px;padding:8px 10px;border:1px solid #dde1e7;border-radius:7px;font-size:13px;" />
+          <input id="nieuw-schip-imo" placeholder="IMO nummer (bijv. 9419163)" maxlength="12"
+            style="flex:1;min-width:120px;padding:8px 10px;border:1px solid #dde1e7;border-radius:7px;font-size:13px;" />
+          <button onclick="voegScheepToe()"
+            style="background:#0d4f6e;color:#fff;border:none;border-radius:7px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:700;white-space:nowrap;">
+            Toevoegen
+          </button>
+        </div>
+        <div style="font-size:11px;color:#999;margin-top:6px;">Het IMO-nummer vind je op de VesselFinder detailpagina in de URL.</div>
+      </div>
+    </div>
+  </div>
   </div>
 
   <div id="view-nieuw" class="view">
@@ -2951,12 +3006,6 @@ document.addEventListener('contextmenu', function(e) {
       <button class="btn-secondary" onclick="resetForm()">Wissen</button>
     </div>
   </div>
-
-
-
-
-
-
   <!-- ===== PUNCTUALITY ===== -->
   <div id="view-punctuality" class="view">
     <div class="page-header">
@@ -4165,7 +4214,8 @@ window.addEventListener('resize', () => {
     'ma_medewerkers_v1',
     'ma_hvh_v1',
     'dj_verjaardagen_v1',
-    'dagpl_cert_v2'
+    'dagpl_cert_v2',
+    'scheepzoeker_schepen'
   ];
 
   function getSyncData() {
@@ -13116,6 +13166,114 @@ async function laadWeer() {
   });
 
   document.addEventListener('DOMContentLoaded', laadGetijden);
+  // ===== MARINETRAFFIC ZOEKFUNCTIES =====
+  // ===== SCHEEPZOEKER =====
+  var SCHEPEN_DEFAULT = [
+    {naam:'Forerunner',  imo:'9227259'},
+    {naam:'Foreteller',  imo:'9214666'},
+    {naam:'Hollandica',  imo:'9419163'},
+    {naam:'Britannica',  imo:'9419175'},
+    {naam:'Transit',     imo:'9469388'},
+    {naam:'Transporter', imo:'9469376'},
+    {naam:'Mistral',     imo:'9183788'},
+    {naam:'Thuleland',   imo:'9343261'}
+  ];
+
+  function getSchepen() {
+    try {
+      var s = localStorage.getItem('scheepzoeker_schepen');
+      if (s) return JSON.parse(s);
+    } catch(e){}
+    return SCHEPEN_DEFAULT.slice();
+  }
+
+  function saveSchepen(arr) {
+    try { localStorage.setItem('scheepzoeker_schepen', JSON.stringify(arr)); } catch(e){}
+    if (typeof cloudOpslaan === 'function') cloudOpslaan(false);
+  }
+
+  function renderScheepSnelkoppelingen() {
+    var el = document.getElementById('scheepzoeker-snelkoppelingen');
+    if (!el) return;
+    var schepen = getSchepen();
+    if (!schepen.length) { el.innerHTML = ''; return; }
+    var html = '<span style="font-size:11px;opacity:0.8;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Snelkoppelingen:</span>';
+    schepen.forEach(function(s) {
+      html += '<button onclick="window.open(\'https://www.vesselfinder.com/vessels/details/'+s.imo+'\',\'_blank\')" '
+             +'style="background:rgba(255,255,255,0.18);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:5px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;">'+s.naam+'</button>';
+    });
+    el.innerHTML = html;
+  }
+
+  function renderScheepLijst() {
+    var el = document.getElementById('scheep-lijst');
+    if (!el) return;
+    var schepen = getSchepen();
+    if (!schepen.length) { el.innerHTML = '<div style="color:#999;font-size:13px;">Geen schepen opgeslagen.</div>'; return; }
+    var html = '';
+    schepen.forEach(function(s, i) {
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#f4f7fa;border-radius:8px;">'
+            + '<span style="font-size:16px;">&#x1F6F3;</span>'
+            + '<input value="'+s.naam+'" maxlength="30" onchange="updateScheepNaam('+i+',this.value)" '
+            +   'style="flex:1;min-width:80px;border:1px solid #dde1e7;border-radius:6px;padding:5px 8px;font-size:13px;font-weight:600;" />'
+            + '<input value="'+s.imo+'" maxlength="12" onchange="updateScheepIMO('+i+',this.value)" '
+            +   'style="width:110px;border:1px solid #dde1e7;border-radius:6px;padding:5px 8px;font-size:12px;color:#666;" />'
+            + '<button onclick="window.open(\'https://www.vesselfinder.com/vessels/details/'+s.imo+'\',\'_blank\')" title="Testen" '
+            +   'style="background:#e8f4fd;border:none;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:14px;">&#x1F50D;</button>'
+            + '<button onclick="verwijderScheep('+i+')" title="Verwijderen" '
+            +   'style="background:#fdecea;border:none;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:14px;color:#c0392b;">&#x2715;</button>'
+            + '</div>';
+    });
+    el.innerHTML = html;
+  }
+
+  window.updateScheepNaam = function(i, val) {
+    var s = getSchepen(); s[i].naam = val.trim(); saveSchepen(s); renderScheepSnelkoppelingen();
+  };
+  window.updateScheepIMO = function(i, val) {
+    var s = getSchepen(); s[i].imo = val.trim(); saveSchepen(s); renderScheepSnelkoppelingen();
+  };
+  window.verwijderScheep = function(i) {
+    var s = getSchepen(); s.splice(i,1); saveSchepen(s); renderScheepLijst(); renderScheepSnelkoppelingen();
+  };
+  window.voegScheepToe = function() {
+    var naam = (document.getElementById('nieuw-schip-naam')||{}).value||'';
+    var imo  = (document.getElementById('nieuw-schip-imo') ||{}).value||'';
+    naam = naam.trim(); imo = imo.replace(/\D/g,'');
+    if (!naam || !imo) { alert('Vul een naam en IMO-nummer in.'); return; }
+    var s = getSchepen(); s.push({naam:naam, imo:imo}); saveSchepen(s);
+    document.getElementById('nieuw-schip-naam').value = '';
+    document.getElementById('nieuw-schip-imo').value  = '';
+    renderScheepLijst(); renderScheepSnelkoppelingen();
+  };
+  window.openScheepzoekModal = function() {
+    var m = document.getElementById('scheepzoeker-modal');
+    if (m) { m.style.display='flex'; renderScheepLijst(); }
+  };
+  window.closeScheepzoekModal = function() {
+    var m = document.getElementById('scheepzoeker-modal');
+    if (m) m.style.display='none';
+  };
+  // Sluit modal bij klik buiten het dialoogvenster
+  document.getElementById('scheepzoeker-modal').addEventListener('click', function(e){
+    if (e.target === this) closeScheepzoekModal();
+  });
+
+  window.openMarineTraffic = function() {
+    var q = (document.getElementById('mt-search-input') || {}).value || '';
+    q = q.trim();
+    if (!q) return;
+    var url = 'https://www.vesselfinder.com/?name=' + encodeURIComponent(q);
+    window.open(url, '_blank');
+  };
+  window.openMTShip = function(name) {
+    var url = 'https://www.vesselfinder.com/?name=' + encodeURIComponent(name);
+    window.open(url, '_blank');
+  };
+
+  // Init snelkoppelingen bij laden
+  renderScheepSnelkoppelingen();
+
   document.addEventListener('DOMContentLoaded', function(){ if(typeof laadWeer==='function') laadWeer(); });
 
   window.openMatInstellingen = function() {
