@@ -4420,10 +4420,11 @@ window.addEventListener('resize', () => {
     if (toonFouten) showSyncStatus('☁️ Opslaan...', 'info');
     try {
       var data = getSyncData();
-      // Voeg volledige dagplan_ entries toe met medewerkers
+      var pfx = getTerminalPrefix(); // 'EP_' of 'HVH_'
+      // Voeg terminal-specifieke dagplan_ entries toe met medewerkers
       for (var _i = 0; _i < localStorage.length; _i++) {
         var _k = localStorage.key(_i);
-        if (!_k || !_k.startsWith('dagplan_')) continue;
+        if (!_k || !_k.startsWith(pfx + 'dagplan_')) continue;
         try {
           var _e = JSON.parse(localStorage.getItem(_k));
           if (_e && ((_e.ochEmps && _e.ochEmps.length > 0) || (_e.avondEmps && _e.avondEmps.length > 0))) {
@@ -15635,39 +15636,37 @@ function navWerkoverdracht(label, btn) {
   }
 
   async function debugSupabase() {
-    var msg = 'Terminal: ' + (sessionStorage.getItem('dj_terminal')||'EP') + '\n';
-    msg += 'SB Row ID: ' + getSBRowId() + '\n\n';
-    msg += 'localStorage HVH keys:\n';
-    for(var i=0; i<localStorage.length; i++){
-      var k = localStorage.key(i);
-      if(k && k.startsWith('HVH_')) msg += '  ' + k + '\n';
-    }
-    msg += '\nlocalStorage EP_dagplan keys:\n';
-    for(var i=0; i<localStorage.length; i++){
-      var k = localStorage.key(i);
-      if(k && k.startsWith('EP_dagplan')) msg += '  ' + k + '\n';
-    }
-    msg += '\nlocalStorage ongeprefixte dagplan keys:\n';
-    for(var i=0; i<localStorage.length; i++){
-      var k = localStorage.key(i);
-      if(k && k.startsWith('dagplan_') && !k.startsWith('EP_') && !k.startsWith('HVH_')) msg += '  ' + k + '\n';
-    }
+    // Bouw een volledig overzicht
+    var msg = '=== TERMINAL STATUS ===\n';
+    msg += 'Actief: ' + (sessionStorage.getItem('dj_terminal')||'EP') + '\n';
+    msg += 'Row ID: ' + getSBRowId() + '\n\n';
+
+    msg += '=== LOCALSTORAGE ===\n';
+    var allKeys = [];
+    for(var i=0; i<localStorage.length; i++) allKeys.push(localStorage.key(i));
+    allKeys.sort();
+    var epKeys = allKeys.filter(function(k){return k&&k.startsWith('EP_');});
+    var hvhKeys = allKeys.filter(function(k){return k&&k.startsWith('HVH_');});
+    var bareKeys = allKeys.filter(function(k){return k&&!k.startsWith('EP_')&&!k.startsWith('HVH_')&&(k.startsWith('dagplan_')||k.startsWith('dienstjournaal')||k.startsWith('vs_data')||k.startsWith('mat_'));});
+    msg += 'EP keys (' + epKeys.length + '): ' + epKeys.join(', ') + '\n\n';
+    msg += 'HVH keys (' + hvhKeys.length + '): ' + hvhKeys.join(', ') + '\n\n';
+    msg += 'Ongeprefixte keys: ' + (bareKeys.join(', ')||'(geen)') + '\n\n';
+
+    msg += '=== SUPABASE ===\n';
     try {
       var resp = await fetch(SB_URL + '/rest/v1/' + SB_TABLE + '?select=id', {
         headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
       });
       var rows = await resp.json();
-      msg += '\nSupabase rijen:\n  ' + rows.map(function(r){return r.id;}).join('\n  ');
-      // Toon keys van HVH_main als die bestaat
-      var hvhRow = rows.find(function(r){return r.id==='HVH_main';});
-      if(!hvhRow){
-        // Haal HVH_main op
-        var r2 = await fetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.HVH_main&select=data',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
-        var hvh = await r2.json();
-        if(hvh && hvh[0] && hvh[0].data) msg += '\nHVH_main keys: '+Object.keys(hvh[0].data).slice(0,10).join(', ');
-        else msg += '\nHVH_main: NIET GEVONDEN';
+      msg += 'Rijen: ' + rows.map(function(r){return r.id;}).join(', ') + '\n';
+      for(var ri=0; ri<rows.length; ri++){
+        var r2 = await fetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.'+rows[ri].id+'&select=data',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
+        var rd = await r2.json();
+        var keys = (rd&&rd[0]&&rd[0].data)?Object.keys(rd[0].data):[];
+        var dagKeys = keys.filter(function(k){return k.indexOf('dagplan')>-1;});
+        msg += '  ' + rows[ri].id + ': ' + keys.length + ' keys, dagplan: [' + dagKeys.join(', ') + ']\n';
       }
-    } catch(e) { msg += '\nSupabase fout: ' + e.message; }
+    } catch(e) { msg += 'Fout: ' + e.message; }
     alert(msg);
   }
   window.debugSupabase = debugSupabase;
