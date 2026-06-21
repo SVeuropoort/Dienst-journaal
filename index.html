@@ -5246,6 +5246,10 @@ function onTextInput(cid, el){
 // After building panels: attach listeners and restore saved text
 // Default values for cells that should never be empty
 const CELL_DEFAULTS = {
+  'dp_title_ochtend':'Ochtend',
+  'dp_title_ochtend_onder':'NA 12:00',
+  'dp_title_avond':'AVOND',
+  'dp_title_avond_onder':'VOOR 17:00',
   'on_lash_t1':'11:30','on_lash_t2':'19:45','on_lash_t3':'21:00',
   'av_lash_t1':'11:30','av_lash_t2':'19:45','av_lash_t3':'21:00',
   'on_lash_extra':'EXTRA!','on_lash_min':'INHUUR- <11:30','on_lash_plus':'INHUUR+ <14:00','on_lash_stage':'STAGE;',
@@ -6192,7 +6196,7 @@ function buildOchtend(){
 <div class="plan-header">
   <span class="ph-date">Dagelijkse planning ${planDate}</span>
   <span class="ph-arrows">⏭</span>
-  <span class="ph-title">Ochtend</span>
+  <span class="ph-title" data-cid="dp_title_ochtend">Ochtend</span>
   <span class="ph-num">${p.length}</span>
   <div class="ph-logo">S<br><small style="font-size:8px;font-weight:400">Stena<br>Line</small></div>
 </div>
@@ -6321,7 +6325,7 @@ function buildOchtend(){
 </table>
 
 <!-- NA 12:00 -->
-<div class="sec-div">NA 12:00</div>
+<div class="sec-div" data-cid="dp_title_ochtend_onder">NA 12:00</div>
 <table class="ptable" style="margin-top:3px">
 <colgroup>
   <col style="width:72px">
@@ -6454,7 +6458,7 @@ function buildAvond(){
 <div class="plan-header">
   <span class="ph-date">Dagelijkse planning ${planDate}</span>
   <span class="ph-arrows">⏭</span>
-  <span class="ph-title">AVOND</span>
+  <span class="ph-title" data-cid="dp_title_avond">AVOND</span>
   <span class="ph-num">${p.length}</span>
   <div class="ph-logo">S<br><small style="font-size:8px;font-weight:400">Stena<br>Line</small></div>
 </div>
@@ -6577,7 +6581,7 @@ function buildAvond(){
 </table>
 
 <!-- ══ VOOR 17:00 ══ -->
-<div class="sec-div">VOOR 17:00</div>
+<div class="sec-div" data-cid="dp_title_avond_onder">VOOR 17:00</div>
 <table class="ptable" style="margin-top:3px">
 <colgroup>
   <col style="width:72px">
