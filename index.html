@@ -2962,8 +2962,8 @@ document.addEventListener('contextmenu', function(e) {
         <div style="display:flex;gap:6px;margin-top:6px;">
           <input type="text" id="mt-search-input" placeholder="Scheepsnaam of MMSI..."
             style="flex:1;padding:7px 10px;border:none;border-radius:6px;font-size:13px;background:rgba(255,255,255,0.15);color:#fff;outline:none;"
-            onkeydown="if(event.key==='Enter')open()" />
-          <button onclick="open()"
+            onkeydown="if(event.key==='Enter')openVesselSearch()" />
+          <button onclick="openVesselSearch()"
             style="background:#fff;color:#0d4f6e;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:13px;font-weight:700;white-space:nowrap;">
             &#x1F50D; Zoeken
           </button>
@@ -14022,7 +14022,7 @@ async function laadWeer() {
     if (e.target === this) closeScheepzoekModal();
   });
 
-  window.open = function() {
+  window.openVesselSearch = function() {
     var q = (document.getElementById('mt-search-input') || {}).value || '';
     q = q.trim();
     if (!q) return;
