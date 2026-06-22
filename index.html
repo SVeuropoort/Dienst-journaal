@@ -5178,7 +5178,7 @@ function isAvond(e){
 // ── POSITIONS ──────────────────────────────────
 let activeDayOffset = 0; // 0 = today's planning (upload date), 1 = tomorrow
 
-function planningKey(type){ return type+'_'+planDate+'_d'+activeDayOffset; }
+function planningKey(type){ return (typeof getTerminalPrefix==='function'?getTerminalPrefix():'')+type+'_'+planDate+'_d'+activeDayOffset; }
 function posKey()  { return planningKey('pos'); }
 function textsKey(){ return planningKey('txt'); }
 function loadPos() {
@@ -5870,10 +5870,13 @@ function ddm(id){
 }
 
 // Get names already selected in non-meren positions of a panel
+// Only return names that are in the current employee pool (ochEmps or avondEmps)
 function getPlacedNames(pfx){
+  const pool = (pfx === 'av') ? avondEmps : ochEmps;
+  const poolNames = new Set(pool.map(e => e.name));
   const names=[];
   Object.entries(pos).forEach(([k,v])=>{
-    if(v && getKeyPfx(k)===pfx && !isMerenKey(k) && k.indexOf('_tr_')===-1) names.push(v);
+    if(v && getKeyPfx(k)===pfx && !isMerenKey(k) && k.indexOf('_tr_')===-1 && poolNames.has(v)) names.push(v);
   });
   return names;
 }
@@ -5894,11 +5897,14 @@ function isALKey(k){
 }
 
 // Get names currently selected in TW positions of a panel
+// Only return names that are in the current employee pool
 function getTWPlacedNames(pfx){
+  const pool = (pfx === 'av') ? avondEmps : ochEmps;
+  const poolNames = new Set(pool.map(e => e.name));
   const names = [];
   const seen  = new Set();
   Object.entries(pos).forEach(([k,v])=>{
-    if(v && getKeyPfx(k)===pfx && isTWKey(k) && !seen.has(v)){
+    if(v && getKeyPfx(k)===pfx && isTWKey(k) && !seen.has(v) && poolNames.has(v)){
       names.push(v);
       seen.add(v);
     }
@@ -11249,13 +11255,14 @@ render();
   let materieel = JSON.parse(JSON.stringify(MATERIEEL_DEF));
 
   function getData() {
+    var pfx = getTerminalPrefix();
     try {
       var main = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-      // Also check for any wo_ entries not yet in main array
+      // Also check for any wo_ entries not yet in main array (terminal-specific prefix)
       var mainIds = new Set(main.map(function(e){ return e.id; }));
       for (var i = 0; i < localStorage.length; i++) {
         var k = localStorage.key(i);
-        if (!k || k.indexOf('wo_') !== 0) continue;
+        if (!k || k.indexOf(pfx + 'wo_') !== 0) continue;
         try {
           var e = JSON.parse(localStorage.getItem(k));
           if (e && e.id && !mainIds.has(e.id)) { main.push(e); mainIds.add(e.id); }
@@ -11265,12 +11272,13 @@ render();
     } catch(e) { return []; }
   }
   function saveData(d) {
+    var pfx = getTerminalPrefix();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
     // Also save each entry per date key for consistency with other tabs
     if (Array.isArray(d)) {
       d.forEach(function(entry) {
         if (entry && entry.datum && entry.dienst) {
-          var key = 'wo_' + entry.datum.replace(/\//g,'-') + '_' + entry.dienst;
+          var key = pfx + 'wo_' + entry.datum.replace(/\//g,'-') + '_' + entry.dienst;
           localStorage.setItem(key, JSON.stringify(entry));
         }
       });
@@ -13297,9 +13305,10 @@ async function laadWeer() {
         var ds = k.slice(8, 18);
         if (ds.length === 10 && ds < cutoffStr) toRemove.push(k);
       }
-      // wo_dd-mm-yyyy_dienst format
-      if (k.indexOf('wo_') === 0) {
-        var parts = k.slice(3).split('_');
+      // wo_dd-mm-yyyy_dienst format (terminal-specific: EP_wo_ or HVH_wo_)
+      if (k.indexOf('_wo_') !== -1 && (k.indexOf('EP_wo_') === 0 || k.indexOf('HVH_wo_') === 0)) {
+        var woPfx = k.indexOf('EP_wo_') === 0 ? 'EP_wo_' : 'HVH_wo_';
+        var parts = k.slice(woPfx.length).split('_');
         if (parts.length >= 1) {
           var dp = parts[0].split('-');
           if (dp.length === 3) {
@@ -13391,11 +13400,16 @@ async function laadWeer() {
           var ds = k.slice(8, 18);
           if (ds.length === 10 && ds < cutoffStr) toRemove.push(k);
         }
-        // ls_pos_ and ls_txt_ keys containing a date
-        if (k.indexOf('ls_pos_') === 0 || k.indexOf('ls_txt_') === 0) {
-          var parts = k.split('_');
-          var datepart = parts[2] || '';
-          if (datepart.length === 10 && datepart < cutoffStr) toRemove.push(k);
+        // ls_pos_ and ls_txt_ keys containing a date (with optional terminal prefix EP_ or HVH_)
+        if (k.indexOf('ls_') === 0) {
+          var kInner = k.slice(3); // strip 'ls_'
+          if (kInner.indexOf('EP_') === 0) kInner = kInner.slice(3);
+          else if (kInner.indexOf('HVH_') === 0) kInner = kInner.slice(4);
+          if (kInner.indexOf('pos_') === 0 || kInner.indexOf('txt_') === 0) {
+            var parts = kInner.split('_');
+            var datepart = parts[1] || '';
+            if (datepart.length === 10 && datepart < cutoffStr) toRemove.push(k);
+          }
         }
       }
 
@@ -16045,12 +16059,17 @@ function renderTruckChart(maand, jaar) {
           try{ var e=JSON.parse(localStorage.getItem(k)); if(e&&e.pos) posPerDag[dt]=e.pos; }catch(ex){}
         }
       }
-      // Bron 2: ls_pos_YYYY-MM-DD_d0 (fallback als geen dagplan_)
-      if(k.startsWith('ls_pos_')){
-        var rest=k.slice(7);
-        var dt2=rest.indexOf('_d')>-1?rest.slice(0,rest.lastIndexOf('_d')):rest;
-        if(dt2.startsWith(prefix)&&!posPerDag[dt2]){
-          try{ var p2=JSON.parse(localStorage.getItem(k)); if(p2&&typeof p2==='object') posPerDag[dt2]=p2; }catch(ex){}
+      // Bron 2: ls_TERMINAL_pos_YYYY-MM-DD_d0 (fallback als geen dagplan_)
+      if(k.startsWith('ls_')&&(k.indexOf('_pos_')!==-1)){
+        var kStrip=k.slice(3);
+        if(kStrip.startsWith('EP_')) kStrip=kStrip.slice(3);
+        else if(kStrip.startsWith('HVH_')) kStrip=kStrip.slice(4);
+        if(kStrip.startsWith('pos_')){
+          var rest=kStrip.slice(4);
+          var dt2=rest.indexOf('_d')>-1?rest.slice(0,rest.lastIndexOf('_d')):rest;
+          if(dt2.startsWith(prefix)&&!posPerDag[dt2]){
+            try{ var p2=JSON.parse(localStorage.getItem(k)); if(p2&&typeof p2==='object') posPerDag[dt2]=p2; }catch(ex){}
+          }
         }
       }
     }
