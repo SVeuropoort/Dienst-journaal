@@ -4279,9 +4279,13 @@ buildServiceTable();
 initSig();
 window.addEventListener('resize', () => {
   if (sigCanvas) {
-    const data = sigCtx.getImageData(0, 0, sigCanvas.width, sigCanvas.height);
-    sigCanvas.width = sigCanvas.offsetWidth;
-    sigCtx.putImageData(data, 0, 0);
+    const newW = sigCanvas.offsetWidth;
+    if (!newW) return; // tab hidden or zero width — skip to avoid getImageData crash
+    const data = sigCanvas.width > 0 && sigCanvas.height > 0
+      ? sigCtx.getImageData(0, 0, sigCanvas.width, sigCanvas.height)
+      : null;
+    sigCanvas.width = newW;
+    if (data) sigCtx.putImageData(data, 0, 0);
     sigCtx.strokeStyle = '#0a2240';
     sigCtx.lineWidth = 2;
     sigCtx.lineCap = 'round';
@@ -4806,7 +4810,7 @@ window.addEventListener('resize', () => {
       if (toonFouten) showSyncStatus('✓ Opgeslagen in ' + rowId + ' (' + dagCount + ' dagplan)', 'ok');
     } catch(e) {
       if (toonFouten) showSyncStatus('✗ ' + e.message, 'err');
-      else console.error('cloudOpslaan:', e.message);
+      else console.warn('cloudOpslaan:', e.message);
     }
     _syncBezig = false;
   }
@@ -5444,8 +5448,7 @@ function refreshDropdowns(pfx, pool){
 
     if(isMeren){
       placedNames.forEach(name=>{
-        if(!merenUsed.has(name) || name===own)
-          html += '<option value="'+esc(name)+'"'+(name===own?' selected':'')+'>'+name+'</option>';
+        html += '<option value="'+esc(name)+'"'+(name===own?' selected':'')+'>'+name+'</option>';
       });
     } else if(isAL){
       twPlaced.forEach(name=>{
@@ -5797,7 +5800,8 @@ function buildStats(){
     <div class="si"><span class="dot" style="background:#c0392b"></span><span class="lbl">Trucks av.:</span><span class="val">${allAvTrucks.size}</span></div>
     <div class="si"><span class="dot" style="background:#c0392b"></span><span class="lbl">CF laden av.:</span><span class="val">${avCFTrucks + avIMMTrucks}</span></div>`;
 
-  document.getElementById('sbar').innerHTML=`
+  const _sbar = document.getElementById('sbar'); if (!_sbar) return;
+  _sbar.innerHTML=`
     <span style="font-weight:700;color:#1a2a4a;font-size:11px;white-space:nowrap;">${fmtDate(planDate)}</span>
     <div style="display:flex;align-items:center;gap:6px;background:#e8f0fb;border:2px solid #1a4a8a;border-radius:7px;padding:4px 10px;">
       <span style="font-size:11px;font-weight:800;color:#1a4a8a;text-transform:uppercase;letter-spacing:1px;margin-right:4px;">🌅 OCHTEND</span>
@@ -5835,8 +5839,10 @@ function showTab(t){
 
 function buildPanels(){
   texts = loadTexts();
-  document.getElementById('panelOchtend').innerHTML=buildOchtend();
-  document.getElementById('panelAvond').innerHTML=buildAvond();
+  const _pO = document.getElementById('panelOchtend');
+  const _pA = document.getElementById('panelAvond');
+  if (_pO) _pO.innerHTML=buildOchtend();
+  if (_pA) _pA.innerHTML=buildAvond();
   restoreTexts();
   refreshAllCertCells();
 }
@@ -5856,14 +5862,9 @@ function ddm(id){
   const sv   = pos[id]||'';
   // collect names placed in non-meren positions of this panel
   const placed = getPlacedNames(pfx);
-  const usedFromPos = new Set();
-  Object.entries(pos).forEach(([k,v])=>{
-    if(v && getKeyPfx(k)===pfx && isMerenKey(k)) usedFromPos.add(v);
-  });
   let opts='';
   placed.forEach(name=>{
-    if(!usedFromPos.has(name)||name===sv)
-      opts+=`<option value="${esc(name)}"${name===sv?' selected':''}>${name}</option>`;
+    opts+=`<option value="${esc(name)}"${name===sv?' selected':''}>${name}</option>`;
   });
   return `<select class="psel" data-pfx="${pfx}" data-key="${id}" data-meren="true" style="background:#fff" onchange="setP('${id}',this.value)"><option value=""></option>${opts}</select>`;
 }
@@ -6778,11 +6779,12 @@ function buildKadeCheck(){
   </table>
 </div>`;
 
-  document.getElementById('panelKade').innerHTML = html;
+  const _pK = document.getElementById('panelKade'); if (!_pK) return;
+  _pK.innerHTML = html;
 
   // Build employee list and append directly to kade panel
   const refHtml = buildRefHtml();
-  document.getElementById('panelKade').innerHTML +=
+  _pK.innerHTML +=
     '<div class="ref-wrap" style="margin-top:0">' + refHtml + '</div>';
 }
 
@@ -6850,7 +6852,8 @@ function buildRef(){
       </tr>`;
     });
   });
-  document.getElementById('refWrap').innerHTML=`
+  const _rw = document.getElementById('refWrap'); if (!_rw) return;
+  _rw.innerHTML=`
     <div style="font-size:12px;font-weight:700;color:#1a2a4a;margin-bottom:6px;margin-top:4px">
       📋 Personeelslijst — ${refEmps.length} medewerkers
       <span style="font-weight:400;font-size:11px;color:#555;margin-left:12px">${ochEmps.length} ochtend · ${avondEmps.length} avond</span>
