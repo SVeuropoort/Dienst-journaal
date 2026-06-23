@@ -2539,6 +2539,17 @@ window.tk = window.tk || function(key) {
     .ptable { width: 100% !important; font-size: 11pt !important; }
     .ptable td, .ptable th { padding: 1px 2px !important; }
     .psel { font-size: 11pt !important; height: auto !important; }
+    /* Bottom planning table (NA 12:00 / VOOR 17:00): proportional columns for print */
+    .ptable-bottom { width: 100% !important; table-layout: fixed !important; }
+    .ptable-bottom col:nth-child(1) { width: 9% !important; }
+    .ptable-bottom col:nth-child(2) { width: 14% !important; }
+    .ptable-bottom col:nth-child(3) { width: 14% !important; }
+    .ptable-bottom col:nth-child(4) { width: 2% !important; }
+    .ptable-bottom col:nth-child(5) { width: 14% !important; }
+    .ptable-bottom col:nth-child(6) { width: 14% !important; }
+    .ptable-bottom col:nth-child(8) { width: auto !important; }
+    .ptable-bottom col:nth-child(9) { width: 4% !important; }
+    .ptable-bottom col:nth-child(10) { width: 4% !important; }
     /* Force color printing */
     * { -webkit-print-color-adjust: exact !important;
          color-adjust: exact !important;
@@ -5417,10 +5428,10 @@ function usedNamesInPanel(pfx){
 function refreshDropdowns(pfx, pool){
   const allSels = Array.from(document.querySelectorAll('[data-pfx="'+pfx+'"]'));
 
-  // Names used by regular (non-meren, non-al, non-truck) selects
+  // Names used by regular (non-meren, non-al, non-truck, non-dup) selects
   const used = new Set();
   allSels.forEach(s=>{
-    if(s.value && s.getAttribute('data-meren')!=='true' && s.getAttribute('data-al')!=='true' && s.getAttribute('data-truck')!=='true')
+    if(s.value && s.getAttribute('data-meren')!=='true' && s.getAttribute('data-al')!=='true' && s.getAttribute('data-truck')!=='true' && s.getAttribute('data-dup')!=='true')
       used.add(s.value);
   });
 
@@ -5456,9 +5467,10 @@ function refreshDropdowns(pfx, pool){
           html += '<option value="'+esc(name)+'"'+(name===own?' selected':'')+'>'+name+'</option>';
       });
     } else {
+      const isDup = sel.getAttribute('data-dup')==='true';
       pool.forEach(e=>{
         if (_isUitgesloten(e) && e.name !== own) return;
-        if(!used.has(e.name) || e.name===own) {
+        if(isDup || !used.has(e.name) || e.name===own) {
           const mb = _isMentor(e) ? '🎓 ' : '';
           html += '<option value="'+esc(e.name)+'"'+(e.name===own?' selected':'')+'>'+mb+e.name+'</option>';
         }
@@ -5874,9 +5886,13 @@ function ddm(id){
 function getPlacedNames(pfx){
   const pool = (pfx === 'av') ? avondEmps : ochEmps;
   const poolNames = new Set(pool.map(e => e.name));
+  const seen = new Set();
   const names=[];
   Object.entries(pos).forEach(([k,v])=>{
-    if(v && getKeyPfx(k)===pfx && !isMerenKey(k) && k.indexOf('_tr_')===-1 && poolNames.has(v)) names.push(v);
+    if(v && getKeyPfx(k)===pfx && !isMerenKey(k) && k.indexOf('_tr_')===-1 && poolNames.has(v) && !seen.has(v)){
+      names.push(v);
+      seen.add(v);
+    }
   });
   return names;
 }
@@ -6153,6 +6169,22 @@ function _isMentor(e) {
   return t.includes('mentor') || s.includes('mentor') || co.includes('mentor');
 }
 
+// dd variant that allows duplicate selections (no "already used" filter)
+function ddd(id, pool, cls=''){
+  const sv  = pos[id]||'';
+  const pfx = (id.startsWith('a_')||id.startsWith('av_')) ? 'av' : 'oc';
+  let opts='';
+  pool.forEach(e=>{
+    if (_isUitgesloten(e) && e.name !== sv) return;
+    const mb = _isMentor(e) ? '🎓 ' : '';
+    opts+=`<option value="${esc(e.name)}"${e.name===sv?' selected':''}>${mb}${e.name}</option>`;
+  });
+  const bg = selBg(sv, pool);
+  const _cbadges = certBadgesHtml(sv);
+  const _verjBadge = (sv && typeof isVerjaardag === 'function' && isVerjaardag(sv)) ? '<span style="font-size:14px;margin-left:2px;" title="Vandaag jarig!">🎂</span>' : '';
+  return `<div class="cert-wrap" style="background:${bg}">${_verjBadge}<select class="psel${cls?' '+cls:''}" data-pfx="${pfx}" data-key="${id}" data-dup="true" style="background:${bg}" onchange="setP('${id}',this.value)"><option value=""></option>${opts}</select>${_cbadges}</div>`;
+}
+
 function dd(id, pool, cls=''){
   const sv  = pos[id]||'';
   const pfx = (id.startsWith('a_')||id.startsWith('av_')) ? 'av' : 'oc';
@@ -6333,14 +6365,14 @@ function buildOchtend(){
 
 <!-- NA 12:00 -->
 <div class="sec-div" data-cid="dp_title_ochtend_onder">NA 12:00</div>
-<table class="ptable" style="margin-top:3px">
+<table class="ptable ptable-bottom" style="margin-top:3px;width:100%;">
 <colgroup>
-  <col style="width:72px">
-  <col style="width:100px"><col style="width:100px">
-  <col style="width:40px">
-  <col style="width:100px"><col style="width:100px">
+  <col style="width:70px">
+  <col style="width:110px"><col style="width:110px">
+  <col style="width:20px">
+  <col style="width:110px"><col style="width:110px">
   <col class="sep">
-  <col><!-- opmerking -->
+  <col><!-- opmerking: fills remaining space -->
   <col style="width:32px"><col style="width:32px">
 </colgroup>
 <tr>
@@ -6352,12 +6384,12 @@ function buildOchtend(){
   <td class="hdr c-gray" colspan="3" data-cid="on_fixed_021"><b>OPMERKING:</b></td>
 </tr>
 <tr>
-  <td contenteditable="true" data-cid="on_pl1" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="on_cf_td1" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="on_cf_td2" style="outline:none;background:#fff;"></td>
+  <td>${ddd('on_pl1',p)}</td><td>${ddd('on_cf_td1',p)}</td><td>${ddd('on_cf_td2',p)}</td>
   <td class="c-gray"></td>
-  <td contenteditable="true" data-cid="on_tw_td1" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="on_tw_td2" style="outline:none;background:#fff;"></td>
+  <td>${ddd('on_tw_td1',p)}</td><td>${ddd('on_tw_td2',p)}</td>
   <td contenteditable="true" class="opm" data-cid="on_opmerking" rowspan="10" colspan="3" style="vertical-align:top"></td>
 </tr>
-<tr><td contenteditable="true" data-cid="on_pl2" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="on_cf_td3" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="on_cf_td4" style="outline:none;background:#fff;"></td><td></td><td contenteditable="true" data-cid="on_tw_td3" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="on_tw_td4" style="outline:none;background:#fff;"></td></tr>
+<tr><td data-cid="on_pl2" style="background:#f0f0f0;"></td><td>${ddd('on_cf_td3',p)}</td><td>${ddd('on_cf_td4',p)}</td><td></td><td>${ddd('on_tw_td3',p)}</td><td>${ddd('on_tw_td4',p)}</td></tr>
 <tr>
   <td class="role c-gray" data-cid="on_fixed_022">Controleur</td>
   <td class="hdr c-blue" data-cid="on_hdr_cf_tw" colspan="2"><select class="hdr-sel" data-cid="on_hdr_cf_tw" onchange="setHdrText('on_hdr_cf_tw',this.value)"><option value="CF Tussen deck" selected>CF Tussen deck</option><option value="CF top">CF top</option><option value="CF Tussen">CF Tussen</option><option value="CF main">CF main</option><option value="CF put">CF put</option><option value="Klaarzetten">Klaarzetten</option><option value="Trade">Trade</option><option value="Vuilronde">Vuilronde</option><option value="Truck wassen">Truck wassen</option></select></td>
@@ -6365,11 +6397,11 @@ function buildOchtend(){
   <td class="hdr c-blue" data-cid="on_hdr_tw_tw" colspan="2"><select class="hdr-sel" data-cid="on_hdr_tw_tw" onchange="setHdrText('on_hdr_tw_tw',this.value)"><option value="TW Tussen deck" selected>TW Tussen deck</option><option value="TW top">TW top</option><option value="TW tussen">TW tussen</option><option value="TW main">TW main</option><option value="TW put">TW put</option><option value="Klaarzetten">Klaarzetten</option><option value="Trade">Trade</option><option value="Vuilronde">Vuilronde</option><option value="Truck wassen">Truck wassen</option></select></td>
 </tr>
 <tr>
-  <td contenteditable="true" data-cid="on_ctrl1" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="on_cf_tw1" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="on_cf_tw2" style="outline:none;background:#fff;"></td>
+  <td>${ddd('on_ctrl1',p)}</td><td>${ddd('on_cf_tw1',p)}</td><td>${ddd('on_cf_tw2',p)}</td>
   <td class="c-gray"></td>
-  <td contenteditable="true" data-cid="on_tw_tw1" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="on_tw_tw2" style="outline:none;background:#fff;"></td>
+  <td>${ddd('on_tw_tw1',p)}</td><td>${ddd('on_tw_tw2',p)}</td>
 </tr>
-<tr><td contenteditable="true" data-cid="on_ctrl2" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="on_ctrl2_l2" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="on_ctrl2_l3" style="outline:none;background:#fff;"></td><td></td><td contenteditable="true" data-cid="on_ctrl2_r1" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="on_ctrl2_r2" style="outline:none;background:#fff;"></td></tr>
+<tr><td data-cid="on_ctrl2" style="background:#f0f0f0;"></td><td>${ddd('on_ctrl2_l2',p)}</td><td>${ddd('on_ctrl2_l3',p)}</td><td></td><td>${ddd('on_ctrl2_r1',p)}</td><td>${ddd('on_ctrl2_r2',p)}</td></tr>
 <tr>
   <td class="role c-gray" data-cid="on_fixed_023">Kraanmeester</td>
   <td class="hdr c-blue" data-cid="on_hdr_kade" colspan="2"><select class="hdr-sel" data-cid="on_hdr_kade" onchange="setHdrText('on_hdr_kade',this.value)"><option value="Kade klaarzetten" selected>Kade klaarzetten</option><option value="CF top">CF top</option><option value="CF Tussen">CF Tussen</option><option value="CF main">CF main</option><option value="CF put">CF put</option><option value="Klaarzetten">Klaarzetten</option><option value="Trade">Trade</option><option value="Vuilronde">Vuilronde</option><option value="Truck wassen">Truck wassen</option></select></td>
@@ -6377,14 +6409,14 @@ function buildOchtend(){
   <td class="hdr c-blue" data-cid="on_hdr_trade" colspan="2"><select class="hdr-sel" data-cid="on_hdr_trade" onchange="setHdrText('on_hdr_trade',this.value)"><option value="Trade" selected>Trade</option><option value="CF top">CF top</option><option value="CF Tussen">CF Tussen</option><option value="CF main">CF main</option><option value="CF put">CF put</option><option value="Klaarzetten">Klaarzetten</option><option value="Vuilronde">Vuilronde</option><option value="Truck wassen">Truck wassen</option></select></td>
 </tr>
 <tr>
-  <td contenteditable="true" data-cid="on_kraan1" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="on_kade1" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="on_kade2" style="outline:none;background:#fff;"></td>
+  <td>${ddd('on_kraan1',p)}</td><td>${ddd('on_kade1',p)}</td><td>${ddd('on_kade2',p)}</td>
   <td class="c-gray"></td>
-  <td contenteditable="true" data-cid="on_trade1" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="on_trade2" style="outline:none;background:#fff;"></td>
+  <td>${ddd('on_trade1',p)}</td><td>${ddd('on_trade2',p)}</td>
 </tr>
-<tr><td contenteditable="true" data-cid="on_kraan2" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="on_kade3" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="on_kade4" style="outline:none;background:#fff;"></td><td></td><td contenteditable="true" data-cid="on_trade3" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="on_trade4" style="outline:none;background:#fff;"></td></tr>
+<tr><td data-cid="on_kraan2" style="background:#f0f0f0;"></td><td>${ddd('on_kade3',p)}</td><td>${ddd('on_kade4',p)}</td><td></td><td>${ddd('on_trade3',p)}</td><td>${ddd('on_trade4',p)}</td></tr>
 
 <tr>
-  <td contenteditable="true" data-cid="on_adr1" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="on_adr2" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="on_adr3" style="outline:none;background:#fff;"></td><td></td><td contenteditable="true" data-cid="on_adr4" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="on_adr5" style="outline:none;background:#fff;"></td>
+  <td contenteditable="true" data-cid="on_adr1" style="outline:none;background:#fff;"></td><td>${ddd('on_adr2',p)}</td><td>${ddd('on_adr3',p)}</td><td></td><td>${ddd('on_adr4',p)}</td><td>${ddd('on_adr5',p)}</td>
 </tr>
 <tr><td></td><td></td><td></td><td></td><td></td><td></td></tr>
 </table>
@@ -6589,14 +6621,14 @@ function buildAvond(){
 
 <!-- ══ VOOR 17:00 ══ -->
 <div class="sec-div" data-cid="dp_title_avond_onder">VOOR 17:00</div>
-<table class="ptable" style="margin-top:3px">
+<table class="ptable ptable-bottom" style="margin-top:3px;width:100%;">
 <colgroup>
-  <col style="width:72px">
-  <col style="width:100px"><col style="width:100px">
-  <col style="width:40px">
-  <col style="width:100px"><col style="width:100px">
+  <col style="width:70px">
+  <col style="width:110px"><col style="width:110px">
+  <col style="width:20px">
+  <col style="width:110px"><col style="width:110px">
   <col class="sep">
-  <col><!-- opmerking -->
+  <col><!-- opmerking: fills remaining space -->
   <col style="width:32px"><col style="width:32px">
 </colgroup>
 <tr>
@@ -6608,12 +6640,12 @@ function buildAvond(){
   <td class="hdr c-gray" colspan="3" data-cid="av_fixed_021"><b>OPMERKING:</b></td>
 </tr>
 <tr>
-  <td contenteditable="true" data-cid="av_pl1" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_cf_td1" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_cf_td2" style="outline:none;background:#fff;"></td>
+  <td>${ddd('av_pl1',p)}</td><td>${ddd('av_cf_td1',p)}</td><td>${ddd('av_cf_td2',p)}</td>
   <td class="c-gray"></td>
-  <td contenteditable="true" data-cid="av_tw_td1" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_tw_td2" style="outline:none;background:#fff;"></td>
+  <td>${ddd('av_tw_td1',p)}</td><td>${ddd('av_tw_td2',p)}</td>
   <td contenteditable="true" class="opm" data-cid="av_opmerking" rowspan="10" colspan="3" style="vertical-align:top"></td>
 </tr>
-<tr><td contenteditable="true" data-cid="av_x1" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_x2" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_x3" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_x4" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_x5" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_x6" style="outline:none;background:#fff;"></td></tr>
+<tr><td data-cid="av_x1" style="background:#f0f0f0;"></td><td>${ddd('av_x2',p)}</td><td>${ddd('av_x3',p)}</td><td></td><td>${ddd('av_x5',p)}</td><td>${ddd('av_x6',p)}</td></tr>
 <tr>
   <td class="role c-gray" data-cid="av_fixed_022">Controleur</td>
   <td class="hdr c-blue" data-cid="av_hdr_ct_l" colspan="2"><select class="hdr-sel" data-cid="av_hdr_ct_l" onchange="setHdrText('av_hdr_ct_l',this.value)"><option value="CF Tussen deck" selected>CF Tussen deck</option><option value="CF top">CF top</option><option value="CF Tussen">CF Tussen</option><option value="CF main">CF main</option><option value="CF put">CF put</option><option value="Klaarzetten">Klaarzetten</option><option value="Trade">Trade</option><option value="Vuilronde">Vuilronde</option><option value="Truck wassen">Truck wassen</option></select></td>
@@ -6621,11 +6653,11 @@ function buildAvond(){
   <td class="hdr c-blue" data-cid="av_hdr_ct_r" colspan="2"><select class="hdr-sel" data-cid="av_hdr_ct_r" onchange="setHdrText('av_hdr_ct_r',this.value)"><option value="TW Tussen deck" selected>TW Tussen deck</option><option value="TW top">TW top</option><option value="TW tussen">TW tussen</option><option value="TW main">TW main</option><option value="TW put">TW put</option><option value="Klaarzetten">Klaarzetten</option><option value="Trade">Trade</option><option value="Vuilronde">Vuilronde</option><option value="Truck wassen">Truck wassen</option></select></td>
 </tr>
 <tr>
-  <td contenteditable="true" data-cid="av_ctrl1" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_cf_tw1" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_cf_tw2" style="outline:none;background:#fff;"></td>
+  <td>${ddd('av_ctrl1',p)}</td><td>${ddd('av_cf_tw1',p)}</td><td>${ddd('av_cf_tw2',p)}</td>
   <td class="c-gray"></td>
-  <td contenteditable="true" data-cid="av_tw_tw1" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_tw_tw2" style="outline:none;background:#fff;"></td>
+  <td>${ddd('av_tw_tw1',p)}</td><td>${ddd('av_tw_tw2',p)}</td>
 </tr>
-<tr><td contenteditable="true" data-cid="av_x7" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_gray_201" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_gray_202" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_x10" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_gray_203" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_gray_204" style="outline:none;background:#fff;"></td></tr>
+<tr><td data-cid="av_x7" style="background:#f0f0f0;"></td><td>${ddd('av_gray_201',p)}</td><td>${ddd('av_gray_202',p)}</td><td></td><td>${ddd('av_gray_203',p)}</td><td>${ddd('av_gray_204',p)}</td></tr>
 <tr>
   <td class="role c-gray" data-cid="av_fixed_023">Kraanmeester</td>
   <td class="hdr c-blue" data-cid="av_hdr_kr_l" colspan="2"><select class="hdr-sel" data-cid="av_hdr_kr_l" onchange="setHdrText('av_hdr_kr_l',this.value)"><option value="Kade klaarzetten" selected>Kade klaarzetten</option><option value="CF top">CF top</option><option value="CF Tussen">CF Tussen</option><option value="CF main">CF main</option><option value="CF put">CF put</option><option value="Klaarzetten">Klaarzetten</option><option value="Trade">Trade</option><option value="Vuilronde">Vuilronde</option><option value="Truck wassen">Truck wassen</option></select></td>
@@ -6633,14 +6665,14 @@ function buildAvond(){
   <td class="hdr c-blue" data-cid="av_hdr_kr_r" colspan="2"><select class="hdr-sel" data-cid="av_hdr_kr_r" onchange="setHdrText('av_hdr_kr_r',this.value)"><option value="Trade" selected>Trade</option><option value="TW top">TW top</option><option value="TW tussen">TW tussen</option><option value="TW main">TW main</option><option value="TW put">TW put</option><option value="Klaarzetten">Klaarzetten</option><option value="Vuilronde">Vuilronde</option><option value="Truck wassen">Truck wassen</option></select></td>
 </tr>
 <tr>
-  <td contenteditable="true" data-cid="av_kraan1" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_kade1" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_kade2" style="outline:none;background:#fff;"></td>
+  <td>${ddd('av_kraan1',p)}</td><td>${ddd('av_kade1',p)}</td><td>${ddd('av_kade2',p)}</td>
   <td class="c-gray"></td>
-  <td contenteditable="true" data-cid="av_trade1" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_trade2" style="outline:none;background:#fff;"></td>
+  <td>${ddd('av_trade1',p)}</td><td>${ddd('av_trade2',p)}</td>
 </tr>
-<tr><td contenteditable="true" data-cid="av_x13" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_x14" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_x15" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_x16" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_x17" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_x18" style="outline:none;background:#fff;"></td></tr>
+<tr><td data-cid="av_x13" style="background:#f0f0f0;"></td><td>${ddd('av_x14',p)}</td><td>${ddd('av_x15',p)}</td><td></td><td>${ddd('av_x17',p)}</td><td>${ddd('av_x18',p)}</td></tr>
 
-<tr><td contenteditable="true" data-cid="av_x19" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_x20" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_x21" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_x22" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_x23" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_x24" style="outline:none;background:#fff;"></td></tr>
-<tr><td contenteditable="true" data-cid="av_x25" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_x26" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_x27" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_x28" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_x29" style="outline:none;background:#fff;"></td><td contenteditable="true" data-cid="av_x30" style="outline:none;background:#fff;"></td></tr>
+<tr><td contenteditable="true" data-cid="av_x19" style="outline:none;background:#fff;"></td><td>${ddd('av_x20',p)}</td><td>${ddd('av_x21',p)}</td><td></td><td>${ddd('av_x23',p)}</td><td>${ddd('av_x24',p)}</td></tr>
+<tr><td contenteditable="true" data-cid="av_x25" style="outline:none;background:#fff;"></td><td>${ddd('av_x26',p)}</td><td>${ddd('av_x27',p)}</td><td></td><td>${ddd('av_x29',p)}</td><td>${ddd('av_x30',p)}</td></tr>
 </table>
 
 <!-- LASHING -->
