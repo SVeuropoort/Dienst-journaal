@@ -3779,6 +3779,7 @@ document.addEventListener('contextmenu', function(e) {
 const _PRIJZEN_KEY = 'werkorder_prijzen_v1';
 const _svcDefault = [
 
+  { id: 's0',  name: 'Uurloon',                        desc: 'Uurtarief per medewerker.',                                                                         price: 0.00,   unit: 'uren',        max: 100 },
   { id: 's1',  name: 'Tank service',                   desc: '',                                                                                                  price: 15.45,  unit: 'keer tanken', max: 10 },
   { id: 's2',  name: 'Jump start auto',                desc: '',                                                                                                  price: 46.35,  unit: 'aantal',      max: 10 },
   { id: 's3',  name: 'Jump Truck (Busje)',              desc: '',                                                                                                  price: 66.95,  unit: 'aantal',      max: 10 },
@@ -3804,8 +3805,14 @@ function _loadSvcArray() {
     var saved = JSON.parse(localStorage.getItem(_PRIJZEN_KEY));
     if (saved && saved.length) {
       var map = {};
-      saved.forEach(function(s){ map[s.id] = s.price; });
-      return _svcDefault.map(function(s){ return Object.assign({}, s, { price: map[s.id] !== undefined ? map[s.id] : s.price }); });
+      saved.forEach(function(s){ map[s.id] = s; });
+      return _svcDefault.map(function(s){
+        var sv = map[s.id];
+        return Object.assign({}, s, {
+          price: sv && sv.price !== undefined ? sv.price : s.price,
+          name:  sv && sv.name  ? sv.name  : s.name
+        });
+      });
     }
   } catch(e){}
   return _svcDefault.slice();
@@ -3854,7 +3861,10 @@ function openPrijsInst() {
   var tbody=document.getElementById('prijs-inst-body'); tbody.innerHTML='';
   _svcArray.forEach(function(s){
     var pv=s.price!==null&&s.price!==undefined?s.price:'';
-    tbody.innerHTML+='<tr style="border-bottom:1px solid #eee;"><td style="padding:6px 10px;">'+s.name+'</td><td style="padding:6px 10px;text-align:right;"><input type="number" step="0.01" min="0" data-id="'+s.id+'" value="'+pv+'" style="width:100px;padding:4px 6px;border:1px solid #c8d7e8;border-radius:4px;text-align:right;font-size:12px;"></td></tr>';
+    tbody.innerHTML+='<tr style="border-bottom:1px solid #eee;">'
+      +'<td style="padding:6px 10px;"><input type="text" data-name-id="'+s.id+'" value="'+s.name.replace(/"/g,'&quot;')+'" style="width:220px;padding:4px 6px;border:1px solid #c8d7e8;border-radius:4px;font-size:12px;"></td>'
+      +'<td style="padding:6px 10px;text-align:right;"><input type="number" step="0.01" min="0" data-id="'+s.id+'" value="'+pv+'" style="width:100px;padding:4px 6px;border:1px solid #c8d7e8;border-radius:4px;text-align:right;font-size:12px;"></td>'
+      +'</tr>';
   });
   document.getElementById('prijs-inst-msg').textContent='';
   document.getElementById('prijs-inst-overlay').style.display='flex';
@@ -3862,7 +3872,12 @@ function openPrijsInst() {
 function closePrijsInst() { document.getElementById('prijs-inst-overlay').style.display='none'; }
 function slaPrijzenOp() {
   var saved=[];
-  document.querySelectorAll('#prijs-inst-body input[data-id]').forEach(function(inp){ var v=inp.value.trim(); saved.push({id:inp.dataset.id,price:v===''?null:parseFloat(v)}); });
+  var nameMap={};
+  document.querySelectorAll('#prijs-inst-body input[data-name-id]').forEach(function(inp){ nameMap[inp.dataset.nameId]=inp.value.trim(); });
+  document.querySelectorAll('#prijs-inst-body input[data-id]').forEach(function(inp){
+    var v=inp.value.trim();
+    saved.push({id:inp.dataset.id, name:nameMap[inp.dataset.id]||'', price:v===''?null:parseFloat(v)});
+  });
   localStorage.setItem(_PRIJZEN_KEY,JSON.stringify(saved));
   _svcArray=_loadSvcArray();
   document.getElementById('prijs-inst-msg').textContent='✓ Prijzen opgeslagen!';
@@ -3870,7 +3885,14 @@ function slaPrijzenOp() {
 }
 function resetPrijzen() {
   localStorage.removeItem(_PRIJZEN_KEY); _svcArray=_loadSvcArray();
-  document.querySelectorAll('#prijs-inst-body input[data-id]').forEach(function(inp){ var def=_svcDefault.find(function(s){return s.id===inp.dataset.id;}); inp.value=def&&def.price!==null?def.price:''; });
+  document.querySelectorAll('#prijs-inst-body input[data-id]').forEach(function(inp){
+    var def=_svcDefault.find(function(s){return s.id===inp.dataset.id;});
+    inp.value=def&&def.price!==null?def.price:'';
+  });
+  document.querySelectorAll('#prijs-inst-body input[data-name-id]').forEach(function(inp){
+    var def=_svcDefault.find(function(s){return s.id===inp.dataset.nameId;});
+    if(def) inp.value=def.name;
+  });
   document.getElementById('prijs-inst-msg').style.color='#666'; document.getElementById('prijs-inst-msg').textContent='Standaard hersteld – klik Opslaan.';
 }
 
@@ -6927,6 +6949,17 @@ function printTab(){
   // Capture the full panel HTML including inline styles/transforms
   var panelHtml = panel.outerHTML;
 
+  // Capture weer and getijden cards from home tab
+  var weerCard     = document.getElementById('weer-card');
+  var getijdenCard = document.getElementById('getijden-card');
+  var extraHtml = '';
+  if (weerCard || getijdenCard) {
+    extraHtml += '<div style="margin-top:4mm;display:flex;gap:4mm;width:410mm;">';
+    if (weerCard)     extraHtml += '<div style="flex:1;overflow:hidden;">' + weerCard.outerHTML + '</div>';
+    if (getijdenCard) extraHtml += '<div style="flex:1;overflow:hidden;">' + getijdenCard.outerHTML + '</div>';
+    extraHtml += '</div>';
+  }
+
   // Collect all <style> tags from current page (so .ptable, .psel, cert-badge etc. all come along)
   var styles = '';
   Array.from(document.styleSheets).forEach(function(ss){
@@ -6941,7 +6974,7 @@ function printTab(){
     + '<style>'
     // Page: A3 landscape, no margins
     + '@page { size: 420mm 297mm landscape; margin: 5mm; }'
-    + 'html, body { width:410mm; height:287mm; margin:0; padding:0; overflow:hidden; background:white; }'
+    + 'html, body { width:410mm; margin:0; padding:0; overflow:hidden; background:white; }'
     // All captured styles
     + styles
     // Print-specific overrides
@@ -6950,9 +6983,19 @@ function printTab(){
     + '.ptable { width:100% !important; table-layout:fixed !important; }'
     + '.psel { -webkit-appearance:none; -moz-appearance:none; appearance:none; border:none !important; background:transparent !important; }'
     + '* { -webkit-print-color-adjust:exact !important; color-adjust:exact !important; print-color-adjust:exact !important; }'
+    // Weer/getijden card print styles
+    + '.btn-secondary { display:none !important; }'
+    + '#weer-loading,#getijden-loading { display:none !important; }'
+    + '#weer-error,#getijden-error { display:none !important; }'
+    + '#weer-data,#getijden-data { display:block !important; }'
+    + '.card { border:1px solid #ccc !important; border-radius:4px !important; padding:6px !important; font-size:9pt !important; background:white !important; }'
+    + '.card-header { display:flex !important; align-items:center !important; gap:6px !important; margin-bottom:4px !important; font-weight:700 !important; }'
+    + '.card-header h2 { font-size:9pt !important; margin:0 !important; }'
+    + '.card-header .icon { font-size:14px !important; }'
     + '@media print { body { margin:0; padding:0; } }'
     + '</style></head><body>'
     + panelHtml
+    + extraHtml
     + '<script>'
     // Auto-scale to fill A3 width exactly, then print
     + 'window.onload = function(){'
@@ -14201,10 +14244,10 @@ async function laadWeer() {
 </div>
 <!-- PRIJS MODAL -->
 <div id="prijs-inst-overlay" onclick="if(event.target===this)closePrijsInst()" style="display:none;position:fixed;inset:0;background:rgba(0,0,30,0.6);z-index:9999;align-items:center;justify-content:center;">
-  <div style="background:#fff;border-radius:10px;padding:28px 32px;max-width:560px;width:95%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
-    <h2 style="color:#003366;margin:0 0 16px;">&#x2699;&#xFE0F; Prijzen aanpassen</h2>
+  <div style="background:#fff;border-radius:10px;padding:28px 32px;max-width:720px;width:95%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
+    <h2 style="color:#003366;margin:0 0 16px;">&#x2699;&#xFE0F; Diensten &amp; Prijzen aanpassen</h2>
     <table style="width:100%;border-collapse:collapse;font-size:12px;">
-      <thead><tr style="background:#003366;color:#fff;"><th style="padding:6px 10px;text-align:left;">Dienst</th><th style="padding:6px 10px;text-align:right;width:120px;">Prijs (&#x20AC;)</th></tr></thead>
+      <thead><tr style="background:#003366;color:#fff;"><th style="padding:6px 10px;text-align:left;">Dienst</th><th style="padding:6px 10px;text-align:right;width:130px;">Prijs (&#x20AC;)</th></tr></thead>
       <tbody id="prijs-inst-body"></tbody>
     </table>
     <p id="prijs-inst-msg" style="font-size:12px;min-height:16px;margin:10px 0 0;color:#1a8a50;"></p>
