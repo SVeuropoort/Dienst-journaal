@@ -8,7 +8,7 @@ window.tk = window.tk || function(key) {
   var splitKeys = ['dienstjournaal_stena_v1','vaarschema_backup_v1','vs_data_v1',
     'materieel_status_v1','mat_standalone_v2','mat_custom_list',
     'plan_v3','dagPlanning_v2_state','dagPlanning_v2_lastDate',
-    'dagpl_cert_v1','dagpl_cert_v2','scheepzoeker_schepen','dagPlanning_vasteCelteksten_v1','telefoonlijst_home_v1'];
+    'dagpl_cert_v1','dagpl_cert_v2','scheepzoeker_schepen','dagPlanning_vasteCelteksten_v1','telefoonlijst_home_v1','dagpl_cert_dates_v1'];
   if (key.startsWith('dagplan_')) return pfx + key;
   if (splitKeys.indexOf(key) >= 0) return pfx + key;
   return key;
@@ -4716,7 +4716,8 @@ window.addEventListener('resize', () => {
     'dagpl_cert_v1',
     'dagpl_cert_v2',
     'scheepzoeker_schepen',
-    'telefoonlijst_home_v1'
+    'telefoonlijst_home_v1',
+    'dagpl_cert_dates_v1'
   ];
 
   function getSyncData() {
@@ -6070,6 +6071,63 @@ function saveCerts(data) {
   localStorage.setItem(getCertKey(), JSON.stringify(data));
 }
 
+// ── CERTIFICAAT DATUMS ─────────────────────────────────────────────
+var CERT_DATES_KEY_BASE = 'dagpl_cert_dates_v1';
+function getCertDatesKey() { return tk(CERT_DATES_KEY_BASE); }
+// Geldigheid in jaren per categorie
+var CERT_GELDIGHEID = { bhv: 1, adm: 1, ehbo: 1, gevst: 5 };
+
+function getCertDates() {
+  try { return JSON.parse(localStorage.getItem(getCertDatesKey())) || {}; } catch(e) { return {}; }
+}
+function saveCertDates(data) {
+  localStorage.setItem(getCertDatesKey(), JSON.stringify(data));
+}
+function getCertVervalDatum(behaald, cat) {
+  if (!behaald) return null;
+  var d = new Date(behaald);
+  if (isNaN(d)) return null;
+  var jaren = CERT_GELDIGHEID[cat] || 1;
+  d.setFullYear(d.getFullYear() + jaren);
+  return d;
+}
+function isoNaarNL(iso) {
+  if (!iso) return '';
+  var p = iso.split('-');
+  if (p.length === 3) return p[2]+'/'+p[1]+'/'+p[0];
+  return iso;
+}
+function nlNaarIso(nl) {
+  if (!nl) return '';
+  var p = nl.split('/');
+  if (p.length === 3) return p[2]+'-'+p[1]+'-'+p[0];
+  return nl;
+}
+function certSaveDatumNL(input) {
+  var cat = input.dataset.cat;
+  var naam = input.dataset.naam;
+  var valNL = input.value.trim();
+  var valISO = nlNaarIso(valNL);
+  var dates = getCertDates();
+  if (!dates[cat]) dates[cat] = {};
+  dates[cat][naam] = valISO;
+  saveCertDates(dates);
+  renderCertGeldigheid();
+}
+function certDatumStatus(verval) {
+  if (!verval) return 'onbekend';
+  var now = new Date(); now.setHours(0,0,0,0);
+  var diff = Math.round((verval - now) / 86400000);
+  if (diff < 0) return 'verlopen';
+  if (diff <= 60) return 'bijna';
+  return 'geldig';
+}
+function fmtDatumNL(d) {
+  if (!d) return '–';
+  return d.toLocaleDateString('nl-NL', {day:'2-digit',month:'2-digit',year:'numeric'});
+}
+
+
 function getCertList(name) {
   if (!name) return [];
   const certs = getCerts();
@@ -7296,17 +7354,76 @@ function dagplanningLaden() {
 
 
 // ── CERTIFICERINGEN MODAL ──────────────────────────────────────────
-function openCertModal() {
+function openCertModal(tab) {
   const certs = getCerts();
   document.getElementById('cert-ta-bhv').value   = certs.bhv.join('\n');
   document.getElementById('cert-ta-adm').value   = certs.adm.join('\n');
   document.getElementById('cert-ta-gevst').value = certs.gevst.join('\n');
   document.getElementById('cert-ta-ehbo').value  = certs.ehbo.join('\n');
-  const el = document.getElementById('cert-overlay');
-  el.style.display = 'flex';
+  certShowTab(tab || 'namen');
+  document.getElementById('cert-overlay').style.display = 'flex';
 }
 function closeCertModal() {
   document.getElementById('cert-overlay').style.display = 'none';
+}
+function certShowTab(tab) {
+  document.getElementById('cert-tab-namen').style.display = tab==='namen' ? '' : 'none';
+  document.getElementById('cert-tab-geldig').style.display = tab==='geldig' ? '' : 'none';
+  document.getElementById('cert-tabbn-namen').style.fontWeight = tab==='namen' ? '700' : '400';
+  document.getElementById('cert-tabbn-namen').style.borderBottom = tab==='namen' ? '2px solid #003366' : '2px solid transparent';
+  document.getElementById('cert-tabbn-geldig').style.fontWeight = tab==='geldig' ? '700' : '400';
+  document.getElementById('cert-tabbn-geldig').style.borderBottom = tab==='geldig' ? '2px solid #003366' : '2px solid transparent';
+  if (tab === 'geldig') renderCertGeldigheid();
+}
+function renderCertGeldigheid() {
+  const certs = getCerts();
+  const dates = getCertDates();
+  const cats = [
+    {key:'bhv',   label:'BHV',               kleur:'#c6f6d5', tekst:'#276749'},
+    {key:'adm',   label:'Ademlucht',          kleur:'#bee3f8', tekst:'#2b6cb0'},
+    {key:'ehbo',  label:'EHBO',               kleur:'#c6f6d5', tekst:'#276749'},
+    {key:'gevst', label:'Gevaarlijke stoffen', kleur:'#feebc8', tekst:'#c05621'}
+  ];
+  let html = '';
+  cats.forEach(function(c) {
+    const namen = certs[c.key] || [];
+    const catDates = dates[c.key] || {};
+    html += '<div style="margin-bottom:18px;">';
+    html += '<div style="background:'+c.kleur+';padding:8px 12px;font-weight:700;font-size:13px;color:'+c.tekst+';border-radius:6px 6px 0 0;">'+c.label+'</div>';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+    html += '<thead><tr style="background:#f7fafc;"><th style="padding:6px 10px;text-align:left;border-bottom:1px solid #e2e8f0;">Naam</th><th style="padding:6px 10px;text-align:left;border-bottom:1px solid #e2e8f0;">Behaald</th><th style="padding:6px 10px;text-align:left;border-bottom:1px solid #e2e8f0;">Verloopt</th><th style="padding:6px 10px;border-bottom:1px solid #e2e8f0;"></th></tr></thead>';
+    html += '<tbody>';
+    if (!namen.length) {
+      html += '<tr><td colspan="4" style="padding:8px 10px;color:#aaa;font-style:italic;">Geen medewerkers</td></tr>';
+    } else {
+      namen.forEach(function(naam) {
+        var behaald = catDates[naam] || '';
+        var verval = getCertVervalDatum(behaald, c.key);
+        var status = certDatumStatus(verval);
+        var statusKleur = status==='verlopen'?'#c0392b':status==='bijna'?'#e67e22':status==='geldig'?'#27ae60':'#aaa';
+        var statusLabel = status==='verlopen'?'⛔ Verlopen':status==='bijna'?'⚠️ Bijna':status==='geldig'?'✓ Geldig':'–';
+        var rowBg = status==='verlopen'?'#fff5f5':status==='bijna'?'#fffbeb':'#fff';
+        html += '<tr style="background:'+rowBg+';border-bottom:1px solid #f0f0f0;">';
+        html += '<td style="padding:6px 10px;font-weight:600;">'+naam+'</td>';
+        html += '<td style="padding:6px 10px;"><input type="text" placeholder="dd/mm/yyyy" data-cat="'+c.key+'" data-naam="'+naam.replace(/"/g,'&quot;')+'" value="'+isoNaarNL(behaald)+'" style="border:1px solid #e2e8f0;border-radius:4px;padding:3px 6px;font-size:11px;width:90px;" onchange="certSaveDatumNL(this)"></td>';
+        html += '<td style="padding:6px 10px;color:'+statusKleur+';font-weight:600;">'+fmtDatumNL(verval)+'</td>';
+        html += '<td style="padding:6px 10px;color:'+statusKleur+';font-size:11px;">'+statusLabel+'</td>';
+        html += '</tr>';
+      });
+    }
+    html += '</tbody></table></div>';
+  });
+  document.getElementById('cert-geldig-body').innerHTML = html;
+}
+function certSaveDatum(input) {
+  var cat = input.dataset.cat;
+  var naam = input.dataset.naam;
+  var val = input.value;
+  var dates = getCertDates();
+  if (!dates[cat]) dates[cat] = {};
+  dates[cat][naam] = val;
+  saveCertDates(dates);
+  renderCertGeldigheid();
 }
 function saveCertModal() {
   const parse = id => document.getElementById(id).value
@@ -11223,10 +11340,17 @@ render();
       <span style="color:#fff;font-weight:700;font-size:15px;">&#x2699;&#xFE0F; Certificeringen</span>
       <button onclick="closeCertModal()" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:13px;">&#x2715;</button>
     </div>
+    <!-- Tabbladen -->
+    <div style="display:flex;gap:0;border-bottom:1px solid #e2e8f0;padding:0 20px;background:#f7fafc;">
+      <button id="cert-tabbn-namen" onclick="certShowTab('namen')" style="padding:10px 18px;border:none;background:transparent;cursor:pointer;font-size:13px;border-bottom:2px solid #003366;font-weight:700;color:#003366;">Medewerkers</button>
+      <button id="cert-tabbn-geldig" onclick="certShowTab('geldig')" style="padding:10px 18px;border:none;background:transparent;cursor:pointer;font-size:13px;border-bottom:2px solid transparent;font-weight:400;color:#555;">📅 Geldigheid & Vervaldata</button>
+    </div>
     <div style="padding:20px;flex:1;">
       <p style="font-size:12px;color:#718096;margin-bottom:16px;background:#f7fafc;border-radius:6px;padding:8px 12px;border-left:3px solid #bee3f8;">
         Medewerkers in de planning krijgen automatisch een badge en gekleurde rand als ze in een van deze lijsten staan.
       </p>
+      <!-- Tab: Medewerkers -->
+      <div id="cert-tab-namen">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
         <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
           <div style="background:#c6f6d5;padding:10px 14px;display:flex;align-items:center;gap:8px;">
@@ -11268,7 +11392,15 @@ render();
             <textarea id="cert-ta-ehbo" rows="11" style="width:100%;border:1px solid #e2e8f0;border-radius:5px;padding:8px;font-size:12px;resize:vertical;font-family:Arial,sans-serif;line-height:1.6;"></textarea>
           </div>
         </div>
+      </div> <!-- einde namen grid -->
+      </div> <!-- einde cert-tab-namen -->
+
+      <!-- Tab: Geldigheid -->
+      <div id="cert-tab-geldig" style="display:none;">
+        <p style="font-size:12px;color:#718096;margin-bottom:12px;">Voer per medewerker de behaaldatum in. De vervaldatum wordt automatisch berekend (BHV/EHBO/Ademlucht = 1 jaar, Gevaarlijke stoffen = 5 jaar).</p>
+        <div id="cert-geldig-body"></div>
       </div>
+
       <div style="display:flex;align-items:center;justify-content:space-between;margin-top:20px;">
         <span id="cert-saved-msg" style="font-size:12px;color:#276749;opacity:0;transition:opacity 0.4s;">&#x2713; Opgeslagen</span>
         <div style="display:flex;gap:10px;">
