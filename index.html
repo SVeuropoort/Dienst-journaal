@@ -4221,6 +4221,9 @@ function submitForm() {
     +'<div class="f"><label>Ondertekend door</label><span>'+ondertekend+'</span></div>'
     +'<div class="f"><label>Datum</label><span>'+datum+'</span></div>'
     +'</div>'
+    +'<div style="margin:18px 15px 8px;padding:10px 14px;background:#fff8e6;border:1px solid #e6a23c;border-radius:6px;font-size:11px;color:#333;">'
+    +'Please submit this work order by e-mail to: <strong style="color:#c0392b;">ports.invoices@stenaline.com</strong>'
+    +'</div>'
     +'<div class="ftr">'
     +'<div>Stena Line Europoort Terminal &bull; Port Operations &bull; '+orderNr+'</div>'
 
@@ -9307,6 +9310,21 @@ function generatePDF() {
       field('Naam klant ondertekenaar', document.getElementById('sigClientName').value);
       embedCanvas('sigClient', 'Handtekening Klant', 35);
       spacer(6);
+
+      // ---- Submission instruction ----
+      checkPage(20);
+      spacer(4);
+      doc.setFillColor(...[255, 248, 230]);
+      doc.setDrawColor(...[230, 162, 60]);
+      doc.roundedRect(ML, y, CW, 14, 1.5, 1.5, 'FD');
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...DARK);
+      doc.text('Please submit this report by e-mail to:', ML + 3, y + 5.5);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...RED);
+      doc.text('ports.invoices@stenaline.com', ML + 3, y + 11);
+      y += 18;
 
       // ---- Footer on last page ----
       checkPage(12);
