@@ -3042,20 +3042,13 @@ document.addEventListener('contextmenu', function(e) {
             <button onclick="fDatumStap(1)" style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:7px 11px;cursor:pointer;font-size:14px;">&#8594;</button>
           </div>
         </div>
+        <input type="hidden" id="f-dienst" value="Dag">
         <div class="field">
-          <label>Dienst</label>
-          <select id="f-dienst" onchange="laadDagData()">
-            <option value="Ochtend">Ochtend</option>
-            <option value="Middag">Middag</option>
-          </select>
-        </div>
-        <div class="field" style="grid-column: span 1;"></div>
-        <div class="field">
-          <label>Naam Overdragende Supervisor</label>
+          <label>Naam Supervisor Ochtend</label>
           <input type="text" id="f-sup-oud" placeholder="Voornaam Achternaam" />
         </div>
         <div class="field">
-          <label>Naam Overnemende Supervisor</label>
+          <label>Naam Supervisor Middag</label>
           <input type="text" id="f-sup-nieuw" placeholder="Voornaam Achternaam" />
         </div>
       </div>
@@ -5279,9 +5272,44 @@ function setHdrText(cid, val){
   saveTexts();
 }
 
+// Bepaalt de "spiegel"-cid voor LASHING (sjorringen) cellen: on_ <-> av_
+function getLashMirrorCid(cid){
+  var m = /^(on|av)_lash_(in|out)([123])$/.exec(cid);
+  if(!m) return null;
+  var otherPfx = (m[1] === 'on') ? 'av' : 'on';
+  return otherPfx + '_lash_' + m[2] + m[3];
+}
+
 function onTextInput(cid, el){
   texts[cid] = el.innerText;
+  var mirror = getLashMirrorCid(cid);
+  if (mirror) {
+    texts[mirror] = el.innerText;
+    var mirrorEl = document.querySelector('[data-cid="'+mirror+'"]');
+    if (mirrorEl && mirrorEl.innerText !== el.innerText) mirrorEl.innerText = el.innerText;
+  }
   saveTexts();
+}
+
+// Zorgt dat de LASHING-waarden van ochtend en avond altijd gelijk zijn,
+// ook voor al eerder opgeslagen datums waar dit nog niet zo was.
+function syncLashSjorMirror(){
+  var keys = ['in1','out1','in2','out2','in3','out3'];
+  var changed = false;
+  keys.forEach(function(k){
+    var onCid = 'on_lash_'+k, avCid = 'av_lash_'+k;
+    var onVal = texts[onCid] || '', avVal = texts[avCid] || '';
+    if (onVal !== avVal) {
+      var val = onVal || avVal;
+      texts[onCid] = val; texts[avCid] = val;
+      var onEl = document.querySelector('[data-cid="'+onCid+'"]');
+      var avEl = document.querySelector('[data-cid="'+avCid+'"]');
+      if (onEl && onEl.innerText !== val) onEl.innerText = val;
+      if (avEl && avEl.innerText !== val) avEl.innerText = val;
+      changed = true;
+    }
+  });
+  if (changed) saveTexts();
 }
 
 // After building panels: attach listeners and restore saved text
@@ -5882,6 +5910,7 @@ function buildPanels(){
   if (_pO) _pO.innerHTML=buildOchtend();
   if (_pA) _pA.innerHTML=buildAvond();
   restoreTexts();
+  if (typeof syncLashSjorMirror === 'function') syncLashSjorMirror();
   refreshAllCertCells();
 }
 
@@ -11661,6 +11690,7 @@ render();
     if (fDatum) {
       var n = new Date();
       fDatum.value = n.getFullYear() + '-' + String(n.getMonth()+1).padStart(2,'0') + '-' + String(n.getDate()).padStart(2,'0');
+      if (typeof laadDagData === 'function') laadDagData();
     }
     var savedMat = getMatSaData();
     if (savedMat && savedMat.length > 0) {
@@ -11690,6 +11720,24 @@ render();
   laadDagData();
 }
 
+// Haalt de SV-namen (Ochtend/Avond) op uit de Dagplanning voor een gegeven datum
+function getDagplanSV(datum){
+  try{
+    var key = (typeof tk === 'function') ? tk('dagplan_'+datum) : ('dagplan_'+datum);
+    var snap = JSON.parse(localStorage.getItem(key) || 'null');
+    var p = (snap && snap.pos) || {};
+    return { och: p['o_sv1'] || '', mid: p['a_sv1'] || '' };
+  }catch(e){ return { och:'', mid:'' }; }
+}
+
+// Zet supervisor-velden in Werkoverdracht op basis van de SV-cel uit de Dagplanning
+function syncSupervisorVanDagplan(datum){
+  var sv = getDagplanSV(datum);
+  var elO = document.getElementById('f-sup-oud'), elM = document.getElementById('f-sup-nieuw');
+  if(elO){ elO.value = sv.och; elO.readOnly = true; elO.title = 'Automatisch overgenomen uit Dagplanning (Ochtend, SV)'; elO.style.background = '#f0f2f5'; }
+  if(elM){ elM.value = sv.mid; elM.readOnly = true; elM.title = 'Automatisch overgenomen uit Dagplanning (Avond, SV)'; elM.style.background = '#f0f2f5'; }
+}
+
 function laadDagData() {
     var datum=document.getElementById('f-datum').value, dienst=document.getElementById('f-dienst').value;
     if(!datum) return;
@@ -11706,14 +11754,14 @@ function laadDagData() {
     document.getElementById('f-datum').dataset.prevDatum=datum;
     document.getElementById('f-datum').dataset.prevDienst=dienst;
     var allD=getData(), ents=allD.filter(function(e){return e.datum===datum&&e.dienst===dienst;});
-    if(!ents.length){document.getElementById('f-sup-oud').value='';document.getElementById('f-sup-nieuw').value='';document.getElementById('f-taken').value='';document.getElementById('f-ziek').value='';document.getElementById('f-incident').value='';document.getElementById('f-startup').value='';return;}
+    if(!ents.length){document.getElementById('f-taken').value='';document.getElementById('f-ziek').value='';document.getElementById('f-incident').value='';document.getElementById('f-startup').value='';syncSupervisorVanDagplan(datum);return;}
     var e=ents[ents.length-1];
-    document.getElementById('f-sup-oud').value=e.supOud||'';document.getElementById('f-sup-nieuw').value=e.supNieuw||'';
     document.getElementById('f-taken').value=e.taken||'';document.getElementById('f-ziek').value=e.ziek||'';
     document.getElementById('f-incident').value=e.incident||'';document.getElementById('f-startup').value=e.startup||'';
     if(e.units){setUnits(e.units);}else{document.querySelectorAll('.units-input').forEach(function(i){i.value='';});berekenUnitsTotalen();}
     if(e.tijden){setTijden(e.tijden);}else{document.querySelectorAll('.tijden-input').forEach(function(i){i.value='';}); }
     if(e.sjorringen){setSjorringen(e.sjorringen);}else{document.querySelectorAll('.sjor-input').forEach(function(i){i.value='';}); }
+    syncSupervisorVanDagplan(datum);
   }
 
   function slaJournaalOp() {
@@ -11758,7 +11806,7 @@ function laadDagData() {
     const maand = String(now.getMonth()+1).padStart(2,'0');
     const jaar  = String(now.getFullYear());
     const el = document.getElementById('f-datum');
-    if (el) el.value = `${dag}/${maand}/${jaar}`;
+    if (el) { el.value = `${jaar}-${maand}-${dag}`; laadDagData(); }
   })();
     materieel = JSON.parse(JSON.stringify(MATERIEEL_DEF));
     buildMaterieelTable(materieel);
@@ -12286,6 +12334,36 @@ Verzonden via Dienst Journaal Europoort`;
     if (result.length === 10) setTimeout(laadVaarschema, 200);
   }
 
+  // Haalt de LASHING (sjorringen) waarden op uit de Dagplanning voor een gegeven datum.
+  // Ochtend- en avondpaneel bevatten dezelfde waarden; on_ heeft voorrang, av_ is fallback.
+  function getDagplanSjor(datum) {
+    var out = {'harwich-ocht-in':'','harwich-ocht-uit':'','harwich-midd-in':'','harwich-midd-uit':'','imm-in':'','imm-uit':''};
+    try {
+      var key = (typeof tk === 'function') ? tk('dagplan_'+datum) : ('dagplan_'+datum);
+      var snap = JSON.parse(localStorage.getItem(key) || 'null');
+      var t = (snap && snap.texts) || {};
+      out['harwich-ocht-in']  = t['on_lash_in1']  || t['av_lash_in1']  || '';
+      out['harwich-ocht-uit'] = t['on_lash_out1'] || t['av_lash_out1'] || '';
+      out['harwich-midd-in']  = t['on_lash_in2']  || t['av_lash_in2']  || '';
+      out['harwich-midd-uit'] = t['on_lash_out2'] || t['av_lash_out2'] || '';
+      out['imm-in']           = t['on_lash_in3']  || t['av_lash_in3']  || '';
+      out['imm-uit']          = t['on_lash_out3'] || t['av_lash_out3'] || '';
+    } catch(e) {}
+    return out;
+  }
+
+  // Zet de sjorringen-velden in Punctuality altijd gelijk aan de LASHING-waarden
+  // van de Dagplanning voor dezelfde datum, en maakt de velden read-only.
+  function syncSjorringenVanDagplan(datum) {
+    var data = getDagplanSjor(datum);
+    setSjorVs(data);
+    document.querySelectorAll('#view-punctuality .sjor-input').forEach(function(i){
+      i.readOnly = true;
+      i.style.background = '#f0f2f5';
+      i.title = 'Automatisch overgenomen uit Dagplanning (LASHING)';
+    });
+  }
+
   function getVsDatumKey() {
     var el = document.getElementById('vs-datum');
     var val = el ? el.value : '';
@@ -12388,18 +12466,19 @@ function wisselPunctualityDatum(dateStr) {
     if (entry) {
       if (entry.tijden) setTijdenVs(entry.tijden);
       if (entry.units)  setUnitsVs(entry.units);
-      if (entry.sjor)   setSjorVs(entry.sjor);
       updateVaarschemaLabel(entry.opgeslagenOp);
     } else {
       updateVaarschemaLabel('Geen data voor ' + key);
     }
+    // Sjorringen komen altijd uit de Dagplanning van dezelfde datum
+    if (typeof syncSjorringenVanDagplan === 'function') syncSjorringenVanDagplan(dateStr);
     // Sync dagplanning date silently
     var dp = document.getElementById('dagPlanDatum');
     if (dp && dp.value !== dateStr) dp.value = dateStr;
   }
   window.wisselPunctualityDatum = wisselPunctualityDatum;
   function isVandaag(d){var t=new Date();return d===t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');}
-  function setVsLock(locked){window._vsLocked=locked;var btn=document.getElementById('vs-lock-btn');var inp=document.querySelectorAll('#view-punctuality .tijden-input,#view-punctuality .units-input,#view-punctuality .units-opmerking-input,#view-punctuality .sjor-input,#view-punctuality textarea,#view-punctuality input[type="text"],#view-punctuality input[type="time"]');if(locked){if(btn){btn.innerHTML='&#x1F512;';btn.style.background='#c0392b';}inp.forEach(function(i){i.readOnly=true;i.style.opacity='0.6';i.style.cursor='not-allowed';});}else{if(btn){btn.innerHTML='&#x1F513;';btn.style.background='#27ae60';}inp.forEach(function(i){i.readOnly=false;i.style.opacity='';i.style.cursor='';});}}
+  function setVsLock(locked){window._vsLocked=locked;var btn=document.getElementById('vs-lock-btn');var inp=document.querySelectorAll('#view-punctuality .tijden-input,#view-punctuality .units-input,#view-punctuality .units-opmerking-input,#view-punctuality textarea,#view-punctuality input[type="text"],#view-punctuality input[type="time"]');if(locked){if(btn){btn.innerHTML='&#x1F512;';btn.style.background='#c0392b';}inp.forEach(function(i){i.readOnly=true;i.style.opacity='0.6';i.style.cursor='not-allowed';});}else{if(btn){btn.innerHTML='&#x1F513;';btn.style.background='#27ae60';}inp.forEach(function(i){i.readOnly=false;i.style.opacity='';i.style.cursor='';});}}
   function toggleVsLock(){setVsLock(!window._vsLocked);}
   var _owp=wisselPunctualityDatum;wisselPunctualityDatum=function(d){_owp(d);setTimeout(function(){setVsLock(!isVandaag(d));},50);};window.wisselPunctualityDatum=wisselPunctualityDatum;
   setTimeout(function(){var vd=document.getElementById('vs-datum');setVsLock(vd&&vd.value?!isVandaag(vd.value):false);},300);
@@ -16131,6 +16210,17 @@ function navTo(view, label, btn){
   if(view === 'archief') { if(typeof renderArchief === 'function') renderArchief(); if(typeof renderKPI === 'function') renderKPI(); }
   if(view === 'dagplanning' && typeof buildPanels === 'function'){ buildPanels(); if(typeof buildStats==='function') buildStats(); }
   if(view === 'materieel' && typeof laadPorto === 'function') laadPorto();
+  if(view === 'nieuw') {
+    var _fd = document.getElementById('f-datum');
+    if(_fd) {
+      var _today = new Date();
+      var _yy = _today.getFullYear();
+      var _mm = String(_today.getMonth()+1).padStart(2,'0');
+      var _dd = String(_today.getDate()).padStart(2,'0');
+      _fd.value = _yy + '-' + _mm + '-' + _dd;
+      if(typeof laadDagData === 'function') laadDagData();
+    }
+  }
   if(view === 'punctuality') {
     var _vsDp = document.getElementById('vs-datum');
     var _dagDp = document.getElementById('dagPlanDatum');
@@ -16334,31 +16424,7 @@ function renderTruckChart(maand, jaar) {
 }
 // ═══ AUTO-SAVE WERKOVERDRACHT ═══
 (function(){
-  var _asTimer = null;
-  var _asSaved = false;
-
-  function autoSaveWerkoverdracht() {
-    clearTimeout(_asTimer);
-    _asTimer = setTimeout(function(){
-      // Alleen opslaan als datum ingevuld is
-      var datum = typeof getDatum === 'function' ? getDatum() : '';
-      if (!datum) return;
-      if (typeof slaJournaalOp === 'function') {
-        slaJournaalOp();
-        // Toon subtiele bevestiging
-        var ind = document.getElementById('autosave-ind');
-        if (ind) { ind.style.opacity='1'; setTimeout(function(){ind.style.opacity='0';},2000); }
-      }
-    }, 2000); // 2 seconden na laatste wijziging
-  }
-
-  // Hook op alle input/textarea/select in view-nieuw
-  document.addEventListener('DOMContentLoaded', function(){
-    var view = document.getElementById('view-nieuw');
-    if (!view) return;
-    view.addEventListener('input',  autoSaveWerkoverdracht);
-    view.addEventListener('change', autoSaveWerkoverdracht);
-  });
+  // Autosave verwijderd - alleen opslaan via de knop "Journaal Opslaan"
 })();
 
 function navWerkoverdracht(label, btn) {
