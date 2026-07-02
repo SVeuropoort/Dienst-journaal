@@ -3296,6 +3296,7 @@ document.addEventListener('contextmenu', function(e) {
       <div class="card-header">
         <div class="icon">&#x26D3;</div>
         <h2>Sjorringen</h2>
+        <span id="sjor-datum-label" style="margin-left:auto;font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.3px;"></span>
       </div>
       <div style="overflow-x:auto;">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;">
@@ -5234,7 +5235,7 @@ function savePos() {
       if (ochEmps.length > 0) snap.ochEmps = ochEmps;
       if (avondEmps.length > 0) snap.avondEmps = avondEmps;
       if (allEmps.length > 0) snap.allEmps = allEmps;
-    } else if (ochEmps.length > 0 || avondEmps.length > 0) {
+    } else {
       snap = { allEmps:allEmps, ochEmps:ochEmps, avondEmps:avondEmps,
                planDate:planDate, pos:pos, texts:texts };
     }
@@ -5262,7 +5263,17 @@ function saveTexts() {
   } catch(e) {}
   try {
     var snap = JSON.parse(localStorage.getItem(tk('dagplan_'+planDate))||'null');
-    if (snap) { snap.texts = texts; localStorage.setItem(tk('dagplan_'+planDate), JSON.stringify(snap)); }
+    if (snap) {
+      snap.texts = texts;
+    } else {
+      // Ook zonder geladen medewerkers moet een snapshot bestaan, anders gaat
+      // getypte tekst (bv. LASHING/sjorringen) niet mee naar andere tabbladen.
+      snap = { allEmps: (typeof allEmps!=='undefined'?allEmps:[]) || [],
+               ochEmps: (typeof ochEmps!=='undefined'?ochEmps:[]) || [],
+               avondEmps: (typeof avondEmps!=='undefined'?avondEmps:[]) || [],
+               planDate: planDate, pos: (typeof pos!=='undefined'?pos:{}) || {}, texts: texts };
+    }
+    localStorage.setItem(tk('dagplan_'+planDate), JSON.stringify(snap));
   } catch(e) {}
 }
 
@@ -5289,6 +5300,16 @@ function onTextInput(cid, el){
     if (mirrorEl && mirrorEl.innerText !== el.innerText) mirrorEl.innerText = el.innerText;
   }
   saveTexts();
+  // Live doorzetten naar Punctuality/Sjorringen, maar alleen als die op dezelfde
+  // datum staat als de dagplanning die nu bewerkt wordt.
+  if (/^(on|av)_lash_(in|out)[123]$/.test(cid)) {
+    try {
+      var vsDp = document.getElementById('vs-datum');
+      if (vsDp && vsDp.value === planDate && typeof window.syncSjorringenVanDagplan === 'function') {
+        window.syncSjorringenVanDagplan(planDate);
+      }
+    } catch(e) {}
+  }
 }
 
 // Zorgt dat de LASHING-waarden van ochtend en avond altijd gelijk zijn,
@@ -5339,7 +5360,15 @@ function dpTerminalNaam(){
 }
 let dpFixedTexts = dpLoadFixedTexts();
 function dpLoadFixedTexts(){
-  try { return JSON.parse(localStorage.getItem(dpFixedStorageKey()) || '{}') || {}; }
+  try {
+    var d = JSON.parse(localStorage.getItem(dpFixedStorageKey()) || '{}') || {};
+    var changed = false;
+    Object.keys(d).forEach(function(cid){
+      if (/^(on|av)_lash_(in|out)[123]$/.test(cid)) { delete d[cid]; changed = true; }
+    });
+    if (changed) { try { localStorage.setItem(dpFixedStorageKey(), JSON.stringify(d)); } catch(e){} }
+    return d;
+  }
   catch(e){ return {}; }
 }
 function dpSaveFixedTexts(){
@@ -5350,6 +5379,10 @@ function dpSaveFixedTexts(){
   } catch(e) {}
 }
 function hasCellDefault(cid){
+  // LASHING IN/OUT waarden mogen NOOIT automatisch worden ingevuld (niet via
+  // CELL_DEFAULTS, niet via terminal-specifieke vaste celteksten). Deze mogen
+  // alleen met de hand ingevuld en opgeslagen worden, per datum.
+  if (/^(on|av)_lash_(in|out)[123]$/.test(cid)) return false;
   dpFixedTexts = dpFixedTexts || {};
   return Object.prototype.hasOwnProperty.call(dpFixedTexts, cid) || Object.prototype.hasOwnProperty.call(CELL_DEFAULTS, cid);
 }
@@ -5399,6 +5432,7 @@ function openDagplanningVasteTekstModal(){
   els.forEach(function(el){
     var cid = el.getAttribute('data-cid');
     if (!cid || dpIsSelectWrapper(el, cid) || seen[cid]) return;
+    if (/^(on|av)_lash_(in|out)[123]$/.test(cid)) return; // alleen met de hand per datum invullen, nooit als vaste tekst
     seen[cid] = true;
     var val = dpReadCurrentDefault(el, cid);
     var isSelect = (el.tagName === 'SELECT');
@@ -5433,6 +5467,7 @@ function saveDagplanningVasteTeksten(){
   document.querySelectorAll('[data-dp-fixed-cid]').forEach(function(inp){
     var cid = inp.getAttribute('data-dp-fixed-cid');
     if (!cid) return;
+    if (/^(on|av)_lash_(in|out)[123]$/.test(cid)) return; // alleen met de hand per datum invullen, nooit als vaste tekst
     next[cid] = inp.value || '';
   });
   dpFixedTexts = next;
@@ -11723,9 +11758,17 @@ render();
 // Haalt de SV-namen (Ochtend/Avond) op uit de Dagplanning voor een gegeven datum
 function getDagplanSV(datum){
   try{
-    var key = (typeof tk === 'function') ? tk('dagplan_'+datum) : ('dagplan_'+datum);
-    var snap = JSON.parse(localStorage.getItem(key) || 'null');
-    var p = (snap && snap.pos) || {};
+    var prefix = (typeof getTerminalPrefix === 'function') ? getTerminalPrefix() : ((sessionStorage.getItem('dj_terminal')||'EP')+'_');
+    var p = null;
+    try { p = JSON.parse(localStorage.getItem('ls_'+prefix+'pos_'+datum+'_d0') || 'null'); } catch(e){}
+    if (!p || !Object.keys(p).length) {
+      try {
+        var key = (typeof tk === 'function') ? tk('dagplan_'+datum) : ('dagplan_'+datum);
+        var snap = JSON.parse(localStorage.getItem(key) || 'null');
+        if (snap && snap.pos) p = snap.pos;
+      } catch(e){}
+    }
+    p = p || {};
     return { och: p['o_sv1'] || '', mid: p['a_sv1'] || '' };
   }catch(e){ return { och:'', mid:'' }; }
 }
@@ -12339,9 +12382,19 @@ Verzonden via Dienst Journaal Europoort`;
   function getDagplanSjor(datum) {
     var out = {'harwich-ocht-in':'','harwich-ocht-uit':'','harwich-midd-in':'','harwich-midd-uit':'','imm-in':'','imm-uit':''};
     try {
-      var key = (typeof tk === 'function') ? tk('dagplan_'+datum) : ('dagplan_'+datum);
-      var snap = JSON.parse(localStorage.getItem(key) || 'null');
-      var t = (snap && snap.texts) || {};
+      var prefix = (typeof getTerminalPrefix === 'function') ? getTerminalPrefix() : ((sessionStorage.getItem('dj_terminal')||'EP')+'_');
+      var t = null;
+      // Bron 1: de altijd-bijgewerkte per-datum tekstopslag (zelfde bron als Dagplanning zelf gebruikt)
+      try { t = JSON.parse(localStorage.getItem('ls_'+prefix+'txt_'+datum+'_d0') || 'null'); } catch(e){}
+      // Bron 2: dagplan_ snapshot als fallback (oudere/andere opslagvorm)
+      if (!t || !Object.keys(t).length) {
+        try {
+          var key = (typeof tk === 'function') ? tk('dagplan_'+datum) : ('dagplan_'+datum);
+          var snap = JSON.parse(localStorage.getItem(key) || 'null');
+          if (snap && snap.texts) t = snap.texts;
+        } catch(e){}
+      }
+      t = t || {};
       out['harwich-ocht-in']  = t['on_lash_in1']  || t['av_lash_in1']  || '';
       out['harwich-ocht-uit'] = t['on_lash_out1'] || t['av_lash_out1'] || '';
       out['harwich-midd-in']  = t['on_lash_in2']  || t['av_lash_in2']  || '';
@@ -12362,7 +12415,13 @@ Verzonden via Dienst Journaal Europoort`;
       i.style.background = '#f0f2f5';
       i.title = 'Automatisch overgenomen uit Dagplanning (LASHING)';
     });
+    var lbl = document.getElementById('sjor-datum-label');
+    if (lbl && datum) {
+      var p = datum.split('-');
+      lbl.textContent = p.length === 3 ? ('voor ' + p[2] + '-' + p[1] + '-' + p[0]) : '';
+    }
   }
+  window.syncSjorringenVanDagplan = syncSjorringenVanDagplan;
 
   function getVsDatumKey() {
     var el = document.getElementById('vs-datum');
