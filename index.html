@@ -3361,6 +3361,7 @@ document.addEventListener('contextmenu', function(e) {
         <div style="font-size:18px;">&#x1F69B;</div>
         <h2>Status Materieel</h2>
         <div style="margin-left:auto;display:flex;gap:8px;">
+          <button id="mat-refresh-btn" onclick="event.stopPropagation();verversMaterieelVanCloud();" title="Haal de laatste statussen op (bv. van de garage)" style="background:#eef3fa;color:#003366;border:1px solid #c8d7e8;border-radius:6px;padding:8px 13px;cursor:pointer;font-size:14px;font-weight:700;display:flex;align-items:center;gap:6px;">&#8635; Vernieuwen</button>
           <button onclick="event.stopPropagation();openMatInstellingen();" title="Materieel beheren" style="background:#003366;color:#fff;border:none;border-radius:6px;padding:8px 13px;cursor:pointer;font-size:17px;">&#x2699;&#xFE0F;</button>
         </div>
       </div>
@@ -12592,6 +12593,57 @@ function wisselPunctualityDatum(dateStr) {
   function saveMatSaData(d) {
     localStorage.setItem(MAT_SA_KEY, JSON.stringify(d));
   }
+
+  // Haalt de laatste materieelstatus rechtstreeks van Supabase op (bv. wijzigingen
+  // gemaakt door de garage via de standalone Materieel-pagina) en werkt de
+  // huidige weergave direct bij, zonder de hele pagina te herladen.
+  async function verversMaterieelVanCloud() {
+    var btn = document.getElementById('mat-refresh-btn');
+    var origHTML = btn ? btn.innerHTML : '';
+    if (btn) { btn.innerHTML = '&#8635; Bezig...'; btn.disabled = true; }
+    try {
+      var pfx = getTerminalPrefix();
+      var resp = await fetch(SB_URL + '/rest/v1/' + SB_TABLE + '?id=eq.' + getSBRowId() + '&select=data', {
+        headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
+      });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      var rows = await resp.json();
+      var data = (rows && rows[0] && rows[0].data) || {};
+
+      var cloudStatus = data[pfx + 'materieel_status_v1'];
+      var cloudCustom  = data[pfx + 'mat_custom_list'];
+      var cloudStore   = data[pfx + 'mat_standalone_v2'];
+
+      if (cloudCustom) localStorage.setItem(tk('mat_custom_list'), JSON.stringify(cloudCustom));
+      if (cloudStatus) localStorage.setItem(MAT_SA_KEY, JSON.stringify(cloudStatus));
+      if (cloudStore)  localStorage.setItem(tk('mat_standalone_v2'), JSON.stringify(cloudStore));
+
+      // Bouw matSaData opnieuw op basis van de (mogelijk vernieuwde) lijst + statussen
+      var basis = cloudCustom && cloudCustom.length
+        ? cloudCustom.map(function(m){ return {type:m.type, naam:m.naam, status:'OK', opmerking:''}; })
+        : JSON.parse(JSON.stringify(MATERIEEL_DEF));
+      if (cloudStatus && cloudStatus.length) {
+        var map = {};
+        cloudStatus.forEach(function(m){ map[m.type + '|' + m.naam] = m; });
+        basis.forEach(function(m){
+          var s = map[m.type + '|' + m.naam];
+          if (s) { m.status = s.status || 'OK'; m.opmerking = s.opmerking || ''; }
+        });
+      }
+      matSaData = basis;
+      materieel = JSON.parse(JSON.stringify(matSaData));
+      buildMatSa(matSaData);
+
+      var lbl = document.getElementById('mat-saved-label');
+      var ts  = document.getElementById('mat-last-saved');
+      if (lbl) { lbl.textContent = '\u2713 Vernieuwd'; lbl.style.opacity = '1'; setTimeout(function(){ lbl.style.opacity = '0'; setTimeout(function(){ lbl.textContent = '\u2713 Opgeslagen'; }, 400); }, 2000); }
+      if (ts)  { ts.textContent = 'Vernieuwd: ' + new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}); }
+    } catch(e) {
+      alert('Vernieuwen mislukt: ' + e.message);
+    }
+    if (btn) { btn.innerHTML = origHTML; btn.disabled = false; }
+  }
+  window.verversMaterieelVanCloud = verversMaterieelVanCloud;
 
   function buildMatSa(data) {
     const trucks = data.filter(m => m.type === 'Truck');
