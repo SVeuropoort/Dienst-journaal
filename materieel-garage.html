@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Status Materieel — Garage</title>
+<style>
+  :root{
+    --navy:#003366; --navy-mid:#004080;
+    --accent:#e8192c; --accent-soft:rgba(232,25,44,0.1);
+    --success:#1a8a50; --warn:#d06010;
+    --border:#c8d7e8; --text:#1a2a3a; --muted:#5a7090; --bg:#f4f7fb;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:'Segoe UI',Arial,sans-serif; background:var(--bg); color:var(--text);
+    -webkit-tap-highlight-color:transparent;
+  }
+  header{
+    background:linear-gradient(135deg,var(--navy),var(--navy-mid));
+    color:#fff; padding:16px 18px 14px; position:sticky; top:0; z-index:20;
+    box-shadow:0 3px 10px rgba(0,0,0,0.15);
+  }
+  .header-top{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px;}
+  header h1{margin:0; font-size:19px; letter-spacing:.5px; display:flex; align-items:center; gap:10px;}
+  #gear-btn{
+    background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.25); color:#fff;
+    border-radius:8px; padding:8px 13px; font-size:17px; cursor:pointer; line-height:1;
+  }
+  #gear-btn:hover{background:rgba(255,255,255,0.22);}
+  .terminal-tabs{display:flex; gap:8px;}
+  .terminal-tab{
+    flex:1; text-align:center; padding:11px 8px; border-radius:8px; border:1px solid rgba(255,255,255,0.25);
+    background:rgba(255,255,255,0.08); color:#fff; font-weight:700; font-size:14px; cursor:pointer;
+    letter-spacing:.3px; transition:background .15s;
+  }
+  .terminal-tab.active{background:#fff; color:var(--navy); border-color:#fff;}
+  .status-bar{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:8px 18px; background:#eaf0f8; border-bottom:1px solid var(--border);
+    font-size:12px; color:var(--muted); flex-wrap:wrap;
+  }
+  .status-bar .dot{display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px;}
+  .dot-ok{background:var(--success);}
+  .dot-busy{background:var(--warn);}
+  .dot-err{background:var(--accent);}
+  #refresh-btn{
+    background:#fff; border:1px solid var(--border); color:var(--navy); border-radius:6px;
+    padding:6px 12px; font-size:12px; font-weight:700; cursor:pointer;
+  }
+  main{padding:14px; max-width:720px; margin:0 auto;}
+  .card{
+    background:#fff; border-radius:12px; box-shadow:0 2px 8px rgba(0,40,90,0.08);
+    margin-bottom:14px; overflow:hidden; border:1px solid var(--border);
+  }
+  .section-toggle{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:13px 16px; background:#eef3fa; cursor:pointer; user-select:none;
+  }
+  .section-toggle .left{display:flex; align-items:center; gap:10px; font-weight:700; font-size:14.5px;}
+  .arrow{transition:transform .15s;}
+  .arrow.closed{transform:rotate(-90deg);}
+  table.mat-table{width:100%; border-collapse:collapse;}
+  .mat-table th{
+    text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted);
+    padding:8px 12px; border-bottom:1px solid var(--border); background:#fafcff;
+  }
+  .mat-table td{padding:9px 12px; border-bottom:1px solid #edf1f7; font-size:14px; vertical-align:middle;}
+  .mat-table tr:last-child td{border-bottom:none;}
+  .type-badge{
+    display:inline-block; background:#eef3fa; color:var(--navy); font-weight:700; font-size:12.5px;
+    padding:3px 9px; border-radius:6px; white-space:nowrap;
+  }
+  select.stat-sel{
+    width:100%; min-width:130px; padding:8px 8px; border-radius:6px; border:1px solid var(--border);
+    font-size:13.5px; font-weight:600; background:#fff; color:var(--text);
+  }
+  select.stat-sel.status-ok{color:var(--success); border-color:rgba(26,138,80,0.4); background:rgba(26,138,80,0.06);}
+  select.stat-sel.status-defect{color:var(--accent); border-color:rgba(232,25,44,0.4); background:var(--accent-soft);}
+  select.stat-sel.status-onderhoud{color:var(--warn); border-color:rgba(208,96,16,0.4); background:rgba(208,96,16,0.08);}
+  .opm-input{
+    width:100%; border:1px solid var(--border); border-radius:6px; padding:8px 9px; font-size:13.5px;
+    font-family:inherit; outline:none; background:#fff;
+  }
+  .opm-input:disabled{background:transparent; border-color:transparent; color:var(--muted);}
+  .badge{border-radius:20px; padding:3px 10px; font-size:11px; font-weight:700; letter-spacing:.2px;}
+  .badge-danger{background:var(--accent-soft); color:var(--accent); border:1px solid rgba(232,25,44,0.2);}
+  .badge-warn{background:rgba(208,96,16,0.12); color:var(--warn); border:1px solid rgba(208,96,16,0.2);}
+  .badge-ok{background:rgba(26,138,80,0.1); color:var(--success); border:1px solid rgba(26,138,80,0.2);}
+  .empty{padding:20px; text-align:center; color:var(--muted); font-size:13px;}
+  footer{text-align:center; color:var(--muted); font-size:11px; padding:10px 0 30px;}
+
+  .modal-overlay{
+    display:none; position:fixed; inset:0; background:rgba(10,20,35,0.55); z-index:100;
+    align-items:flex-start; justify-content:center; padding:24px 12px; overflow-y:auto;
+  }
+  .modal-box{
+    background:#fff; border-radius:12px; width:100%; max-width:520px; overflow:hidden;
+    box-shadow:0 10px 40px rgba(0,0,0,0.3);
+  }
+  .modal-head{
+    background:linear-gradient(135deg,var(--navy),var(--navy-mid)); color:#fff;
+    padding:14px 16px; display:flex; align-items:center; justify-content:space-between;
+  }
+  .modal-head span{font-weight:800; font-size:15px; letter-spacing:.3px;}
+  .modal-head button{background:rgba(255,255,255,0.15); border:none; color:#fff; border-radius:6px; padding:5px 11px; cursor:pointer; font-size:15px;}
+  .modal-body{padding:16px; max-height:60vh; overflow-y:auto;}
+  .modal-body h3{margin:0 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted);}
+  .chip-wrap{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px;}
+  .chip{
+    display:inline-flex; align-items:center; gap:4px; border-radius:20px; padding:5px 10px 5px 12px;
+    font-size:13px; font-weight:600;
+  }
+  .chip.truck{background:#e8eef5; border:1px solid #c0cfe0; color:#003366;}
+  .chip.overig{background:#f0f4e8; border:1px solid #c0d0a0; color:#2d5a1b;}
+  .chip small{opacity:.6; margin-right:2px;}
+  .chip button{background:none; border:none; color:#c0392b; cursor:pointer; font-size:15px; line-height:1; padding:0 0 0 4px;}
+  .add-row{display:flex; gap:6px; margin-bottom:18px;}
+  .add-row input{flex:1; padding:8px 9px; border:1px solid var(--border); border-radius:6px; font-size:13.5px;}
+  .add-row button{background:var(--navy); color:#fff; border:none; border-radius:6px; padding:8px 14px; font-weight:700; cursor:pointer; font-size:13px; white-space:nowrap;}
+  .modal-foot{display:flex; justify-content:space-between; gap:8px; padding:12px 16px; border-top:1px solid var(--border); background:#fafcff;}
+  .btn-secondary{background:#fff; color:var(--accent); border:1px solid rgba(232,25,44,0.3); border-radius:6px; padding:9px 14px; font-weight:700; cursor:pointer; font-size:13px;}
+  .btn-cancel{background:#fff; color:var(--navy); border:1px solid var(--border); border-radius:6px; padding:9px 14px; font-weight:700; cursor:pointer; font-size:13px;}
+  .btn-save{background:var(--navy); color:#fff; border:none; border-radius:6px; padding:9px 18px; font-weight:700; cursor:pointer; font-size:13px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <h1>&#x1F69B; Status Materieel</h1>
+    <button id="gear-btn" title="Materieel beheren" onclick="openInstellingen()">&#x2699;&#xFE0F;</button>
+  </div>
+  <div class="terminal-tabs">
+    <div class="terminal-tab active" id="tab-EP" onclick="wisselTerminal('EP')">Europoort</div>
+    <div class="terminal-tab" id="tab-HVH" onclick="wisselTerminal('HVH')">Hoek van Holland</div>
+  </div>
+</header>
+
+<div class="status-bar">
+  <span id="status-text"><span class="dot dot-ok"></span>Klaar</span>
+  <button id="refresh-btn" onclick="ververs()">&#8635; Vernieuwen</button>
+</div>
+
+<main>
+  <div class="card">
+    <div class="section-toggle" onclick="toggleSectie('trucks')">
+      <div class="left"><span>&#x1F69A; Trucks</span><span id="trucks-summary"></span></div>
+      <span class="arrow" id="trucks-arrow">&#9660;</span>
+    </div>
+    <div id="trucks-panel">
+      <table class="mat-table">
+        <thead><tr><th style="width:90px;">Truck</th><th style="width:150px;">Status</th><th>Opmerking</th></tr></thead>
+        <tbody id="trucks-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-toggle" onclick="toggleSectie('overig')">
+      <div class="left"><span>&#x2699;&#xFE0F; Overig materieel</span><span id="overig-summary"></span></div>
+      <span class="arrow" id="overig-arrow">&#9660;</span>
+    </div>
+    <div id="overig-panel">
+      <table class="mat-table">
+        <thead><tr><th style="width:110px;">Type</th><th>Naam</th><th style="width:150px;">Status</th><th>Opmerking</th></tr></thead>
+        <tbody id="overig-body"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<footer>Stena Line Europoort &middot; Dienst Journaal &middot; wijzigingen worden automatisch opgeslagen</footer>
+
+<div class="modal-overlay" id="inst-modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <span>&#x2699;&#xFE0F; Materieel beheren &mdash; <span id="inst-terminal-naam"></span></span>
+      <button onclick="closeInstellingen()">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <h3>Trucks</h3>
+      <div class="chip-wrap" id="inst-trucks"></div>
+      <div class="add-row">
+        <input type="text" id="inst-truck-naam" placeholder="Nieuwe truck, bijv. E25" maxlength="10">
+        <button onclick="instAddTruck()">+ Toevoegen</button>
+      </div>
+
+      <h3>Overig materieel</h3>
+      <div class="chip-wrap" id="inst-overig"></div>
+      <div class="add-row">
+        <input type="text" id="inst-overig-type" placeholder="Type" style="flex:0.6;">
+        <input type="text" id="inst-overig-naam" placeholder="Naam">
+        <button onclick="instAddOverig()">+ Toevoegen</button>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-secondary" onclick="instReset()">Standaard lijst</button>
+      <div style="display:flex; gap:8px;">
+        <button class="btn-cancel" onclick="closeInstellingen()">Annuleren</button>
+        <button class="btn-save" onclick="instOpslaan()">Opslaan</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== Supabase config (zelfde database als Dienst Journaal) =====
+var SB_URL   = 'https://xgqtiseknvjwaqapwjdt.supabase.co';
+var SB_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhncXRpc2VrbnZqd2FxYXB3amR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODYxNzIsImV4cCI6MjA5NjE2MjE3Mn0.DdBJ6OzEVC-l_9qbJE-bVlv1WdxFkB1C2tjEHXqh5SE';
+var SB_TABLE = 'sync_data';
+
+var MATERIEEL_DEF = [
+  {type:'Truck',naam:'E1',status:'OK',opmerking:''},{type:'Truck',naam:'E2',status:'OK',opmerking:''},
+  {type:'Truck',naam:'E3',status:'OK',opmerking:''},{type:'Truck',naam:'E4',status:'OK',opmerking:''},
+  {type:'Truck',naam:'E5',status:'OK',opmerking:''},{type:'Truck',naam:'E6',status:'OK',opmerking:''},
+  {type:'Truck',naam:'E7',status:'OK',opmerking:''},{type:'Truck',naam:'E8',status:'OK',opmerking:''},
+  {type:'Truck',naam:'E9',status:'OK',opmerking:''},{type:'Truck',naam:'E10',status:'OK',opmerking:''},
+  {type:'Truck',naam:'E11',status:'OK',opmerking:''},{type:'Truck',naam:'E12',status:'OK',opmerking:''},
+  {type:'Truck',naam:'E13',status:'OK',opmerking:''},{type:'Truck',naam:'E14',status:'OK',opmerking:''},
+  {type:'Truck',naam:'E15',status:'OK',opmerking:''},{type:'Truck',naam:'E16',status:'OK',opmerking:''},
+  {type:'Truck',naam:'E17',status:'OK',opmerking:''},{type:'Truck',naam:'E18',status:'OK',opmerking:''},
+  {type:'Truck',naam:'E19',status:'OK',opmerking:''},{type:'Truck',naam:'E20',status:'OK',opmerking:''},
+  {type:'Truck',naam:'E21',status:'OK',opmerking:''},{type:'Truck',naam:'E22',status:'OK',opmerking:''},
+  {type:'Truck',naam:'E23',status:'OK',opmerking:''},{type:'Truck',naam:'E24',status:'OK',opmerking:''},
+  {type:'Reachstacker',naam:'Reachstacker',status:'OK',opmerking:''},
+  {type:'Kleine heftruck',naam:'Kleine heftruck',status:'OK',opmerking:''},
+  {type:'16T heftruck',naam:'16T heftruck',status:'OK',opmerking:''},
+  {type:'Auto',naam:'Checkers auto',status:'OK',opmerking:''},
+  {type:'Bus',naam:'Ploegleider bus',status:'OK',opmerking:''}
+];
+
+var terminal = localStorage.getItem('garage_mat_terminal') || 'EP';
+var matData = [];
+var saveTimer = null;
+var pollTimer = null;
+var isSaving = false;
+var sectieOpen = {trucks:true, overig:true};
+
+function prefix(){ return terminal + '_'; }
+function rowId(){ return terminal + '_main'; }
+
+function setStatus(msg, type){
+  var el = document.getElementById('status-text');
+  var dotClass = type === 'busy' ? 'dot-busy' : (type === 'err' ? 'dot-err' : 'dot-ok');
+  el.innerHTML = '<span class="dot ' + dotClass + '"></span>' + msg;
+}
+
+function wisselTerminal(t){
+  if (t === terminal) return;
+  terminal = t;
+  localStorage.setItem('garage_mat_terminal', t);
+  document.getElementById('tab-EP').classList.toggle('active', t === 'EP');
+  document.getElementById('tab-HVH').classList.toggle('active', t === 'HVH');
+  ladenVanServer();
+}
+
+async function ladenVanServer(){
+  setStatus('Laden...', 'busy');
+  try{
+    var resp = await fetch(SB_URL + '/rest/v1/' + SB_TABLE + '?id=eq.' + rowId() + '&select=data', {
+      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var rows = await resp.json();
+    var data = (rows && rows[0] && rows[0].data) || {};
+
+    var customList = data[prefix() + 'mat_custom_list'];
+    var basis = customList && customList.length
+      ? customList.map(function(m){ return {type:m.type, naam:m.naam, status:'OK', opmerking:''}; })
+      : JSON.parse(JSON.stringify(MATERIEEL_DEF));
+
+    var opgeslagen = data[prefix() + 'materieel_status_v1'];
+    if (opgeslagen && opgeslagen.length){
+      var map = {};
+      opgeslagen.forEach(function(m){ map[m.type + '|' + m.naam] = m; });
+      basis.forEach(function(m){
+        var s = map[m.type + '|' + m.naam];
+        if (s){ m.status = s.status || 'OK'; m.opmerking = s.opmerking || ''; }
+      });
+    }
+    matData = basis;
+    bouwTabel();
+    setStatus('Bijgewerkt ' + new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}), 'ok');
+  }catch(e){
+    setStatus('Kon niet laden: ' + e.message, 'err');
+  }
+}
+
+function statSelectHTML(m, i){
+  return '<select class="stat-sel" onchange="statusGewijzigd(' + i + ',this)">' +
+    '<option value="OK"'        + (m.status==='OK'?' selected':'')        + '>&#10003; OK</option>' +
+    '<option value="DEFECT"'    + (m.status==='DEFECT'?' selected':'')    + '>&#10007; DEFECT</option>' +
+    '<option value="ONDERHOUD"' + (m.status==='ONDERHOUD'?' selected':'') + '>&#9881; ONDERHOUD</option>' +
+    '<option value="N.V.T."'    + (m.status==='N.V.T.'?' selected':'')    + '>&#8212; N.V.T.</option>' +
+    '</select>';
+}
+
+function statClass(s){
+  if (s === 'OK') return 'status-ok';
+  if (s === 'DEFECT') return 'status-defect';
+  if (s === 'ONDERHOUD') return 'status-onderhoud';
+  return '';
+}
+
+function bouwTabel(){
+  var trucks = matData.filter(function(m){ return m.type === 'Truck'; });
+  var overig = matData.filter(function(m){ return m.type !== 'Truck'; });
+
+  var tb = document.getElementById('trucks-body');
+  tb.innerHTML = '';
+  if (!trucks.length){ tb.innerHTML = '<tr><td colspan="3" class="empty">Geen trucks gevonden</td></tr>'; }
+  trucks.forEach(function(m){
+    var i = matData.indexOf(m);
+    var isOK = m.status === 'OK';
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td><span class="type-badge">' + m.naam + '</span></td>' +
+      '<td>' + statSelectHTML(m, i) + '</td>' +
+      '<td><input type="text" class="opm-input" id="opm-' + i + '" value="' + (isOK ? '' : esc(m.opmerking||'')) + '" ' +
+        'placeholder="' + (isOK ? '—' : 'Omschrijf de situatie...') + '" ' + (isOK ? 'disabled' : '') +
+        ' oninput="opmerkingGewijzigd(' + i + ',this.value)"></td>';
+    tb.appendChild(tr);
+    var sel = tr.querySelector('select');
+    sel.className = 'stat-sel ' + statClass(m.status);
+  });
+
+  var ob = document.getElementById('overig-body');
+  ob.innerHTML = '';
+  if (!overig.length){ ob.innerHTML = '<tr><td colspan="4" class="empty">Geen overig materieel gevonden</td></tr>'; }
+  overig.forEach(function(m){
+    var i = matData.indexOf(m);
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td><span class="type-badge">' + esc(m.type) + '</span></td>' +
+      '<td>' + esc(m.naam) + '</td>' +
+      '<td>' + statSelectHTML(m, i) + '</td>' +
+      '<td><input type="text" class="opm-input" id="opm-' + i + '" value="' + esc(m.opmerking||'') + '" ' +
+        'placeholder="optioneel..." oninput="opmerkingGewijzigd(' + i + ',this.value)"></td>';
+    ob.appendChild(tr);
+    var sel = tr.querySelector('select');
+    sel.className = 'stat-sel ' + statClass(m.status);
+  });
+
+  updateSamenvatting();
+}
+
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+function updateSamenvatting(){
+  ['trucks','overig'].forEach(function(sectie){
+    var list = matData.filter(function(m){ return sectie === 'trucks' ? m.type === 'Truck' : m.type !== 'Truck'; });
+    var defects = list.filter(function(m){ return m.status === 'DEFECT'; }).length;
+    var onderhoud = list.filter(function(m){ return m.status === 'ONDERHOUD'; }).length;
+    var el = document.getElementById(sectie + '-summary');
+    if (!el) return;
+    if (defects || onderhoud){
+      el.innerHTML = (defects ? '<span class="badge badge-danger">' + defects + '&#215; DEFECT</span> ' : '') +
+                      (onderhoud ? '<span class="badge badge-warn">' + onderhoud + '&#215; ONDERHOUD</span>' : '');
+    } else {
+      el.innerHTML = '<span class="badge badge-ok">Alles OK</span>';
+    }
+  });
+}
+
+function statusGewijzigd(i, sel){
+  matData[i].status = sel.value;
+  sel.className = 'stat-sel ' + statClass(sel.value);
+  var isOK = sel.value === 'OK';
+  var inp = document.getElementById('opm-' + i);
+  if (inp && matData[i].type === 'Truck'){
+    if (isOK){
+      matData[i].opmerking = '';
+      inp.value = '';
+      inp.disabled = true;
+      inp.placeholder = '—';
+    } else {
+      inp.disabled = false;
+      inp.placeholder = 'Omschrijf de situatie...';
+      inp.focus();
+    }
+  }
+  updateSamenvatting();
+  plannenOpslaan();
+}
+
+function opmerkingGewijzigd(i, val){
+  matData[i].opmerking = val;
+  plannenOpslaan();
+}
+
+function plannenOpslaan(){
+  setStatus('Wijzigingen wachten...', 'busy');
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(opslaanNaarServer, 900);
+}
+
+async function opslaanNaarServer(){
+  if (isSaving) { saveTimer = setTimeout(opslaanNaarServer, 500); return; }
+  isSaving = true;
+  setStatus('Opslaan...', 'busy');
+  try{
+    // Haal de meest recente volledige rij op, zodat we alleen onze eigen sleutels overschrijven
+    var resp = await fetch(SB_URL + '/rest/v1/' + SB_TABLE + '?id=eq.' + rowId() + '&select=data', {
+      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
+    });
+    var rows = resp.ok ? await resp.json() : [];
+    var data = (rows && rows[0] && rows[0].data) || {};
+
+    data[prefix() + 'materieel_status_v1'] = matData;
+
+    // Truckstatus ook wegschrijven in mat_standalone_v2 zodat de Dagplanning-dropdown in de hoofdapp synchroon blijft
+    var matStore = data[prefix() + 'mat_standalone_v2'] || {};
+    matData.forEach(function(m){
+      if (m.type === 'Truck'){ matStore['t-' + m.naam] = { s: m.status, o: m.opmerking || '' }; }
+    });
+    data[prefix() + 'mat_standalone_v2'] = matStore;
+
+    // Zorg dat de materieellijst (namen/types) ook up-to-date staat
+    data[prefix() + 'mat_custom_list'] = matData.map(function(m){ return {type:m.type, naam:m.naam}; });
+
+    var putResp = await fetch(SB_URL + '/rest/v1/' + SB_TABLE, {
+      method: 'POST',
+      headers: {
+        'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY,
+        'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal'
+      },
+      body: JSON.stringify({ id: rowId(), data: data, updated_at: new Date().toISOString() })
+    });
+    if (!putResp.ok && putResp.status !== 204) throw new Error('HTTP ' + putResp.status);
+    setStatus('Opgeslagen ' + new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}), 'ok');
+  }catch(e){
+    setStatus('Opslaan mislukt: ' + e.message, 'err');
+  }
+  isSaving = false;
+}
+
+function ververs(){
+  clearTimeout(saveTimer);
+  ladenVanServer();
+}
+
+function toggleSectie(naam){
+  sectieOpen[naam] = !sectieOpen[naam];
+  document.getElementById(naam + '-panel').style.display = sectieOpen[naam] ? 'block' : 'none';
+  var arrow = document.getElementById(naam + '-arrow');
+  arrow.classList.toggle('closed', !sectieOpen[naam]);
+}
+
+// ===== Materieel beheren (tandwiel) =====
+var instData = [];
+
+function openInstellingen(){
+  instData = JSON.parse(JSON.stringify(matData));
+  document.getElementById('inst-terminal-naam').textContent = terminal === 'HVH' ? 'Hoek van Holland' : 'Europoort';
+  bouwInstellingenLijst();
+  document.getElementById('inst-modal').style.display = 'flex';
+}
+function closeInstellingen(){
+  document.getElementById('inst-modal').style.display = 'none';
+}
+function bouwInstellingenLijst(){
+  var td = document.getElementById('inst-trucks');
+  td.innerHTML = '';
+  instData.filter(function(m){ return m.type === 'Truck'; }).forEach(function(m){
+    var chip = document.createElement('div');
+    chip.className = 'chip truck';
+    chip.innerHTML = esc(m.naam) + ' <button>&#x2715;</button>';
+    chip.querySelector('button').addEventListener('click', function(){ instVerwijder(m.naam, 'Truck'); });
+    td.appendChild(chip);
+  });
+  var od = document.getElementById('inst-overig');
+  od.innerHTML = '';
+  instData.filter(function(m){ return m.type !== 'Truck'; }).forEach(function(m){
+    var chip = document.createElement('div');
+    chip.className = 'chip overig';
+    chip.innerHTML = '<small>' + esc(m.type) + '</small> ' + esc(m.naam) + ' <button>&#x2715;</button>';
+    chip.querySelector('button').addEventListener('click', function(){ instVerwijder(m.naam, m.type); });
+    od.appendChild(chip);
+  });
+}
+function instVerwijder(naam, type){
+  instData = instData.filter(function(m){ return !(m.naam === naam && m.type === type); });
+  bouwInstellingenLijst();
+}
+function instAddTruck(){
+  var inp = document.getElementById('inst-truck-naam');
+  var naam = inp.value.trim().toUpperCase();
+  if (!naam) return;
+  if (instData.some(function(m){ return m.naam === naam && m.type === 'Truck'; })){ alert(naam + ' bestaat al.'); return; }
+  instData.push({type:'Truck', naam:naam, status:'OK', opmerking:''});
+  instData.sort(function(a,b){
+    if (a.type==='Truck' && b.type!=='Truck') return -1;
+    if (a.type!=='Truck' && b.type==='Truck') return 1;
+    return (parseInt(a.naam.replace(/[^0-9]/g,''))||0) - (parseInt(b.naam.replace(/[^0-9]/g,''))||0);
+  });
+  inp.value = '';
+  bouwInstellingenLijst();
+}
+function instAddOverig(){
+  var t = document.getElementById('inst-overig-type').value.trim();
+  var n = document.getElementById('inst-overig-naam').value.trim();
+  if (!t || !n){ alert('Vul type en naam in.'); return; }
+  if (instData.some(function(m){ return m.naam === n && m.type === t; })){ alert('Bestaat al.'); return; }
+  instData.push({type:t, naam:n, status:'OK', opmerking:''});
+  document.getElementById('inst-overig-type').value = '';
+  document.getElementById('inst-overig-naam').value = '';
+  bouwInstellingenLijst();
+}
+function instReset(){
+  if (!confirm('Terugkeren naar standaard materiaallijst voor ' + (terminal==='HVH'?'Hoek van Holland':'Europoort') + '?')) return;
+  instData = JSON.parse(JSON.stringify(MATERIEEL_DEF));
+  bouwInstellingenLijst();
+}
+function instOpslaan(){
+  // Behoud bestaande status/opmerking waar de naam/type nog bestaat
+  var statusMap = {};
+  matData.forEach(function(m){ statusMap[m.type + '|' + m.naam] = {status:m.status, opmerking:m.opmerking}; });
+  matData = instData.map(function(m){
+    var s = statusMap[m.type + '|' + m.naam] || {};
+    return {type:m.type, naam:m.naam, status:s.status || 'OK', opmerking:s.opmerking || ''};
+  });
+  bouwTabel();
+  closeInstellingen();
+  plannenOpslaan();
+}
+
+// Periodiek verversen vanaf de server, maar niet als iemand net aan het typen is
+function starPolling(){
+  clearInterval(pollTimer);
+  pollTimer = setInterval(function(){
+    var actief = document.activeElement;
+    var bezig = actief && (actief.tagName === 'INPUT' || actief.tagName === 'SELECT');
+    if (!bezig && !isSaving) ladenVanServer();
+  }, 25000);
+}
+
+document.getElementById('tab-' + terminal).classList.add('active');
+if (terminal !== 'EP') document.getElementById('tab-EP').classList.remove('active');
+ladenVanServer();
+starPolling();
+</script>
+</body>
+</html>
