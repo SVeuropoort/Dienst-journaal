@@ -3480,9 +3480,14 @@ document.addEventListener('contextmenu', function(e) {
         <div class="red-rule"></div>
         <h1>To Do List</h1>
       </div>
-      <button class="btn-primary" id="plan-add-btn" onclick="pNieuw()" style="padding:10px 24px;font-size:15px;">
-        &#x2B; Nieuwe Taak
-      </button>
+      <div style="display:flex;gap:10px;">
+        <button class="btn-primary" id="plan-add-btn" onclick="pNieuw()" style="padding:10px 24px;font-size:15px;">
+          &#x2B; Nieuwe Taak
+        </button>
+        <button class="btn-primary" id="plan-recur-btn" onclick="pOpenHerhaling()" style="padding:10px 20px;font-size:15px;background:var(--navy);">
+          &#x1F501; Terugkerende taken
+        </button>
+      </div>
     </div>
     <div id="plan-lijst"></div>
     <div id="plan-archief-sectie" style="display:none;margin-top:24px;">
@@ -3491,6 +3496,44 @@ document.addEventListener('contextmenu', function(e) {
         <span id="plan-arch-arrow" style="color:var(--muted);font-size:11px;">&#9654;</span>
       </div>
       <div id="plan-archief-lijst" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- TERUGKERENDE TAKEN MODAL -->
+  <div id="plan-recur-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:99000;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:12px;width:500px;max-width:96vw;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,0.35);">
+      <div style="background:var(--navy);color:#fff;padding:16px 20px;border-radius:12px 12px 0 0;display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:800;letter-spacing:1px;">&#x1F501; TERUGKERENDE TAKEN</span>
+        <button onclick="pCloseHerhaling()" style="background:rgba(255,255,255,0.15);border:none;color:#fff;border-radius:6px;padding:5px 11px;cursor:pointer;font-size:17px;">&#x2715;</button>
+      </div>
+      <div style="padding:14px 20px 4px;background:#f0f4ff;border-bottom:1px solid #dde;">
+        <span style="font-size:12px;color:#555;">Deze taken verschijnen automatisch opnieuw in de lijst op het gekozen moment. Verwijder een terugkerende taak hier om 'm definitief te stoppen.</span>
+      </div>
+      <div style="overflow-y:auto;padding:16px 20px;flex:1;">
+        <div id="plan-recur-lijst" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;"></div>
+        <div style="border-top:1px solid var(--border);padding-top:14px;">
+          <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;">Nieuwe terugkerende taak</div>
+          <input id="pr-taak" type="text" placeholder="Omschrijving van de taak..." style="width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:6px;font-size:13.5px;margin-bottom:8px;box-sizing:border-box;">
+          <input id="pr-wie" type="text" placeholder="Wie pakt dit standaard op (optioneel)..." style="width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:6px;font-size:13.5px;margin-bottom:8px;box-sizing:border-box;">
+          <select id="pr-type" onchange="pTypeVeranderd()" style="width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:6px;font-size:13.5px;margin-bottom:10px;">
+            <option value="everyweekday">Elke doordeweekse dag (ma t/m vr)</option>
+            <option value="weekday">Op een vaste dag van de week</option>
+            <option value="monthly">Elke 1e dag van de maand</option>
+            <option value="yearly">Jaarlijks op een vaste datum</option>
+          </select>
+          <select id="pr-weekday" style="display:none;width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:6px;font-size:13.5px;margin-bottom:10px;">
+            <option value="1">Maandag</option>
+            <option value="2">Dinsdag</option>
+            <option value="3">Woensdag</option>
+            <option value="4">Donderdag</option>
+            <option value="5">Vrijdag</option>
+            <option value="6">Zaterdag</option>
+            <option value="7">Zondag</option>
+          </select>
+          <input id="pr-yearly-datum" type="date" style="display:none;width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:6px;font-size:13.5px;margin-bottom:10px;box-sizing:border-box;">
+          <button onclick="pAddHerhaling()" style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:9px 20px;cursor:pointer;font-size:13px;font-weight:700;">+ Terugkerende taak toevoegen</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -13207,8 +13250,145 @@ function wisselPunctualityDatum(dateStr) {
 
   // ===== PLANNING (simple) =====
   var PK = tk('plan_v3');
-  function pGet() { try { return JSON.parse(localStorage.getItem(PK)||'{"a":[],"d":[]}'); } catch(e){ return {a:[],d:[]}; } }
+  function pGet() {
+    try {
+      var d = JSON.parse(localStorage.getItem(PK)||'{"a":[],"d":[]}');
+      if (!d.r) d.r = []; // terugkerende taken (sjablonen)
+      d.r.forEach(function(tpl){ if (tpl.type === 'weekly') { tpl.type = 'weekday'; tpl.weekday = 1; } });
+      return d;
+    } catch(e){ return {a:[],d:[],r:[]}; }
+  }
   function pSet(x) { localStorage.setItem(PK,JSON.stringify(x)); }
+
+  // ISO-weeknummer, bv. "2026-W03" — gebruikt om te bepalen of de wekelijkse
+  // taak deze week al is aangemaakt (ook als de app niet exact op maandag open is).
+  function pIsoWeekKey(d){
+    var dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    var dayNr = (dt.getUTCDay() + 6) % 7;
+    dt.setUTCDate(dt.getUTCDate() - dayNr + 3);
+    var firstThursday = new Date(Date.UTC(dt.getUTCFullYear(),0,4));
+    var weekNr = 1 + Math.round(((dt - firstThursday) / 86400000 - 3 + ((firstThursday.getUTCDay()+6)%7)) / 7);
+    return dt.getUTCFullYear() + '-W' + String(weekNr).padStart(2,'0');
+  }
+  function pMonthKey(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
+  function pDateKey(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+
+  // Zet nieuwe instanties van terugkerende taken in de lijst als de periode
+  // (dag/week/maand/jaar) nog niet is gegenereerd én het gekozen moment is aangebroken.
+  function pGenereerHerhalingen(){
+    var d = pGet();
+    if (!d.r || !d.r.length) return;
+    var now = new Date();
+    var dow = now.getDay(); // 0=zo,1=ma,...,6=za
+    var isoDow = (dow === 0) ? 7 : dow; // ma=1 ... zo=7, voor correcte volgorde binnen de week
+    var datumStr = String(now.getDate()).padStart(2,'0')+'/'+String(now.getMonth()+1).padStart(2,'0')+'/'+now.getFullYear();
+    var gewijzigd = false;
+    d.r.forEach(function(tpl){
+      if (tpl.type === 'weekly') { tpl.type = 'weekday'; tpl.weekday = 1; } // oude sjablonen migreren
+      var periode, magVandaag;
+      if (tpl.type === 'everyweekday') {
+        periode = pDateKey(now);
+        magVandaag = (dow >= 1 && dow <= 5);
+      } else if (tpl.type === 'weekday') {
+        periode = pIsoWeekKey(now);
+        magVandaag = (isoDow >= tpl.weekday); // pas zichtbaar vanaf de gekozen dag in deze week
+      } else if (tpl.type === 'yearly') {
+        periode = String(now.getFullYear());
+        var maandNu = now.getMonth() + 1, dagNu = now.getDate();
+        magVandaag = (maandNu > tpl.month) || (maandNu === tpl.month && dagNu >= tpl.day);
+      } else { // monthly
+        periode = pMonthKey(now);
+        magVandaag = true; // periode start altijd op dag 1
+      }
+      if (!magVandaag) return;
+      if (tpl.lastPeriod === periode) return; // al gegenereerd voor deze periode
+      var bestaatAl = d.a.some(function(t){ return t.herhalingId === tpl.id; });
+      if (!bestaatAl) {
+        d.a.push({ id: Date.now() + Math.random(), taak: tpl.taak, wie: tpl.wie||'', uitleg: tpl.uitleg||'', datum: datumStr, herhalingId: tpl.id });
+      }
+      tpl.lastPeriod = periode;
+      gewijzigd = true;
+    });
+    if (gewijzigd) pSet(d);
+  }
+
+  var PR_WEEKDAG_NAMEN = {1:'Maandag',2:'Dinsdag',3:'Woensdag',4:'Donderdag',5:'Vrijdag',6:'Zaterdag',7:'Zondag'};
+  var PR_MAAND_NAMEN = ['','januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'];
+  function pHerhalingLabel(tpl){
+    if (tpl.type === 'everyweekday') return '&#x1F501; Elke doordeweekse dag';
+    if (tpl.type === 'weekday')      return '&#x1F501; Elke ' + (PR_WEEKDAG_NAMEN[tpl.weekday]||'').toLowerCase();
+    if (tpl.type === 'yearly')       return '&#x1F4C5; Jaarlijks op ' + tpl.day + ' ' + PR_MAAND_NAMEN[tpl.month];
+    return '&#x1F4C5; Elke 1e van de maand';
+  }
+
+  window.pTypeVeranderd = function(){
+    var type = document.getElementById('pr-type').value;
+    document.getElementById('pr-weekday').style.display = (type === 'weekday') ? 'block' : 'none';
+    document.getElementById('pr-yearly-datum').style.display = (type === 'yearly') ? 'block' : 'none';
+  };
+
+  window.pOpenHerhaling = function(){
+    pBouwHerhalingLijst();
+    pTypeVeranderd();
+    document.getElementById('plan-recur-modal').style.display = 'flex';
+  };
+  window.pCloseHerhaling = function(){
+    document.getElementById('plan-recur-modal').style.display = 'none';
+  };
+  function pBouwHerhalingLijst(){
+    var d = pGet();
+    var el = document.getElementById('plan-recur-lijst');
+    if (!el) return;
+    el.innerHTML = '';
+    if (!d.r.length) {
+      el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:6px 0;">Nog geen terugkerende taken ingesteld.</div>';
+      return;
+    }
+    d.r.forEach(function(tpl){
+      var row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:9px 12px;';
+      row.innerHTML =
+        '<div style="flex:1;">'
+          + '<div style="font-weight:700;font-size:13.5px;color:var(--navy);">' + pEsc(tpl.taak) + '</div>'
+          + '<div style="font-size:11.5px;color:var(--muted);">' + pHerhalingLabel(tpl) + (tpl.wie ? ' &middot; ' + pEsc(tpl.wie) : '') + '</div>'
+        + '</div>'
+        + '<button title="Terugkerende taak verwijderen" style="background:transparent;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:4px;">&#x2715;</button>';
+      row.querySelector('button').addEventListener('click', function(){ pVerwijderHerhaling(tpl.id); });
+      el.appendChild(row);
+    });
+  }
+  window.pAddHerhaling = function(){
+    var taakInp = document.getElementById('pr-taak');
+    var wieInp  = document.getElementById('pr-wie');
+    var typeSel = document.getElementById('pr-type');
+    var taak = taakInp.value.trim();
+    if (!taak) { alert('Vul een omschrijving van de taak in.'); return; }
+    var type = typeSel.value;
+    var tpl = { id: Date.now(), taak: taak, wie: wieInp.value.trim(), uitleg:'', type: type, lastPeriod: '' };
+    if (type === 'weekday') {
+      tpl.weekday = parseInt(document.getElementById('pr-weekday').value, 10);
+    } else if (type === 'yearly') {
+      var datumVal = document.getElementById('pr-yearly-datum').value; // yyyy-mm-dd
+      if (!datumVal) { alert('Kies een datum voor de jaarlijkse taak.'); return; }
+      var delen = datumVal.split('-');
+      tpl.month = parseInt(delen[1], 10);
+      tpl.day = parseInt(delen[2], 10);
+    }
+    var d = pGet();
+    d.r.push(tpl);
+    pSet(d);
+    taakInp.value = ''; wieInp.value = '';
+    pBouwHerhalingLijst();
+    pGenereerHerhalingen();
+    pRender();
+  };
+  function pVerwijderHerhaling(id){
+    if (!confirm('Deze terugkerende taak definitief stoppen? Al aangemaakte taken in de lijst blijven gewoon staan.')) return;
+    var d = pGet();
+    d.r = d.r.filter(function(tpl){ return tpl.id !== id; });
+    pSet(d);
+    pBouwHerhalingLijst();
+  }
 
   
 
@@ -13241,7 +13421,7 @@ function wisselPunctualityDatum(dateStr) {
     if (a) a.innerHTML = open ? '&#9660;' : '&#9654;';
   }
 
-  document.addEventListener('DOMContentLoaded', pRender);
+  document.addEventListener('DOMContentLoaded', function(){ pGenereerHerhalingen(); pRender(); });
 
 
 
@@ -13548,7 +13728,7 @@ function wisselPunctualityDatum(dateStr) {
         var hdr = document.createElement('div');
         hdr.className = 'ptask-hdr';
         var hL = document.createElement('span');
-        hL.textContent = 'Taak';
+        hL.innerHTML = t.herhalingId ? 'Taak <span title="Terugkerende taak" style="font-size:11px;font-weight:400;color:var(--muted);">&#x1F501; terugkerend</span>' : 'Taak';
         var hR = document.createElement('span');
         hR.className = 'ptask-hdr-date';
         hR.textContent = 'aangemaakt op: ' + (t.datum || '-');
@@ -13674,7 +13854,7 @@ function wisselPunctualityDatum(dateStr) {
     }
   }
 
-  document.addEventListener('DOMContentLoaded', pRender);
+  document.addEventListener('DOMContentLoaded', function(){ pGenereerHerhalingen(); pRender(); });
 
 
   // ===== GETIJDEN EUROPOORT =====
