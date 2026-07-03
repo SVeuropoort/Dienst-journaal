@@ -1675,7 +1675,10 @@ window.tk = window.tk || function(key) {
 
   #plan-lijst{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px;}
   .ptask-card{background:var(--surface);border:2px dashed #aabbcc;border-radius:6px;overflow:hidden;}
+  .ptask-card.ptask-recur{border:2px solid #7c4fd6;background:#f6f1ff;}
   .ptask-hdr{background:var(--surface2);padding:8px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);font-size:12px;font-weight:700;color:var(--navy);}
+  .ptask-hdr.ptask-hdr-recur{background:#efe6fb;border-bottom:1px solid #d8c5f5;}
+  .ptask-recur-badge{display:inline-flex;align-items:center;gap:4px;background:#7c4fd6;color:#fff;font-size:10.5px;font-weight:700;letter-spacing:.3px;padding:3px 8px;border-radius:20px;margin-left:8px;vertical-align:middle;}
   .ptask-hdr-date{font-size:11px;color:var(--muted);font-weight:400;}
   .ptask-lbl{width:115px;padding:8px 10px;font-size:12px;font-weight:600;color:var(--label);background:var(--surface2);border-right:1px solid var(--border);border-bottom:1px solid var(--border);vertical-align:top;white-space:nowrap;}
   .ptask-val{border-bottom:1px solid var(--border);vertical-align:top;padding:0;}
@@ -13291,14 +13294,14 @@ function wisselPunctualityDatum(dateStr) {
         magVandaag = (dow >= 1 && dow <= 5);
       } else if (tpl.type === 'weekday') {
         periode = pIsoWeekKey(now);
-        magVandaag = (isoDow >= tpl.weekday); // pas zichtbaar vanaf de gekozen dag in deze week
+        magVandaag = (isoDow === tpl.weekday); // uitsluitend precies op de gekozen dag
       } else if (tpl.type === 'yearly') {
         periode = String(now.getFullYear());
         var maandNu = now.getMonth() + 1, dagNu = now.getDate();
-        magVandaag = (maandNu > tpl.month) || (maandNu === tpl.month && dagNu >= tpl.day);
+        magVandaag = (maandNu === tpl.month && dagNu === tpl.day); // uitsluitend precies op de gekozen datum
       } else { // monthly
         periode = pMonthKey(now);
-        magVandaag = true; // periode start altijd op dag 1
+        magVandaag = (now.getDate() === 1); // uitsluitend precies op de 1e van de maand
       }
       if (!magVandaag) return;
       if (tpl.lastPeriod === periode) return; // al gegenereerd voor deze periode
@@ -13442,6 +13445,7 @@ function wisselPunctualityDatum(dateStr) {
     _origSwTab(t, btn);
     if (t==='werkorder') { setTimeout(function(){ if(typeof haalDieselprijs==='function') haalDieselprijs(); }, 400); }
     if (t==='home') { laadGetijden(); }
+    if (t==='planning') { if (typeof pGenereerHerhalingen==='function') pGenereerHerhalingen(); if (typeof pRender==='function') pRender(); }
   };
 
   // ===== PUNCTUALITY SAVE (standalone, no dep on other fns) =====
@@ -13704,6 +13708,19 @@ function wisselPunctualityDatum(dateStr) {
   });
 
 
+  var PR_WEEKDAG_KORT = {1:'MAANDAG',2:'DINSDAG',3:'WOENSDAG',4:'DONDERDAG',5:'VRIJDAG',6:'ZATERDAG',7:'ZONDAG'};
+  var PR_MAAND_KORT = ['','JAN','FEB','MRT','APR','MEI','JUN','JUL','AUG','SEP','OKT','NOV','DEC'];
+  function pHerhalingBadgeTekst(herhalingId){
+    if (!herhalingId) return '';
+    var d = pGet();
+    var tpl = d.r.find(function(t){ return t.id === herhalingId; });
+    if (!tpl) return 'TERUGKEREND';
+    if (tpl.type === 'everyweekday') return 'ELKE DOORDEWEEKSE DAG';
+    if (tpl.type === 'weekday')      return 'ELKE ' + (PR_WEEKDAG_KORT[tpl.weekday] || '');
+    if (tpl.type === 'yearly')       return 'ELKE ' + tpl.day + ' ' + (PR_MAAND_KORT[tpl.month] || '');
+    return 'ELKE 1E V/D MAAND';
+  }
+
   function pRender() {
     var data = pGet();
     var lijst = document.getElementById('plan-lijst');
@@ -13723,12 +13740,12 @@ function wisselPunctualityDatum(dateStr) {
       (function(idx) {
         var t = data.a[idx];
         var card = document.createElement('div');
-        card.className = 'ptask-card';
+        card.className = 'ptask-card' + (t.herhalingId ? ' ptask-recur' : '');
 
         var hdr = document.createElement('div');
-        hdr.className = 'ptask-hdr';
+        hdr.className = 'ptask-hdr' + (t.herhalingId ? ' ptask-hdr-recur' : '');
         var hL = document.createElement('span');
-        hL.innerHTML = t.herhalingId ? 'Taak <span title="Terugkerende taak" style="font-size:11px;font-weight:400;color:var(--muted);">&#x1F501; terugkerend</span>' : 'Taak';
+        hL.innerHTML = 'Taak' + (t.herhalingId ? ' <span class="ptask-recur-badge">&#x1F501; TERUGKEREND ' + pHerhalingBadgeTekst(t.herhalingId) + '</span>' : '');
         var hR = document.createElement('span');
         hR.className = 'ptask-hdr-date';
         hR.textContent = 'aangemaakt op: ' + (t.datum || '-');
