@@ -13261,7 +13261,7 @@ function wisselPunctualityDatum(dateStr) {
       return d;
     } catch(e){ return {a:[],d:[],r:[]}; }
   }
-  function pSet(x) { localStorage.setItem(PK,JSON.stringify(x)); }
+  function pSet(x) { localStorage.setItem(PK,JSON.stringify(x)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }
 
   // ISO-weeknummer, bv. "2026-W03" — gebruikt om te bepalen of de wekelijkse
   // taak deze week al is aangemaakt (ook als de app niet exact op maandag open is).
@@ -14141,6 +14141,7 @@ async function laadWeer() {
 
     alert(removed + ' items opgeruimd (ouder dan 60 dagen).');
     renderKPI();
+    if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
   }
 
   function kpiStapMaand(d){_kpiM+=d;if(_kpiM>11){_kpiM=0;_kpiY++;}if(_kpiM<0){_kpiM=11;_kpiY--;}renderKPI();}
@@ -14215,6 +14216,7 @@ async function laadWeer() {
       if (removed > 0) localStorage.setItem(_VS, JSON.stringify(vsData));
 
       toRemove.forEach(function(k) { localStorage.removeItem(k); removed++; });
+      if (removed > 0 && typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
       return removed;
     } catch(e) { return 0; }
   }
