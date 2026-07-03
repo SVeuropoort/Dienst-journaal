@@ -4609,7 +4609,8 @@ window.addEventListener('resize', () => {
     'dienstjournaal_stena_v1','vaarschema_backup_v1','vs_data_v1',
     'materieel_status_v1','mat_standalone_v2','mat_custom_list',
     'plan_v3','dagPlanning_v2_state','dagPlanning_v2_lastDate',
-    'dagpl_cert_v1','dagpl_cert_v2','scheepzoeker_schepen','dagPlanning_vasteCelteksten_v1'
+    'dagpl_cert_v1','dagpl_cert_v2','scheepzoeker_schepen','dagPlanning_vasteCelteksten_v1',
+    'kade_vakken_v1'
   ];
 
   function getTerminalPrefix() {
@@ -4715,7 +4716,8 @@ window.addEventListener('resize', () => {
     'dagpl_cert_v2',
     'scheepzoeker_schepen',
     'telefoonlijst_home_v1',
-    'dagpl_cert_dates_v1'
+    'dagpl_cert_dates_v1',
+    'kade_vakken_v1'
   ];
 
   function getSyncData() {
@@ -6887,6 +6889,79 @@ function buildAvond(){
 
 // ── REFERENCE LIST ─────────────────────────────
 // ── KADE CHECK ────────────────────────────────────────────────
+var KADE_VAKKEN_DEFAULT = ['Trade & 1','1','2','A & B','C & D','E & F','G & H','I & J','K & L','M & N','O & Z'];
+
+function getKadeVakken(){
+  try {
+    var v = JSON.parse(localStorage.getItem(tk('kade_vakken_v1')) || 'null');
+    if (Array.isArray(v) && v.length) return v;
+  } catch(e) {}
+  return KADE_VAKKEN_DEFAULT.slice();
+}
+function saveKadeVakken(list){
+  try {
+    localStorage.setItem(tk('kade_vakken_v1'), JSON.stringify(list));
+    if (typeof saveFullState === 'function') saveFullState();
+    if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+  } catch(e) {}
+}
+
+var _kadeVakWerklijst = [];
+
+window.openKadeVakModal = function(){
+  _kadeVakWerklijst = getKadeVakken().slice();
+  kadeVakBouwLijst();
+  document.getElementById('kade-vak-modal').style.display = 'flex';
+};
+window.closeKadeVakModal = function(){
+  document.getElementById('kade-vak-modal').style.display = 'none';
+};
+function kadeVakBouwLijst(){
+  var el = document.getElementById('kade-vak-lijst');
+  if (!el) return;
+  el.innerHTML = '';
+  _kadeVakWerklijst.forEach(function(vak, i){
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:6px;';
+    row.innerHTML =
+      '<input type="text" value="' + esc(vak) + '" data-i="' + i + '" style="flex:1;padding:7px 10px;border:1px solid #ccc;border-radius:6px;font-size:13px;" onchange="_kadeVakWerklijst[' + i + ']=this.value">' +
+      '<button title="Omhoog" onclick="kadeVakVerplaats(' + i + ',-1)" ' + (i===0?'disabled style="opacity:.3;"':'') + ' style="background:#eef3fa;border:1px solid #c8d7e8;border-radius:6px;padding:6px 9px;cursor:pointer;">&#8593;</button>' +
+      '<button title="Omlaag" onclick="kadeVakVerplaats(' + i + ',1)" ' + (i===_kadeVakWerklijst.length-1?'disabled style="opacity:.3;"':'') + ' style="background:#eef3fa;border:1px solid #c8d7e8;border-radius:6px;padding:6px 9px;cursor:pointer;">&#8595;</button>' +
+      '<button title="Verwijderen" onclick="kadeVakVerwijderen(' + i + ')" style="background:#fdecea;border:1px solid #f0b8b0;color:#c0392b;border-radius:6px;padding:6px 9px;cursor:pointer;">&#x2715;</button>';
+    el.appendChild(row);
+  });
+}
+window.kadeVakVerplaats = function(i, richting){
+  var j = i + richting;
+  if (j < 0 || j >= _kadeVakWerklijst.length) return;
+  var tmp = _kadeVakWerklijst[i]; _kadeVakWerklijst[i] = _kadeVakWerklijst[j]; _kadeVakWerklijst[j] = tmp;
+  kadeVakBouwLijst();
+};
+window.kadeVakVerwijderen = function(i){
+  _kadeVakWerklijst.splice(i, 1);
+  kadeVakBouwLijst();
+};
+window.kadeVakToevoegen = function(){
+  var inp = document.getElementById('kade-vak-input');
+  var val = inp.value.trim();
+  if (!val) return;
+  _kadeVakWerklijst.push(val);
+  inp.value = '';
+  kadeVakBouwLijst();
+};
+window.kadeVakReset = function(){
+  if (!confirm('Terugkeren naar de standaard vakkenlijst?')) return;
+  _kadeVakWerklijst = KADE_VAKKEN_DEFAULT.slice();
+  kadeVakBouwLijst();
+};
+window.kadeVakOpslaan = function(){
+  var lijst = _kadeVakWerklijst.map(function(v){ return v.trim(); }).filter(function(v){ return v; });
+  if (!lijst.length){ alert('Er moet minstens 1 vak overblijven.'); return; }
+  saveKadeVakken(lijst);
+  window.closeKadeVakModal();
+  if (typeof buildKadeCheck === 'function') buildKadeCheck();
+};
+
 function getControleurName(){
   return pos['o_ctrl1'] || '';
 }
@@ -6897,8 +6972,8 @@ function buildKadeCheck(){
   const controleur = getControleurName();
   const pool       = ochEmps;
 
-  // Vakken list
-  const vakken = ['Trade & 1','1','2','A & B','C & D','E & F','G & H','I & J','K & L','M & N','O & Z'];
+  // Vakken list (per terminal instelbaar via het tandwiel)
+  const vakken = getKadeVakken();
 
   function kadeDD(id){
     const sv   = pos[id]||'';
@@ -6933,7 +7008,10 @@ function buildKadeCheck(){
   <table style="width:100%;border-collapse:collapse;margin-bottom:0;border:1px solid #bbb">
     <tr>
       <td style="padding:5px 10px;font-size:11px;color:#555;width:200px;border-right:1px solid #bbb">${dateLabel}</td>
-      <td style="padding:5px 10px;font-size:22px;font-weight:700;text-align:center">Kade Check</td>
+      <td style="padding:5px 10px;font-size:22px;font-weight:700;text-align:center;position:relative">
+        Kade Check
+        <button onclick="openKadeVakModal()" title="Vakken aanpassen" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:#003366;color:#fff;border:none;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:14px;">&#x2699;&#xFE0F;</button>
+      </td>
     </tr>
   </table>
 
@@ -16732,6 +16810,30 @@ function navWerkoverdracht(label, btn) {
     <div style="padding:14px 24px;border-top:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">
       <button onclick="matReset()" style="background:#f0f0f0;color:#555;border:none;border-radius:6px;padding:10px 16px;cursor:pointer;font-size:13px;">&#x21BA; Standaard herstellen</button>
       <button onclick="matOpslaan()" style="background:#27ae60;color:#fff;border:none;border-radius:6px;padding:10px 28px;cursor:pointer;font-size:14px;font-weight:700;">&#x1F4BE; Opslaan</button>
+    </div>
+  </div>
+</div>
+
+<!-- KADE CHECK - VAKKEN BEHEER MODAL -->
+<div id="kade-vak-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:99000;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:12px;width:460px;max-width:96vw;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,0.35);">
+    <div style="background:#003366;color:#fff;padding:16px 20px;border-radius:12px 12px 0 0;display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:800;letter-spacing:1px;">&#x2699; VAKKEN BEHEER</span>
+      <button onclick="closeKadeVakModal()" style="background:rgba(255,255,255,0.15);border:none;color:#fff;border-radius:6px;padding:5px 11px;cursor:pointer;font-size:17px;">&#x2715;</button>
+    </div>
+    <div style="padding:14px 20px 4px;background:#f0f4ff;border-bottom:1px solid #dde;">
+      <span style="font-size:12px;color:#555;">Pas hier de rijen onder "Vak" aan. Wijzigingen gelden voor deze terminal en worden direct opgeslagen.</span>
+    </div>
+    <div style="overflow-y:auto;padding:16px 20px;flex:1;">
+      <div id="kade-vak-lijst" style="display:flex;flex-direction:column;gap:6px;"></div>
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <input id="kade-vak-input" type="text" placeholder="Nieuw vak, bijv. P & Q" maxlength="30" style="flex:1;padding:8px 12px;border:1px solid #ccc;border-radius:6px;font-size:14px;" onkeydown="if(event.key==='Enter')kadeVakToevoegen()">
+        <button onclick="kadeVakToevoegen()" style="background:#003366;color:#fff;border:none;border-radius:6px;padding:8px 18px;cursor:pointer;font-size:13px;font-weight:700;">+ Toevoegen</button>
+      </div>
+    </div>
+    <div style="padding:14px 24px;border-top:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">
+      <button onclick="kadeVakReset()" style="background:#f0f0f0;color:#555;border:none;border-radius:6px;padding:10px 16px;cursor:pointer;font-size:13px;">&#x21BA; Standaard herstellen</button>
+      <button onclick="kadeVakOpslaan()" style="background:#27ae60;color:#fff;border:none;border-radius:6px;padding:10px 28px;cursor:pointer;font-size:14px;font-weight:700;">&#x1F4BE; Opslaan</button>
     </div>
   </div>
 </div>
