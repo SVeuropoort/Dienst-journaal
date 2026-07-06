@@ -11022,7 +11022,7 @@ const MAANDEN = [&quot;Januari&quot;,&quot;Februari&quot;,&quot;Maart&quot;,&quo
 const TYPE_MAP = {&quot;∑ V175&quot;:&quot;V175&quot;,&quot;∑ V176&quot;:&quot;V176&quot;,&quot;∑ V177&quot;:&quot;V177&quot;,&quot;∑ V301&quot;:&quot;V301&quot;,&quot;∑ V301 &quot;:&quot;V301&quot;,&quot;∑ V430 mutatie&quot;:&quot;V430_MUTATIE&quot;,&quot;∑ V430&quot;:&quot;V430&quot;,&quot;∑ 12&quot;:&quot;V12&quot;};
 const GROEP_LIJST = Object.keys(LOONGROEPEN);
 
-let state = { step:&quot;upload&quot;, payroll:null, resultaten:null, maand:new Date().getMonth()+1, jaar:new Date().getFullYear(), filter:&quot;actief&quot;, zoek:&quot;&quot;, fileName:&quot;&quot; };
+let state = { step:&quot;upload&quot;, payroll:null, resultaten:null, maand:new Date().getMonth()+1, jaar:new Date().getFullYear(), filter:&quot;actief&quot;, zoek:&quot;&quot;, fileName:&quot;&quot;, rawWorkbook:null };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const eur2 = v => (v==null||isNaN(v)) ? &quot;—&quot; : new Intl.NumberFormat(&quot;nl-NL&quot;,{style:&quot;currency&quot;,currency:&quot;EUR&quot;,minimumFractionDigits:2}).format(v);
@@ -11106,76 +11106,150 @@ function exportExcel() {
   const tMut  = res.reduce((s,r)=>s+r.totMut,0);
   const tTot  = res.reduce((s,r)=>s+r.totaal,0);
 
-  // CSS
-  const css = `
-    body { font-family: Arial, sans-serif; font-size: 10pt; }
-    table { border-collapse: collapse; width: 100%; }
-    th, td { border: 1px solid #c0c8d8; padding: 4px 7px; white-space: nowrap; }
-    .hdr-dark  { background:#1F3864; color:#fff; font-weight:bold; text-align:center; }
-    .hdr-teal  { background:#17A398; color:#fff; font-weight:bold; text-align:center; }
-    .hdr-blue  { background:#2E75B6; color:#fff; font-weight:bold; text-align:center; }
-    .alt       { background:#D9E2F3; }
-    .white     { background:#FFFFFF; }
-    .tot-row   { background:#FFF2CC; font-weight:bold; color:#744210; }
-    .r         { text-align:right; }
-    .l         { text-align:left; }
-    .lbl       { color:#6B7280; font-size:9pt; }
-    .groen     { color:#22543D; font-weight:bold; }
+  // ── Excel XML Spreadsheet (SpreadsheetML) bouwen: behoudt kleuren EN staat
+  // ── meerdere echte tabbladen toe in één bestand.
+  const xEsc = s => String(s==null?&quot;&quot;:s).replace(/&amp;/g,&quot;&amp;amp;&quot;).replace(/</g,&quot;&amp;lt;&quot;).replace(/>/g,&quot;&amp;gt;&quot;).replace(/&quot;/g,&quot;&amp;quot;&quot;).replace(/'/g,&quot;&amp;apos;&quot;);
+  const cell = (val, styleId, type) => {
+    const t = type || (typeof val === &quot;number&quot; ? &quot;Number&quot; : &quot;String&quot;);
+    const data = val==null||val===&quot;&quot; ? &quot;&quot; : `<Data ss:Type=&quot;${t}&quot;>${xEsc(val)}</Data>`;
+    return `<Cell${styleId?` ss:StyleID=&quot;${styleId}&quot;`:&quot;&quot;}>${data}</Cell>`;
+  };
+  const row = (...cells) => `<Row>${cells.join(&quot;&quot;)}</Row>`;
+
+  // Vaste stijlen voor het overzicht (zelfde kleuren als voorheen)
+  const sheet1Styles = `
+    <Style ss:ID=&quot;hdrdark&quot;><Interior ss:Color=&quot;#1F3864&quot; ss:Pattern=&quot;Solid&quot;/><Font ss:Color=&quot;#FFFFFF&quot; ss:Bold=&quot;1&quot;/><Alignment ss:Horizontal=&quot;Center&quot;/></Style>
+    <Style ss:ID=&quot;hdrteal&quot;><Interior ss:Color=&quot;#17A398&quot; ss:Pattern=&quot;Solid&quot;/><Font ss:Color=&quot;#FFFFFF&quot; ss:Bold=&quot;1&quot;/><Alignment ss:Horizontal=&quot;Center&quot;/></Style>
+    <Style ss:ID=&quot;hdrblue&quot;><Interior ss:Color=&quot;#2E75B6&quot; ss:Pattern=&quot;Solid&quot;/><Font ss:Color=&quot;#FFFFFF&quot; ss:Bold=&quot;1&quot;/><Alignment ss:Horizontal=&quot;Center&quot;/></Style>
+    <Style ss:ID=&quot;l_alt&quot;><Interior ss:Color=&quot;#D9E2F3&quot; ss:Pattern=&quot;Solid&quot;/><Alignment ss:Horizontal=&quot;Left&quot;/></Style>
+    <Style ss:ID=&quot;l_white&quot;><Interior ss:Color=&quot;#FFFFFF&quot; ss:Pattern=&quot;Solid&quot;/><Alignment ss:Horizontal=&quot;Left&quot;/></Style>
+    <Style ss:ID=&quot;lb_alt&quot;><Interior ss:Color=&quot;#D9E2F3&quot; ss:Pattern=&quot;Solid&quot;/><Font ss:Bold=&quot;1&quot;/><Alignment ss:Horizontal=&quot;Left&quot;/></Style>
+    <Style ss:ID=&quot;lb_white&quot;><Interior ss:Color=&quot;#FFFFFF&quot; ss:Pattern=&quot;Solid&quot;/><Font ss:Bold=&quot;1&quot;/><Alignment ss:Horizontal=&quot;Left&quot;/></Style>
+    <Style ss:ID=&quot;lblr_alt&quot;><Interior ss:Color=&quot;#D9E2F3&quot; ss:Pattern=&quot;Solid&quot;/><Font ss:Color=&quot;#6B7280&quot; ss:Size=&quot;9&quot;/><Alignment ss:Horizontal=&quot;Right&quot;/></Style>
+    <Style ss:ID=&quot;lblr_white&quot;><Interior ss:Color=&quot;#FFFFFF&quot; ss:Pattern=&quot;Solid&quot;/><Font ss:Color=&quot;#6B7280&quot; ss:Size=&quot;9&quot;/><Alignment ss:Horizontal=&quot;Right&quot;/></Style>
+    <Style ss:ID=&quot;r_alt&quot;><Interior ss:Color=&quot;#D9E2F3&quot; ss:Pattern=&quot;Solid&quot;/><Alignment ss:Horizontal=&quot;Right&quot;/></Style>
+    <Style ss:ID=&quot;r_white&quot;><Interior ss:Color=&quot;#FFFFFF&quot; ss:Pattern=&quot;Solid&quot;/><Alignment ss:Horizontal=&quot;Right&quot;/></Style>
+    <Style ss:ID=&quot;rg_alt&quot;><Interior ss:Color=&quot;#D9E2F3&quot; ss:Pattern=&quot;Solid&quot;/><Font ss:Color=&quot;#22543D&quot; ss:Bold=&quot;1&quot;/><Alignment ss:Horizontal=&quot;Right&quot;/></Style>
+    <Style ss:ID=&quot;rg_white&quot;><Interior ss:Color=&quot;#FFFFFF&quot; ss:Pattern=&quot;Solid&quot;/><Font ss:Color=&quot;#22543D&quot; ss:Bold=&quot;1&quot;/><Alignment ss:Horizontal=&quot;Right&quot;/></Style>
+    <Style ss:ID=&quot;totl&quot;><Interior ss:Color=&quot;#FFF2CC&quot; ss:Pattern=&quot;Solid&quot;/><Font ss:Color=&quot;#744210&quot; ss:Bold=&quot;1&quot;/><Alignment ss:Horizontal=&quot;Left&quot;/></Style>
+    <Style ss:ID=&quot;totr&quot;><Interior ss:Color=&quot;#FFF2CC&quot; ss:Pattern=&quot;Solid&quot;/><Font ss:Color=&quot;#744210&quot; ss:Bold=&quot;1&quot;/><Alignment ss:Horizontal=&quot;Right&quot;/></Style>
   `;
 
-  // Datarijen HTML
-  const rows = res.map((r, i) => {
+  const headerRow = row(
+    cell(&quot;Mannummer&quot;,&quot;hdrdark&quot;), cell(&quot;Naam Personeelszaken&quot;,&quot;hdrdark&quot;), cell(&quot;Loongroep Personeelszaken&quot;,&quot;hdrdark&quot;),
+    cell(&quot;&quot;,&quot;hdrdark&quot;), cell(&quot;totaal km&quot;,&quot;hdrteal&quot;),
+    cell(&quot;&quot;,&quot;hdrdark&quot;), cell(&quot;Totaal verschoven&quot;,&quot;hdrblue&quot;),
+    cell(&quot;&quot;,&quot;hdrdark&quot;), cell(&quot;Totaal uur 0,74%&quot;,&quot;hdrblue&quot;),
+    cell(&quot;&quot;,&quot;hdrdark&quot;), cell(&quot;Aantal uur 0,89%&quot;,&quot;hdrblue&quot;),
+    cell(&quot;&quot;,&quot;hdrdark&quot;), cell(&quot;Totaal uur 1,20%&quot;,&quot;hdrblue&quot;),
+    cell(&quot;&quot;,&quot;hdrdark&quot;), cell(&quot;Mutatie Totaal&quot;,&quot;hdrblue&quot;),
+    cell(&quot;Totaal&quot;,&quot;hdrdark&quot;)
+  );
+
+  const dataRows = res.map((r, i) => {
     const bg = i % 2 === 0 ? &quot;alt&quot; : &quot;white&quot;;
-    return `<tr class=&quot;${bg}&quot;>
-      <td class=&quot;l&quot;>${r.mannr}</td>
-      <td class=&quot;l&quot; style=&quot;font-weight:bold&quot;>${r.naam}</td>
-      <td class=&quot;l&quot;>${r.groep}</td>
-      <td class=&quot;lbl r&quot;>∑ V301</td><td class=&quot;r&quot;>${fmtKm(r.totKm)}</td>
-      <td class=&quot;lbl r&quot;>∑ V430</td><td class=&quot;r&quot;>${fmt(r.totV430)}</td>
-      <td class=&quot;lbl r&quot;>∑ V175</td><td class=&quot;r&quot;>${fmt(r.totV175)}</td>
-      <td class=&quot;lbl r&quot;>∑ V176</td><td class=&quot;r&quot;>${fmt(r.totV176)}</td>
-      <td class=&quot;lbl r&quot;>∑ V177</td><td class=&quot;r&quot;>${fmt(r.totV177)}</td>
-      <td class=&quot;lbl r&quot;>∑ V430 mutatie</td><td class=&quot;r&quot;>${fmt(r.totMut)}</td>
-      <td class=&quot;r groen&quot;>${fmt(r.totaal)}</td>
-    </tr>`;
+    return row(
+      cell(r.mannr, `l_${bg}`),
+      cell(r.naam, `lb_${bg}`),
+      cell(r.groep, `l_${bg}`),
+      cell(&quot;\u2211 V301&quot;, `lblr_${bg}`), cell(fmtKm(r.totKm), `r_${bg}`),
+      cell(&quot;\u2211 V430&quot;, `lblr_${bg}`), cell(fmt(r.totV430), `r_${bg}`),
+      cell(&quot;\u2211 V175&quot;, `lblr_${bg}`), cell(fmt(r.totV175), `r_${bg}`),
+      cell(&quot;\u2211 V176&quot;, `lblr_${bg}`), cell(fmt(r.totV176), `r_${bg}`),
+      cell(&quot;\u2211 V177&quot;, `lblr_${bg}`), cell(fmt(r.totV177), `r_${bg}`),
+      cell(&quot;\u2211 V430 mutatie&quot;, `lblr_${bg}`), cell(fmt(r.totMut), `r_${bg}`),
+      cell(fmt(r.totaal), `rg_${bg}`)
+    );
   }).join(&quot;&quot;);
 
-  const htmlContent = `<!DOCTYPE html>
-<html><head><meta charset=&quot;UTF-8&quot;>
-<style>${css}</style>
-</head><body>
-<table>
-  <thead>
-    <tr>
-      <th class=&quot;hdr-dark&quot;>Mannummer</th>
-      <th class=&quot;hdr-dark&quot;>Naam Personeelszaken</th>
-      <th class=&quot;hdr-dark&quot;>Loongroep Personeelszaken</th>
-      <th class=&quot;hdr-dark&quot;></th><th class=&quot;hdr-teal&quot;>totaal km</th>
-      <th class=&quot;hdr-dark&quot;></th><th class=&quot;hdr-blue&quot;>Totaal verschoven</th>
-      <th class=&quot;hdr-dark&quot;></th><th class=&quot;hdr-blue&quot;>Totaal uur 0,74%</th>
-      <th class=&quot;hdr-dark&quot;></th><th class=&quot;hdr-blue&quot;>Aantal uur 0,89%</th>
-      <th class=&quot;hdr-dark&quot;></th><th class=&quot;hdr-blue&quot;>Totaal uur 1,20%</th>
-      <th class=&quot;hdr-dark&quot;></th><th class=&quot;hdr-blue&quot;>Mutatie Totaal</th>
-      <th class=&quot;hdr-dark&quot;>Totaal</th>
-    </tr>
-  </thead>
-  <tbody>
-    ${rows}
-    <tr class=&quot;tot-row&quot;>
-      <td colspan=&quot;3&quot; class=&quot;l&quot;>TOTAAL</td>
-      <td></td><td class=&quot;r&quot;>${fmtKm(tKm)}</td>
-      <td></td><td class=&quot;r&quot;>${fmt(tV430)}</td>
-      <td></td><td class=&quot;r&quot;>${fmt(tV175)}</td>
-      <td></td><td class=&quot;r&quot;>${fmt(tV176)}</td>
-      <td></td><td class=&quot;r&quot;>${fmt(tV177)}</td>
-      <td></td><td class=&quot;r&quot;>${fmt(tMut)}</td>
-      <td class=&quot;r&quot;>${fmt(tTot)}</td>
-    </tr>
-  </tbody>
-</table>
-</body></html>`;
+  const totalRow = row(
+    cell(&quot;TOTAAL&quot;,&quot;totl&quot;), cell(&quot;&quot;,&quot;totl&quot;), cell(&quot;&quot;,&quot;totl&quot;),
+    cell(&quot;&quot;,&quot;totl&quot;), cell(fmtKm(tKm),&quot;totr&quot;),
+    cell(&quot;&quot;,&quot;totl&quot;), cell(fmt(tV430),&quot;totr&quot;),
+    cell(&quot;&quot;,&quot;totl&quot;), cell(fmt(tV175),&quot;totr&quot;),
+    cell(&quot;&quot;,&quot;totl&quot;), cell(fmt(tV176),&quot;totr&quot;),
+    cell(&quot;&quot;,&quot;totl&quot;), cell(fmt(tV177),&quot;totr&quot;),
+    cell(&quot;&quot;,&quot;totl&quot;), cell(fmt(tMut),&quot;totr&quot;),
+    cell(fmt(tTot),&quot;totr&quot;)
+  );
 
-  const blob = new Blob([htmlContent], {type: &quot;application/vnd.ms-excel;charset=utf-8&quot;});
+  const sheet1Xml = `<Worksheet ss:Name=&quot;Maandafsluiting&quot;><Table>${headerRow}${dataRows}${totalRow}</Table></Worksheet>`;
+
+  // ── Extra tabblad(en): de originele geüploade Excel, zo dicht mogelijk bij
+  // ── het origineel (celwaarden + achtergrondkleur + lettertype + uitlijning).
+  let origSheetsXml = &quot;&quot;;
+  let origStyles = &quot;&quot;;
+  if (typeof XLSX !== &quot;undefined&quot; && state.rawWorkbook) {
+    const styleMap = new Map(); // key -> id
+    let styleCounter = 0;
+    const registerStyle = (attrs) => {
+      const key = JSON.stringify(attrs);
+      if (styleMap.has(key)) return styleMap.get(key);
+      const id = &quot;os&quot; + (styleCounter++);
+      styleMap.set(key, id);
+      let xml = `<Style ss:ID=&quot;${id}&quot;>`;
+      if (attrs.bg) xml += `<Interior ss:Color=&quot;${attrs.bg}&quot; ss:Pattern=&quot;Solid&quot;/>`;
+      if (attrs.bold || attrs.color) xml += `<Font${attrs.color?` ss:Color=&quot;${attrs.color}&quot;`:&quot;&quot;}${attrs.bold?` ss:Bold=&quot;1&quot;`:&quot;&quot;}${attrs.italic?` ss:Italic=&quot;1&quot;`:&quot;&quot;}/>`;
+      if (attrs.align) xml += `<Alignment ss:Horizontal=&quot;${attrs.align}&quot;/>`;
+      xml += `</Style>`;
+      origStyles += xml;
+      return id;
+    };
+
+    const rgb = (c) => {
+      if (!c) return null;
+      if (c.rgb) return &quot;#&quot; + c.rgb.substring(c.rgb.length-6);
+      return null;
+    };
+    const HALIGN = { left:&quot;Left&quot;, center:&quot;Center&quot;, right:&quot;Right&quot; };
+
+    state.rawWorkbook.SheetNames.forEach((naam) => {
+      const ws = state.rawWorkbook.Sheets[naam];
+      if (!ws || !ws[&quot;!ref&quot;]) { origSheetsXml += `<Worksheet ss:Name=&quot;${xEsc(naam.substring(0,31))}&quot;><Table></Table></Worksheet>`; return; }
+      const range = XLSX.utils.decode_range(ws[&quot;!ref&quot;]);
+      let rowsXml = &quot;&quot;;
+      for (let R = range.s.r; R <= range.e.r; R++) {
+        let cellsXml = &quot;&quot;;
+        for (let C = range.s.c; C <= range.e.c; C++) {
+          const addr = XLSX.utils.encode_cell({r:R, c:C});
+          const c = ws[addr];
+          if (!c) { cellsXml += `<Cell></Cell>`; continue; }
+
+          const st = c.s || {};
+          const bg = (st.patternType &amp;&amp; st.patternType !== &quot;none&quot;) ? (rgb(st.fgColor) || rgb(st.bgColor)) : null;
+          const bold = !!(st.font &amp;&amp; st.font.bold);
+          const italic = !!(st.font &amp;&amp; st.font.italic);
+          const fontColor = st.font ? rgb(st.font.color) : null;
+          const align = (st.alignment &amp;&amp; HALIGN[st.alignment.horizontal]) ? HALIGN[st.alignment.horizontal] : null;
+          const styleId = (bg||bold||italic||fontColor||align) ? registerStyle({bg,bold,italic,color:fontColor,align}) : null;
+
+          let val = c.v;
+          let type = &quot;String&quot;;
+          if (c.t === &quot;n&quot;) { type = &quot;Number&quot;; }
+          else if (c.t === &quot;d&quot;) { type = &quot;String&quot;; val = c.w || (val ? new Date(val).toLocaleDateString(&quot;nl-NL&quot;) : &quot;&quot;); }
+          else { val = (c.w != null ? c.w : c.v); type = &quot;String&quot;; }
+
+          cellsXml += cell(val, styleId, type);
+        }
+        rowsXml += `<Row>${cellsXml}</Row>`;
+      }
+      const veiligeNaam = xEsc(String(naam).replace(/[\\/?*\[\]:]/g,&quot; &quot;).substring(0,31).trim() || &quot;Blad&quot;);
+      origSheetsXml += `<Worksheet ss:Name=&quot;${veiligeNaam}&quot;><Table>${rowsXml}</Table></Worksheet>`;
+    });
+  }
+
+  const xmlContent = `<?xml version=&quot;1.0&quot;?>
+<?mso-application progid=&quot;Excel.Sheet&quot;?>
+<Workbook xmlns=&quot;urn:schemas-microsoft-com:office:spreadsheet&quot;
+ xmlns:o=&quot;urn:schemas-microsoft-com:office:office&quot;
+ xmlns:x=&quot;urn:schemas-microsoft-com:office:excel&quot;
+ xmlns:ss=&quot;urn:schemas-microsoft-com:office:spreadsheet&quot;>
+ <Styles>${sheet1Styles}${origStyles}</Styles>
+ ${sheet1Xml}
+ ${origSheetsXml}
+</Workbook>`;
+
+  const blob = new Blob([xmlContent], {type: &quot;application/vnd.ms-excel;charset=utf-8&quot;});
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement(&quot;a&quot;);
   a.href     = url;
@@ -11583,16 +11657,17 @@ function handleFile(file) {
   state.fileName = file.name;
   const reader = new FileReader();
   reader.onload = e => {
-    const wb = XLSX.read(e.target.result, {type:&quot;array&quot;});
+    const wb = XLSX.read(e.target.result, {type:&quot;array&quot;, cellStyles:true, cellNF:true});
     const {data, jaar, maand} = parsePayroll(wb);
     state.payroll=data; state.maand=maand; state.jaar=jaar; state.step=&quot;preview&quot;;
+    state.rawWorkbook = wb; // originele upload bewaren voor extra tabblad bij export
     render();
   };
   reader.readAsArrayBuffer(file);
 }
 function handleDrop(e) { e.preventDefault(); document.getElementById(&quot;dropzone&quot;).classList.remove(&quot;dragover&quot;); handleFile(e.dataTransfer.files[0]); }
 function doBereken() { state.resultaten = bereken(state.payroll); state.step = &quot;result&quot;; render(); }
-function reset() { state={step:&quot;upload&quot;,payroll:null,resultaten:null,maand:new Date().getMonth()+1,jaar:new Date().getFullYear(),filter:&quot;actief&quot;,zoek:&quot;&quot;,fileName:&quot;&quot;}; render(); }
+function reset() { state={step:&quot;upload&quot;,payroll:null,resultaten:null,maand:new Date().getMonth()+1,jaar:new Date().getFullYear(),filter:&quot;actief&quot;,zoek:&quot;&quot;,fileName:&quot;&quot;,rawWorkbook:null}; render(); }
 function setFilter(f) { state.filter = f; render(); }
 
 render();
