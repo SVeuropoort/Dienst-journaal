@@ -7798,25 +7798,23 @@ function openVerjModal() {
   var data = getVerjaardagen();
   var terminal = sessionStorage.getItem('dj_terminal') || 'EP';
 
-  // Bij HVH: laad medewerkers uit ma_hvh_v1
-  var medewerkers;
-  if (terminal === 'HVH') {
-    try {
-      var hvhData = JSON.parse(localStorage.getItem('ma_hvh_v1') || '[]');
-      medewerkers = hvhData.length > 0 ? hvhData : null;
-    } catch(e) { medewerkers = null; }
-  }
+  // Hardcoded namen als allerlaatste terugvaloptie (als er nog nooit iets is opgeslagen)
+  var _fallbackNamen = ["M. Adamu", "A. Ahmetagic", "R. Bakker", "V. van den Berg", "J. Blokland", "L.G.N. Bosveld", "R. Brooshooft", "C. Burger", "D.J.A. Dambruck", "J.C.M.T.H. Dammers", "R.F. Duvel", "A.E. Erad", "H.E. Erad", "R. Forman", "S.G. Flater", "W. van Geffen", "H.C.W. Goedegebuure", "R.A. Groenewegen", "A. Gijbels", "S. van der Helden", "A.A. Rodgers", "D. Mastenbroek", "H. Karagül", "H. Karagul", "M. Kievit", "D Stoutjesdijk", "K. Krullaars", "J. de Kruyk", "S. Laaij", "R.R.T Lauwers", "M.J. van Lieburg", "P. van der Lichte", "D. van Linschoten", "M. van Marsbergen", "S.N.A. van der Meer", "G.R. Mol", "R. Molendijk", "G van der Sluis", "R. Ottenhoff", "H. Ozdemir", "M.F. Punselie", "J. van Reenen", "N.E.J. Rietdijk", "S.F. Rimon", "Rodgers, A.A.,'83", "V.O. Schipper", "S Soekhoe", "G. Voormeeren", "G.H.M. Verwaal", "M. de Visser", "N. van der Waarde", "P.H.M. Waardenburg", "J. Wiegmans", "R. Wubben", "K.A. Zandijk", "M. Zoeteman", "J. Zijlstra"];
 
-  // Bij EP of als HVH geen data heeft: gebruik window._MEDEWERKERS of fallback
+  // Medewerkerslijst komt rechtstreeks uit de Maandafsluiting-instellingen (Instellingen
+  // > Medewerkers Europoort / Hoek van Holland), zodat nieuw toegevoegde medewerkers
+  // automatisch in de verjaardagenlijst verschijnen. Dit staat opgeslagen onder
+  // 'ma_medewerkers_v1' (EP) en 'ma_hvh_v1' (HVH) — dezelfde localStorage die de
+  // Maandafsluiting-tool zelf gebruikt en bijwerkt.
+  var medewerkers = null;
+  try {
+    var key = (terminal === 'HVH') ? 'ma_hvh_v1' : 'ma_medewerkers_v1';
+    var opgeslagen = JSON.parse(localStorage.getItem(key) || '[]');
+    if (Array.isArray(opgeslagen) && opgeslagen.length > 0) medewerkers = opgeslagen;
+  } catch(e) { medewerkers = null; }
+
   if (!medewerkers || medewerkers.length === 0) {
-    // Hardcoded namen als fallback (uit MEDEWERKERS array)
-    var _fallbackNamen = ["M. Adamu", "A. Ahmetagic", "R. Bakker", "V. van den Berg", "J. Blokland", "L.G.N. Bosveld", "R. Brooshooft", "C. Burger", "D.J.A. Dambruck", "J.C.M.T.H. Dammers", "R.F. Duvel", "A.E. Erad", "H.E. Erad", "R. Forman", "S.G. Flater", "W. van Geffen", "H.C.W. Goedegebuure", "R.A. Groenewegen", "A. Gijbels", "S. van der Helden", "A.A. Rodgers", "D. Mastenbroek", "H. Karagül", "H. Karagul", "M. Kievit", "D Stoutjesdijk", "K. Krullaars", "J. de Kruyk", "S. Laaij", "R.R.T Lauwers", "M.J. van Lieburg", "P. van der Lichte", "D. van Linschoten", "M. van Marsbergen", "S.N.A. van der Meer", "G.R. Mol", "R. Molendijk", "G van der Sluis", "R. Ottenhoff", "H. Ozdemir", "M.F. Punselie", "J. van Reenen", "N.E.J. Rietdijk", "S.F. Rimon", "Rodgers, A.A.,'83", "V.O. Schipper", "S Soekhoe", "G. Voormeeren", "G.H.M. Verwaal", "M. de Visser", "N. van der Waarde", "P.H.M. Waardenburg", "J. Wiegmans", "R. Wubben", "K.A. Zandijk", "M. Zoeteman", "J. Zijlstra"];
-    medewerkers = window._MEDEWERKERS
-      ? window._MEDEWERKERS
-      : (typeof MEDEWERKERS !== 'undefined' ? MEDEWERKERS : _fallbackNamen.map(function(n){ return {naam:n}; }));
-    if (!medewerkers || medewerkers.length === 0) {
-      medewerkers = _fallbackNamen.map(function(n){ return {naam:n}; });
-    }
+    medewerkers = _fallbackNamen.map(function(n){ return {naam:n}; });
   }
   var tbody = document.getElementById('verj-tbody');
   tbody.innerHTML = '';
