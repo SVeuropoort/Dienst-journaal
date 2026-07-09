@@ -8,7 +8,7 @@ window.tk = window.tk || function(key) {
   var splitKeys = ['dienstjournaal_stena_v1','vaarschema_backup_v1','vs_data_v1',
     'materieel_status_v1','mat_standalone_v2','mat_custom_list',
     'plan_v3','dagPlanning_v2_state','dagPlanning_v2_lastDate',
-    'dagpl_cert_v1','dagpl_cert_v2','scheepzoeker_schepen','dagPlanning_vasteCelteksten_v1','telefoonlijst_home_v1','dagpl_cert_dates_v1'];
+    'dagpl_cert_v1','dagpl_cert_v2','scheepzoeker_schepen','dagPlanning_vasteCelteksten_v1','telefoonlijst_home_v1','dagpl_cert_dates_v1','kade_vakken_v1'];
   if (key.startsWith('dagplan_')) return pfx + key;
   if (splitKeys.indexOf(key) >= 0) return pfx + key;
   return key;
@@ -4656,7 +4656,7 @@ window.addEventListener('resize', () => {
     'materieel_status_v1','mat_standalone_v2','mat_custom_list',
     'plan_v3','dagPlanning_v2_state','dagPlanning_v2_lastDate',
     'dagpl_cert_v1','dagpl_cert_v2','scheepzoeker_schepen','dagPlanning_vasteCelteksten_v1',
-    'kade_vakken_v1'
+    'kade_vakken_v1','ortRekentoolState_v1'
   ];
 
   function getTerminalPrefix() {
@@ -4763,7 +4763,8 @@ window.addEventListener('resize', () => {
     'scheepzoeker_schepen',
     'telefoonlijst_home_v1',
     'dagpl_cert_dates_v1',
-    'kade_vakken_v1'
+    'kade_vakken_v1',
+    'ortRekentoolState_v1'
   ];
 
   function getSyncData() {
@@ -11687,6 +11688,1192 @@ render();
   </div>
 
 
+<!-- ===== ORT / BASISROOSTER ===== -->
+<div id="view-ort" class="view">
+  <!-- Wachtwoord scherm -->
+  <div id="ort-lock" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:20px;">
+    <div style="font-size:40px;">&#x1F512;</div>
+    <div style="font-size:18px;font-weight:700;color:#003366;">ORT / Basisrooster</div>
+    <div style="font-size:13px;color:#666;">Voer het wachtwoord in om door te gaan</div>
+    <div style="display:flex;gap:10px;">
+      <input type="password" id="ort-pw-input" placeholder="Wachtwoord..." onkeydown="if(event.key==='Enter')checkOrtPw()"
+        style="padding:10px 16px;border:2px solid #c8d7e8;border-radius:8px;font-size:14px;width:220px;outline:none;">
+      <button onclick="checkOrtPw()" style="background:#003366;color:#fff;border:none;border-radius:8px;padding:10px 20px;cursor:pointer;font-size:14px;font-weight:700;">
+        &#x27A1; Openen
+      </button>
+    </div>
+    <div id="ort-pw-err" style="color:#c0392b;font-size:12px;min-height:16px;"></div>
+  </div>
+  <iframe id="ort-iframe"
+    style="width:100%;height:calc(100vh - 56px);border:none;display:none;"
+    srcdoc="<!DOCTYPE html>
+<html lang=&quot;nl&quot;>
+<head>
+<meta charset=&quot;UTF-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;>
+<title>ORT Rekentool – Nieuw Rooster</title>
+<style>
+  :root{
+    --stena-blue:#003b70;
+    --stena-blue-light:#0057a3;
+    --accent:#e30613;
+    --bg:#f4f6f8;
+    --card:#ffffff;
+    --border:#d7dde3;
+    --text:#1c2733;
+    --muted:#5b6b7a;
+    --band-55:#e8f0fb;
+    --band-74:#dbe9f7;
+    --band-89:#c9defa;
+    --band-120:#9fc3ef;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:Arial, Helvetica, sans-serif; background:var(--bg); color:var(--text);
+  }
+  header{
+    background:var(--stena-blue); color:#fff; padding:20px 28px;
+  }
+  header h1{margin:0; font-size:20px; font-weight:700;}
+  header p{margin:4px 0 0; font-size:13px; color:#cfe0f2;}
+  .wrap{max-width:1180px; margin:0 auto; padding:20px;}
+  .card{
+    background:var(--card); border:1px solid var(--border); border-radius:8px;
+    padding:18px 20px; margin-bottom:18px;
+  }
+  .card h2{margin:0 0 12px; font-size:15px; color:var(--stena-blue); border-bottom:2px solid var(--border); padding-bottom:8px;}
+  .controls{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:6px;}
+  .controls label{font-size:13px; font-weight:600;}
+  .controls input[type=number]{
+    width:70px; padding:6px 8px; border:1px solid var(--border); border-radius:5px; font-size:14px;
+  }
+  .ploegSizeGroup{display:flex; align-items:center; gap:8px; margin-left:auto; padding-left:14px; border-left:1px solid var(--border);}
+  .ploegSizeGroup input{width:55px;}
+  .btn{
+    background:var(--stena-blue); color:#fff; border:none; border-radius:5px;
+    padding:7px 14px; font-size:13px; cursor:pointer; font-weight:600;
+  }
+  .btn:hover{background:var(--stena-blue-light);}
+  .btn.secondary{background:#fff; color:var(--stena-blue); border:1px solid var(--stena-blue);}
+  table.grid{border-collapse:collapse; width:100%; font-size:12.5px;}
+  table.grid th, table.grid td{border:1px solid var(--border); padding:5px; text-align:center; vertical-align:middle;}
+  table.grid th{background:#eef2f6; font-weight:700; color:var(--stena-blue); position:sticky; top:0;}
+  table.grid td.daylabel{background:#eef2f6; font-weight:700; text-align:left; padding-left:8px; white-space:nowrap;}
+  .grid-scroll{overflow-x:auto;}
+  .cell{display:flex; flex-direction:column; gap:3px; align-items:center;}
+  .cell input[type=time]{width:78px; font-size:12px; padding:2px; border:1px solid var(--border); border-radius:4px;}
+  .cell label.vrij{font-size:11px; display:flex; gap:4px; align-items:center; color:var(--muted); cursor:pointer;}
+  .cell.is-vrij .startInp, .cell.is-vrij .endInp{visibility:hidden;}
+  .cell.is-vrij .pauzeToggle, .cell.is-vrij .pauzeFields{display:none !important;}
+  .pauzeToggle{font-size:10px; color:var(--muted); display:flex; gap:3px; align-items:center; cursor:pointer;}
+  .pauzeFields{display:flex; align-items:center; gap:2px; background:#f4f6f8; border:1px dashed var(--border); border-radius:4px; padding:2px 3px;}
+  .pauzeFields input{width:36px !important; font-size:10.5px !important; padding:1px !important;}
+  .pauzeFields .dash{font-size:10px; color:var(--muted);}
+  .hoursLabel{font-size:10.5px; font-weight:700; color:var(--stena-blue); margin-top:1px;}
+  .cell.is-vrij .hoursLabel{color:var(--muted); font-weight:400;}
+  .cell.is-adv{background:#e05252 !important; border-radius:6px;}
+  .cell.is-adv .vrij, .cell.is-adv .advToggle, .cell.is-adv .hoursLabel{color:#fff;}
+  .cell.is-adv .startInp, .cell.is-adv .endInp, .cell.is-adv .breakStartInp, .cell.is-adv .breakEndInp{background:#fff5f5;}
+  .advToggle{font-size:10px; color:var(--muted); display:flex; gap:3px; align-items:center; cursor:pointer; margin-top:1px;}
+  .vrijAdvRow{display:flex; align-items:center; gap:8px; flex-wrap:nowrap;}
+  .results{display:grid; grid-template-columns: 1.2fr 1fr; gap:18px;}
+  @media (max-width:800px){ .results{grid-template-columns:1fr;} }
+  .big-result{
+    background:linear-gradient(135deg, var(--stena-blue), var(--stena-blue-light));
+    color:#fff; border-radius:8px; padding:20px; text-align:center;
+  }
+  .big-result .pct{font-size:44px; font-weight:800; line-height:1;}
+  .big-result .lbl{font-size:13px; color:#cfe0f2; margin-top:6px;}
+  .subresult{display:flex; justify-content:space-between; font-size:13px; margin-top:14px; padding-top:12px; border-top:1px solid rgba(255,255,255,.25);}
+  .band-table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  .band-table th, .band-table td{border:1px solid var(--border); padding:6px 8px; text-align:right;}
+  .band-table th{background:#eef2f6; text-align:left; color:var(--stena-blue);}
+  .band-table td:first-child{text-align:left;}
+  .swatch{display:inline-block; width:12px; height:12px; border-radius:2px; margin-right:6px; vertical-align:-1px;}
+  details{margin-top:10px; font-size:12.5px; color:var(--muted);}
+  details summary{cursor:pointer; font-weight:600; color:var(--stena-blue);}
+  .calc-steps{margin-top:8px; line-height:1.7;}
+  .calc-steps code{background:#eef2f6; padding:1px 5px; border-radius:3px;}
+  .ref-table{width:100%; border-collapse:collapse; font-size:12.5px; margin-top:6px;}
+  .ref-table th, .ref-table td{border:1px solid var(--border); padding:6px 8px;}
+  .ref-table th{background:#eef2f6; color:var(--stena-blue);}
+  footer{text-align:center; font-size:11.5px; color:var(--muted); padding:16px;}
+  .tabbar{display:flex; align-items:center; gap:6px; flex-wrap:wrap;}
+  .tab{
+    padding:7px 14px; border-radius:6px 6px 0 0; border:1px solid var(--border); border-bottom:none;
+    background:#eef2f6; color:var(--stena-blue); font-size:13px; font-weight:600; cursor:pointer;
+    display:flex; align-items:center; gap:8px;
+  }
+  .tab.active{background:var(--stena-blue); color:#fff;}
+  .tab .close-tab{font-weight:400; opacity:.7; cursor:pointer;}
+  .tab .close-tab:hover{opacity:1;}
+  .tab-add{
+    padding:7px 12px; border-radius:6px; border:1px dashed var(--border); background:#fff;
+    color:var(--stena-blue); font-size:13px; cursor:pointer; font-weight:600;
+  }
+  .note-badge{
+    display:inline-block; background:#fff4e5; border:1px solid #f0c987; color:#8a5a00;
+    font-size:12px; padding:8px 10px; border-radius:6px; margin-bottom:12px;
+  }
+  .clockrow{display:flex; gap:28px; flex-wrap:wrap; justify-content:center; padding:10px 0;}
+  .clockbox{display:flex; flex-direction:column; align-items:center; gap:8px;}
+  .clockface{
+    position:relative; width:150px; height:150px; border-radius:50%;
+    box-shadow:0 0 0 1px var(--border), inset 0 0 0 2px #fff;
+  }
+  .clockface .hub{
+    position:absolute; top:50%; left:50%; width:74px; height:74px; border-radius:50%;
+    background:#fff; transform:translate(-50%,-50%); box-shadow:0 0 0 1px var(--border);
+    display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;
+    color:var(--stena-blue); text-align:center; line-height:1.25;
+  }
+  .clockface .tick{
+    position:absolute; top:50%; left:50%; width:2px; height:8px; background:#7a8a99;
+    transform-origin:1px 0px; margin-left:-1px; margin-top:-75px;
+  }
+  .clockface .ticklbl{
+    position:absolute; top:50%; left:50%; font-size:10px; color:var(--muted); font-weight:700;
+    transform:translate(-50%,-50%);
+  }
+  .clock-legend{display:flex; gap:18px; flex-wrap:wrap; justify-content:center; font-size:12.5px; color:var(--text); margin-top:4px;}
+  .clock-legend .swatch{width:12px; height:12px; margin-right:5px;}
+  .tabbar-row{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+  .saveArea{display:flex; align-items:center; gap:10px; flex-shrink:0; padding-top:2px;}
+  .save-btn{background:#1b7a3d;}
+  .save-btn:hover{background:#22994c;}
+  .print-btn{background:#4a4a4a;}
+  .print-btn:hover{background:#606060;}
+  .printOnlyHeader{display:none;}
+
+  @media print{
+    @page{ size: A4 landscape; margin: 6mm; }
+    html, body{ background:#fff; font-size:8px; height:auto !important; overflow:visible !important; }
+    header, footer, .saveArea, .blocksBar, .blocksHint, .blockForm,
+    .tabbar, #tabNote, .controls, details, .no-print{ display:none !important; }
+    .wrap{ max-width:none; padding:0; margin:0; zoom:0.75; }
+    .card{
+      border:none; box-shadow:none; padding:0; margin:0 0 4px; border-radius:0;
+      page-break-inside: avoid; break-inside: avoid;
+    }
+    .printOnlyHeader{
+      display:block !important; font-weight:700; font-size:13px; color:#000;
+      margin-bottom:4px; border-bottom:2px solid #000; padding-bottom:3px;
+    }
+    h2{ font-size:10px; margin:4px 0 3px; color:#000; border-bottom:1px solid #999; }
+    table.grid{ font-size:6.5px; width:100%; table-layout:fixed; }
+    table.grid th, table.grid td{ padding:0 1px; }
+    .grid-scroll{ overflow:visible !important; }
+    .cell{ gap:0; }
+    .cell input[type=text]{ font-size:6px !important; padding:0 !important; border:none !important; background:transparent !important; width:30px !important; }
+    .vrij, .advToggle, .pauzeToggle{ font-size:5.5px !important; }
+    .pauzeFields{ padding:0 !important; border:none !important; background:transparent !important; gap:0 !important; }
+    .pauzeFields input{ width:24px !important; font-size:5.5px !important; }
+    .hoursLabel{ font-size:6px !important; }
+    .hoursLabel::before{ content:&quot;(&quot;; }
+    .hoursLabel::after{ content:&quot;)&quot;; }
+    .results{ grid-template-columns: 1fr 1fr; gap:6px; }
+    .big-result{ padding:6px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .big-result .pct{ font-size:22px; }
+    .subresult{ margin-top:6px; padding-top:6px; }
+    .band-table{ font-size:7px; }
+    .band-table th, .band-table td{ padding:1px 3px; }
+    .cell, .cell.is-adv{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    * { box-shadow:none !important; }
+  }
+  .save-status{font-size:12px; color:var(--muted);}
+  .blocksBar{display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:10px 0 4px;}
+  .blockChip{
+    display:flex; align-items:center; gap:6px; padding:6px 10px; border-radius:16px;
+    border:1.5px solid var(--stena-blue-light); background:#fff; color:var(--stena-blue);
+    font-size:12.5px; font-weight:600; cursor:pointer; transition:background .1s, color .1s;
+  }
+  .blockChip:hover{background:#eef4fb;}
+  .blockChip.armed{background:var(--stena-blue); color:#fff;}
+  .blockChip .chipTimes{font-weight:400; opacity:.85;}
+  .blockChip .chipDel{opacity:.6; font-weight:400; padding-left:2px;}
+  .blockChip .chipDel:hover{opacity:1;}
+  .blockChip .chipEdit{opacity:.6; font-weight:400; padding-left:2px;}
+  .blockChip .chipEdit:hover{opacity:1;}
+  .blockChip.armed .chipEdit, .blockChip.armed .chipDel{color:#fff;}
+  .addBlockBtn{
+    padding:6px 12px; border-radius:16px; border:1.5px dashed var(--border); background:#fff;
+    color:var(--stena-blue); font-size:12.5px; font-weight:600; cursor:pointer;
+  }
+  .blocksHint{font-size:11.5px; color:var(--muted); margin:0 0 8px;}
+  .blockForm{
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:#f4f6f8;
+    border:1px solid var(--border); border-radius:8px; padding:10px; margin-bottom:8px;
+  }
+  .blockForm input[type=text]:not(.timeSmall){width:150px; padding:5px 8px; border:1px solid var(--border); border-radius:5px; font-size:13px;}
+  .blockForm .timeSmall{width:60px; padding:5px 6px; border:1px solid var(--border); border-radius:5px; font-size:13px;}
+  .blockForm label{font-size:12px; color:var(--muted); display:flex; align-items:center; gap:4px;}
+  .cell.cellClickable{cursor:copy;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>ORT Rekentool — Schematoeslag nieuw rooster</h1>
+  <p>Gebaseerd op CAO Stena Line Stevedoring B.V. 2021–2023, Artikel B8 (Schematoeslag)</p>
+</header>
+
+<div class=&quot;wrap&quot;>
+
+  <div class=&quot;printOnlyHeader&quot; id=&quot;printOnlyHeader&quot;></div>
+
+  <div class=&quot;card&quot;>
+    <div class=&quot;tabbar-row&quot;>
+      <div class=&quot;tabbar&quot; id=&quot;tabBar&quot;></div>
+      <div class=&quot;saveArea&quot;>
+        <button class=&quot;btn save-btn&quot; id=&quot;saveBtn&quot;>💾 Opslaan</button>
+        <button class=&quot;btn print-btn&quot; id=&quot;printBtn&quot;>🖨️ Printen</button>
+        <span class=&quot;save-status&quot; id=&quot;saveStatus&quot;></span>
+      </div>
+    </div>
+    <h2 style=&quot;margin-top:14px;&quot;>1. Rooster instellen</h2>
+    <div id=&quot;tabNote&quot;></div>
+    <div class=&quot;blocksBar&quot; id=&quot;blocksBar&quot;></div>
+    <p class=&quot;blocksHint&quot; id=&quot;blocksHint&quot;>Klik een blok aan en klik daarna op de dagen waar die dienst moet komen. Klik het blok nogmaals aan om te stoppen.</p>
+    <p class=&quot;blocksHint&quot; style=&quot;display:flex; align-items:center; gap:8px;&quot;>
+      <span>Kleur van een dienst:</span>
+      <span style=&quot;background:rgb(255,213,79); padding:2px 8px; border-radius:4px; color:#5c4a00;&quot;>vroeg (04:00)</span>
+      <span style=&quot;background:rgb(179,200,93); padding:2px 8px; border-radius:4px; color:#3a3a00;&quot;>→</span>
+      <span style=&quot;background:rgb(102,187,106); padding:2px 8px; border-radius:4px; color:#0d3b12;&quot;>laat (23:00)</span>
+      <span>— hoe geler, hoe vroeger de dienst start; hoe groener, hoe later.</span>
+    </p>
+    <div class=&quot;controls&quot;>
+      <label for=&quot;numWeeks&quot;>Aantal weken in de cyclus:</label>
+      <input type=&quot;number&quot; id=&quot;numWeeks&quot; min=&quot;1&quot; max=&quot;20&quot; value=&quot;4&quot;>
+      <button class=&quot;btn&quot; id=&quot;applyWeeks&quot;>Toepassen</button>
+      <button class=&quot;btn secondary&quot; id=&quot;clearAll&quot;>Alles op Vrij</button>
+      <span class=&quot;ploegSizeGroup&quot;>
+        <label for=&quot;ploegSize&quot;>Een ploeg bestaat uit:</label>
+        <input type=&quot;number&quot; id=&quot;ploegSize&quot; min=&quot;1&quot; max=&quot;99&quot; value=&quot;1&quot;>
+        <label for=&quot;ploegSize&quot;>personen</label>
+      </span>
+    </div>
+    <div class=&quot;grid-scroll&quot;>
+      <table class=&quot;grid&quot; id=&quot;gridTable&quot;></table>
+    </div>
+  </div>
+
+  <div class=&quot;card&quot;>
+    <h2>2. Resultaat</h2>
+    <div class=&quot;results&quot;>
+      <div class=&quot;big-result&quot;>
+        <div class=&quot;pct&quot; id=&quot;pctResult&quot;>–</div>
+        <div class=&quot;lbl&quot;>Schema percentage (ORT)</div>
+        <div class=&quot;subresult&quot;>
+          <span>Gemiddeld aantal uren / week</span>
+          <span id=&quot;avgHours&quot;>–</span>
+        </div>
+        <div class=&quot;subresult&quot;>
+          <span>Totaal aantal diensturen (hele cyclus)</span>
+          <span id=&quot;totHours&quot;>–</span>
+        </div>
+      </div>
+      <div>
+        <table class=&quot;band-table&quot;>
+          <thead><tr><th>Tijdvak</th><th>%</th><th>Uren (cyclus)</th></tr></thead>
+          <tbody id=&quot;bandBody&quot;></tbody>
+        </table>
+        <details open>
+          <summary>Berekening in detail</summary>
+          <div class=&quot;calc-steps&quot; id=&quot;calcSteps&quot;></div>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <div class=&quot;card&quot;>
+    <h2>3. Bezetting per dag</h2>
+    <p class=&quot;no-print&quot; style=&quot;font-size:12.5px; color:var(--muted); margin-top:-4px;&quot;>
+      Aantal personen op dienst per dag, uitgesplitst naar diensttype op basis van de starttijd
+      (vroeg &amp;lt;06:00, dag 06:00–11:00, middag 11:00–14:00, laat ≥14:00), opgeteld over alle weken
+      in deze tab (aantal diensten × ploeggrootte, instelbaar hierboven bij &quot;Een ploeg bestaat uit&quot;).
+    </p>
+    <table class=&quot;band-table&quot; id=&quot;occupancyTable&quot; style=&quot;max-width:640px;&quot;>
+      <thead><tr><th>Dag</th><th>Vroege dienst</th><th>Dagdienst</th><th>Middagdienst</th><th>Late dienst</th><th>Totaal</th></tr></thead>
+      <tbody id=&quot;occupancyBody&quot;></tbody>
+    </table>
+  </div>
+
+  <div class=&quot;card no-print&quot;>
+    <h2>Gehanteerde tijdvakken (CAO Artikel B8 — vast, niet aanpasbaar)</h2>
+    <div class=&quot;clockrow&quot; id=&quot;clockRow&quot;></div>
+    <div class=&quot;clock-legend&quot;>
+      <span><i class=&quot;swatch&quot; style=&quot;background:var(--band-55)&quot;></i>55% — dag (07:00–18:00)</span>
+      <span><i class=&quot;swatch&quot; style=&quot;background:var(--band-74)&quot;></i>74% — avond/nacht (18:00–07:00)</span>
+      <span><i class=&quot;swatch&quot; style=&quot;background:var(--band-89)&quot;></i>89% — zaterdag dag</span>
+      <span><i class=&quot;swatch&quot; style=&quot;background:var(--band-120)&quot;></i>120% — weekend-nacht (za 18:00 t/m ma 06:00) &amp;amp; hele zondag</span>
+    </div>
+    <p style=&quot;font-size:12px; color:var(--muted); margin-top:8px;&quot;>
+      Diensten die over middernacht heen lopen worden automatisch per kalenderdag opgesplitst,
+      zodat bijvoorbeeld een dienst van vrijdag 22:00 tot zaterdag 02:00 correct verdeeld wordt
+      over het vrijdagavond-tijdvak (0,74%) en het zaterdag-tijdvak (0,89%).
+    </p>
+  </div>
+
+</div>
+
+<footer>Alle berekeningen volgens Artikel B8 CAO Stena Line Stevedoring B.V. — geverifieerd tegen de officiële schemapercentages in Bijlage BII (o.a. 33,28% / 30,51% / 21,74%).</footer>
+
+<script>
+const DAY_NAMES = [&quot;Zondag&quot;,&quot;Maandag&quot;,&quot;Dinsdag&quot;,&quot;Woensdag&quot;,&quot;Donderdag&quot;,&quot;Vrijdag&quot;,&quot;Zaterdag&quot;];
+const DAY_SHORT = [&quot;ZO&quot;,&quot;MA&quot;,&quot;DI&quot;,&quot;WO&quot;,&quot;DO&quot;,&quot;VR&quot;,&quot;ZA&quot;];
+
+function breakpointsForDay(dow){
+  if(dow===0) return [];
+  if(dow===1) return [6,7,18];
+  if(dow===6) return [18];
+  return [7,18];
+}
+function bandForDayHour(dow, h){
+  if(dow===0) return 1.20;
+  if(dow===1){
+    if(h<6) return 1.20;
+    if(h<7) return 0.74;
+    if(h<18) return 0.55;
+    return 0.74;
+  }
+  if(dow===6){
+    return h<18 ? 0.89 : 1.20;
+  }
+  if(h<7) return 0.74;
+  if(h<18) return 0.55;
+  return 0.74;
+}
+// Kleurverloop op basis van starttijd: geel = vroeg, groen = laat.
+// Bereik 04:00-23:00 gebruikt (buiten dat bereik wordt geclipt naar het uiterste).
+const SHIFT_COLOR_MIN_H = 4;
+const SHIFT_COLOR_MAX_H = 23;
+const SHIFT_COLOR_EARLY = [255, 213, 79];  // geel
+const SHIFT_COLOR_LATE  = [102, 187, 106]; // groen
+function getShiftColor(startH){
+  if(startH===null || startH===undefined || isNaN(startH)) return null;
+  let t = (startH - SHIFT_COLOR_MIN_H) / (SHIFT_COLOR_MAX_H - SHIFT_COLOR_MIN_H);
+  t = Math.max(0, Math.min(1, t));
+  const r = Math.round(SHIFT_COLOR_EARLY[0] + (SHIFT_COLOR_LATE[0]-SHIFT_COLOR_EARLY[0])*t);
+  const g = Math.round(SHIFT_COLOR_EARLY[1] + (SHIFT_COLOR_LATE[1]-SHIFT_COLOR_EARLY[1])*t);
+  const b = Math.round(SHIFT_COLOR_EARLY[2] + (SHIFT_COLOR_LATE[2]-SHIFT_COLOR_EARLY[2])*t);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+function refreshCellColor(cellDiv, cellObj){
+  if(cellObj.vrij){
+    cellDiv.style.backgroundColor = &quot;&quot;;
+  } else {
+    const col = getShiftColor(timeToDec(cellObj.start));
+    cellDiv.style.backgroundColor = col || &quot;&quot;;
+  }
+}
+
+function timeToDec(t){
+  if(!t) return null;
+  const [h,m] = t.split(&quot;:&quot;).map(Number);
+  return h + m/60;
+}
+function decToTime(d){
+  const h = Math.floor(d);
+  const m = Math.round((d-h)*60);
+  return String(h).padStart(2,&quot;0&quot;)+&quot;:&quot;+String(m).padStart(2,&quot;0&quot;);
+}
+function keyFor(w,d){ return w+&quot;_&quot;+d; }
+
+function cellHours(cellObj){
+  if(cellObj.vrij) return 0;
+  const s = timeToDec(cellObj.start);
+  const e = timeToDec(cellObj.end);
+  if(s===null || e===null) return 0;
+  let total = e>s ? (e-s) : (24-s+e);
+  if(cellObj.breakStart &amp;&amp; cellObj.breakEnd){
+    const bs = timeToDec(cellObj.breakStart);
+    const be = timeToDec(cellObj.breakEnd);
+    if(bs!==null &amp;&amp; be!==null){
+      total -= (be>bs ? (be-bs) : (24-bs+be));
+    }
+  }
+  return Math.max(0, total);
+}
+function formatCellHours(cellObj){
+  if(cellObj.vrij) return &quot;vrij&quot;;
+  const h = cellHours(cellObj);
+  return h.toLocaleString(&quot;nl-NL&quot;, {minimumFractionDigits:2, maximumFractionDigits:2}) + &quot; u&quot;;
+}
+function refreshCellHours(cellDiv, cellObj){
+  const lbl = cellDiv.querySelector(&quot;.hoursLabel&quot;);
+  if(lbl) lbl.textContent = formatCellHours(cellObj);
+}
+// Standaard pauze van precies 30 minuten, gecentreerd op het midden van de dienst.
+function defaultBreak(cellObj){
+  const s = timeToDec(cellObj.start);
+  let e = timeToDec(cellObj.end);
+  if(s===null || e===null) return {breakStart:&quot;12:00&quot;, breakEnd:&quot;12:30&quot;};
+  if(e<=s) e += 24; // dienst loopt over middernacht
+  const mid = s + (e-s)/2;
+  let bs = mid - 0.25;
+  let be = mid + 0.25;
+  if(bs<0) bs += 24;
+  if(be>=24) be -= 24;
+  return {breakStart:decToTime(bs%24), breakEnd:decToTime(be%24)};
+}
+
+// Normaliseert vrije invoer naar strikt 24-uurs &quot;HH:MM&quot; (geen AM/PM).
+// Accepteert o.a. &quot;7:5&quot;, &quot;0730&quot;, &quot;23:15&quot; en corrigeert foutieve invoer terug naar de vorige waarde.
+function normalizeTime24(raw, fallback){
+  if(!raw) return fallback;
+  let s = raw.trim().replace(/[^\d:]/g,&quot;&quot;);
+  let h,m;
+  if(s.includes(&quot;:&quot;)){
+    const parts = s.split(&quot;:&quot;);
+    h = parseInt(parts[0],10);
+    m = parseInt(parts[1]||&quot;0&quot;,10);
+  } else if(s.length<=2){
+    h = parseInt(s,10); m = 0;
+  } else {
+    h = parseInt(s.slice(0,-2),10); m = parseInt(s.slice(-2),10);
+  }
+  if(isNaN(h) || isNaN(m) || h<0 || h>23 || m<0 || m>59) return fallback;
+  return String(h).padStart(2,&quot;0&quot;)+&quot;:&quot;+String(m).padStart(2,&quot;0&quot;);
+}
+
+// --- Ploegdienst-shifttypes zoals gereconstrueerd uit het huidige Europoort-teamrooster ---
+// (&quot;Aanpasbaar rooster&quot; tabblad, 18-weekse cyclus — geverifieerd: komt EXACT uit op 21,74%,
+//  precies de officiële CAO-waarde uit Bijlage BII voor Stevedoring Europoort)
+const SHIFT_DEFS = {
+  DAY:  [[7,12],[12.5,15.25]],
+  LATE: [[14,16.5],[17,22.25]],
+  SUN:  [[12,16.25],[17,20.5]],
+  SAT:  [[7,12],[12.5,15.25]],
+  // Hoek van Holland — teamrooster (&quot;Teams&quot;, 13-weekse cyclus)
+  S1: [[7.25,12],[12.5,15.5]],
+  S2: [[7.25,12.5],[13,15.5]],
+  S3: [[12.5,16.5],[17,20.75]],
+  S4: [[13.5,16.5],[17,21.75]],
+  S5: [[13.5,17.25],[17.75,21.75]],
+  S6: [[14.5,16.75],[17.25,22.75]],
+  // Hoek van Holland — supervisor-rooster (&quot;Roosters SV&quot;, 4-weekse cyclus)
+  SA: [[6.75,11.5],[12,15]],
+  SB: [[14.75,18],[18.5,23.25]],
+  SC: [[13.25,17.25],[17.75,21.75]],
+  // Europoort supervisor-rooster (&quot;rooster_Supervisors.xlsx&quot;, 3-weekse cyclus) —
+  // gereconstrueerd uit een deels beschadigd bestand, zie toelichting in de tab zelf.
+  EPS_DAY:  [[7,12],[12.5,15.25]],
+  EPS_LATE: [[15,18],[18.5,23.25]],
+  EPS_SAT:  [[7,11.75],[12.25,23.25]],
+  EPS_SUN:  [[12,17],[17.75,21]],
+  EPS_DAYV: [[7.25,11.75],[12.5,15.75]],
+};
+function shiftToCell(shiftKey){
+  if(shiftKey===&quot;VRIJ&quot;) return {vrij:true, start:&quot;07:00&quot;, end:&quot;15:00&quot;};
+  const segs = SHIFT_DEFS[shiftKey];
+  return {vrij:false, start:decToTime(segs[0][0]), end:decToTime(segs[1][1]),
+          breakStart:decToTime(segs[0][1]), breakEnd:decToTime(segs[1][0])};
+}
+function makeDataFromWeeks(weeksArray){
+  const data = {};
+  weeksArray.forEach((week,w)=>{
+    week.forEach((shift,d)=>{
+      data[keyFor(w,d)] = shiftToCell(shift);
+    });
+  });
+  return data;
+}
+
+// Gereconstrueerd rooster &quot;Europoort&quot; — het huidige team-werkschema, 18-weken cyclus,
+// exact geverifieerd tegen de officiële 21,74% (Bijlage BII CAO).
+const EUROPOORT_WEEKS = [
+  ['VRIJ','LATE','LATE','LATE','LATE','LATE','VRIJ'],
+  ['VRIJ','DAY','DAY','DAY','VRIJ','VRIJ','SAT'],
+  ['SUN','VRIJ','LATE','LATE','LATE','LATE','VRIJ'],
+  ['VRIJ','DAY','DAY','DAY','DAY','DAY','VRIJ'],
+  ['VRIJ','LATE','LATE','LATE','LATE','LATE','VRIJ'],
+  ['VRIJ','DAY','DAY','DAY','VRIJ','DAY','SAT'],
+  ['SUN','VRIJ','LATE','LATE','LATE','LATE','VRIJ'],
+  ['SUN','VRIJ','DAY','DAY','DAY','DAY','VRIJ'],
+  ['VRIJ','LATE','LATE','LATE','LATE','LATE','VRIJ'],
+  ['SUN','VRIJ','DAY','DAY','DAY','VRIJ','SAT'],
+  ['SUN','LATE','VRIJ','DAY','DAY','DAY','VRIJ'],
+  ['VRIJ','LATE','LATE','LATE','LATE','LATE','VRIJ'],
+  ['VRIJ','DAY','DAY','VRIJ','DAY','DAY','SAT'],
+  ['SUN','VRIJ','VRIJ','LATE','LATE','LATE','VRIJ'],
+  ['SUN','DAY','DAY','DAY','DAY','DAY','VRIJ'],
+  ['VRIJ','LATE','LATE','LATE','LATE','LATE','VRIJ'],
+  ['SUN','LATE','LATE','VRIJ','DAY','DAY','SAT'],
+  ['SUN','VRIJ','DAY','DAY','DAY','DAY','VRIJ'],
+];
+
+// Gereconstrueerd rooster &quot;Rooster HvH&quot; — Hoek van Holland teamrooster, 13-weekse cyclus
+// (&quot;Teams&quot; tabblad, bestand Roosters_2015_teams_en_sv). Komt uit op 32,61%
+// (CAO Bijlage BII noemt 33,28% — dit 2015-rooster wijkt kennelijk op 1 dienst na iets af).
+const HVH_TEAM_WEEKS = [
+  ['VRIJ','S6','S6','S6','S6','VRIJ','S1'],
+  ['S1','S1','S1','VRIJ','VRIJ','S4','S4'],
+  ['S4','S5','VRIJ','S1','S1','S1','VRIJ'],
+  ['VRIJ','S4','S4','S4','S4','VRIJ','S1'],
+  ['S1','S1','VRIJ','VRIJ','S6','S6','S6'],
+  ['S6','VRIJ','S2','S2','S2','S2','VRIJ'],
+  ['VRIJ','S6','S6','S6','S6','VRIJ','S2'],
+  ['S2','VRIJ','S5','S5','VRIJ','S5','S5'],
+  ['S4','VRIJ','S2','S2','S2','S2','VRIJ'],
+  ['VRIJ','S3','S3','S3','S3','S3','S3'],
+  ['VRIJ','S2','S2','S2','VRIJ','S6','S6'],
+  ['S6','S6','VRIJ','VRIJ','S2','S2','S2'],
+  ['S2','VRIJ','S6','S6','S5','S5','VRIJ'],
+];
+
+// Gereconstrueerd rooster &quot;Rooster HvH Supervisor&quot; — 4-weekse cyclus
+// (&quot;Roosters SV&quot; tabblad). Exact geverifieerd: komt uit op 30,51%,
+// precies de officiële CAO-waarde uit Bijlage BII voor Stevedoring supervisors Hoek van Holland.
+const HVH_SV_WEEKS = [
+  ['SA','SA','SA','VRIJ','SB','SC','VRIJ'],
+  ['VRIJ','SB','SC','SC','VRIJ','SB','SB'],
+  ['SB','SC','VRIJ','SA','SA','SA','VRIJ'],
+  ['VRIJ','SB','SB','SB','SC','VRIJ','SA'],
+];
+
+// Gereconstrueerd rooster &quot;Rooster Europoort Supervisor&quot; — 3-weekse cyclus
+// (rooster_Supervisors.xlsx). LET OP: dit bronbestand was deels beschadigd
+// (ontbrekende %-configuratie, een #VALUE!-fout bij zaterdag). De kale diensttijden
+// waren wel leesbaar en zijn hier overgenomen; controleer met name:
+//  - zondag week B (12:00–17:00 + 17:45–21:00, dat is 8:15 i.p.v. de gebruikelijke 7:45)
+//  - vrijdag week C stond als &quot;ATVA&quot; (geen tijden gegeven) — hier als vrij gerekend
+const EPS_WEEKS = [
+  ['VRIJ','EPS_DAY','EPS_DAY','VRIJ','EPS_LATE','EPS_LATE','EPS_SAT'],
+  ['EPS_SUN','VRIJ','VRIJ','EPS_DAYV','EPS_DAYV','EPS_DAYV','VRIJ'],
+  ['VRIJ','EPS_LATE','EPS_LATE','EPS_LATE','EPS_LATE','VRIJ','VRIJ'],
+];
+
+function makeEmptyData(numWeeks){
+  const data = {};
+  for(let w=0; w<numWeeks; w++){
+    for(let d=0; d<7; d++){
+      data[keyFor(w,d)] = {vrij:true, start:&quot;07:00&quot;, end:&quot;15:00&quot;};
+    }
+  }
+  return data;
+}
+
+const STORAGE_KEY = (function(){
+  try {
+    var t = sessionStorage.getItem(&quot;dj_terminal&quot;) || &quot;EP&quot;;
+    return t + &quot;_ortRekentoolState_v1&quot;;
+  } catch(e) { return &quot;ortRekentoolState_v1&quot;; }
+})();
+
+const defaultTabs = [
+  { name:&quot;Europoort&quot;, weeks:18, data: makeDataFromWeeks(EUROPOORT_WEEKS), note:&quot;Het huidige Europoort-teamrooster (18-weekse cyclus), gereconstrueerd uit de bestaande Excel. Geverifieerd: dit komt exact uit op 21,74% — hetzelfde percentage als in Bijlage BII van de CAO.&quot; },
+  { name:&quot;Rooster HvH&quot;, weeks:13, data: makeDataFromWeeks(HVH_TEAM_WEEKS), note:&quot;Hoek van Holland teamrooster (13-weekse cyclus), gereconstrueerd uit 'Roosters_2015_teams_en_sv.xlsx'. Komt uit op 32,61%. CAO Bijlage BII noemt 33,28% voor Stevedoring Hoek van Holland — dit 2015-rooster wijkt op minstens 1 dienst na kennelijk iets af van de huidige CAO-tabel.&quot; },
+  { name:&quot;Rooster HvH Supervisor&quot;, weeks:4, data: makeDataFromWeeks(HVH_SV_WEEKS), note:&quot;Hoek van Holland supervisor-rooster (4-weekse cyclus). Geverifieerd: komt exact uit op 30,51% — precies de officiële CAO-waarde uit Bijlage BII voor Stevedoring supervisors Hoek van Holland.&quot; },
+  { name:&quot;Rooster Europoort Supervisor&quot;, weeks:3, data: makeDataFromWeeks(EPS_WEEKS), note:&quot;⚠️ Gereconstrueerd uit een deels beschadigd bestand (rooster_Supervisors.xlsx). Zaterdag in week 1 is bevestigd: 07:00–23:15 (lange dienst, pauze 11:45–12:15). Komt nu uit op 20,16%, nog lager dan de officiële 27,47% (Bijlage BII) — controleer de zondagdienst in week 2 en de 'ATVA'-dag op vrijdag in week 3 (hier als vrij gerekend, tijden ontbraken in het bronbestand) en pas aan waar nodig.&quot; },
+  { name:&quot;Nieuw rooster&quot;, weeks:4, data: makeEmptyData(4), note:&quot;&quot; },
+];
+
+const defaultBlocks = [
+  { name:&quot;Vroege dienst&quot;, start:&quot;07:00&quot;, end:&quot;15:15&quot;, breakStart:&quot;12:00&quot;, breakEnd:&quot;12:30&quot; },
+  { name:&quot;Dagdienst&quot;, start:&quot;07:15&quot;, end:&quot;15:30&quot;, breakStart:&quot;12:00&quot;, breakEnd:&quot;12:30&quot; },
+  { name:&quot;Middagdienst&quot;, start:&quot;12:30&quot;, end:&quot;20:45&quot;, breakStart:&quot;16:30&quot;, breakEnd:&quot;17:00&quot; },
+  { name:&quot;Late dienst&quot;, start:&quot;15:00&quot;, end:&quot;23:15&quot;, breakStart:&quot;18:00&quot;, breakEnd:&quot;18:30&quot; },
+];
+
+function loadSavedState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return null;
+    const parsed = JSON.parse(raw);
+    if(!parsed || !Array.isArray(parsed.tabs) || parsed.tabs.length===0) return null;
+    return parsed;
+  } catch(e){
+    console.warn(&quot;Kon opgeslagen rooster niet laden:&quot;, e);
+    return null;
+  }
+}
+
+const savedState = loadSavedState();
+let tabs = savedState ? savedState.tabs : defaultTabs;
+let activeTab = savedState ? (savedState.activeTab || 0) : 0;
+if(activeTab >= tabs.length) activeTab = 0;
+let blocks = (savedState &amp;&amp; Array.isArray(savedState.blocks) &amp;&amp; savedState.blocks.length) ? savedState.blocks : defaultBlocks;
+let armedBlockIndex = null;
+
+function saveState(){
+  const statusEl = document.getElementById(&quot;saveStatus&quot;);
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({tabs, activeTab, blocks}));
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString(&quot;nl-NL&quot;, {hour:&quot;2-digit&quot;, minute:&quot;2-digit&quot;});
+    if(statusEl) statusEl.textContent = &quot;✓ Opgeslagen om &quot; + timeStr;
+    // Stuur door naar de hoofdapp zodat dit ook naar de cloud (Supabase) gesynchroniseerd
+    // wordt, net als de rest van Dienst Journaal.
+    try {
+      if (window.parent &amp;&amp; typeof window.parent.autoCloudOpslaan === &quot;function&quot;) {
+        window.parent.autoCloudOpslaan();
+      }
+    } catch(syncErr) { console.warn(&quot;Cloud-sync niet bereikbaar:&quot;, syncErr); }
+  } catch(e){
+    if(statusEl) statusEl.textContent = &quot;⚠ Opslaan mislukt (browseropslag niet beschikbaar)&quot;;
+    console.error(&quot;Opslaan mislukt:&quot;, e);
+  }
+}
+
+document.getElementById(&quot;saveBtn&quot;).addEventListener(&quot;click&quot;, saveState);
+
+document.getElementById(&quot;printBtn&quot;).addEventListener(&quot;click&quot;, ()=>{
+  const tab = tabs[activeTab];
+  const now = new Date();
+  const dateStr = now.toLocaleDateString(&quot;nl-NL&quot;);
+  document.getElementById(&quot;printOnlyHeader&quot;).innerHTML =
+    `ORT Rekentool — ${tab.name} <span style=&quot;font-weight:400; font-size:11px; float:right;&quot;>Afgedrukt op ${dateStr}</span>`;
+  window.print();
+});
+
+// --- Blokken: herbruikbare tijdblokken die je met 1 klik op cellen kunt toepassen ---
+function buildBlocksBar(){
+  const bar = document.getElementById(&quot;blocksBar&quot;);
+  let html = &quot;&quot;;
+  blocks.forEach((b,i)=>{
+    const armed = i===armedBlockIndex;
+    html += `<div class=&quot;blockChip ${armed?'armed':''}&quot; data-idx=&quot;${i}&quot;>
+      <span class=&quot;chipName&quot;>${b.name}</span>
+      <span class=&quot;chipTimes&quot;>${b.start}–${b.end}${b.breakStart?` (pauze ${b.breakStart}–${b.breakEnd})`:''}</span>
+      <span class=&quot;chipEdit&quot; data-edit=&quot;${i}&quot; title=&quot;Bewerken&quot;>✎</span>
+      <span class=&quot;chipDel&quot; data-del=&quot;${i}&quot; title=&quot;Verwijderen&quot;>✕</span>
+    </div>`;
+  });
+  html += `<div class=&quot;addBlockBtn&quot; id=&quot;addBlockBtn&quot;>+ Nieuw blok</div>`;
+  bar.innerHTML = html;
+
+  bar.querySelectorAll(&quot;.blockChip&quot;).forEach(chip=>{
+    chip.addEventListener(&quot;click&quot;, e=>{
+      if(e.target.classList.contains(&quot;chipDel&quot;) || e.target.classList.contains(&quot;chipEdit&quot;)) return;
+      const idx = parseInt(chip.dataset.idx,10);
+      armedBlockIndex = (armedBlockIndex===idx) ? null : idx;
+      buildBlocksBar();
+      updateCellClickability();
+    });
+  });
+  bar.querySelectorAll(&quot;.chipDel&quot;).forEach(del=>{
+    del.addEventListener(&quot;click&quot;, e=>{
+      e.stopPropagation();
+      const idx = parseInt(del.dataset.del,10);
+      if(!confirm(`Blok &quot;${blocks[idx].name}&quot; verwijderen?`)) return;
+      blocks.splice(idx,1);
+      if(armedBlockIndex===idx) armedBlockIndex=null;
+      else if(armedBlockIndex!==null &amp;&amp; armedBlockIndex>idx) armedBlockIndex--;
+      buildBlocksBar();
+      updateCellClickability();
+    });
+  });
+  bar.querySelectorAll(&quot;.chipEdit&quot;).forEach(editBtn=>{
+    editBtn.addEventListener(&quot;click&quot;, e=>{
+      e.stopPropagation();
+      const idx = parseInt(editBtn.dataset.edit,10);
+      showBlockForm(idx);
+    });
+  });
+  document.getElementById(&quot;addBlockBtn&quot;).addEventListener(&quot;click&quot;, ()=> showBlockForm(null));
+}
+
+// editIndex = null -> nieuw blok toevoegen; anders -> bestaand blok op die index bewerken
+function showBlockForm(editIndex){
+  const bar = document.getElementById(&quot;blocksBar&quot;);
+  const existing = document.getElementById(&quot;blockForm&quot;);
+  if(existing){
+    const wasEditingSame = existing.dataset.editIndex === String(editIndex);
+    existing.remove();
+    if(wasEditingSame) return; // tweede klik op hetzelfde potlood/plusje sluit het formulier
+  }
+  const b = editIndex!==null ? blocks[editIndex] : {name:&quot;&quot;, start:&quot;07:00&quot;, end:&quot;15:00&quot;, breakStart:null, breakEnd:null};
+  const form = document.createElement(&quot;div&quot;);
+  form.className = &quot;blockForm&quot;;
+  form.id = &quot;blockForm&quot;;
+  form.dataset.editIndex = String(editIndex);
+  form.innerHTML = `
+    <input type=&quot;text&quot; id=&quot;nb_name&quot; placeholder=&quot;Naam (bijv. Nachtdienst)&quot; value=&quot;${b.name||''}&quot;>
+    <label>Van <input type=&quot;text&quot; inputmode=&quot;numeric&quot; class=&quot;timeSmall&quot; id=&quot;nb_start&quot; placeholder=&quot;uu:mm&quot; value=&quot;${b.start||''}&quot;></label>
+    <label>Tot <input type=&quot;text&quot; inputmode=&quot;numeric&quot; class=&quot;timeSmall&quot; id=&quot;nb_end&quot; placeholder=&quot;uu:mm&quot; value=&quot;${b.end||''}&quot;></label>
+    <label><input type=&quot;checkbox&quot; id=&quot;nb_pauze&quot; ${b.breakStart?'checked':''}> pauze</label>
+    <span id=&quot;nb_pauzeFields&quot; style=&quot;${b.breakStart?'display:inline-flex;':'display:none;'}&quot;>
+      <label>van <input type=&quot;text&quot; inputmode=&quot;numeric&quot; class=&quot;timeSmall&quot; id=&quot;nb_bstart&quot; placeholder=&quot;uu:mm&quot; value=&quot;${b.breakStart||''}&quot;></label>
+      <label>tot <input type=&quot;text&quot; inputmode=&quot;numeric&quot; class=&quot;timeSmall&quot; id=&quot;nb_bend&quot; placeholder=&quot;uu:mm&quot; value=&quot;${b.breakEnd||''}&quot;></label>
+    </span>
+    <button class=&quot;btn&quot; id=&quot;nb_save&quot;>${editIndex!==null ? 'Opslaan' : 'Toevoegen'}</button>
+    ${editIndex!==null ? `<button class=&quot;btn secondary&quot; id=&quot;nb_cancel&quot;>Annuleren</button>` : ``}
+  `;
+  bar.parentNode.insertBefore(form, bar.nextSibling);
+  document.getElementById(&quot;nb_pauze&quot;).addEventListener(&quot;change&quot;, e=>{
+    document.getElementById(&quot;nb_pauzeFields&quot;).style.display = e.target.checked ? &quot;inline-flex&quot; : &quot;none&quot;;
+  });
+  if(editIndex!==null){
+    document.getElementById(&quot;nb_cancel&quot;).addEventListener(&quot;click&quot;, ()=> form.remove());
+  }
+  document.getElementById(&quot;nb_save&quot;).addEventListener(&quot;click&quot;, ()=>{
+    const name = document.getElementById(&quot;nb_name&quot;).value.trim() || &quot;Nieuw blok&quot;;
+    const start = normalizeTime24(document.getElementById(&quot;nb_start&quot;).value, &quot;07:00&quot;);
+    const end = normalizeTime24(document.getElementById(&quot;nb_end&quot;).value, &quot;15:00&quot;);
+    const pauzeOn = document.getElementById(&quot;nb_pauze&quot;).checked;
+    let breakStart = null, breakEnd = null;
+    if(pauzeOn){
+      breakStart = normalizeTime24(document.getElementById(&quot;nb_bstart&quot;).value, &quot;12:00&quot;);
+      breakEnd = normalizeTime24(document.getElementById(&quot;nb_bend&quot;).value, &quot;12:30&quot;);
+    }
+    const updated = {name, start, end, breakStart, breakEnd};
+    if(editIndex!==null){
+      blocks[editIndex] = updated;
+    } else {
+      blocks.push(updated);
+    }
+    form.remove();
+    buildBlocksBar();
+    updateCellClickability();
+  });
+}
+
+function updateCellClickability(){
+  document.querySelectorAll(&quot;#gridTable .cell&quot;).forEach(cellDiv=>{
+    cellDiv.classList.toggle(&quot;cellClickable&quot;, armedBlockIndex!==null);
+  });
+  const hint = document.getElementById(&quot;blocksHint&quot;);
+  if(hint){
+    hint.textContent = armedBlockIndex!==null
+      ? `Blok &quot;${blocks[armedBlockIndex].name}&quot; actief — klik op de dagen waar deze dienst moet komen. Klik het blok nogmaals aan om te stoppen.`
+      : &quot;Klik een blok aan en klik daarna op de dagen waar die dienst moet komen. Klik het blok nogmaals aan om te stoppen.&quot;;
+  }
+}
+
+function applyBlockToCell(cellDiv, cellObj){
+  if(armedBlockIndex===null) return;
+  const b = blocks[armedBlockIndex];
+  cellObj.vrij = false;
+  cellObj.start = b.start;
+  cellObj.end = b.end;
+  cellObj.breakStart = b.breakStart || null;
+  cellObj.breakEnd = b.breakEnd || null;
+  const k = cellDiv.dataset.key;
+  const w = parseInt(k.split(&quot;_&quot;)[0],10);
+  const d = parseInt(k.split(&quot;_&quot;)[1],10);
+  // volledige cel opnieuw tekenen (checkbox/pauzevelden moeten mee-updaten)
+  buildGrid();
+  updateCellClickability();
+  calculate();
+}
+
+function ensureWeeks(tab){
+  const newData = {};
+  for(let w=0; w<tab.weeks; w++){
+    for(let d=0; d<7; d++){
+      const k = keyFor(w,d);
+      newData[k] = tab.data[k] || {vrij:true, start:&quot;07:00&quot;, end:&quot;15:00&quot;};
+    }
+  }
+  tab.data = newData;
+}
+
+function buildTabBar(){
+  const bar = document.getElementById(&quot;tabBar&quot;);
+  let html = &quot;&quot;;
+  tabs.forEach((t,i)=>{
+    html += `<div class=&quot;tab ${i===activeTab?'active':''}&quot; data-idx=&quot;${i}&quot;>
+      <span class=&quot;tabname&quot;>${t.name}</span>
+      ${tabs.length>1 ? `<span class=&quot;close-tab&quot; data-idx=&quot;${i}&quot;>&amp;times;</span>` : ``}
+    </div>`;
+  });
+  html += `<div class=&quot;tab-add&quot; id=&quot;addTab&quot;>+ Nieuwe tab</div>`;
+  bar.innerHTML = html;
+
+  bar.querySelectorAll(&quot;.tab&quot;).forEach(el=>{
+    el.addEventListener(&quot;click&quot;, (e)=>{
+      if(e.target.classList.contains(&quot;close-tab&quot;)) return;
+      activeTab = parseInt(el.dataset.idx,10);
+      renderAll();
+    });
+  });
+  bar.querySelectorAll(&quot;.close-tab&quot;).forEach(el=>{
+    el.addEventListener(&quot;click&quot;,(e)=>{
+      e.stopPropagation();
+      const idx = parseInt(el.dataset.idx,10);
+      tabs.splice(idx,1);
+      if(activeTab>=tabs.length) activeTab = tabs.length-1;
+      renderAll();
+    });
+  });
+  document.getElementById(&quot;addTab&quot;).addEventListener(&quot;click&quot;, ()=>{
+    const name = prompt(&quot;Naam voor nieuwe tab:&quot;, &quot;Rooster &quot;+(tabs.length+1)) || (&quot;Rooster &quot;+(tabs.length+1));
+    tabs.push({name, weeks:4, data: makeEmptyData(4), note:&quot;&quot;});
+    activeTab = tabs.length-1;
+    renderAll();
+  });
+}
+
+function buildGrid(){
+  const tab = tabs[activeTab];
+  document.getElementById(&quot;numWeeks&quot;).value = tab.weeks;
+  document.getElementById(&quot;ploegSize&quot;).value = tab.ploegSize!=null ? tab.ploegSize : 1;
+  document.getElementById(&quot;tabNote&quot;).innerHTML = tab.note ? `<div class=&quot;note-badge&quot;>${tab.note}</div>` : &quot;&quot;;
+
+  const table = document.getElementById(&quot;gridTable&quot;);
+  let html = &quot;<thead><tr><th>Dag</th>&quot;;
+  for(let w=0; w<tab.weeks; w++){ html += `<th>Week ${w+1}</th>`; }
+  html += &quot;</tr></thead><tbody>&quot;;
+  for(let d=0; d<7; d++){
+    html += `<tr><td class=&quot;daylabel&quot;>${DAY_SHORT[d]}</td>`;
+    for(let w=0; w<tab.weeks; w++){
+      const k = keyFor(w,d);
+      const cell = tab.data[k];
+      const hasBreak = !cell.vrij &amp;&amp; cell.breakStart &amp;&amp; cell.breakEnd;
+      html += `<td>
+        <div class=&quot;cell ${cell.vrij ? 'is-vrij':''} ${cell.adv ? 'is-adv':''}&quot; data-key=&quot;${k}&quot; style=&quot;background-color:${cell.vrij ? '' : (getShiftColor(timeToDec(cell.start))||'')}&quot;>
+          <div class=&quot;vrijAdvRow&quot;>
+            <label class=&quot;vrij&quot;><input type=&quot;checkbox&quot; class=&quot;vrijBox&quot; ${cell.vrij?'checked':''}> Vrij</label>
+            <label class=&quot;advToggle&quot;><input type=&quot;checkbox&quot; class=&quot;advBox&quot; ${cell.adv?'checked':''}> ADV</label>
+          </div>
+          <input type=&quot;text&quot; inputmode=&quot;numeric&quot; class=&quot;startInp&quot; value=&quot;${cell.vrij ? '' : cell.start}&quot; maxlength=&quot;5&quot; placeholder=&quot;uu:mm&quot;>
+          <label class=&quot;pauzeToggle&quot;><input type=&quot;checkbox&quot; class=&quot;pauzeBox&quot; ${hasBreak?'checked':''}> pauze</label>
+          <div class=&quot;pauzeFields&quot; style=&quot;${hasBreak?'':'display:none;'}&quot;>
+            <input type=&quot;text&quot; inputmode=&quot;numeric&quot; class=&quot;breakStartInp&quot; value=&quot;${cell.breakStart||''}&quot; maxlength=&quot;5&quot; placeholder=&quot;v.&quot;>
+            <span class=&quot;dash&quot;>–</span>
+            <input type=&quot;text&quot; inputmode=&quot;numeric&quot; class=&quot;breakEndInp&quot; value=&quot;${cell.breakEnd||''}&quot; maxlength=&quot;5&quot; placeholder=&quot;t.&quot;>
+          </div>
+          <input type=&quot;text&quot; inputmode=&quot;numeric&quot; class=&quot;endInp&quot; value=&quot;${cell.vrij ? '' : cell.end}&quot; maxlength=&quot;5&quot; placeholder=&quot;uu:mm&quot;>
+          <div class=&quot;hoursLabel&quot;>${formatCellHours(cell)}</div>
+        </div>
+      </td>`;
+    }
+    html += &quot;</tr>&quot;;
+  }
+  html += &quot;</tbody>&quot;;
+  table.innerHTML = html;
+
+  table.querySelectorAll(&quot;.vrijBox&quot;).forEach(box=>{
+    box.addEventListener(&quot;change&quot;, e=>{
+      const cellDiv = e.target.closest(&quot;.cell&quot;);
+      const k = cellDiv.dataset.key;
+      const cellObj = tabs[activeTab].data[k];
+      cellObj.vrij = e.target.checked;
+      cellDiv.classList.toggle(&quot;is-vrij&quot;, e.target.checked);
+      const startEl = cellDiv.querySelector(&quot;.startInp&quot;);
+      const endEl = cellDiv.querySelector(&quot;.endInp&quot;);
+      if(e.target.checked){
+        startEl.value = &quot;&quot;;
+        endEl.value = &quot;&quot;;
+      } else {
+        startEl.value = cellObj.start;
+        endEl.value = cellObj.end;
+      }
+      refreshCellHours(cellDiv, cellObj);
+      refreshCellColor(cellDiv, cellObj);
+      calculate();
+    });
+  });
+  table.querySelectorAll(&quot;.advBox&quot;).forEach(box=>{
+    box.addEventListener(&quot;change&quot;, e=>{
+      const cellDiv = e.target.closest(&quot;.cell&quot;);
+      const cellObj = tabs[activeTab].data[cellDiv.dataset.key];
+      cellObj.adv = e.target.checked;
+      cellDiv.classList.toggle(&quot;is-adv&quot;, e.target.checked);
+      calculate();
+    });
+  });
+  table.querySelectorAll(&quot;.startInp&quot;).forEach(inp=>{
+    inp.addEventListener(&quot;change&quot;, e=>{
+      const cellDiv = e.target.closest(&quot;.cell&quot;);
+      const cellObj = tabs[activeTab].data[cellDiv.dataset.key];
+      const newVal = normalizeTime24(e.target.value, cellObj.start);
+      cellObj.start = newVal;
+      e.target.value = cellObj.start;
+      refreshCellHours(cellDiv, cellObj);
+      refreshCellColor(cellDiv, cellObj);
+      calculate();
+    });
+  });
+  table.querySelectorAll(&quot;.endInp&quot;).forEach(inp=>{
+    inp.addEventListener(&quot;change&quot;, e=>{
+      const cellDiv = e.target.closest(&quot;.cell&quot;);
+      const cellObj = tabs[activeTab].data[cellDiv.dataset.key];
+      const newVal = normalizeTime24(e.target.value, cellObj.end);
+      cellObj.end = newVal;
+      e.target.value = cellObj.end;
+      refreshCellHours(cellDiv, cellObj);
+      calculate();
+    });
+  });
+  table.querySelectorAll(&quot;.pauzeBox&quot;).forEach(box=>{
+    box.addEventListener(&quot;change&quot;, e=>{
+      const cellDiv = e.target.closest(&quot;.cell&quot;);
+      const cellObj = tabs[activeTab].data[cellDiv.dataset.key];
+      const fieldsDiv = cellDiv.querySelector(&quot;.pauzeFields&quot;);
+      if(e.target.checked){
+        if(!cellObj.breakStart || !cellObj.breakEnd){
+          const def = defaultBreak(cellObj);
+          cellObj.breakStart = def.breakStart;
+          cellObj.breakEnd = def.breakEnd;
+        }
+        fieldsDiv.style.display = &quot;flex&quot;;
+        fieldsDiv.querySelector(&quot;.breakStartInp&quot;).value = cellObj.breakStart;
+        fieldsDiv.querySelector(&quot;.breakEndInp&quot;).value = cellObj.breakEnd;
+      } else {
+        cellObj.breakStart = null;
+        cellObj.breakEnd = null;
+        fieldsDiv.style.display = &quot;none&quot;;
+      }
+      refreshCellHours(cellDiv, cellObj);
+      calculate();
+    });
+  });
+  table.querySelectorAll(&quot;.breakStartInp&quot;).forEach(inp=>{
+    inp.addEventListener(&quot;change&quot;, e=>{
+      const cellDiv = e.target.closest(&quot;.cell&quot;);
+      const cellObj = tabs[activeTab].data[cellDiv.dataset.key];
+      cellObj.breakStart = normalizeTime24(e.target.value, cellObj.breakStart);
+      e.target.value = cellObj.breakStart;
+      refreshCellHours(cellDiv, cellObj);
+      calculate();
+    });
+  });
+  table.querySelectorAll(&quot;.breakEndInp&quot;).forEach(inp=>{
+    inp.addEventListener(&quot;change&quot;, e=>{
+      const cellDiv = e.target.closest(&quot;.cell&quot;);
+      const cellObj = tabs[activeTab].data[cellDiv.dataset.key];
+      cellObj.breakEnd = normalizeTime24(e.target.value, cellObj.breakEnd);
+      e.target.value = cellObj.breakEnd;
+      refreshCellHours(cellDiv, cellObj);
+      calculate();
+    });
+  });
+}
+
+function splitShift(dow, start, end){
+  const bps = breakpointsForDay(dow).filter(b => b>start &amp;&amp; b<end);
+  const points = [start, ...bps, end];
+  const segs = [];
+  for(let i=0;i<points.length-1;i++){
+    const a = points[i], b = points[i+1];
+    const mid = (a+b)/2;
+    segs.push({hours: b-a, pct: bandForDayHour(dow, mid)});
+  }
+  return segs;
+}
+
+// Deelt een dienst in op basis van de starttijd, voor de bezettingstabel per diensttype.
+function classifyShift(startH){
+  if(startH===null || startH===undefined) return &quot;dag&quot;;
+  if(startH < 6) return &quot;vroeg&quot;;
+  if(startH < 11) return &quot;dag&quot;;
+  if(startH < 14) return &quot;middag&quot;;
+  return &quot;laat&quot;;
+}
+
+function calculate(){
+  const tab = tabs[activeTab];
+  const N = tab.weeks;
+  let totalPctHours = 0;
+  let totalHours = 0;
+  const occupancy = [0,1,2,3,4,5,6].map(()=>({vroeg:0, dag:0, middag:0, laat:0}));
+  const bandHours = {0.55:0, 0.74:0, 0.89:0, 1.20:0};
+
+  for(let w=0; w<N; w++){
+    for(let d=0; d<7; d++){
+      const cell = tab.data[keyFor(w,d)];
+      if(cell.vrij) continue;
+
+      const startH = timeToDec(cell.start);
+      const cat = classifyShift(startH);
+      if(!cell.adv) occupancy[d][cat] += 1;
+
+      const useBreak = !!(cell.breakStart &amp;&amp; cell.breakEnd);
+      const segmentsToUse = useBreak
+        ? [[cell.start, cell.breakStart],[cell.breakEnd, cell.end]]
+        : [[cell.start, cell.end]];
+
+      segmentsToUse.forEach(([startStr,endStr])=>{
+        const s = timeToDec(startStr);
+        const e = timeToDec(endStr);
+        if(s===null || e===null) return;
+        const globalDay = w*7 + d;
+        let segments = [];
+        if(e > s){
+          segments = splitShift(d, s, e).map(seg=>({...seg, dow:d}));
+        } else {
+          segments = splitShift(d, s, 24).map(seg=>({...seg, dow:d}));
+          const nextDow = (globalDay+1) % 7;
+          segments = segments.concat(splitShift(nextDow, 0, e).map(seg=>({...seg, dow:nextDow})));
+        }
+        segments.forEach(seg=>{
+          totalHours += seg.hours;
+          totalPctHours += seg.hours * seg.pct;
+          bandHours[seg.pct] = (bandHours[seg.pct]||0) + seg.hours;
+        });
+      });
+    }
+  }
+
+  const baseline = 7.75 * 5 * N * 0.55;
+  const extra = totalPctHours - baseline;
+  const extraPerWeek = extra / N;
+  const weeksPerMonth = 365.25/12/7;
+  const schemaPct = extraPerWeek * weeksPerMonth;
+  const avgHoursPerWeek = totalHours / N;
+
+  document.getElementById(&quot;pctResult&quot;).textContent = schemaPct.toFixed(2) + &quot;%&quot;;
+  document.getElementById(&quot;avgHours&quot;).textContent = avgHoursPerWeek.toFixed(2) + &quot; uur&quot;;
+  document.getElementById(&quot;totHours&quot;).textContent = totalHours.toFixed(2) + &quot; uur (over &quot; + N + &quot; weken)&quot;;
+
+  const bandLabels = {0.55:&quot;07:00–18:00 ma-vr (55%)&quot;, 0.74:&quot;18:00–07:00 ma-vr (74%)&quot;, 0.89:&quot;zaterdag dag (89%)&quot;, 1.20:&quot;za 18:00 t/m ma 06:00 (120%)&quot;};
+  const bandColors = {0.55:&quot;var(--band-55)&quot;, 0.74:&quot;var(--band-74)&quot;, 0.89:&quot;var(--band-89)&quot;, 1.20:&quot;var(--band-120)&quot;};
+  let rows = &quot;&quot;;
+  [0.55,0.74,0.89,1.20].forEach(pct=>{
+    rows += `<tr><td><span class=&quot;swatch&quot; style=&quot;background:${bandColors[pct]}&quot;></span>${bandLabels[pct]}</td><td>${(pct*100).toFixed(0)}%</td><td>${(bandHours[pct]||0).toFixed(2)}</td></tr>`;
+  });
+  document.getElementById(&quot;bandBody&quot;).innerHTML = rows;
+
+  document.getElementById(&quot;calcSteps&quot;).innerHTML = `
+    Totaal (uren × %) over ${N} weken = <code>${totalPctHours.toFixed(4)}</code><br>
+    Basis (7,75 × 5 × ${N} × 0,55) = <code>${baseline.toFixed(4)}</code><br>
+    Extra boven basis = <code>${totalPctHours.toFixed(4)} − ${baseline.toFixed(4)} = ${extra.toFixed(4)}</code><br>
+    Extra per week = <code>${extra.toFixed(4)} / ${N} = ${extraPerWeek.toFixed(4)}</code><br>
+    Weken per maand (365,25/12/7) = <code>${weeksPerMonth.toFixed(4)}</code><br>
+    Schema percentage = <code>${extraPerWeek.toFixed(4)} × ${weeksPerMonth.toFixed(4)} = ${schemaPct.toFixed(2)}%</code>
+  `;
+
+  const occBody = document.getElementById(&quot;occupancyBody&quot;);
+  if(occBody){
+    const ploegSize = tab.ploegSize!=null ? tab.ploegSize : 1;
+    let occRows = &quot;&quot;;
+    for(let d=0; d<7; d++){
+      const o = occupancy[d];
+      const totaal = (o.vroeg + o.dag + o.middag + o.laat) * ploegSize;
+      occRows += `<tr>
+        <td>${DAY_NAMES[d]}</td>
+        <td>${o.vroeg * ploegSize}</td>
+        <td>${o.dag * ploegSize}</td>
+        <td>${o.middag * ploegSize}</td>
+        <td>${o.laat * ploegSize}</td>
+        <td><strong>${totaal}</strong></td>
+      </tr>`;
+    }
+    occBody.innerHTML = occRows;
+  }
+}
+
+function renderAll(){
+  buildTabBar();
+  buildBlocksBar();
+  buildGrid();
+  updateCellClickability();
+  buildClocks();
+  calculate();
+}
+
+// --- 24-uursklok visualisatie van de CAO-tijdvakken ---
+const BAND_COLORS = {0.55:&quot;#0057a3&quot;, 0.74:&quot;#f2a71b&quot;, 0.89:&quot;#e07b1b&quot;, 1.20:&quot;#c0392b&quot;};
+// (gebruikt duidelijk onderscheidbare kleuren i.p.v. de lichte band-achtergronden, voor leesbaarheid op de klok)
+
+function bandSegmentsForDayType(dow){
+  // returns list of {startH, endH, pct} covering 0-24 for a representative day-of-week
+  const bps = [0, ...breakpointsForDay(dow), 24];
+  const segs = [];
+  for(let i=0;i<bps.length-1;i++){
+    const a=bps[i], b=bps[i+1];
+    segs.push({a,b,pct:bandForDayHour(dow,(a+b)/2)});
+  }
+  return segs;
+}
+
+function buildClockFace(dow, label, sublabel){
+  const segs = bandSegmentsForDayType(dow);
+  let gradientParts = [];
+  segs.forEach(seg=>{
+    const deg1 = (seg.a/24*360).toFixed(2);
+    const deg2 = (seg.b/24*360).toFixed(2);
+    const color = BAND_COLORS[seg.pct];
+    gradientParts.push(`${color} ${deg1}deg ${deg2}deg`);
+  });
+  const gradient = `conic-gradient(from 0deg, ${gradientParts.join(&quot;, &quot;)})`;
+
+  let ticks = &quot;&quot;;
+  [0,3,6,9,12,15,18,21].forEach(h=>{
+    const deg = h/24*360;
+    ticks += `<div class=&quot;tick&quot; style=&quot;transform:rotate(${deg}deg)&quot;></div>`;
+    const labR = 68; // radius for label placement
+    const rad = (deg-90) * Math.PI/180;
+    const lx = 75 + labR*Math.cos(rad);
+    const ly = 75 + labR*Math.sin(rad);
+    const hh = String(h).padStart(2,&quot;0&quot;)+&quot;:00&quot;;
+    ticks += `<div class=&quot;ticklbl&quot; style=&quot;left:${lx}px; top:${ly}px;&quot;>${hh}</div>`;
+  });
+
+  return `<div class=&quot;clockbox&quot;>
+    <div class=&quot;clockface&quot; style=&quot;background:${gradient}&quot;>
+      ${ticks}
+      <div class=&quot;hub&quot;>${label}<br><span style=&quot;font-weight:400; color:var(--muted); font-size:10.5px;&quot;>${sublabel}</span></div>
+    </div>
+  </div>`;
+}
+
+function buildClocks(){
+  const row = document.getElementById(&quot;clockRow&quot;);
+  if(!row) return;
+  row.innerHTML =
+    buildClockFace(1, &quot;Maandag&quot;, &quot;bijzonder&quot;) +
+    buildClockFace(2, &quot;Di–Vr&quot;, &quot;normale week&quot;) +
+    buildClockFace(6, &quot;Zaterdag&quot;, &quot;&quot;) +
+    buildClockFace(0, &quot;Zondag&quot;, &quot;hele dag 120%&quot;);
+}
+
+document.getElementById(&quot;applyWeeks&quot;).addEventListener(&quot;click&quot;, ()=>{
+  let n = parseInt(document.getElementById(&quot;numWeeks&quot;).value, 10);
+  if(isNaN(n) || n<1) n=1;
+  if(n>20) n=20;
+  document.getElementById(&quot;numWeeks&quot;).value = n;
+  const tab = tabs[activeTab];
+  tab.weeks = n;
+  ensureWeeks(tab);
+  buildGrid();
+  updateCellClickability();
+  calculate();
+});
+
+document.getElementById(&quot;clearAll&quot;).addEventListener(&quot;click&quot;, ()=>{
+  const tab = tabs[activeTab];
+  Object.keys(tab.data).forEach(k=> { tab.data[k] = {vrij:true, start:&quot;07:00&quot;, end:&quot;15:00&quot;}; });
+  tab.note = &quot;&quot;;
+  buildGrid();
+  updateCellClickability();
+  calculate();
+});
+
+document.getElementById(&quot;ploegSize&quot;).addEventListener(&quot;change&quot;, e=>{
+  const tab = tabs[activeTab];
+  let n = parseInt(e.target.value,10);
+  if(isNaN(n) || n<1) n=1;
+  if(n>99) n=99;
+  tab.ploegSize = n;
+  e.target.value = n;
+  calculate();
+});
+
+// Eenmalig een delegated click-handler op de tabel zetten (blijft werken na elke buildGrid() herrender).
+document.getElementById(&quot;gridTable&quot;).addEventListener(&quot;click&quot;, e=>{
+  if(armedBlockIndex===null) return;
+  if(e.target.closest(&quot;input, label, .chipDel&quot;)) return; // niet ingrijpen op normale invoer
+  const cellDiv = e.target.closest(&quot;.cell&quot;);
+  if(!cellDiv) return;
+  const cellObj = tabs[activeTab].data[cellDiv.dataset.key];
+  applyBlockToCell(cellDiv, cellObj);
+});
+
+renderAll();
+</script>
+
+
+</body>
+</html>
+"
+    sandbox="allow-scripts allow-same-origin allow-downloads"
+    loading="lazy">
+  </iframe>
+</div>
+
+
 <!-- VASTE CELTEKSTEN MODAL (dagplanning) -->
 <div id="dpFixedModal" style="display:none;position:fixed;inset:0;background:rgba(0,20,45,.55);z-index:12000;align-items:center;justify-content:center;padding:24px;">
   <div style="background:#fff;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.35);width:min(780px,96vw);max-height:86vh;display:flex;flex-direction:column;overflow:hidden;">
@@ -13762,6 +14949,17 @@ function wisselPunctualityDatum(dateStr) {
         setTimeout(function(){
           var f=document.getElementById('ma-iframe');
           if(f){f.style.width='99%';setTimeout(function(){f.style.width='100%';},50);}
+        }, 150);      }
+    }
+    if (t==='ort') {
+      var ortLock = document.getElementById('ort-lock');
+      var ortIframe = document.getElementById('ort-iframe');
+      if (ortLock && ortLock.style.display !== 'none') {
+        // Show lock, keep iframe hidden
+      } else {
+        setTimeout(function(){
+          var f=document.getElementById('ort-iframe');
+          if(f){f.style.width='99%';setTimeout(function(){f.style.width='100%';},50);}
         }, 150);
       }
     }
@@ -14778,6 +15976,24 @@ async function laadWeer() {
     var err = document.getElementById('ma-pw-err');
     var lock = document.getElementById('ma-lock');
     var iframe = document.getElementById('ma-iframe');
+    if (!inp) return;
+    if (inp.value === 'anets') {
+      lock.style.display = 'none';
+      iframe.style.display = 'block';
+      iframe.style.width = '99%';
+      setTimeout(function(){ iframe.style.width = '100%'; }, 100);
+    } else {
+      if (err) err.textContent = 'Onjuist wachtwoord';
+      inp.value = '';
+      inp.focus();
+    }
+  }
+
+  function checkOrtPw() {
+    var inp = document.getElementById('ort-pw-input');
+    var err = document.getElementById('ort-pw-err');
+    var lock = document.getElementById('ort-lock');
+    var iframe = document.getElementById('ort-iframe');
     if (!inp) return;
     if (inp.value === 'anets') {
       lock.style.display = 'none';
@@ -16740,6 +17956,7 @@ if(_sfrEd) _sfrEd.addEventListener('keypress', function(e){if(e.key==='Enter')ca
   <button onclick="navTo('planning','TO DO LIST',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x2705; To Do List</button>
   <button onclick="navTo('archief','KPI DASHBOARD',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x1F4CA; KPI Dashboard</button>
   <button onclick="navTo('maandafsluiting','MAANDAFSLUITING',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x1F4C8; Maandafsluiting &#x1F512;</button>
+  <button onclick="navTo('ort','ORT / BASISROOSTER',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x1F4D0; ORT / Basisrooster &#x1F512;</button>
   <button onclick="navTo('aowdash','AOW & SFR',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x1F4B0; AOW &amp; SFR</button>
   <button onclick="navTo('schade','SCHADE FORMULIER',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:none;color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x1F4CB; Schade Formulier</button>
 </div>
@@ -17070,6 +18287,7 @@ function navWerkoverdracht(label, btn) {
                (k.startsWith('dagPlanning_arch') || k.startsWith('ls_') ||
                 k === 'dagPlanning_archIdx' || k.startsWith('kpi_') ||
                 k.startsWith('ma_') || k.startsWith('dj_verjaardagen') ||
+                k === 'ortRekentoolState_v1' ||
                 k.startsWith('std_bezetting'))) {
         try { data[k] = JSON.parse(localStorage.getItem(k)); }
         catch(e) { data[k] = localStorage.getItem(k); }
