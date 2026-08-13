@@ -3342,6 +3342,19 @@ document.addEventListener('contextmenu', function(e) {
       </div>
     </div>
 
+    <div style="margin-top:24px;padding:0 20px 20px;">
+<!-- Tolynx kade bezetting -->
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header" onclick="toggleTolynxKade('punct')" style="cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:8px;"><div class="icon">&#x1F69B;</div><h2>Kade bezetting (rePort)</h2></div>
+          <div style="display:flex;align-items:center;gap:10px;">
+              <button onclick="event.stopPropagation();openTolynxKadeModal()" title="Aantallen bijwerken" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--navy);padding:0;">&#x2699;&#xFE0F;</button>
+              <span id="tolynx-kade-toggle-icon-punct" style="font-size:14px;color:var(--muted);">&#x25BC;</span>
+            </div>
+        </div>
+        <div id="tolynx-kade-body-punct" style="margin-top:14px;"></div>
+      </div>
+    </div>
 
   </div>
 
@@ -4658,7 +4671,9 @@ window.addEventListener('resize', () => {
     'plan_v3','dagPlanning_v2_state','dagPlanning_v2_lastDate',
     'dagpl_cert_v1','dagpl_cert_v2','scheepzoeker_schepen','dagPlanning_vasteCelteksten_v1',
     'kade_vakken_v1','ortRekentoolState_v1',
-    'opleiding_shunten_v1','opleiding_lossen_v1','opleiding_laden_v1','opleiding_heftruck_v1','opleiding_reachstacker_v1'
+    'opleiding_shunten_v1','opleiding_lossen_v1','opleiding_laden_v1','opleiding_heftruck_v1','opleiding_reachstacker_v1',
+    'kpi_tolynx_kade_v1',
+    'kpi_tolynx_max_v1'
   ];
 
   function getTerminalPrefix() {
@@ -4769,7 +4784,10 @@ window.addEventListener('resize', () => {
     'ortRekentoolState_v1',
     'opleiding_shunten_v1','opleiding_lossen_v1','opleiding_laden_v1','opleiding_heftruck_v1','opleiding_reachstacker_v1',
     'opleiding_overzicht_v1',
-    'opleiding_aftek_config_v1'
+    'opleiding_aftek_config_v1',
+    'opleiding_introductie_secties_v1',
+    'kpi_tolynx_kade_v1',
+    'kpi_tolynx_max_v1'
   ];
 
   function getSyncData() {
@@ -8117,6 +8135,20 @@ document.getElementById('archOverlay').addEventListener('click',function(e){
     </div>
     </div>
 
+    <div style="margin-top:24px;">
+<!-- Tolynx kade bezetting -->
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header" onclick="toggleTolynxKade('kpi')" style="cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:8px;"><div class="icon">&#x1F69B;</div><h2>Kade bezetting (rePort)</h2></div>
+          <div style="display:flex;align-items:center;gap:10px;">
+              <button onclick="event.stopPropagation();openTolynxKadeModal()" title="Aantallen bijwerken" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--navy);padding:0;">&#x2699;&#xFE0F;</button>
+              <span id="tolynx-kade-toggle-icon-kpi" style="font-size:14px;color:var(--muted);">&#x25BC;</span>
+            </div>
+        </div>
+        <div id="tolynx-kade-body-kpi" style="margin-top:14px;"></div>
+      </div>
+    </div>
+
   </div>
 
 
@@ -11120,7 +11152,7 @@ function oplToonTab(id){
   var content = document.getElementById('opl-content');
   if (!form || !content) return;
   if (id === 'overzicht') { content.innerHTML = oplOverzichtHtml(); return; }
-  if (id === 'introductie') { content.innerHTML = oplIntroductieHtml(form); return; }
+  if (id === 'introductie') { oplIntroSectiesLoadConfig(); content.innerHTML = oplIntroductieHtml(form); return; }
   content.innerHTML = oplBouwFormHtml(form);
 }
 
@@ -11211,6 +11243,8 @@ function oplAftekInstellingenOpenen(){
   _aftekWerkRijen = OPL_AFTEK_ROWS.map(function(r){ return {t:r.t, nvt:r.nvt.slice()}; });
   _aftekWerkKolommen = OPL_AFTEK_KOLOMMEN.map(function(k){ return {key:k.key, label:k.label}; });
   oplAftekInstellingenRender();
+  oplIntroInstellingenVoorbereiden();
+  oplIntroInstellingenRender();
   var modal = document.getElementById('aftek-instellingen-modal');
   if (modal) modal.style.display = 'flex';
 }
@@ -11274,10 +11308,11 @@ function oplAftekInstToevoegen(){
   }, 50);
 }
 function oplAftekInstStandaardHerstellen(){
-  if (!confirm('Alle rijen en kolommen terugzetten naar de standaardlijst? Eigen aanpassingen gaan verloren.')) return;
+  if (!confirm('Alle rijen, kolommen en onderwerpen terugzetten naar de standaardlijst? Eigen aanpassingen gaan verloren.')) return;
   _aftekWerkRijen = OPL_AFTEK_ROWS_DEFAULT.map(function(r){ return {t:r.t, nvt:r.nvt.slice()}; });
   _aftekWerkKolommen = OPL_AFTEK_KOLOMMEN_DEFAULT.map(function(k){ return {key:k.key, label:k.label}; });
   oplAftekInstellingenRender();
+  oplIntroInstStandaardHerstellen();
 }
 function oplAftekInstOpslaan(){
   OPL_AFTEK_KOLOMMEN.length = 0;
@@ -11285,6 +11320,7 @@ function oplAftekInstOpslaan(){
   OPL_AFTEK_ROWS.length = 0;
   _aftekWerkRijen.forEach(function(r){ OPL_AFTEK_ROWS.push({t:r.t, nvt:r.nvt.slice()}); });
   oplAftekSaveConfig();
+  oplIntroSectiesOpslaanVanuitWerklijst();
   oplAftekInstellingenSluiten();
   if (oplHuidigeTab === 'introductie') {
     var content = document.getElementById('opl-content');
@@ -11292,6 +11328,115 @@ function oplAftekInstOpslaan(){
     if (content && form) content.innerHTML = oplIntroductieHtml(form);
   }
 }
+
+// --- Introductie-onderwerpen (conceptuele kaarten: Veiligheid, PBM, etc.) ---
+function oplIntroSectiesConfigKey(){ return 'opleiding_introductie_secties_v1'; }
+function oplIntroForm(){ return OPLEIDINGEN_FORMS.find(function(f){ return f.id === 'introductie'; }); }
+function oplIntroSectiesLoadConfig(){
+  var form = oplIntroForm();
+  if (!form) return;
+  if (!form._sectiesDefault) form._sectiesDefault = JSON.parse(JSON.stringify(form.secties));
+  try {
+    var saved = JSON.parse(localStorage.getItem(oplIntroSectiesConfigKey()) || 'null');
+    if (Array.isArray(saved)) {
+      form.secties.length = 0;
+      saved.forEach(function(s){ form.secties.push(s); });
+    }
+  } catch(e) {}
+}
+function oplIntroSectiesSaveConfig(secties){
+  localStorage.setItem(oplIntroSectiesConfigKey(), JSON.stringify(secties));
+  if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+}
+function oplIntroSectieToTekst(sec){
+  return sec.rijen.map(function(rij){
+    if (typeof rij === 'string') return rij;
+    var lines = [rij.tekst || ''];
+    (rij.bullets || []).forEach(function(b){ lines.push('  - ' + b); });
+    return lines.join('\n');
+  }).join('\n');
+}
+function oplIntroTekstNaarRijen(tekst){
+  var lines = tekst.split('\n');
+  var rijen = [];
+  lines.forEach(function(line){
+    if (!line.trim()) return;
+    var bulletMatch = line.match(/^\s*-\s+(.*)$/);
+    if (bulletMatch && rijen.length) {
+      var last = rijen[rijen.length - 1];
+      if (typeof last === 'string') {
+        rijen[rijen.length - 1] = {tekst: last, bullets: [bulletMatch[1]]};
+      } else {
+        last.bullets = last.bullets || [];
+        last.bullets.push(bulletMatch[1]);
+      }
+    } else {
+      rijen.push(line.trim());
+    }
+  });
+  return rijen;
+}
+var _introWerkSecties = [];
+function oplIntroInstellingenVoorbereiden(){
+  var form = oplIntroForm();
+  if (!form) return;
+  _introWerkSecties = form.secties.map(function(sec){
+    return {kop: sec.kop, tekst: oplIntroSectieToTekst(sec)};
+  });
+}
+function oplIntroInstellingenRender(){
+  var el = document.getElementById('aftek-inst-onderwerpen');
+  if (!el) return;
+  el.innerHTML = _introWerkSecties.map(function(sec, i){
+    return '<div style="border:1px solid #e2e8f0;border-radius:6px;padding:10px;margin-bottom:10px;">' +
+      '<div style="display:flex;gap:8px;margin-bottom:6px;align-items:center;">' +
+      '<input type="text" value="' + oplEsc(sec.kop) + '" oninput="_introWerkSecties[' + i + '].kop=this.value" placeholder="Titel van het onderwerp" style="flex:1;padding:6px 9px;border:1px solid #ccc;border-radius:6px;font-size:13px;font-weight:700;">' +
+      '<button title="Omhoog" onclick="oplIntroInstVerplaats(' + i + ',-1)" ' + (i===0?'disabled style="opacity:.3;"':'') + ' style="background:#eef3fa;border:1px solid #c8d7e8;border-radius:5px;padding:4px 8px;cursor:pointer;font-size:11px;">&#8593;</button>' +
+      '<button title="Omlaag" onclick="oplIntroInstVerplaats(' + i + ',1)" ' + (i===_introWerkSecties.length-1?'disabled style="opacity:.3;"':'') + ' style="background:#eef3fa;border:1px solid #c8d7e8;border-radius:5px;padding:4px 8px;cursor:pointer;font-size:11px;">&#8595;</button>' +
+      '<button title="Verwijderen" onclick="oplIntroInstVerwijder(' + i + ')" style="background:#fdecea;border:1px solid #f0b8b0;color:#c0392b;border-radius:5px;padding:4px 8px;cursor:pointer;font-size:11px;">&#x2715;</button>' +
+      '</div>' +
+      '<textarea rows="5" oninput="_introWerkSecties[' + i + '].tekst=this.value" placeholder="Eén punt per regel. Zet een bullet met &quot;  - tekst&quot; op een eigen regel onder het bijbehorende punt." style="width:100%;padding:8px;border:1px solid #ccd6e5;border-radius:6px;font-size:12.5px;font-family:Arial,sans-serif;box-sizing:border-box;resize:vertical;">' + oplEsc(sec.tekst) + '</textarea>' +
+      '</div>';
+  }).join('');
+}
+function oplIntroInstVerplaats(i, richting){
+  var j = i + richting;
+  if (j < 0 || j >= _introWerkSecties.length) return;
+  var tmp = _introWerkSecties[i]; _introWerkSecties[i] = _introWerkSecties[j]; _introWerkSecties[j] = tmp;
+  oplIntroInstellingenRender();
+}
+function oplIntroInstVerwijder(i){
+  if (!confirm('Dit onderwerp helemaal verwijderen?')) return;
+  _introWerkSecties.splice(i, 1);
+  oplIntroInstellingenRender();
+}
+function oplIntroInstToevoegen(){
+  _introWerkSecties.push({kop: 'Nieuw onderwerp', tekst: 'Eerste punt van dit onderwerp.'});
+  oplIntroInstellingenRender();
+  setTimeout(function(){
+    var el = document.getElementById('aftek-inst-onderwerpen');
+    if (el && el.lastElementChild) el.lastElementChild.scrollIntoView({behavior:'smooth', block:'center'});
+  }, 50);
+}
+function oplIntroInstStandaardHerstellen(){
+  var form = oplIntroForm();
+  if (!form || !form._sectiesDefault) return;
+  _introWerkSecties = form._sectiesDefault.map(function(sec){
+    return {kop: sec.kop, tekst: oplIntroSectieToTekst(sec)};
+  });
+  oplIntroInstellingenRender();
+}
+function oplIntroSectiesOpslaanVanuitWerklijst(){
+  var form = oplIntroForm();
+  if (!form) return;
+  var nieuweSecties = _introWerkSecties.map(function(sec){
+    return {kop: sec.kop, rijen: oplIntroTekstNaarRijen(sec.tekst)};
+  });
+  form.secties.length = 0;
+  nieuweSecties.forEach(function(s){ form.secties.push(s); });
+  oplIntroSectiesSaveConfig(form.secties);
+}
+oplIntroSectiesLoadConfig();
 
 function oplAftekGetCel(state, rIdx, kol){
   return (state.aftek && state.aftek[rIdx] && state.aftek[rIdx][kol]) || false;
@@ -15218,6 +15363,12 @@ function wisselPunctualityDatum(dateStr) {
     }
     // Sjorringen komen altijd uit de Dagplanning van dezelfde datum
     if (typeof syncSjorringenVanDagplan === 'function') syncSjorringenVanDagplan(dateStr);
+    // De vrije opmerkingen-tekst hoort niet bij de Dagplanning-sync (die kent geen 'opm' veld) —
+    // die moet apart worden teruggezet vanuit de eerder opgeslagen invoer voor deze datum.
+    if (entry && entry.sjor && typeof entry.sjor.opm === 'string') {
+      var opmEl = document.getElementById('sjor-opm');
+      if (opmEl) opmEl.value = entry.sjor.opm;
+    }
     // Sync dagplanning date silently
     var dp = document.getElementById('dagPlanDatum');
     if (dp && dp.value !== dateStr) dp.value = dateStr;
@@ -16778,6 +16929,7 @@ async function laadWeer() {
   function resetKpiNormen(){localStorage.removeItem('kpi_normen_v1');document.querySelectorAll('#kpi-normen-body input[data-key]').forEach(function(i){i.value='';});}
 
   function renderKPI(){
+    renderTolynxKade();
     var lbl=document.getElementById('kpi-maand-label');
     if(lbl) lbl.textContent=_ML[_kpiM]+' '+_kpiY;
     var all=_vsGet();
@@ -17092,7 +17244,7 @@ async function laadWeer() {
     if(nT&&nC){
       var normen=getKpiNormen(),bRows=[];
       entries.forEach(function(e){_RT.forEach(function(route,ri){var rij=(e.tijden||[])[ri];if(!rij)return;(rij.tijden||[]).forEach(function(t,ti){if(!t)return;var _d=e.datum?e.datum.split('/'):[],_isWE=false;if(_d.length===3){var _wd=new Date(parseInt(_d[2]),parseInt(_d[1])-1,parseInt(_d[0]));_isWE=_wd.getDay()===0||_wd.getDay()===6;}var _nk=route+'_'+ti+(_isWE&&normen[route+'_'+ti+'_we']?'_we':'');var nv=normen[_nk];if(!nv||!nv.tijd)return;var nm2=_t2m(nv.tijd);if(nm2===null)return;var mg=nv.marge?parseInt(nv.marge):0,tM=_t2m(t);if(tM===null)return;var afw=tM-nm2;if(afw>mg)bRows.push({datum:e.datum,route:route,kolom:_TC[ti],werkelijk:t,norm:nv.tijd,marge:mg,afwijking:afw,isWE:_isWE,opm:[(e.sjor&&(e.sjor.opm||e.sjor['opm']))||(e.units&&e.units['opmerking-lossing'])||(e.units&&e.units['opmerking-lading'])].filter(Boolean).join(' | ')});});});});
-      if(!bRows.length){nC.style.display='none';}else{nC.style.display='block';var _nb=document.getElementById('normen-count-badge');if(_nb)_nb.textContent=bRows.length+' regel'+(bRows.length===1?'':'s');nT.innerHTML=bRows.map(function(r,i){var bg=r.isWE?(i%2===0?'#fff3cd':'#ffeaa7'):(i%2===0?'#fff5f5':'#fde8e8'),aw=(r.afwijking>0?'+':'')+r.afwijking+' min',weBadge=r.isWE?'<span style="background:#e67e22;color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:5px;vertical-align:middle;">WE</span>':'';return '<tr style="background:'+bg+';"><td style="padding:7px 10px;border:1px solid #f5b7b1;font-weight:700;color:var(--navy);">'+r.datum+weBadge+'</td><td style="padding:7px 10px;border:1px solid #f5b7b1;">'+r.route+'</td><td style="padding:7px 10px;border:1px solid #f5b7b1;">'+r.kolom+'</td><td style="text-align:center;padding:7px 10px;border:1px solid #f5b7b1;font-weight:700;color:#c0392b;">'+r.werkelijk+'</td><td style="text-align:center;padding:7px 10px;border:1px solid #f5b7b1;color:#555;">'+r.norm+'&#177;'+r.marge+'m</td><td style="text-align:center;padding:7px 10px;border:1px solid #f5b7b1;font-weight:700;color:#c0392b;">'+aw+'</td><td style="padding:7px 10px;border:1px solid #f5b7b1;color:'+(r.opm?'var(--navy)':'#aaa')+';font-style:'+(r.opm?'normal':'italic')+';">'+(r.opm||'&#x2014;')+'</td></tr>';}).join('');}
+      if(!bRows.length){nC.style.display='none';}else{nC.style.display='block';var _nb=document.getElementById('normen-count-badge');if(_nb)_nb.textContent=bRows.length+' regel'+(bRows.length===1?'':'s');nT.innerHTML=bRows.map(function(r,i){var bg=r.isWE?(i%2===0?'#fff3cd':'#ffeaa7'):(i%2===0?'#fff5f5':'#fde8e8'),aw=(r.afwijking>0?'+':'')+r.afwijking+' min',weBadge=r.isWE?'<span style="background:#e67e22;color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:5px;vertical-align:middle;">WE</span>':'';return '<tr onclick="kpiNormRegelNaarPunctualiteit(\''+r.datum+'\')" title="Klik om naar deze dag in Punctuality te gaan" style="cursor:pointer;background:'+bg+';" onmouseover="this.style.filter=\'brightness(0.94)\'" onmouseout="this.style.filter=\'none\'"><td style="padding:7px 10px;border:1px solid #f5b7b1;font-weight:700;color:var(--navy);">'+r.datum+weBadge+'</td><td style="padding:7px 10px;border:1px solid #f5b7b1;">'+r.route+'</td><td style="padding:7px 10px;border:1px solid #f5b7b1;">'+r.kolom+'</td><td style="text-align:center;padding:7px 10px;border:1px solid #f5b7b1;font-weight:700;color:#c0392b;">'+r.werkelijk+'</td><td style="text-align:center;padding:7px 10px;border:1px solid #f5b7b1;color:#555;">'+r.norm+'&#177;'+r.marge+'m</td><td style="text-align:center;padding:7px 10px;border:1px solid #f5b7b1;font-weight:700;color:#c0392b;">'+aw+'</td><td onclick="event.stopPropagation()" style="padding:7px 10px;border:1px solid #f5b7b1;color:'+(r.opm?'var(--navy)':'#aaa')+';font-style:'+(r.opm?'normal':'italic')+';cursor:text;">'+(r.opm||'&#x2014;')+'</td></tr>';}).join('');}
     }
 
     // Cirkeldiagrammen
@@ -17127,7 +17279,8 @@ async function laadWeer() {
       });
 
       colStats=colStats.filter(function(s){return s.hasN;});
-      if(!colStats.length){cC.style.display='none';}
+      var tolynxKaartHtml = tolynxMaandDonutKaartHtml();
+      if(!colStats.length && !tolynxKaartHtml){cC.style.display='none';}
       else{
         cC.style.display='block';
         cW.innerHTML=colStats.map(function(s){
@@ -17164,7 +17317,7 @@ async function laadWeer() {
             '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">'+paths+donut+lbls+'</svg>'+
             '<div style="font-size:9px;color:#999;margin-top:1px;">'+(s.hasN?'norm '+s.normT+(s.normM?'&#177;'+s.normM+'m':'')+'  &#x2022;  ':'')+tot+' meetpunten</div>'+
             '<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;justify-content:center;">'+leg+'</div></div>';
-        }).join('');
+        }).join('') + tolynxKaartHtml;
       }
     }
   }
@@ -19177,6 +19330,16 @@ function toggleNavMenu(){
     m.style.display = 'block';
   }
 }
+
+function kpiNormRegelNaarPunctualiteit(datumSlash){
+  if (!datumSlash) return;
+  var d = datumSlash.split('/');
+  if (d.length !== 3) return;
+  var iso = d[2] + '-' + d[1] + '-' + d[0]; // dd/mm/yyyy -> yyyy-mm-dd
+  navTo('punctuality', 'PUNCTUALITY', null);
+  if (typeof wisselPunctualityDatum === 'function') wisselPunctualityDatum(iso);
+}
+
 function navTo(view, label, btn){
   // Hide menu
   document.getElementById('navMenu').style.display = 'none';
@@ -19191,6 +19354,7 @@ function navTo(view, label, btn){
   if(view === 'archief') { if(typeof renderArchief === 'function') renderArchief(); if(typeof renderKPI === 'function') renderKPI(); }
   if(view === 'dagplanning' && typeof buildPanels === 'function'){ buildPanels(); if(typeof buildStats==='function') buildStats(); }
   if(view === 'materieel' && typeof laadPorto === 'function') laadPorto();
+  if(view === 'punctuality' && typeof renderTolynxKade === 'function') renderTolynxKade('punct');
   if(view === 'nieuw') {
     var _fd = document.getElementById('f-datum');
     if(_fd) {
@@ -19239,6 +19403,416 @@ function toggleBezetting() {
   var open = body.style.display === 'block';
   body.style.display  = open ? 'none' : 'block';
   arrow.style.transform = open ? '' : 'rotate(180deg)';
+}
+
+// ===== Tolynx kade bezetting (handmatig bijgewerkt via screenshot) =====
+var TOLYNX_KOL_KLEUR = ['#3b8fd6', '#c9a86a', '#e8830f', '#2f7bd6', '#c0392b'];
+function tolynxSvg(inner, kleur, size){
+  return '<svg viewBox="0 0 24 24" width="' + (size||16) + '" height="' + (size||16) + '" style="display:block;" fill="none" stroke="' + kleur + '" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
+}
+var TOLYNX_KOL_SVG = [
+  tolynxSvg('<path d="M6 12c0-2.2 1.6-4 3.6-4 1.6 0 2.6 1.2 2.4 1.6-.4.9-1 2.4-2 2.4-1.6 0-2-2-2-2M12 12c0 2.2 1.6 4 3.6 4 2 0 3.6-1.8 3.6-4s-1.6-4-3.6-4c-1.6 0-2.6 1.2-2.4 1.6.4.9 1 2.4 2 2.4"/>', TOLYNX_KOL_KLEUR[0]),
+  tolynxSvg('<rect x="8" y="5" width="3" height="14" fill="' + TOLYNX_KOL_KLEUR[1] + '" stroke="none"/><rect x="13" y="5" width="3" height="14" fill="' + TOLYNX_KOL_KLEUR[1] + '" stroke="none"/>', TOLYNX_KOL_KLEUR[1]),
+  tolynxSvg('<path d="M12 3 L21 12 L12 21 L3 12 Z" fill="' + TOLYNX_KOL_KLEUR[2] + '" stroke="' + TOLYNX_KOL_KLEUR[2] + '"/>', TOLYNX_KOL_KLEUR[2]),
+  tolynxSvg('<circle cx="12" cy="14" r="4.5"/><path d="M9 6v4M13 6v4M8 6h6"/><path d="M9.5 6a1 1 0 0 1 0-2h3a1 1 0 0 1 0 2"/>', TOLYNX_KOL_KLEUR[3]),
+  tolynxSvg('<rect x="5" y="10" width="14" height="9" rx="1.5"/><path d="M8 10V6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v4"/><circle cx="12" cy="14.5" r="1.6" fill="' + TOLYNX_KOL_KLEUR[4] + '" stroke="none"/>', TOLYNX_KOL_KLEUR[4])
+];
+var TOLYNX_RIJ_IMG = {
+  trekker: 'data:image/png;base64,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',
+  chauffeur: 'data:image/png;base64,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',
+  trailer_reachstacker: 'data:image/png;base64,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',
+  tugmaster: 'data:image/png;base64,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',
+  heftruck: 'data:image/png;base64,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',
+};
+var TOLYNX_RIJ_KLEUR = '#5a6b82';
+var TOLYNX_RIJ_SVG = [
+  tolynxSvg('<path d="M6 12c0-2.2 1.6-4 3.6-4 1.6 0 2.6 1.2 2.4 1.6-.4.9-1 2.4-2 2.4-1.6 0-2-2-2-2M12 12c0 2.2 1.6 4 3.6 4 2 0 3.6-1.8 3.6-4s-1.6-4-3.6-4c-1.6 0-2.6 1.2-2.4 1.6.4.9 1 2.4 2 2.4"/>', TOLYNX_RIJ_KLEUR, 18),
+  '<img src="' + TOLYNX_RIJ_IMG.trekker + '" style="height:18px;width:auto;display:block;">',
+  '<img src="' + TOLYNX_RIJ_IMG.chauffeur + '" style="height:18px;width:auto;display:block;">',
+  '<img src="' + TOLYNX_RIJ_IMG.trailer_reachstacker + '" style="height:18px;width:auto;display:block;">',
+  '<img src="' + TOLYNX_RIJ_IMG.tugmaster + '" style="height:18px;width:auto;display:block;">',
+  '<img src="' + TOLYNX_RIJ_IMG.heftruck + '" style="height:18px;width:auto;display:block;">'
+];
+var TOLYNX_RIJ_LABELS = ['Totaal', 'Trekker', 'Chauffeur', 'Trailer/Reachstacker', 'Tugmaster', 'Heftruck'];
+
+function tolynxKadeKey(){ return tk('kpi_tolynx_kade_v1'); }
+function tolynxKadeLeeg(){ return [[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]]; }
+function getTolynxKadeHistorie(){
+  try {
+    var d = JSON.parse(localStorage.getItem(tolynxKadeKey()) || 'null');
+    if (d && Array.isArray(d.historie)) return d.historie;
+    // Migratie vanuit de oude opslagvorm (1 losse snapshot zonder geschiedenis)
+    if (d && d.import && d.export) {
+      var migratie = [{ tijdstip: d.bijgewerkt || '(onbekend tijdstip)', import: d.import, export: d.export }];
+      localStorage.setItem(tolynxKadeKey(), JSON.stringify({ historie: migratie }));
+      return migratie;
+    }
+  } catch(e) {}
+  return [];
+}
+function saveTolynxKadeHistorie(historie){
+  localStorage.setItem(tolynxKadeKey(), JSON.stringify({ historie: historie }));
+  if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+}
+var _tolynxHistorieIdx = null; // index van de momenteel bekeken snapshot; null = laatste (nieuwste)
+function tolynxKadeTabelHtml(titel, rijen, icoonKleur){
+  var html = '<div style="flex:1;min-width:280px;">';
+  html += '<div style="text-align:center;font-weight:700;color:var(--navy);margin-bottom:8px;font-family:\'Barlow Condensed\',sans-serif;letter-spacing:.5px;">' + titel + '</div>';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:12.5px;">';
+  html += '<tr>' + '<td style="width:34px;"></td>' + TOLYNX_KOL_SVG.map(function(ic){
+    return '<td style="text-align:center;padding:4px 2px;"><div style="display:flex;justify-content:center;">' + ic + '</div></td>';
+  }).join('') + '</tr>';
+  rijen.forEach(function(rij, rIdx){
+    html += '<tr style="border-top:1px solid #eee;">' +
+      '<td style="text-align:center;padding:7px 2px;" title="' + TOLYNX_RIJ_LABELS[rIdx] + '"><div style="display:flex;justify-content:center;">' + TOLYNX_RIJ_SVG[rIdx] + '</div></td>' +
+      rij.map(function(v){ return '<td style="text-align:center;padding:7px 2px;font-weight:' + (rIdx===0?'800':'500') + ';color:' + (rIdx===0?'var(--navy)':'#333') + ';">' + v + '</td>'; }).join('') +
+      '</tr>';
+  });
+  html += '</table></div>';
+  return html;
+}
+function tolynxMaxKey(){ return tk('kpi_tolynx_max_v1'); }
+function getTolynxMax(){
+  try {
+    var v = JSON.parse(localStorage.getItem(tolynxMaxKey()) || 'null');
+    if (typeof v === 'number' && v > 0) return v;
+  } catch(e) {}
+  return null; // geen maximum ingesteld = geen rood-markering
+}
+function saveTolynxMax(v){
+  localStorage.setItem(tolynxMaxKey(), JSON.stringify(v));
+  if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+}
+function tolynxMaandTijdstipMatch(tijdstip, maand, jaar){
+  var m = /^(\d{2})-(\d{2})-(\d{4})/.exec(tijdstip || '');
+  if (!m) return false;
+  return (parseInt(m[2], 10) - 1) === maand && parseInt(m[3], 10) === jaar;
+}
+function tolynxMaandDonutKaartHtml(){
+  var historie = getTolynxKadeHistorie();
+  var max = getTolynxMax();
+  var maandEntries = historie.filter(function(h){ return tolynxMaandTijdstipMatch(h.tijdstip, _kpiM, _kpiY); });
+  var tot = maandEntries.length;
+  var binnen = 0, boven = 0;
+  maandEntries.forEach(function(e){
+    var totaalKade = (e.import[0][0] || 0) + (e.export[0][0] || 0);
+    if (max !== null && totaalKade > max) boven++; else binnen++;
+  });
+
+  var segs;
+  if (tot === 0) {
+    segs = [{ l: 'Geen data', v: 1, c: '#e0e0e0' }];
+  } else if (max !== null) {
+    segs = [
+      binnen > 0 ? { l: 'Binnen maximum', v: binnen, c: '#27ae60' } : null,
+      boven > 0 ? { l: 'Boven maximum', v: boven, c: '#c0392b' } : null
+    ].filter(Boolean);
+  } else {
+    segs = [{ l: 'Ingevoerd', v: tot, c: '#3498db' }];
+  }
+
+  var R = 60, cx = 100, cy = 90, W = 200, H = 210, cum = -90, paths = '', lbls = '', totDeg = 0;
+  var som = segs.reduce(function(a, s){ return a + s.v; }, 0);
+  segs.forEach(function(seg, si){
+    var sw = si === segs.length - 1 ? (360 - totDeg) : Math.round(seg.v / som * 3600) / 10;
+    totDeg += sw;
+    var r1 = cum * Math.PI / 180, r2 = (cum + sw) * Math.PI / 180;
+    var x1 = cx + R * Math.cos(r1), y1 = cy + R * Math.sin(r1), x2 = cx + R * Math.cos(r2), y2 = cy + R * Math.sin(r2);
+    if (sw >= 359.9) { paths += '<circle cx="' + cx + '" cy="' + cy + '" r="' + R + '" fill="' + seg.c + '"/>'; }
+    else { paths += '<path d="M' + cx + ',' + cy + ' L' + x1.toFixed(1) + ',' + y1.toFixed(1) + ' A' + R + ',' + R + ' 0 ' + (sw > 180 ? 1 : 0) + ',1 ' + x2.toFixed(1) + ',' + y2.toFixed(1) + ' Z" fill="' + seg.c + '" stroke="#fff" stroke-width="2"/>'; }
+    if (tot > 0) {
+      var mr = (cum + sw / 2) * Math.PI / 180, lx = cx + (R + 26) * Math.cos(mr), ly = cy + (R + 26) * Math.sin(mr), anch = lx > cx ? 'start' : 'end', sp = Math.round(seg.v / som * 100);
+      lbls += '<line x1="' + (cx + R * Math.cos(mr)).toFixed(1) + '" y1="' + (cy + R * Math.sin(mr)).toFixed(1) + '" x2="' + (cx + (R + 18) * Math.cos(mr)).toFixed(1) + '" y2="' + (cy + (R + 18) * Math.sin(mr)).toFixed(1) + '" stroke="#666" stroke-width="1.2"/><text x="' + lx.toFixed(1) + '" y="' + (ly - 4).toFixed(1) + '" text-anchor="' + anch + '" font-size="8" font-weight="700" fill="' + seg.c + '">' + sp + '%</text><text x="' + lx.toFixed(1) + '" y="' + (ly + 7).toFixed(1) + '" text-anchor="' + anch + '" font-size="7" fill="#555">' + seg.l + '</text>';
+    }
+    cum += sw;
+  });
+
+  var pct = (max !== null && tot > 0) ? Math.round(binnen / tot * 100) : null;
+  var kc = tot === 0 ? '#999' : (max === null ? '#3498db' : (boven === 0 ? '#1a7a40' : (pct >= 80 ? '#1a7a40' : pct >= 60 ? '#e67e22' : '#c0392b')));
+  var cp = tot === 0 ? '&#8211;' : (pct !== null ? pct + '%' : tot + 'x');
+  var cl = tot === 0 ? 'Geen data' : (max === null ? 'Geen maximum' : (boven === 0 ? '&#x2713; KPI OK' : '&#x2717; AANDACHT'));
+  var donut = '<circle cx="' + cx + '" cy="' + cy + '" r="' + (R - 24) + '" fill="#fff" stroke="#eee" stroke-width="1"/><text x="' + cx + '" y="' + (cy - 7) + '" text-anchor="middle" font-size="15" font-weight="800" fill="' + kc + '">' + cp + '</text><text x="' + cx + '" y="' + (cy + 8) + '" text-anchor="middle" font-size="8" font-weight="600" fill="' + kc + '">' + cl + '</text>';
+  var leg = segs.map(function(seg){ return '<span style="font-size:9px;color:' + seg.c + ';font-weight:700;"><svg width="12" height="12" style="vertical-align:middle;margin-right:3px;"><circle cx="6" cy="6" r="5" fill="' + seg.c + '"/></svg>' + seg.l + ' (' + seg.v + ')</span>'; }).join(' &nbsp;');
+
+  var ok = tot === 0 || max === null || boven === 0;
+  var html = '<div style="background:#fff;border:2px solid ' + (ok ? '#1a7a40' : '#c0392b') + ';border-radius:10px;padding:8px 6px 8px;box-shadow:0 3px 12px rgba(0,0,0,0.1);display:flex;flex-direction:column;align-items:center;">' +
+    '<div style="font-size:10px;font-weight:700;color:#003366;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:1px;text-align:center;">Kade bezetting</div>' +
+    '<div style="font-size:9px;color:#888;font-weight:600;margin-bottom:2px;">' + _ML[_kpiM] + ' ' + _kpiY + '</div>' +
+    '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">' + paths + donut + lbls + '</svg>' +
+    '<div style="font-size:9px;color:#999;margin-top:1px;">' + (max !== null ? 'max. ' + max + '  &#x2022;  ' : '') + tot + ' screenshot' + (tot === 1 ? '' : 's') + ' ingevoerd</div>' +
+    '<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;justify-content:center;">' + leg + '</div></div>';
+  return html;
+}
+function tolynxTotaalOpKadeHtml(snapshot){
+  var totaal = (snapshot.import[0][0] || 0) + (snapshot.export[0][0] || 0);
+  var max = getTolynxMax();
+  var overschreden = max !== null && totaal > max;
+  var kleurBg = overschreden ? '#c0392b' : '#eef3fa';
+  var kleurTxt = overschreden ? '#fff' : 'var(--navy)';
+  var html = '<div style="display:flex;justify-content:center;margin-bottom:16px;">';
+  html += '<div style="background:' + kleurBg + ';border-radius:10px;padding:12px 28px;text-align:center;min-width:220px;' + (overschreden ? 'box-shadow:0 0 0 2px #c0392b;' : 'border:1px solid #ccd6e5;') + '">';
+  html += '<div style="font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:' + (overschreden ? '#fdd' : 'var(--muted)') + ';font-weight:700;">Totaal op kade</div>';
+  html += '<div style="font-size:32px;font-weight:800;color:' + kleurTxt + ';line-height:1.2;">' + totaal + '</div>';
+  if (max !== null) {
+    html += '<div style="font-size:10.5px;color:' + (overschreden ? '#fee' : 'var(--muted)') + ';">' + (overschreden ? '&#9888; boven maximum van ' + max : 'max. ' + max) + '</div>';
+  }
+  html += '</div></div>';
+  return html;
+}
+var TOLYNX_INSTANTIES = ['kpi', 'punct'];
+function renderTolynxKadeAlle(){
+  TOLYNX_INSTANTIES.forEach(function(inst){ renderTolynxKade(inst); });
+}
+function renderTolynxKade(inst){
+  inst = inst || 'kpi';
+  var el = document.getElementById('tolynx-kade-body-' + inst);
+  if (!el) return;
+  var historie = getTolynxKadeHistorie();
+  if (!historie.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:10px 0;">Nog geen data ingevoerd. Klik op &#x2699;&#xFE0F; om de eerste screenshot te verwerken.</div>';
+    return;
+  }
+  if (_tolynxHistorieIdx === null || _tolynxHistorieIdx >= historie.length) _tolynxHistorieIdx = historie.length - 1;
+  var snapshot = historie[_tolynxHistorieIdx];
+  var isLaatste = _tolynxHistorieIdx === historie.length - 1;
+
+  var html = '<div style="display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:10px;">' +
+    '<button onclick="tolynxHistorieNaviGeer(-1)" ' + (_tolynxHistorieIdx === 0 ? 'disabled style="opacity:.3;"' : '') + ' style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:14px;">&#8592;</button>' +
+    '<div style="text-align:center;">' +
+      '<div style="font-weight:700;color:var(--navy);font-size:14px;">' + oplEsc(snapshot.tijdstip) + '</div>' +
+      '<div style="font-size:11px;color:var(--muted);">' + (_tolynxHistorieIdx + 1) + ' van ' + historie.length + (isLaatste ? ' &middot; meest recent' : '') + '</div>' +
+    '</div>' +
+    '<button onclick="tolynxHistorieNaviGeer(1)" ' + (isLaatste ? 'disabled style="opacity:.3;"' : '') + ' style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:14px;">&#8594;</button>' +
+    '</div>';
+
+  html += tolynxTotaalOpKadeHtml(snapshot);
+
+  html += '<div style="display:flex;gap:24px;flex-wrap:wrap;">' +
+    tolynxKadeTabelHtml('&#9664;&#9664; Import', snapshot.import) +
+    tolynxKadeTabelHtml('Export &#9654;&#9654;', snapshot.export) +
+    '</div>';
+  if (!isLaatste) {
+    html += '<div style="margin-top:10px;text-align:center;"><button onclick="_tolynxHistorieIdx=null;renderTolynxKadeAlle();" style="background:none;border:1px solid #ccd6e5;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:11.5px;color:var(--navy);">&#x21BB; Naar meest recente</button></div>';
+  }
+  el.innerHTML = html;
+}
+
+function tolynxHistorieNaviGeer(richting){
+  var historie = getTolynxKadeHistorie();
+  if (_tolynxHistorieIdx === null) _tolynxHistorieIdx = historie.length - 1;
+  var nieuw = _tolynxHistorieIdx + richting;
+  if (nieuw < 0 || nieuw >= historie.length) return;
+  _tolynxHistorieIdx = nieuw;
+  renderTolynxKadeAlle();
+}
+
+function toggleTolynxKade(inst) {
+  inst = inst || 'kpi';
+  var body  = document.getElementById('tolynx-kade-body-' + inst);
+  var arrow = document.getElementById('tolynx-kade-toggle-icon-' + inst);
+  if (!body) return;
+  var open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  if (arrow) arrow.innerHTML = open ? '&#x25BC;' : '&#x25B2;';
+}
+var _tolynxWerkData = null;
+function openTolynxKadeModal(){
+  var historie = getTolynxKadeHistorie();
+  var laatste = historie.length ? historie[historie.length - 1] : null;
+  _tolynxWerkData = { import: laatste ? JSON.parse(JSON.stringify(laatste.import)) : tolynxKadeLeeg(), export: laatste ? JSON.parse(JSON.stringify(laatste.export)) : tolynxKadeLeeg() };
+  renderTolynxKadeModalInputs();
+  var maxInput = document.getElementById('tolynx-max-input');
+  if (maxInput) maxInput.value = getTolynxMax() || '';
+  var modal = document.getElementById('tolynx-kade-modal');
+  if (modal) modal.style.display = 'flex';
+  TOLYNX_INSTANTIES.forEach(function(inst){
+    var body = document.getElementById('tolynx-kade-body-' + inst);
+    if (body && body.style.display === 'none') {
+      body.style.display = 'block';
+      var arrow = document.getElementById('tolynx-kade-toggle-icon-' + inst);
+      if (arrow) arrow.innerHTML = '&#x25B2;';
+    }
+  });
+  var status = document.getElementById('tolynx-ocr-status');
+  if (status) { status.style.display = 'none'; status.innerHTML = ''; }
+  var preview = document.getElementById('tolynx-ocr-preview');
+  if (preview) preview.style.display = 'none';
+  document.addEventListener('paste', tolynxOnPaste);
+}
+
+function tolynxOnPaste(ev){
+  var modal = document.getElementById('tolynx-kade-modal');
+  if (!modal || modal.style.display !== 'flex') return;
+  var items = (ev.clipboardData && ev.clipboardData.items) || [];
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].type.indexOf('image') !== -1) {
+      var file = items[i].getAsFile();
+      tolynxVerwerkGeuploadBestand(file);
+      ev.preventDefault();
+      return;
+    }
+  }
+}
+function closeTolynxKadeModal(){
+  var modal = document.getElementById('tolynx-kade-modal');
+  if (modal) modal.style.display = 'none';
+  document.removeEventListener('paste', tolynxOnPaste);
+}
+function tolynxModalInvoerHtml(kant){
+  var rijen = _tolynxWerkData[kant];
+  var html = '<div style="flex:1;min-width:260px;">';
+  html += '<div style="text-align:center;font-weight:700;color:var(--navy);margin-bottom:8px;text-transform:capitalize;">' + kant + '</div>';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:11.5px;">';
+  html += '<tr>' + '<td style="width:30px;"></td>' + TOLYNX_KOL_SVG.map(function(ic){
+    return '<td style="text-align:center;padding:2px;"><div style="display:flex;justify-content:center;">' + ic + '</div></td>';
+  }).join('') + '</tr>';
+  rijen.forEach(function(rij, rIdx){
+    html += '<tr>' + '<td style="text-align:center;padding:3px;" title="' + TOLYNX_RIJ_LABELS[rIdx] + '"><div style="display:flex;justify-content:center;">' + TOLYNX_RIJ_SVG[rIdx] + '</div></td>' +
+      rij.map(function(v, cIdx){
+        return '<td style="padding:2px;"><input type="number" value="' + v + '" min="0" ' +
+          'oninput="_tolynxWerkData[\'' + kant + '\'][' + rIdx + '][' + cIdx + ']=parseInt(this.value)||0" ' +
+          'style="width:100%;padding:5px 3px;border:1px solid #ccc;border-radius:5px;font-size:12px;text-align:center;box-sizing:border-box;"></td>';
+      }).join('') + '</tr>';
+  });
+  html += '</table></div>';
+  return html;
+}
+function renderTolynxKadeModalInputs(){
+  var el = document.getElementById('tolynx-kade-modal-inputs');
+  if (!el) return;
+  el.innerHTML = tolynxModalInvoerHtml('import') + tolynxModalInvoerHtml('export');
+}
+function tolynxKadeOpslaan(){
+  var maxInput = document.getElementById('tolynx-max-input');
+  if (maxInput) {
+    var maxVal = parseInt(maxInput.value, 10);
+    saveTolynxMax((maxVal > 0) ? maxVal : null);
+  }
+  var tijdstip = new Date().toLocaleDateString('nl-NL', {day:'2-digit', month:'2-digit', year:'numeric'}) + ' ' + new Date().toLocaleTimeString('nl-NL', {hour:'2-digit', minute:'2-digit'});
+  var historie = getTolynxKadeHistorie();
+  historie.push({ tijdstip: tijdstip, import: _tolynxWerkData.import, export: _tolynxWerkData.export });
+  saveTolynxKadeHistorie(historie);
+  _tolynxHistorieIdx = null; // toon meteen de nieuw toegevoegde (laatste) snapshot
+  renderTolynxKadeAlle();
+  if (typeof renderKPI === 'function') renderKPI(); // ververst ook het donut-diagram in de KPI Tijden-sectie
+  closeTolynxKadeModal();
+}
+
+// --- Automatisch cijfers inlezen uit een geuploade/geplakte screenshot (OCR) ---
+function tolynxOcrStatus(tekst, kleur){
+  var el = document.getElementById('tolynx-ocr-status');
+  if (!el) return;
+  el.style.display = 'block';
+  el.style.color = kleur || '#888';
+  el.innerHTML = tekst;
+}
+var _tesseractLaadPromise = null;
+function tolynxLaadTesseract(){
+  if (window.Tesseract) return Promise.resolve();
+  if (_tesseractLaadPromise) return _tesseractLaadPromise;
+  _tesseractLaadPromise = new Promise(function(resolve, reject){
+    var script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js';
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+  return _tesseractLaadPromise;
+}
+function tolynxVerwerkGeuploadBestand(file){
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var preview = document.getElementById('tolynx-ocr-preview');
+    if (preview) { preview.src = e.target.result; preview.style.display = 'block'; }
+    tolynxOcrStatus('&#8987; Bezig met automatisch inlezen van de cijfers&hellip;', '#888');
+    tolynxLaadTesseract().then(function(){
+      return Tesseract.recognize(e.target.result, 'eng');
+    }).then(function(result){
+      tolynxOcrVerwerkResultaat(result);
+    }).catch(function(err){
+      tolynxOcrStatus('&#9888; Automatisch inlezen is niet gelukt. Vul de cijfers handmatig in (de screenshot staat hierboven als hulp).', '#c0392b');
+      console.error('Tolynx OCR fout:', err);
+    });
+  };
+  reader.readAsDataURL(file);
+}
+function tolynxOcrVerwerkResultaat(result){
+  var woorden = [];
+  try {
+    result.data.words.forEach(function(w){
+      var tekst = (w.text || '').trim();
+      if (/^\d+$/.test(tekst)) {
+        var n = parseInt(tekst, 10);
+        if (n > 9999) return; // onwaarschijnlijk hoog (bijv. een jaartal uit de taakbalk-datum) -> ruis
+        var b = w.bbox;
+        woorden.push({ n: n, xc: (b.x0 + b.x1) / 2, yc: (b.y0 + b.y1) / 2, h: (b.y1 - b.y0) });
+      }
+    });
+  } catch(e) {}
+
+  if (woorden.length < 40) {
+    tolynxOcrStatus('&#9888; Er zijn maar ' + woorden.length + ' getallen herkend (verwacht: 60). Controleer en vul handmatig aan met de screenshot hierboven als hulp.', '#c0392b');
+    return;
+  }
+
+  // Groepeer in rijen op basis van y-positie
+  woorden.sort(function(a, b){ return a.yc - b.yc; });
+  var hoogtes = woorden.map(function(w){ return w.h; }).filter(function(h){ return h > 0; }).sort(function(a,b){ return a-b; });
+  var mediaanHoogte = (hoogtes[Math.floor(hoogtes.length/2)] || 14);
+  var rijen = [];
+  woorden.forEach(function(w){
+    var rij = rijen.find(function(r){ return Math.abs(r.yc - w.yc) < mediaanHoogte * 0.8; });
+    if (rij) { rij.woorden.push(w); rij.yc = (rij.yc * (rij.woorden.length-1) + w.yc) / rij.woorden.length; }
+    else rijen.push({ yc: w.yc, woorden: [w] });
+  });
+
+  // Ruis wegfilteren: losse elementen (zoals een klok/datum in een taakbalk) leveren
+  // maar een handvol getallen op -- een echte databalk-rij heeft er rond de 10.
+  var kandidaten = rijen.filter(function(r){ return r.woorden.length >= 7 && r.woorden.length <= 13; });
+  kandidaten.sort(function(a, b){ return a.yc - b.yc; });
+
+  if (kandidaten.length !== TOLYNX_RIJ_LABELS.length) {
+    tolynxOcrStatus('&#9888; Er zijn ' + kandidaten.length + ' bruikbare rijen herkend in plaats van ' + TOLYNX_RIJ_LABELS.length + '. Controleer en vul handmatig aan met de screenshot hierboven als hulp.', '#c0392b');
+    return;
+  }
+
+  var nieuw = { import: [], export: [] };
+  var onvolledig = false;
+  kandidaten.forEach(function(rij){
+    rij.woorden.sort(function(a, b){ return a.xc - b.xc; });
+    var lijst = rij.woorden;
+    if (lijst.length !== 10) {
+      // Probeer de grootste x-kloof te vinden om Import/Export te scheiden en overtollige ruis aan de randen te negeren
+      if (lijst.length > 10) {
+        var grootsteKloof = 0, kloofIdx = 5;
+        for (var i = 1; i < lijst.length; i++) {
+          var d = lijst[i].xc - lijst[i-1].xc;
+          if (d > grootsteKloof) { grootsteKloof = d; kloofIdx = i; }
+        }
+        var links = lijst.slice(0, kloofIdx), rechts = lijst.slice(kloofIdx);
+        if (links.length > 5) links = links.slice(links.length - 5);
+        if (rechts.length > 5) rechts = rechts.slice(0, 5);
+        if (links.length === 5 && rechts.length === 5) {
+          nieuw.import.push(links.map(function(w){ return w.n; }));
+          nieuw.export.push(rechts.map(function(w){ return w.n; }));
+          return;
+        }
+      }
+      onvolledig = true; nieuw.import.push([0,0,0,0,0]); nieuw.export.push([0,0,0,0,0]); return;
+    }
+    nieuw.import.push(lijst.slice(0, 5).map(function(w){ return w.n; }));
+    nieuw.export.push(lijst.slice(5, 10).map(function(w){ return w.n; }));
+  });
+
+  if (onvolledig) {
+    tolynxOcrStatus('&#9888; Niet elke rij kon volledig worden herkend. Controleer alle velden goed voordat je opslaat (screenshot staat hierboven).', '#c0392b');
+  } else {
+    tolynxOcrStatus('&#9989; Cijfers automatisch ingevuld. Controleer ze even voordat je op Opslaan klikt.', '#1e7d34');
+  }
+  _tolynxWerkData.import = nieuw.import;
+  _tolynxWerkData.export = nieuw.export;
+  renderTolynxKadeModalInputs();
 }
 
 function toggleNormen() {
@@ -19647,10 +20221,43 @@ function navWerkoverdracht(label, btn) {
       <div style="font-size:11px;color:#667;text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px;">Regels</div>
       <div id="aftek-inst-rijen"></div>
       <button onclick="oplAftekInstToevoegen()" style="margin-top:12px;background:#eef3fa;color:#003366;border:1px solid #c8d7e8;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:700;">+ Regel toevoegen</button>
+      <div style="font-size:11px;color:#667;text-transform:uppercase;letter-spacing:.3px;margin:22px 0 6px;border-top:1px solid #eee;padding-top:16px;">Introductie-onderwerpen (Veiligheid, PBM, etc.)</div>
+      <div id="aftek-inst-onderwerpen"></div>
+      <button onclick="oplIntroInstToevoegen()" style="margin-top:6px;background:#eef3fa;color:#003366;border:1px solid #c8d7e8;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:700;">+ Onderwerp toevoegen</button>
     </div>
     <div style="padding:14px 24px;border-top:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">
       <button onclick="oplAftekInstStandaardHerstellen()" style="background:#f0f0f0;color:#555;border:none;border-radius:6px;padding:10px 16px;cursor:pointer;font-size:13px;">&#x21BA; Standaard herstellen</button>
       <button onclick="oplAftekInstOpslaan()" style="background:#27ae60;color:#fff;border:none;border-radius:6px;padding:10px 28px;cursor:pointer;font-size:14px;font-weight:700;">&#x1F4BE; Opslaan</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOLYNX KADE BEZETTING MODAL -->
+<div id="tolynx-kade-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:99000;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:12px;width:640px;max-width:96vw;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,0.35);">
+    <div style="background:#003366;color:#fff;padding:16px 20px;border-radius:12px 12px 0 0;display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:800;letter-spacing:1px;">&#x1F69B; KADE BEZETTING BIJWERKEN</span>
+      <button onclick="closeTolynxKadeModal()" style="background:rgba(255,255,255,0.15);border:none;color:#fff;border-radius:6px;padding:5px 11px;cursor:pointer;font-size:17px;">&#x2715;</button>
+    </div>
+    <div style="padding:12px 20px;background:#f0f4ff;border-bottom:1px solid #dde;font-size:12px;color:#555;">
+      Vul hier de aantallen in van de rePort-screenshot (Import/Export). De kolomvolgorde en iconen komen overeen met rePort: totaal, on hold, gevaarlijke stoffen, reefer, geblokkeerd.
+    </div>
+    <div style="padding:12px 20px;border-bottom:1px solid #eee;display:flex;align-items:center;gap:10px;">
+      <label style="font-size:12.5px;color:#333;font-weight:600;">Maximum totaal op kade (Import+Export):</label>
+      <input type="number" id="tolynx-max-input" min="0" placeholder="geen maximum" value="" style="width:110px;padding:6px 9px;border:1px solid #ccc;border-radius:6px;font-size:13px;">
+      <span style="font-size:11px;color:#888;">leeg = geen rood-markering</span>
+    </div>
+    <div style="padding:14px 20px 4px;border-bottom:1px solid #eee;">
+      <div id="tolynx-upload-zone" style="border:2px dashed #c8d7e8;border-radius:8px;padding:14px;text-align:center;cursor:pointer;background:#fafcff;" onclick="document.getElementById('tolynx-file-input').click()">
+        <span style="font-size:13px;color:#556;">&#x1F4F7; Klik hier, of plak (Ctrl+V) een screenshot om de cijfers automatisch te laten inlezen</span>
+        <input type="file" id="tolynx-file-input" accept="image/*" style="display:none;" onchange="tolynxVerwerkGeuploadBestand(this.files[0])">
+      </div>
+      <div id="tolynx-ocr-status" style="font-size:12px;color:#888;margin-top:6px;display:none;"></div>
+      <img id="tolynx-ocr-preview" style="display:none;max-width:100%;max-height:220px;margin-top:8px;border:1px solid #ddd;border-radius:6px;">
+    </div>
+    <div style="overflow-y:auto;padding:16px 20px;flex:1;display:flex;gap:20px;flex-wrap:wrap;" id="tolynx-kade-modal-inputs"></div>
+    <div style="padding:14px 24px;border-top:1px solid #eee;display:flex;justify-content:flex-end;">
+      <button onclick="tolynxKadeOpslaan()" style="background:#27ae60;color:#fff;border:none;border-radius:6px;padding:10px 28px;cursor:pointer;font-size:14px;font-weight:700;">&#x1F4BE; Opslaan</button>
     </div>
   </div>
 </div>
