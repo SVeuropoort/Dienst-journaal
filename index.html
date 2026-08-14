@@ -3029,7 +3029,12 @@ document.addEventListener('contextmenu', function(e) {
       <span id="current-date-label"></span>
     </div>
 
+    <div style="display:flex;gap:6px;margin-bottom:16px;">
+      <button id="nieuw-tab-btn-overdracht" onclick="nieuwToonTab('overdracht')" style="padding:9px 18px;border:none;border-radius:6px 6px 0 0;background:var(--navy);color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#x21C4; Overdracht</button>
+      <button id="nieuw-tab-btn-personeelsdossier" onclick="nieuwToonTab('personeelsdossier')" style="padding:9px 18px;border:none;border-radius:6px 6px 0 0;background:#e8eef5;color:var(--navy);font-family:'Barlow Condensed',sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#x1F4C1; Personeelsdossier</button>
+    </div>
 
+    <div id="nieuw-tab-overdracht">
 
     <!-- Overdracht -->
     <div class="card">
@@ -3113,7 +3118,37 @@ document.addEventListener('contextmenu', function(e) {
       <button class="btn-primary" onclick="slaJournaalOp()">&#x1F4BE; Journaal Opslaan</button>
       <button class="btn-secondary" onclick="resetForm()">Wissen</button>
     </div>
+
+    </div>
+
+    <!-- ===== PERSONEELSDOSSIER (sub-tab) ===== -->
+    <div id="nieuw-tab-personeelsdossier" style="display:none;">
+      <div class="card">
+        <div class="card-header"><div class="icon">&#x1F4C1;</div><h2>Zoeken &amp; Registreren</h2></div>
+        <div style="padding:16px 20px;">
+          <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+            <input type="text" id="pd-zoek" placeholder="&#x1F50D; Zoek op naam of tekst (bijv. 'verslapen', 'schade', 'Ahmetagic')..." oninput="pdZoek(this.value)" style="flex:1;min-width:260px;padding:10px 14px;border:1px solid #ccd6e5;border-radius:8px;font-size:14px;">
+          </div>
+          <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
+            <div style="flex:0 0 240px;max-width:100%;">
+              <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:6px;">Medewerkers</div>
+              <div style="display:flex;gap:4px;margin-bottom:8px;">
+                <button id="pd-cat-btn-actief" onclick="pdToonCategorie('actief')" style="flex:1;padding:6px 4px;border:1px solid #ccd6e5;border-radius:6px;background:var(--navy);color:#fff;font-size:11px;font-weight:700;cursor:pointer;">Actief</button>
+                <button id="pd-cat-btn-groep" onclick="pdToonCategorie('groep')" style="flex:1;padding:6px 4px;border:1px solid #ccd6e5;border-radius:6px;background:#eef3fa;color:var(--navy);font-size:11px;font-weight:700;cursor:pointer;">Groepen</button>
+                <button id="pd-cat-btn-uit_dienst" onclick="pdToonCategorie('uit_dienst')" style="flex:1;padding:6px 4px;border:1px solid #ccd6e5;border-radius:6px;background:#eef3fa;color:var(--navy);font-size:11px;font-weight:700;cursor:pointer;">Uit dienst</button>
+              </div>
+              <div id="pd-medewerkers-lijst" style="max-height:520px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;"></div>
+            </div>
+            <div style="flex:1;min-width:300px;">
+              <div id="pd-detail"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
+
   <!-- ===== PUNCTUALITY ===== -->
   <div id="view-punctuality" class="view">
     <div class="page-header">
@@ -4673,7 +4708,9 @@ window.addEventListener('resize', () => {
     'kade_vakken_v1','ortRekentoolState_v1',
     'opleiding_shunten_v1','opleiding_lossen_v1','opleiding_laden_v1','opleiding_heftruck_v1','opleiding_reachstacker_v1',
     'kpi_tolynx_kade_v1',
-    'kpi_tolynx_max_v1'
+    'kpi_tolynx_max_v1',
+    'personeelsdossier_v1',
+    'personeelsdossier_actief_v1'
   ];
 
   function getTerminalPrefix() {
@@ -4787,7 +4824,9 @@ window.addEventListener('resize', () => {
     'opleiding_aftek_config_v1',
     'opleiding_introductie_secties_v1',
     'kpi_tolynx_kade_v1',
-    'kpi_tolynx_max_v1'
+    'kpi_tolynx_max_v1',
+    'personeelsdossier_v1',
+    'personeelsdossier_actief_v1'
   ];
 
   function getSyncData() {
@@ -11659,6 +11698,7 @@ window.addEventListener('message', function(ev){
   var d = ev.data;
   if (d && d.type === 'ma-medewerkers-sync') {
     oplOverzichtSyncVanuitMaandafsluiting(d.ep, d.hvh);
+    if (typeof pdSyncVanuitMaandafsluiting === 'function') pdSyncVanuitMaandafsluiting(d.ep, d.hvh);
   }
 });
 function oplOverzichtSetDatum(terminal, idx, veld, valNL){
@@ -19989,6 +20029,393 @@ function navWerkoverdracht(label, btn) {
   var correct = terminal === 'HVH' ? 'svhvh' : 'SVeuropoort';
   if (ww !== correct) { alert('Onjuist wachtwoord.'); return; }
   navTo('nieuw', label, btn);
+}
+function nieuwToonTab(tab){
+  var tabs = ['overdracht', 'personeelsdossier'];
+  tabs.forEach(function(t){
+    var body = document.getElementById('nieuw-tab-' + t);
+    var btn = document.getElementById('nieuw-tab-btn-' + t);
+    if (body) body.style.display = (t === tab) ? 'block' : 'none';
+    if (btn) { btn.style.background = (t === tab) ? 'var(--navy)' : '#e8eef5'; btn.style.color = (t === tab) ? '#fff' : 'var(--navy)'; }
+  });
+  if (tab === 'personeelsdossier' && typeof pdInit === 'function') pdInit();
+}
+
+var PERSONEELSDOSSIER_SEED_EP = {"A. Ahmetagic": [{"datum": "22-5-2024", "id": 1, "tekst": "poten draaien en gelijk gebruik van telefoon. AR"}, {"datum": "29-3-2025", "id": 2, "tekst": "Verkeerde trailer HRO-B 1187 geladen op IMM ipv Harwich. AR"}, {"datum": "18-08-2022", "id": 3, "tekst": "Verkeerde trailer geladen DRC 40201 ipv 40210 MvT"}], "A. Gijbels": [{"datum": "maandag 18 april", "id": 4, "tekst": "Gesprek met Ashwin / Ralph over incidentjes van afgelopen weken."}, {"datum": "Dinsdag 21 juni 2011", "id": 5, "tekst": "Gesprek gehad met Ralph & Martin. Aangesproken op boevenstaande punten. Eind juli 2011 volgt er een evaluatiegesprek. Ralph neemt initiatief"}, {"datum": "", "id": 6, "tekst": "had ook om 7 uur al kunnen opmerken"}, {"datum": "donderdag 31 augustus 2023", "id": 7, "tekst": "Zonder stoot cap aan in de kettingen (svdm)"}, {"datum": "30-5-2024", "id": 8, "tekst": "trailer FMBK0062368 geladen op de Gothica maar stond niet in zn report lijst. Ar"}, {"datum": "16-11-2010", "id": 9, "tekst": "Rijd velg krom na uitwijken met de e12..vergeet schade formulier in te vullen. JW"}, {"datum": "21-11-2010", "id": 10, "tekst": "Zet trailer weg op maindek partner/Wist dat er geen rem op zat en/of lucht./Zet hem toch neer, koppeld af, en trailer rijd naar achter,trekt bok om en valt naar de vloer./geen schade maar toch? JW"}, {"datum": "30-11-2010", "id": 11, "tekst": "a gijbels  10 minuten te laat  kon niet weg rijden uit parkeervak thuis  r.r."}, {"datum": "08-12-2010", "id": 12, "tekst": "Gijbels stond al aagekleed klaar om naar huis te gaan terwijl hij moest meren. M.v.T."}, {"datum": "07-01-2011", "id": 13, "tekst": "Verslapen, 6:50 aanwezig.(ochtend dienst oud rooster) jw"}, {"datum": "11-01-2011", "id": 14, "tekst": "rookt in truck"}, {"datum": "21-01-2011", "id": 15, "tekst": "kwam pas om  10 over 7 de kantiene uit"}, {"datum": "31-01-2011", "id": 16, "tekst": "belde om 5 voor 7 op dat zijn auto niet meer starte en niet naar werk kan komen heb hem snipperen gegeven R.R."}, {"datum": "02-02-2011", "id": 17, "tekst": "Auto starte weer niet heb hem snipperen gegeven M.v.T."}, {"datum": "27-02-2011", "id": 18, "tekst": "10 over 7 op werk  had verkeerd af gesproken met g du chatinier"}, {"datum": "28-02-2011", "id": 19, "tekst": "Truck (12) vuil weggezet"}, {"datum": "30-03-2011", "id": 20, "tekst": "30-03-2011, geholpen met lossen maar geen chauffeurs brief ingeleverd."}, {"datum": "19-04-2011", "id": 21, "tekst": "19-04-2011, A Gijbels heeft met container rpgu 2011149 tegen de spoiler van p&p genemuiden gezeten."}, {"datum": "20-04-2011", "id": 22, "tekst": "20-04-2011, Vanochtend komt Vrieze naar me toe en die zegt tegen mij dat de 14 een snee in de band heeft aan de rechter voor zijde.\nIk heb dit onderzocht en nu blijkt dat wederom Gijbels een aanrijding met de 42-117 heeft gehad.\nDie boot trailer is aan de voorzijde rechts ingepakt met rubber en er lag rubber op de straat.\nDaarop heb ik gezocht naar zijn RS formulier en niet gevonden.\nDan zijn verscheping lijstje, geen naam, geen datums.\nDie gast moet even worden wakker geschud want dit gaat niet goed.JW"}, {"datum": "04-05-2011", "id": 23, "tekst": "met de schotel onder de kingpen doorgeschoten en afdekplaat verbogen"}, {"datum": "08-05-2011", "id": 24, "tekst": "Wakker gebeld om 7:10….verslapen maar zegt\"dacht dat ik avond dienst had\".JW"}, {"datum": "17-06-2011", "id": 25, "tekst": "15 minuten te laat op het werk i.v.m. file. Hij heeft check-in gebeld om 17:15"}, {"datum": "20-06-2011", "id": 26, "tekst": "Wakker gebeld om 07.10 uur. 07.50 op de zaak. Wekker??"}, {"datum": "20-06-2011", "id": 27, "tekst": "reachstacker 16 zonder diesel 300 liter getankt"}, {"datum": "20-06-2011", "id": 28, "tekst": "Truck niet afgetankt ondanks de vemelding op formulier van wel."}, {"datum": "20-09-2011", "id": 29, "tekst": "Truck (12) niet afgetankt."}, {"datum": "26-09-2011", "id": 30, "tekst": "Te laat voor avonddienst. Dacht dat hij vrij was. MvT"}, {"datum": "06-10-2011", "id": 31, "tekst": "Te laat voor avonddienst. Had lange avond was pas om 15.40 op de zaak. MvT"}, {"datum": "18-10-2011", "id": 32, "tekst": "Geen chauffeurs lijst ingeleverd en truck laten staan bij de boot. MvT"}, {"datum": "22-10-2011", "id": 33, "tekst": "verkeerd gesjord aan gesproken door a howell r.r."}, {"datum": "27-10-2011", "id": 34, "tekst": "Kon zelf niet bellen om ziek te melden moest gebeld worden waar hij bleef."}, {"datum": "05-12-2011", "id": 35, "tekst": "container niet goed in de twistlocks gezet op skelly laten staan en naar huis gegaan"}, {"datum": "14-01-2012", "id": 36, "tekst": "Om 7:10 wakker gebeld...om 7:40 aanwezig. JW"}, {"datum": "13-02-2012", "id": 37, "tekst": "alles op zijn gemakje  2 kettingen in de put  brooshooft"}, {"datum": "09-03-2012", "id": 38, "tekst": "hap uit band gereden  rechts achter  schade    r.r."}, {"datum": "14-03-2012", "id": 39, "tekst": "komt pas om 08:05 melden dat de beugel van de spiegel krom is  terwijl ze al aan lossen zijn"}, {"datum": "10-06-2012", "id": 40, "tekst": "verslapen MvT"}, {"datum": "01-07-2013", "id": 41, "tekst": "30m telaat. Door rooster wijziging zich eigen vergist."}, {"datum": "07-10-2013", "id": 42, "tekst": "schade gemaakt  aan overlading en container"}, {"datum": "23-10-2013", "id": 43, "tekst": "te laat op werk  om 08:15 op werk verslapen"}, {"datum": "29-09-2015", "id": 44, "tekst": "Klein half uur voor tijd verstoppen op het maindeck scotia."}, {"datum": "07-11-2016", "id": 45, "tekst": "Telaat op werk door niet goed lezen nieuwe rooster (75 min) JW"}, {"datum": "16-05-2017", "id": 46, "tekst": "Dacht dat hij avond had. MvT"}, {"datum": "03-02-2018", "id": 47, "tekst": "zeer zware schade gereden doordat hij aangesproken werdt op dingen die hij niet mocht doen. MvT"}, {"datum": "22-02-2018", "id": 48, "tekst": "Gewaarschuwd telefoon gebruik MvT"}, {"datum": "15-03-2018", "id": 49, "tekst": "Eerder weg voor tandarts 14.15 weg MvT"}, {"datum": "19-05-2020", "id": 50, "tekst": "Naar dokter 12 uur weg MvT"}, {"datum": "10-09-2020", "id": 51, "tekst": "Laad kill trailer weg met blauwe sticker op HC en verkeerd nummer REPORT gebruikt."}, {"datum": "21-09-2020", "id": 52, "tekst": "Trailer poten krom gereden ondanks dat sjorders hem waarschuwden MvT"}, {"datum": "21-07-2021", "id": 53, "tekst": "Verslapen dacht dat hij avond had. 8.15 aanwezig MvT"}, {"datum": "24-08-2021", "id": 54, "tekst": "trailer verkeerd weg geladen EC2325.ar"}, {"datum": "17-11-2021", "id": 55, "tekst": "verkeerde trailer weggedrukt E277 geladen en de E276 weggedrukt. Ar"}, {"datum": "06-07-2022", "id": 56, "tekst": "trailer HRO-B 3882 Forerunner weggedrukt maar niet geladen. ar"}, {"datum": "06-12-2022", "id": 57, "tekst": "Te laat op zijn werk (aangepast) dacht dat hij roostervrij was maar weekend ZO JW"}, {"datum": "22-03-2023", "id": 58, "tekst": "Verkeerde trailer geladen in de kelder WGM45375 weggedrukt en andere geladen MvT"}, {"datum": "23-03-2023", "id": 59, "tekst": "Stond zonder meervest bij aankomst Somerset MvT"}, {"datum": "09-06-2023", "id": 60, "tekst": "Zonder stoot cap aan in de kettingen (svdm)"}, {"datum": "09-04-2025", "id": 61, "tekst": "14:20 aanwezig door File. Ar"}, {"datum": "09-05-2025", "id": 62, "tekst": "Trailer FMBK0067499 opgehaald P&O en daarna weer teruggezet bij P&O. AR"}, {"datum": "26-07-2025", "id": 63, "tekst": "Verslapen, 7:55 aanwezig. JW"}, {"datum": "24-10-2025", "id": 64, "tekst": "Grote schade gereden aan de DRC40225. AR ( kosten 15k )"}, {"datum": "11-11-2025", "id": 65, "tekst": "aangesproken op Eerst helm wegleggen en dan gaan losgooien. Antw Gijbels.. Moest plassen. Ar"}, {"datum": "27-02-2026", "id": 66, "tekst": "Auto kapot. 15:30 aanwezig ivm vervangend vervoer.AR"}], "Boer (uit dienst)": [{"datum": "04-10-2021", "id": 67, "tekst": "hele bumper eraf gereden van airproducts (2.2) te hard gereden binnenboord antw; ramp goed leggen. Ar"}], "Bul (uit dienst)": [{"datum": "Maandag 21 November 2016", "id": 68, "tekst": "Wakker gebeld. Aanwezig om 8:30. AR"}, {"datum": "", "id": 69, "tekst": "Waaschuwing gehad m.b.t. het verslapen. Volgende keer brief. MvT"}, {"datum": "Maandag 24 Juli 2017", "id": 70, "tekst": "Belde pas om 12:24 dat hij zich had  verslapen.AR"}, {"datum": "", "id": 71, "tekst": "Bul meerdere keren op aangesproken, dat hij op tijd naar buiten moet."}, {"datum": "17-2-2023", "id": 72, "tekst": "aangesproken op het niet dragen van een stootcap. AR"}, {"datum": "17-6-23", "id": 73, "tekst": "Te laat bij meren Nordica. Hij had niet goed op de lijst gekeken. Bij volgende"}, {"datum": "donderdag 24-08-2023", "id": 74, "tekst": "Stipt optijd binnenlopen waardoor net te laat omgekleed (13:59) svdm"}, {"datum": "13-9-2023", "id": 75, "tekst": "te laat op werk/te laat omgekleed 14:02 Ar"}, {"datum": "18-6-2024", "id": 76, "tekst": "DRC 40606 in de put geladen maar op het maindeck weggedrukt. Ar"}, {"datum": "", "id": 77, "tekst": "En een HRO geladen en niet weggedrukt."}, {"datum": "26-8-2024", "id": 78, "tekst": "Te laat. Ar"}, {"datum": "27-8-2024", "id": 79, "tekst": "Te laat. Ar. Eerste volgende te laat een officiele waarschuwing. Besproken met J Bul"}, {"datum": "26-9-2024", "id": 80, "tekst": "Te laat. Belt om 13:45 of hij een halve snip mag i.v.m. verslapen. Om 14:20 aanwezig op werk (SvdM)"}, {"datum": "28-10-2014", "id": 81, "tekst": "Verslapen 1,5 uur te laat RR"}, {"datum": "29-10-2014", "id": 82, "tekst": "Verslapen 7.05 aanwezig MvT"}, {"datum": "08-12-2014", "id": 83, "tekst": "40 min te laat aanwezig  r.r."}, {"datum": "16-09-2016", "id": 84, "tekst": "7:05 wakker gebeld…7:50 aanwezig. JW"}, {"datum": "16-01-2017", "id": 85, "tekst": "Te laat op de zaak 06.50 MvT Brief naar dossier."}, {"datum": "10-03-2019", "id": 86, "tekst": "te laat binnen 12.35 MvT"}, {"datum": "15-08-2019", "id": 87, "tekst": "Telefoongebruik in truck. 2de waarschuwing mvT"}, {"datum": "01-06-2020", "id": 88, "tekst": "Belt om 6:45, verslapen, aanwezig 7:10 JW"}, {"datum": "10-07-2020", "id": 89, "tekst": "15 min laat aanwezig ivm ongeluk (auto in brand) voor hem. AR"}, {"datum": "16-07-2020", "id": 90, "tekst": "Bul om 7:07 uit het schaftloklaal moeten halen om een truck te pakken.Ar"}, {"datum": "08-09-2020", "id": 91, "tekst": "Bul 7:05 uit het schaftlokaal om truck te pakken.AR"}, {"datum": "09-10-2020", "id": 92, "tekst": "Bul verslapen 7:03 aanrijden. AR"}, {"datum": "29-11-2020", "id": 93, "tekst": "Verslapen 12:25 op terminal MvT"}, {"datum": "15-12-2020", "id": 94, "tekst": "Verslapen 7:35 aanwezig MvT"}, {"datum": "25-08-2021", "id": 95, "tekst": "Belde om 07:02 dat hij ziek is. JW"}, {"datum": "18-03-2022", "id": 96, "tekst": "Litsped trailer niet weggedrukt op de somerset.AR"}, {"datum": "24-03-2022", "id": 97, "tekst": "Spiegel/beugel kapot gereden van de E16. Ar"}, {"datum": "06-11-2022", "id": 98, "tekst": "Zondag, 12:00 aanwezeg, gemeld 10 voor 12 aanwezig zijn in de kantine omgekleed. JW"}, {"datum": "10-03-2023", "id": 99, "tekst": "932-46 weggedrukt en de 932-42 geladen. AR Somerset"}, {"datum": "14-03-2023", "id": 100, "tekst": "Teruggestuurd van boot om cap te halen. MvT"}, {"datum": "04-07-2023", "id": 101, "tekst": "Laad bij avond boot een verkeerd nummer 618806 en gebruikt order 618808"}], "C. Burger": [{"datum": "14-08-2017", "id": 102, "tekst": "Verslapen 04.35 aanwezig MvT"}, {"datum": "14-11-2018", "id": 103, "tekst": "Verslapen 7.15 AR"}, {"datum": "09-02-2020", "id": 104, "tekst": "aangesproken op gedrag. Had wat op een trailer bij een begeleide geschreven. Chauffeur zeer boos MvT"}, {"datum": "01-08-2022", "id": 105, "tekst": "verslapen! Om 7:40 aanwezig. Ar."}, {"datum": "18-08-2022", "id": 106, "tekst": "Laad een MTB maar staat nog op dfe kade. JW"}, {"datum": "18-08-2022", "id": 107, "tekst": "MFB3584 naar Imm, weg gedrukt maar niet geladen. JW"}], "D.J.A. Dambruck": [{"datum": "", "id": 140, "tekst": "Verslapen 07.00 aanwezig MvT"}, {"datum": "", "id": 141, "tekst": "Aangesproken over porto gebruik en het bemoeien met SV zaken JW"}], "Du Chatenier G (uit dienst)": [{"datum": "29-03-2011", "id": 142, "tekst": "OL-90-HD Kleine zeilschade gemaakt aan trailer tijdens lossing."}, {"datum": "30-03-2011", "id": 143, "tekst": "30-03-2011, geholpen met lossen maar geen chauffeurs brief ingeleverd."}], "Duvel K (uit dienst)": [{"datum": "06-10-2010", "id": 144, "tekst": "Spiegel van tugmaster 6 gebroken(glas)"}, {"datum": "11-11-2010", "id": 145, "tekst": "Te laat ongeval met zijn auto"}, {"datum": "12-11-2010", "id": 146, "tekst": "Teveel onzin over porto. Probeert als sjorder de ploegleider op scherp te zetten.(gedrag)"}, {"datum": "30-12-2010", "id": 147, "tekst": "Snipperdag genomen omdat hij geen vervoer heeft."}, {"datum": "12-04-2011", "id": 148, "tekst": "Gewaarschuwd omdat hij liep te bellen aan boord. MvT"}, {"datum": "20-05-2011", "id": 149, "tekst": "aan gesproken op niet dragen van een zwemvest  voorschip"}, {"datum": "10-06-2011", "id": 150, "tekst": "Verslapen"}], "G. Voormeeren": [{"datum": "Vrijdag 24 juli 2020", "id": 151, "tekst": "Ondanks de instructie het werk niet opvolgen.KK"}, {"datum": "30-3-2023", "id": 152, "tekst": "verslapen! Om 7:25 aanwezig. AR"}, {"datum": "14-09-2018", "id": 153, "tekst": "te vroeg weggegaan in dagdienst MvT"}, {"datum": "02-07-2019", "id": 154, "tekst": "Te laat op zijn werk ochtend dienst. JW"}, {"datum": "22-08-2019", "id": 155, "tekst": "Te laat op zijn werk ochtend dienst. JW"}, {"datum": "27-01-2020", "id": 156, "tekst": "Verslapen ochtend…40 min telaat. JW"}, {"datum": "09-04-2020", "id": 157, "tekst": "mannen laten meerijden op een vuilbak. (zelf chauffeur) Ar Officiele waarschuwing."}, {"datum": "21-07-2020", "id": 158, "tekst": "Verslapen 7.40 aanwezig MvT"}, {"datum": "23-08-2020", "id": 159, "tekst": "Verslapen 15min te laat aanwezig! AR."}, {"datum": "29-11-2020", "id": 160, "tekst": "Verslapen 12:30 op terminal MvT"}, {"datum": "21-03-2021", "id": 161, "tekst": "te laat aanwezig om 12:05. Ar Atw Glenn… hij had de tijd niet in de gaten."}, {"datum": "29-04-2021", "id": 162, "tekst": "Schade gereden aan de mdf 20 kon poten niet indraaien en daar wist hij zelf van. AR"}], "G.H.M. Verwaal": [{"datum": "", "id": 163, "tekst": "even poten uitdraaien r.r."}, {"datum": "14-11-2011", "id": 164, "tekst": "heeft niet volgens procedure gewerkt is niets eens  a,howell getuige  r.r."}, {"datum": "14-02-2012", "id": 165, "tekst": "erop aan gesproken dat hij niet meer de lucht knopen in slaat  tijdens het lossen  r.r."}, {"datum": "24-02-2012", "id": 166, "tekst": "staat als checker met marsbergen doet niets en laat de trailers niet stoppen kan makkelijk"}, {"datum": "10-04-2012", "id": 167, "tekst": "gaat iets voor drie urr weg zonder wat te zeggen tegen  sv  r.r a howell/m marsbergen"}, {"datum": "02-05-2012", "id": 168, "tekst": "checker staat bij h erad  en laat de trailers niet stoppen  om te controleren"}, {"datum": "10-04-2016", "id": 169, "tekst": "wilde geen boot laten doen  had oneenigheid  met  j de kruyk  hier over aan gesproken  r.r."}], "H. Karagul": [{"datum": "Zaterdag 25-06-2011", "id": 170, "tekst": "Ziek gemeld om 01:59 onder verdachte omstandigheden, RR uit bed gebeld s'nachts"}, {"datum": "14-02-1-2012", "id": 171, "tekst": "zonder lucht slangen gereden  lege skelly erop aan gesproken   r.r."}, {"datum": "Donderdag 6 april 2017", "id": 172, "tekst": "te vroeg van de boot met commentaar naar de sv   J.W"}, {"datum": "26-4-2024", "id": 173, "tekst": "Trailer DRC40733 geladen ipv de DRC40773. AR"}, {"datum": "16-06-2011", "id": 174, "tekst": "Rijden en bezig met telefoon.(niet op aangesproken)."}, {"datum": "13-07-2011", "id": 175, "tekst": "mee gereden op een truck bij van der meer a howell heeft hem hier over aangesproken"}, {"datum": "14-12-2011", "id": 176, "tekst": "was  pl verkeerde trailer geladen in de put   klasse 2 imo   r.r."}, {"datum": "28-09-2013", "id": 177, "tekst": "geen zwemvest aan r.r."}, {"datum": "26-11-2014", "id": 178, "tekst": "Velg en band kapot gereden bij paal onder de linkspan.MvT"}, {"datum": "05-03-2015", "id": 179, "tekst": "Verslapen"}, {"datum": "12-03-2015", "id": 180, "tekst": "Staat te tanken onder de boot. Was niets te doen volgens hem. A.R."}, {"datum": "12-10-2015", "id": 181, "tekst": "Verslapen"}, {"datum": "25-05-2016", "id": 182, "tekst": "verslapen r.r."}, {"datum": "06-12-2016", "id": 183, "tekst": "Verslapen 7.15 aanwezig MvT"}, {"datum": "21-08-2019", "id": 184, "tekst": "Aangesproken over uitspraken Porto. JW"}], "H. Ozdemir": [{"datum": "16-06-2025", "id": 185, "tekst": "verslapen. Om 8:15 aanwezig. Ar"}, {"datum": "12-09-2025", "id": 186, "tekst": "15u naar de Arts. Ar"}], "H.C.W. Goedegebuure": [{"datum": "", "id": 187, "tekst": "12-05-2023 ,Laad verkeerde trailer Tipe597352-6 laten staan, aan boord gezet FMCE007362-6, een boeking voor 14-05. JW"}, {"datum": "", "id": 188, "tekst": "15-11-2023 geen helm dragen bij meren Somerset"}], "H.E. Erad": [{"datum": "30-9-2023", "id": 189, "tekst": "Schade aan de E15 gemaakt . Uitgeleden met truck tegen trailer. AR"}], "Intercedent": [{"datum": "vrijdag 1-10-2021", "id": 190, "tekst": "Chris Poolander verslapen. Om 9:15 contact. Hoefde niet meer te komen. Ar"}, {"datum": "vrijdag 22 oktober 2021", "id": 191, "tekst": "Bjorn niet komen werken in ochtend door auto pech!"}, {"datum": "vrijdag 22 oktober 2021", "id": 192, "tekst": "Bjorn geen alternatief vervoer gevonden voor de avond dienst!"}, {"datum": "15-08-2019", "id": 193, "tekst": "Regi Diaz te laat pas om 8.30 aanwezig MvT"}, {"datum": "09-01-2020", "id": 194, "tekst": "Ger zonder toestemming weggegaan. AR."}, {"datum": "19-11-2020", "id": 195, "tekst": "Albert verslapen. 9:10 aanwezig.Ar"}, {"datum": "02-12-2020", "id": 196, "tekst": "Dias verslapen 8.30 aanwezig MvT"}, {"datum": "13-01-2021", "id": 197, "tekst": "Lennart te laat MvT"}, {"datum": "13-08-2021", "id": 198, "tekst": "Jonathan 17:15 pas aanboord.AR"}, {"datum": "24-08-2021", "id": 199, "tekst": "Jonathan 20 min te laat ivm auto pech. AR"}, {"datum": "24-08-2021", "id": 200, "tekst": "Jorgo op telefoon gebruik aangsproken bij volgende keer gelijk weg! Ar."}, {"datum": "03-09-2021", "id": 201, "tekst": "Jonathan loopt om 17:07 pas naar buiten. AR"}, {"datum": "20-10-2021", "id": 202, "tekst": "Fatih niet te bereiken/niet komen werken in de avond. AR"}, {"datum": "21-10-2021", "id": 203, "tekst": "Fatih niet komen werken ochtend en avond.AR"}, {"datum": "28-10-2021", "id": 204, "tekst": "Hamza in opleiding niet op komen dagen, uit planning gehaald. JW"}, {"datum": "17-09-2025", "id": 205, "tekst": "Matzz verslapen. 10min te laat. AR."}], "J. Blokland": [{"datum": "14-11-2016", "id": 206, "tekst": "Verslapen  7.25 aanwezig MvT"}, {"datum": "21-07-2017", "id": 207, "tekst": "Schade gereden aan de E9. voorkap.door inbekken topdeck."}, {"datum": "10-07-2019", "id": 208, "tekst": "Verslapen 7:40 aanwezig JW"}], "J. Zijlstra": [{"datum": "07-03-2012", "id": 209, "tekst": "Spiegel van truck 6 kapot gereden. MvT"}, {"datum": "17-02-2015", "id": 210, "tekst": "zijlstra aan gesproken als hij geen tijd heeft om sv te roepen om actie te ondernemen  voor de twistlocks"}, {"datum": "29-09-2015", "id": 211, "tekst": "Klein half uur voor tijd verstoppen op het maindeck."}, {"datum": "19-09-2017", "id": 212, "tekst": "Na los gooien scotia in de put blijven staan(sv waarschuwing dat hij moest starten met werken."}, {"datum": "17-02-2019", "id": 213, "tekst": "Te vroeg naar huis gegaan. MvT"}, {"datum": "28-06-2022", "id": 214, "tekst": "in zn trekker vertopt tussen 2 trailers bij P&O. op aangesproken en antw was… zal wel een caravan hebben weggebracht. AR"}, {"datum": "10-12-2025", "id": 215, "tekst": "Uit eigen beweging spoor trailers gaan halen terwijl hij staat ingedeeld als put chaufeur."}], "J. de Kruyk": [{"datum": "vrijdag 2 Maart 2012", "id": 216, "tekst": "Weigeren aan boord te gaan als terugkomdienst. AH"}, {"datum": "16-06-2011", "id": 217, "tekst": "geen checklijst in geleverd van de truck"}, {"datum": "22-06-2011", "id": 218, "tekst": "truck niet afgetankt  zat nog 60 ltr in gevolg in de avond chauffeur tanken"}, {"datum": "28-11-2011", "id": 219, "tekst": "30 min te laat"}, {"datum": "21-02-2012", "id": 220, "tekst": "rijd met handschoenen aan in truck e 11"}, {"datum": "24-08-2014", "id": 221, "tekst": "Te Laat dacht dat hij vrij was MvT"}, {"datum": "06-08-2015", "id": 222, "tekst": "Gewaarschuwd voor gebruikt MB telefoon op tugmaster MvT"}, {"datum": "10-04-2016", "id": 223, "tekst": "oneenigheid  met verwaal  en negeerde verzoek om porto mee te nemen   aan het  bellen tijdens het werk  r.r."}, {"datum": "13-09-2017", "id": 224, "tekst": "Niet gemeert tewijl boot met veel wind tegen de kant lag. MvT"}], "J. van Reenen": [{"datum": "26-6-23", "id": 225, "tekst": "verkeerde trailer geladen WL665HA ipv WL655HA. AR"}, {"datum": "21-09-2021", "id": 226, "tekst": "verslapen. Om 7:30 aanwezig.Ar"}, {"datum": "06-09-2022", "id": 227, "tekst": "laad de 574150 gevaarlijke stoffen op de forerunner die bestemd was voor de Imm schip. En drukt de fmbk 0063451 weg.Ar"}], "J.C.M.T.H. Dammers": [{"datum": "", "id": 228, "tekst": "te vroeg weggegaan in dagdienst MvT"}, {"datum": "", "id": 229, "tekst": "Ondanks de instructie andere dingen gaan doen KK"}, {"datum": "", "id": 230, "tekst": "Aangesproken op het uitvoeren van de Hitler groet. AR"}], "Kofferman (uit dienst)": [{"datum": "14-03-2023", "id": 231, "tekst": "Teruggestuurd van boot om cap te halen. MvT"}, {"datum": "12-07-2024", "id": 232, "tekst": "Verslapen, 7 uur start. Belde om 7:30 dat wekker niet is afgegaan. JW"}, {"datum": "05-11-2024", "id": 233, "tekst": "Tijdens het fluiten niet goed opgelet waardoor onze chauffer zijn trailer tegen een andere trailer heeft geparkeerd."}, {"datum": "03-12-2024", "id": 234, "tekst": "Heeft zelf een ruildienst aangevraagd en deze gekregen. Deze dienst heeft hij zich verslapen en is hij pas om 7:56 op het werk verschenene (SvdM)"}], "M. Adamu": [{"datum": "", "id": 235, "tekst": "zijn gemak de kantine uit lopen toen iedereen al weer op weg was naar de kantine ik heb"}, {"datum": "", "id": 236, "tekst": "hem daar over aan gesproken  r.r."}, {"datum": "vrijdag 18-3", "id": 237, "tekst": "stond op maindeck met praat paal  maar heeft veel moeite met communiseren"}, {"datum": "", "id": 238, "tekst": "met crew"}, {"datum": "", "id": 239, "tekst": "aan rijden van de heuvel p waardenbrug kon nog net remmen gevolg stenen op flat verschoven"}, {"datum": "23-2-2024", "id": 240, "tekst": "Schade ontstaan door geen fluit te gebruiken met V v/d Berg cf. AR"}, {"datum": "11-01-2011", "id": 241, "tekst": "van de week twee keer schade gereden , iedereen was al naar de boot en m adamu kwam op"}, {"datum": "02-02-2011", "id": 242, "tekst": "Tugmaster 7 onder kinkpen door geschoten. Houder luchtslag en staander verbogen."}, {"datum": "13-09-2011", "id": 243, "tekst": "m.adamu heeft  p waardenburg afgesneden die met stenen reed hij kwam luid toeterend"}, {"datum": "04-05-2012", "id": 244, "tekst": "verkeerde trailers aan boord gezet 3 maal niet op stickers gelet r.r."}, {"datum": "21-01-2013", "id": 245, "tekst": "Spiegel van de 7 kapot gereden. MvT"}, {"datum": "01-07-2014", "id": 246, "tekst": "Rijd trailer tussen de lossing en raakt rechts voor een geparkeerde links achter.2x schade JW"}, {"datum": "26-03-2017", "id": 247, "tekst": "Te laat door zomertijd. 13.00 uur aanwezig MvT"}, {"datum": "03-10-2023", "id": 248, "tekst": "Porto in locker bewaard. JB / KK"}, {"datum": "08-08-2025", "id": 249, "tekst": "Geen inventory gedaan omdat hj dacht dat het niets moestook andere hadden dat tegen hem gezegd. Ar"}], "M. Kievit": [{"datum": "", "id": 250, "tekst": "vraagt ook niet voor een lijst om te checken r.r."}, {"datum": "06-12-2011", "id": 251, "tekst": "verkeerd geladen in de put  deze moest weer open gemaakt worden hij was pl  r.r."}, {"datum": "24-02-2012", "id": 252, "tekst": "container check laat gedaan had geen lijst  zat wel voor bij de vracht (p de beer)"}, {"datum": "12-03-2012", "id": 253, "tekst": "10 min telaat op zijn werk. JW"}, {"datum": "01-05-2012", "id": 254, "tekst": "als checker  trailer niet opgemerkt  die niet ingecheckt was"}, {"datum": "09-05-2012", "id": 255, "tekst": "als checker  trailer niet opgemerkt  die niet ingecheckt was"}], "M. Zoeteman": [{"datum": "24-8-2023", "id": 256, "tekst": "telefoongebruik in truck. Mondelinge waarschuwing. Bij volgende een officiele. Ar"}, {"datum": "20-5-2025", "id": 257, "tekst": "Weer aangesproken om het niet dragen van een veiligheidshesje op de kade op de fiets. AR"}], "M. de Visser": [{"datum": "Zondag 11Februari 2018", "id": 258, "tekst": "Te laat aanwezig omdat hij dacht dat hij om 13u moest beginnen. AR"}, {"datum": "Dinsdag 20Februari 2018", "id": 259, "tekst": "Niet dragen van reddingsvest. Antw.. Was ik vergeten. AR"}, {"datum": "19-6-23", "id": 260, "tekst": "Lekke band dus snipperdag"}, {"datum": "21-6-23", "id": 261, "tekst": "lekke band dus snipperdag. Ar"}, {"datum": "19-09-2017", "id": 262, "tekst": "Na los gooien scotia in de put blijven staan(sv waarschuwing dat hij moest starten met werken."}, {"datum": "28-11-2018", "id": 263, "tekst": "Schade gemaakt in loods tijdens weghalen TM. Niets gemerkt! MvT"}, {"datum": "01-07-2019", "id": 264, "tekst": "Telaat op werk, wekker de schuld. JW"}, {"datum": "09-04-2020", "id": 265, "tekst": "Meerijden op een vuilbak. Ar Officiele waarschuwing."}, {"datum": "27-03-2025", "id": 266, "tekst": "aan dek met telefoon. Jw"}, {"datum": "07-08-2025", "id": 267, "tekst": "trailer EFT3904 niet weggedrukt. Ar ( Jamie pl )"}], "M. van Marsbergen": [{"datum": "", "id": 268, "tekst": "hadden ook geen zin  r.r."}, {"datum": "24-02-2012", "id": 269, "tekst": "staat als schade controleur  maar laat de chauffeurs doorrijden en stoppen niet r.r."}, {"datum": "31-03-2012", "id": 270, "tekst": "pl vroeg om mee te rijden had er geen zin in normaal doet hij het wel  de beer en brands"}, {"datum": "10-04-2012", "id": 271, "tekst": "gaat iets voor 3 uur weg zonder sv in te lichten r.r.  A howell/g verwaal"}, {"datum": "03-06-2012", "id": 272, "tekst": "schade gemaakt aan trailer tijdens lossen put r.r."}, {"datum": "14-06-2012", "id": 273, "tekst": "op truck e 12 gereden en schade niet opgemerkt  controleerd zijn truck niet goed"}, {"datum": "06-11-2013", "id": 274, "tekst": "Verslapen 07.30 aanwezig. MvT"}], "M.F. Punselie": [{"datum": "12-11-2024", "id": 275, "tekst": "Laad de MTR068 ipv d 069 op immingham JW"}, {"datum": "28-02-2026", "id": 276, "tekst": "gewaarschuwd voor telefoon gebruik. AR"}], "M.J. van Lieburg": [{"datum": "12-11-2010", "id": 277, "tekst": "lekke band gereden e10...geen eigen schade formulier ingevuld. JW"}, {"datum": "13-03-2012", "id": 278, "tekst": "Spiegel gebroken van tugmaster 9 MvT"}, {"datum": "01-05-2012", "id": 279, "tekst": "rijd door zonder te stoppen bij checker"}, {"datum": "17-02-2015", "id": 280, "tekst": "aan gesproken  om naar de twistlocks te kijken"}, {"datum": "22-02-2026", "id": 281, "tekst": "Dal24003xl weggedrukt maar dal26003xl geladen. AR"}, {"datum": "25-03-2026", "id": 282, "tekst": "OV35RT weggedrukt maar niet geladen. AR"}], "Molenaar (uit dienst)": [{"datum": "14-09-2018", "id": 283, "tekst": "te vroeg weggegaan in dagdienst MvT"}], "N. van der Waarde": [{"datum": "Woensdag 27-12-2017", "id": 284, "tekst": "Via sms ziek gemeld en daarna niet meer bereikbaar tot de volgende dag pas.AR"}, {"datum": "Dinsdag 19-06-2018", "id": 285, "tekst": "Zat op zijn telefoon. KK"}, {"datum": "23-4-2024", "id": 286, "tekst": "ochtenddienst, maar verslapen belde om 9:02 ( ook reintregreren) Ar"}, {"datum": "", "id": 287, "tekst": "niet komen werken. (SvdM)"}, {"datum": "18-7-2024", "id": 288, "tekst": "verslapen en belde om 10:30. Snip gekregen van JW ( Ar )"}, {"datum": "31-7-2024", "id": 289, "tekst": "Potenstel kapot gereden 6476. Ar"}, {"datum": "09-06-2017", "id": 290, "tekst": "Verslapen 7.25 aanwezig MvT"}, {"datum": "29-06-2017", "id": 291, "tekst": "Wakker gebeld om 09.00 dacht dat hij avonddienst had. MvT Halve dag afgeschreven"}, {"datum": "19-09-2017", "id": 292, "tekst": "Na los gooien scotia in de put blijven staan(sv waarschuwing dat hij moest starten met werken."}, {"datum": "21-06-2018", "id": 293, "tekst": "reed tegen een trailer aan zonder dat hij het zelf wist. AR"}, {"datum": "16-01-2019", "id": 294, "tekst": "Te laat naar buiten om te meren. AR"}, {"datum": "04-07-2020", "id": 295, "tekst": "Te laat op overwerkdag. 9.45 aanwezig en naar huis gestuurd. MvT"}, {"datum": "10-09-2021", "id": 296, "tekst": "belde om 8:15 dat hij zich verslapen had. Naar de avond gezet.AR"}, {"datum": "22-06-2022", "id": 297, "tekst": "Verslapen 7.25 aanwezig MvT"}, {"datum": "22-08-2022", "id": 298, "tekst": "7:02 de poort binnen rijden. En ook nog achter iemand aan zonder zn kaartje te gebruiken. Ar / bob v Tol/ KK"}, {"datum": "20-06-2024", "id": 299, "tekst": "verslapen gebeld op 07:05. later bericht gekregen dat hij met kind naar huisarts moest"}, {"datum": "09-05-2025", "id": 300, "tekst": "Rijden zonder luchtslangen. Ar"}, {"datum": "01-08-2025", "id": 301, "tekst": "Weggegaan (13:47 poort uit) zonder opdracht van de PL ( J Dammers ) AR"}, {"datum": "25-09-2025", "id": 302, "tekst": "zie verslag hier naast"}], "N.E.J. Rietdijk": [{"datum": "Vrijdag 6-2-2015", "id": 303, "tekst": "Klacht van een chauffeur ( zie mail 6-2-2015)"}, {"datum": "17:02:00", "id": 304, "tekst": "n rietdijk aan gesproken dat hij twist lock na moet kijken"}, {"datum": "13-42016", "id": 305, "tekst": "ghesprek gehad  over zijn gedrag  k woorden en omgang  collega s   r.r."}, {"datum": "Vrijdag 24-07-2020", "id": 306, "tekst": "Ondanks de instructie andere dingen gaan doen.KK"}, {"datum": "5-10-203", "id": 307, "tekst": "Schade gemaakt aan trailer WGM 4495P. AR"}, {"datum": "30-09-2011", "id": 308, "tekst": "Schade gereden aan 93047 tegen topdek ramp aan. Trailer te hoog gehouden met lossen."}, {"datum": "29-07-2012", "id": 309, "tekst": "Te laat. 07.05 aanwezig. MvT"}, {"datum": "17-06-2013", "id": 310, "tekst": "spiegel kapot gereden  r.r."}, {"datum": "03-08-2013", "id": 311, "tekst": "Aangesporken op zijn rijgedrag. Rijd te snel zonder rekening te houden met ander verkeer. JW"}, {"datum": "17-08-2013", "id": 312, "tekst": "Te vroeg gestopt met werken. Was al dik 10 min omgekleed terwijl de rest nog aan het laden was"}, {"datum": "18-08-2013", "id": 313, "tekst": "Schade veroorzaakt aan de E8 en E9 door onachtzaamheid."}, {"datum": "09-10-2013", "id": 314, "tekst": "schade in de put gemaakt  is gemeld r.r."}, {"datum": "20-11-2013", "id": 315, "tekst": "met trailer aankoppelen zonder lucht van de schotel afgegleden en beide poten afgebroken. Lompigheid. MvT"}, {"datum": "03-12-2013", "id": 316, "tekst": "schade gereden op topdeck capucine ontluchtings koker afgebroken .r.r"}, {"datum": "13-12-2013", "id": 317, "tekst": "Weg voordat de boot los was 20.35 MvT"}, {"datum": "15-01-2014", "id": 318, "tekst": "Weg voordat de boot los was 20.52 MvT"}, {"datum": "11-02-2014", "id": 319, "tekst": "Schooljongen niet geholpen bij de overlading tewijl dit wel gevraagd was. MvT"}, {"datum": "22-02-2014", "id": 320, "tekst": "in de put niet goed opgelet  trailers mety koppen tegen elkaar aan gezet r.r. nagevraagd bij de erads"}, {"datum": "10-02-2015", "id": 321, "tekst": "schade gemaakt op maindeck trok te scherp weg"}, {"datum": "24-02-2015", "id": 322, "tekst": "schade gemaakt aan truck e9 bordes"}, {"datum": "04-03-2015", "id": 323, "tekst": "schade gemaakt aan truck e11 spiegel kapot. AR"}, {"datum": "12-04-2016", "id": 324, "tekst": "Neemt chauffeur mee van schmith zeevis achter op zijn truck en zegt dat de chauffeur zomaar achterop springt…word anders gezien door SV. JW"}, {"datum": "15-04-2016", "id": 325, "tekst": "schade aan schip topdeck en scade aan de trailer ( ontluchter afgebroken en deur wand schade aan de trailer )  zegt dat hij niet gemerkt heeft naar mijn inziens  is dat onmogelijk r.r."}, {"datum": "04-10-2017", "id": 326, "tekst": "Waarschuwing gegeven over blijven zitten na losgooien MvT"}, {"datum": "18-11-2017", "id": 327, "tekst": "Heeft ruzie gehad met Rimon nadat Sharlon iets had gezegd over gedrag Rietdijk. (rascisme)"}, {"datum": "05-02-2019", "id": 328, "tekst": "Brief voor telefoongebruik MvT"}, {"datum": "21-08-2019", "id": 329, "tekst": "Aangesproken over uitspraken porto en zijn langzame rijden. JW"}, {"datum": "30-09-2019", "id": 330, "tekst": "2 ramen kapot van trekker. Was uitgegleden was zijn antw. AR"}, {"datum": "31-10-2019", "id": 331, "tekst": "Rijden zonder luchtslangen op de kade. AR"}, {"datum": "11-08-2020", "id": 332, "tekst": "Schade gereden tegen een trailer aan. Andere trailer stond al over de lijn. Niet helemaal zijn schuld. AR"}, {"datum": "17-01-2022", "id": 333, "tekst": "Schade gereden aan trailer poten topdek Forerunner.AR"}, {"datum": "22-03-2023", "id": 334, "tekst": "Verkeerde trailer geladen DRC40744 ipv DRC40774 MvT"}], "P.H.M. Waardenburg": [{"datum": "Dinsdag 22/02/11", "id": 335, "tekst": "Wederom trailer vergeten TNT"}, {"datum": "vrijdag 18-03-2011", "id": 336, "tekst": "niet goed opgelet poten stonden uitgedraaid niets door gegeven aan chauffeur"}, {"datum": "", "id": 337, "tekst": "stond weg te geven op top dek"}, {"datum": "", "id": 338, "tekst": "top deck gegaan"}, {"datum": "", "id": 339, "tekst": "ik heb zelf de check over gedaan en stonden er gewoon in . R.R."}, {"datum": "", "id": 340, "tekst": "Ik weet niet of jullie het registreren maar P Waardenburg heeft vanochtend een forse schade gereden aan een trailer."}, {"datum": "", "id": 341, "tekst": "Onderstel van de poten plus dieseltank los gelukkig niet lek is met spanbanden weer vastgezet."}, {"datum": "", "id": 342, "tekst": "Gr Eric Gevers"}, {"datum": "19&20-10-2020", "id": 343, "tekst": "Beide dagen meren, maar geen helm gedragen. Aangesproken maar geen duidelijk antwoord. AR"}, {"datum": "22-5-2024", "id": 344, "tekst": "Tol onder een bumper gezet en daardoor kapot gedrukt. AR"}, {"datum": "", "id": 345, "tekst": "Hierdoor schade ondstaan aan trailer ICTE9111693 (SvdM)"}, {"datum": "01-12-2010", "id": 346, "tekst": "Gesprek Ralph & Jeroen wederom trailer vergeten te laden."}, {"datum": "12-01-2011", "id": 347, "tekst": "heeft op de reachstacker gezeten  maar vuld de lijsten niet goed in  geen tijden r.r."}, {"datum": "16-06-2011", "id": 348, "tekst": "was checker niet goed gecontroleerd  hanging meat artic  niet door gegeven gevolg is naar"}, {"datum": "21-06-2011", "id": 349, "tekst": "kantine niet opgeruimd terwijl hij kraanmachinist was"}, {"datum": "22-06-2011", "id": 350, "tekst": "bootcheck gedaan zei dat hij klopte , maar klopte niet bts8011 achtergebleven (niet geladen)"}, {"datum": "25-06-2011", "id": 351, "tekst": "geen gevaarlijke stoffen check gedaan was in gedeeld op reachstacker nu zelf gedaan RR"}, {"datum": "24-07-2011", "id": 352, "tekst": "Te vroeg naar huis gegaan terwijl hij kraanmachinist was. 09.50 i.p.v. 10.00 MvT"}, {"datum": "08-09-2011", "id": 353, "tekst": "heeft onnodige schade gereden tijdens het lossen bij checkers hok (achterop gereden bij ander )"}, {"datum": "11-10-2011", "id": 354, "tekst": "heeft terrein check gedaan, 8 maal een container niet gezien die gewoon in de clamp stond"}, {"datum": "17-01-2012", "id": 355, "tekst": "Geen chauffeurslijst ingeleverd. MvT"}, {"datum": "15-02-2012", "id": 356, "tekst": "te laat bij ehbo h.v.h.  R.r."}, {"datum": "17-02-2012", "id": 357, "tekst": "onder verdachte omstandigheden op tank plaats gezien  zat naast r.zoon in zijn auto r.r."}, {"datum": "22-02-2012", "id": 358, "tekst": "kleine schade aan nieuwe trailer gemaakt in de put  r.r."}, {"datum": "18-09-2013", "id": 359, "tekst": "trailer vergeten  gewoon aangenomen dat hij op de boot staat en vinkje erbij gezet r.r."}, {"datum": "02-07-2020", "id": 360, "tekst": "Heren,"}, {"datum": "10-09-2020", "id": 361, "tekst": "Verslapen ..8:00 pas aanwezig na bellen om 7:00. Reistijd max 15 min."}, {"datum": "10-05-2021", "id": 362, "tekst": "Schade rechtsvoor TM1 MvT"}, {"datum": "12-09-2024", "id": 363, "tekst": "Als checker. twee trailers laten staan voor de avond afvaart bij het spoor. Trailers stonden 11:15 klaar (SvdM)"}, {"datum": "28-02-2025", "id": 364, "tekst": "Achteruit doorgereden tijdens laden zonder dat er een fluiter op positie stond."}, {"datum": "07-08-2025", "id": 365, "tekst": "13:30 weg ivm zieknhuis bezoek vrouw. JB & Ar"}, {"datum": "20-09-2025", "id": 366, "tekst": "Laad een tr op Fionia maar drukt hem niet weg, op 21-09 gezien op camera, FMBK0063317"}], "Pro Intermediair": [{"datum": "", "id": 367, "tekst": "Na telefoontje toch gekomen 45 min te laat  (S. v/d M)"}, {"datum": "22-6-2023", "id": 368, "tekst": "Adnan 7:30 aanwezig ipv 7u. AR"}, {"datum": "23-6-2023", "id": 369, "tekst": "Adnan 7:30 aanwezig ipv 7u. AR"}, {"datum": "14-12-2021", "id": 370, "tekst": "Jeroen heeft zich een dag vergist."}, {"datum": "07-01-2022", "id": 371, "tekst": "Jeroen verslapen om 8u aanwezig. AR"}, {"datum": "12-01-2022", "id": 372, "tekst": "Anass te laat 7:37 aanwezig door verkeerde afslag genomen. Ar"}, {"datum": "06-05-2022", "id": 373, "tekst": "Via app aangegeven te kunnen werken. Niet aanwezig door eigen vergissing"}, {"datum": "25-07-2022", "id": 374, "tekst": "Isaak 10 in te laat in avonddienst MvT"}, {"datum": "05-08-2022", "id": 375, "tekst": "Jeroen Brands niet opgekomen MvT"}, {"datum": "18-08-2022", "id": 376, "tekst": "Isaak meld zich ziek in de ochtend via whatsup JW"}, {"datum": "19-08-2022", "id": 377, "tekst": "Alec meld zich ziek in de ochtend via whatsup JW"}, {"datum": "17-10-2022", "id": 378, "tekst": "J Brands vergeten dat hij moest werken om 16:20 aanwezig. AR"}, {"datum": "18-10-2022", "id": 379, "tekst": "Ziek gemeld 26-10 nog steeds ziek mvT"}, {"datum": "27-10-2022", "id": 380, "tekst": "Izaak ziek gemeld MvT"}, {"datum": "08-11-2022", "id": 381, "tekst": "Alec Boot afgemeld om 6.57 door zijn enkel gegaan. MvT"}, {"datum": "29-11-2022", "id": 382, "tekst": "Burak om 13.00 uur zich ziek gemeld. Nek zit vast. MvT"}, {"datum": "30-11-2022", "id": 383, "tekst": "Alec Boot afgemeld om 16:05 ( moest om 17u werken) met niet goed voelen en positief getest.AR"}, {"datum": "14-12-2022", "id": 384, "tekst": "Lucas van Oranje 14.00 afgemeld voor avonddienst MvT"}, {"datum": "21-02-2023", "id": 385, "tekst": "Senna ziek 11.50 voor avonddienst MvT"}, {"datum": "04-09-2023", "id": 386, "tekst": "J Brands 4-9 niet komen opdagen. AR"}, {"datum": "06-10-2023", "id": 387, "tekst": "Burak verslapen. Ar"}, {"datum": "06-12-2023", "id": 388, "tekst": "J Brands niet opkomen dagen. Verkeerd in agenda gegeken. Svdm"}, {"datum": "11-12-2023", "id": 389, "tekst": "J Brands niet opkomen dagen.  Svdm"}, {"datum": "04-04-2024", "id": 390, "tekst": "Burac 10 min te laat op werk. (laatste waarschuwing) Svdm"}, {"datum": "07-12-2024", "id": 391, "tekst": "Milan laat (07:24) gemeld dat hij telaat zou komen. Kwam pas om 08:03 binnen Laatste waarschuwing"}, {"datum": "17-05-2025", "id": 392, "tekst": "Wesley te Laat (07:55)"}, {"datum": "19-05-2025", "id": 393, "tekst": "Wesley te Laat (07:37)"}, {"datum": "10-08-2025", "id": 394, "tekst": "Jules te laat 12u binnenstappen."}, {"datum": "05-11-2025", "id": 395, "tekst": "Jaidon te laat. Op aangesproken. Ar"}, {"datum": "08-12-2025", "id": 396, "tekst": "S Muis wekker niet afgegaan, telaat op werk."}, {"datum": "31-07-2026", "id": 397, "tekst": "Ibrahim niet opkomen dagen. Appte om 11:55 dat ze zich had verslapen. AR"}], "R. Bakker": [{"datum": "20-4-2023", "id": 398, "tekst": "trailer FT6213 weggedrukt maar niet geladen. JW"}, {"datum": "", "id": 399, "tekst": "telefonich kwam hij met de opmerking dat de fnv bestuurder deze zou opsturen."}, {"datum": "", "id": 400, "tekst": "uit een screenshot deze is gestuurd via whats-app is duidelijk te lezen dat robbin deze zelf"}, {"datum": "", "id": 401, "tekst": "had moeten aanvragen bij de bestuurder en deze had moeten inleveren."}, {"datum": "", "id": 402, "tekst": "Na dit telefoongesprek is dit formulier als nog aangeleverd ( 12-10-23 13:48) SVDM"}, {"datum": "", "id": 403, "tekst": "niet op een duidelijke ziekmeldeing. De melding was ''ik denk niet dat ik er morgen ben''"}, {"datum": "", "id": 404, "tekst": "Dit was in het voorbij lopen in de kantine. SVDM"}, {"datum": "Zondag 22-3-2026", "id": 405, "tekst": "Auto opladen op stena laadpaal. Ar"}, {"datum": "12-12-2019", "id": 406, "tekst": "Verslapen 8.30 aanwezig MvT"}, {"datum": "24-08-2022", "id": 407, "tekst": "trailer EC2432 weggedrukt maar niet geladen. Ar"}, {"datum": "08-03-2023", "id": 408, "tekst": "geen helm bij meren. Antw… vergeten. Ar"}, {"datum": "12-10-2023", "id": 409, "tekst": "Niet op komen dagen op het werk. Heeft verzuimd een verlofformulier in te leveren van het FNV"}, {"datum": "06-12-2023", "id": 410, "tekst": "niet aanwezig. Collega's vertelde dat hij zich ziek heeft gemeld."}, {"datum": "05-08-2025", "id": 411, "tekst": "Trailer 973-489 geladen en de 973-498 weggedrukt. Ar"}, {"datum": "02-02-2026", "id": 412, "tekst": "Trailer 22008 geladen maar de 29028 weggedrukt. AR"}, {"datum": "16-02-2026", "id": 413, "tekst": "Auto opladen op stena laadpaal. Antw Robin, wou checken want thuis deed opladen niet. Ar"}], "R. Brooshooft": [{"datum": "", "id": 414, "tekst": "boot voor de kant  brooshooft als laste uit de kantine iedereen was bij de boot hij moest er nog naar toe lopen  r.r."}, {"datum": "", "id": 415, "tekst": "verteld  dat hij tot 23:30  betaald word, en voor het af halen dit  geld . Boot  te laat erg druk  laat  containers in de grond staan .het is nu de zoveelste keer maak er nu melding van r.r."}, {"datum": "Woensdag 26 April 2017", "id": 416, "tekst": "Te laat! Hij dacht dat hij avonddienst had. AR"}, {"datum": "Woensdag 3 oktober 2018", "id": 417, "tekst": "7:30 aanwezig. Hij dacht dat ie avonddienst had. Ar"}, {"datum": "06-05-2011", "id": 418, "tekst": "Aangesproken op het niet doorgeven van poten niet ingedraaied met de lossing aan de chauffeur, zodat een chauffeur de poten stuk rijd als hij naar beneden komt. Zijn antwoord was dat hij het onzin vond en hij zei \"zal ik het ff doen\" rijden zonder ze te beschadiggen."}, {"datum": "06-07-2011", "id": 419, "tekst": "1,5 uur over de check gedaan daarna op zijn gemak koffie gaan drinken  klant stond te wachten  r.r."}, {"datum": "09-03-2012", "id": 420, "tekst": "alles op zijn dooie  gemak reed in de put   a gijbels  put om 20:50 pas klaar"}, {"datum": "10-04-2012", "id": 421, "tekst": "schade aan caravan  niet gemeld bij ploegleider had de porto  r.r."}, {"datum": "12-05-2012", "id": 422, "tekst": "gewaarschuwd dat hij zewmvest moet dragen r.r."}, {"datum": "10-10-2013", "id": 423, "tekst": "zeer negatief  als hij op reachstacker zit  vind  dat hij genoeg doet  en om tien uur klaar is"}, {"datum": "23-01-2015", "id": 424, "tekst": "zeer negatief  werk niet mee  twee porto s leeg daarom geen contact kunnen krijgen  maar de porto s deden het gewoon de hele avond  denk ook niet mee  gaat eten zonder sv te informeren  klanten die wachten  21:00 nog  overlader op moeten zetten op chassis  hij wist niet maar zal ook niets vragen"}, {"datum": "20-08-2017", "id": 425, "tekst": "Dacht dat hij 2 dagen later moest beginnen. Niet opgekomen MvT"}, {"datum": "29-08-2022", "id": 426, "tekst": "Laad de CLS7142 ipv de 7147 JW"}], "R. Forman": [{"datum": "Dinsdag 18-9-2018", "id": 427, "tekst": "Te laat door verslapen. AR"}, {"datum": "04-06-2018", "id": 428, "tekst": "te laat 07.25 MvT"}, {"datum": "18-09-2019", "id": 429, "tekst": "te laat dacht dat hij vavond had. 7.50 aanwezig Mvt"}, {"datum": "17-08-2020", "id": 430, "tekst": "verslapen en rond 7:45 aanwezig. AR"}, {"datum": "04-09-2020", "id": 431, "tekst": "Meerijden op een vuilbak. Ar Officiele waarschuwing."}, {"datum": "04-10-2021", "id": 432, "tekst": "Verslapen 7.55 aaanwezig MvT"}, {"datum": "03-08-2022", "id": 433, "tekst": "Verslapen 7.45 aanwezig MvT"}, {"datum": "31-01-2025", "id": 434, "tekst": "Verslapen 07:45 aanwezig SvdM"}, {"datum": "07-03-2025", "id": 435, "tekst": "Naar aanleiding van fout sjorren Een officieele waarschuwing gesprek gehad (LvC)"}], "R. Molendijk": [{"datum": "Dinsdag 11 december 2012", "id": 436, "tekst": "Schade gemaakt bij firma verhelst aan de trailer. Bovenkant hout! Niet ernstig:AA"}, {"datum": "Donderdag 30 Juli 2015", "id": 437, "tekst": "Schade aan trailer gemaakt bij Volmer met een stenenflatje. AR"}, {"datum": "09-12-2010", "id": 438, "tekst": "Rijd bumper van trailer af Carrier.( schotel te hoog en te hard )"}, {"datum": "16-03-2012", "id": 439, "tekst": "schade gemaakt bij overladen ecs  2 palets"}, {"datum": "12-05-2012", "id": 440, "tekst": "geen zwemvest gedragen"}, {"datum": "16-04-2021", "id": 441, "tekst": "Behoorlijke Schade gereden brandstoftank en steunpoten aan de FT4346. AR"}, {"datum": "03-05-2021", "id": 442, "tekst": "schade gereden aan de E124. trailer waarschijnlijk total loss AR"}], "R. Wubben": [{"datum": "30-03-2012", "id": 443, "tekst": "10 min te praten met oud collega van p en o tijdens het laden  r.r."}, {"datum": "01-05-2012", "id": 444, "tekst": "rijd door zonder te stoppen bij checker"}, {"datum": "28-01-2014", "id": 445, "tekst": "Rijd ontluchter op het topdeck van de sockel af. JW"}, {"datum": "30-07-2014", "id": 446, "tekst": "gewaarschuwd  over het gebruik van de telefoon  a rodgers"}, {"datum": "21-08-2019", "id": 447, "tekst": "Aangesproken over zijn reageren tegen anderen. Verbetering verzocht. JW"}, {"datum": "12-07-2020", "id": 448, "tekst": "5 min te laat aanwezig ivm verwarring aanvangstijd. Ar"}], "R.F. Duvel": [{"datum": "01-12-2010", "id": 449, "tekst": "Schade aan tugmaster niet gemeld aan tugmaster 12 benzinetank"}, {"datum": "10-06-2011", "id": 450, "tekst": "Verslapen"}, {"datum": "06-08-2011", "id": 451, "tekst": "zaterdag,orgen in dubbele dienst verslapen. Hele dag afgeschreven. MvT"}, {"datum": "25-01-2017", "id": 452, "tekst": "Van boord moeten halen om te gaan lossen. Verstopt in trappenhuis MvT"}, {"datum": "11-11-2017", "id": 453, "tekst": "Niet gaan meren terwijl boot tegen ligplaats ligt MvT"}, {"datum": "12-02-2018", "id": 454, "tekst": "te vroeg weggegaan terwijl boot nog vast lag 21.20 MvT"}, {"datum": "16-04-2021", "id": 455, "tekst": "V Schipper mee laten rijden op de trekker. Mondelinge waarschuwing. AR"}], "R.R.T Lauwers": [{"datum": "22-2-2023", "id": 456, "tekst": "het niet dragen van een stootcap. AR"}, {"datum": "17-3-2024", "id": 457, "tekst": "Frustraties geuit tegen Sjoerd van de Foreteller. AR"}, {"datum": "29-11-2019", "id": 458, "tekst": "Discusie over te hard rijden MvT"}, {"datum": "11-12-2019", "id": 459, "tekst": "Brief telefoongebruik MvT"}, {"datum": "31-12-2019", "id": 460, "tekst": "te laat aanwezig 8:30.Hij dacht dat hij vrij was. AR"}, {"datum": "20-03-2020", "id": 461, "tekst": "Schade gereden met een scania achterlicht krom.AR"}, {"datum": "03-10-2020", "id": 462, "tekst": "verslapen en om aanwezig. AR"}, {"datum": "05-11-2021", "id": 463, "tekst": "618810 weggedrukt, mar trailer stond nog op de kade."}, {"datum": "09-08-2022", "id": 464, "tekst": "Verkeerde HRO geladen, is andere trailer blijven staan. JW"}, {"datum": "30-10-2022", "id": 465, "tekst": "verslapen en om 12:25 aanwezig. AR"}, {"datum": "03-11-2022", "id": 466, "tekst": "Het niet dragen van een reddingsvest tijdens meren. AR"}, {"datum": "12-02-2024", "id": 467, "tekst": "verslapen om 7:10 op het werk. AR"}, {"datum": "23-02-2026", "id": 468, "tekst": "verslapen. 7:30 aanwezig. Ar"}], "S Soekhoe": [{"datum": "", "id": 469, "tekst": "EX trailer verloren na de 2de bocht die hij maakte. Flinke schade aan onderstel. MvT"}, {"datum": "", "id": 470, "tekst": "Verkeerde LKW trailer galaden. 9831 ipv 9381 MvT"}], "S. Laaij": [{"datum": "22-06-2024", "id": 471, "tekst": "21-06 verwkeerde trailer geladen imm MTB3924 ipv MTB3942 (SvdM)"}, {"datum": "31-10-2025", "id": 472, "tekst": "S Laaij aangesproken om lopend met telefon op noordsteiger. AR"}], "S. van der Helden": [{"datum": "29-3-2025", "id": 473, "tekst": "telefoon gebruik in trekker tijdens lossen in vak K. AR"}, {"datum": "13-04-2017", "id": 474, "tekst": "Uit zijn bed gebeld….8:00 aanwezig zonder gegronde reden.JW"}, {"datum": "13-02-2018", "id": 475, "tekst": "Waarschuwing gegeven voor telefgoongebruik in truck MvT"}, {"datum": "09-06-2018", "id": 476, "tekst": "Laatste waarschuwing MvT"}, {"datum": "08-12-2019", "id": 477, "tekst": "Brief telefoongebruik mvT"}, {"datum": "25-06-2020", "id": 478, "tekst": "Eerder naar huis ivm dochter ophalen 13.20 weg. MvT"}, {"datum": "12-02-2021", "id": 479, "tekst": "Niet berijkbaar tijdens ziekte. MvT"}, {"datum": "10-09-2022", "id": 480, "tekst": "Gewaarschuwd telefoon gebruik MvT"}, {"datum": "22-09-2022", "id": 481, "tekst": "Tandarts in dagdienst 14.00"}, {"datum": "15-05-2023", "id": 482, "tekst": "Trailer tegen beton balk, bumper schade, klant opgemerkt JW"}, {"datum": "07-07-2023", "id": 483, "tekst": "Trailer verkeerd geladen. Op tussendeck"}, {"datum": "11-07-2023", "id": 484, "tekst": "om 13:50 weggegaan tijdens een training ivm kind ophalen. AR"}, {"datum": "28-11-2023", "id": 485, "tekst": "schade gemaakt draaien caravan jutlandia. Ar"}, {"datum": "25-06-2025", "id": 486, "tekst": "Telefoongebruik in in trekker tijdens lossen in vak N. Ar"}], "S.F. Rimon": [{"datum": "", "id": 487, "tekst": "Ruzie met Rietdijk over rascisme."}, {"datum": "", "id": 488, "tekst": "Ondanks mail en Iphone te laat door omschakeling naar zomertijd. 10 min te laat MvT"}, {"datum": "", "id": 489, "tekst": "Verslapen! 20min te laat. AR"}, {"datum": "", "id": 490, "tekst": "Te laat aanwezig. Stapte om 12:30 pas binnen. Zijn uitleg was te laat wakker geworden. AR"}, {"datum": "", "id": 491, "tekst": "Wakker gebeld om 7:15 en aanwezig om 08;00! AR"}, {"datum": "", "id": 492, "tekst": "Aangesproken over het roken aan boord en ontrekken van werk. JW"}, {"datum": "", "id": 493, "tekst": "Gisteren schade gereden aan de E5, heeft niet gezien, waarschijnlijk put nordica.JW"}, {"datum": "", "id": 494, "tekst": "Gisteren schade gereden aan de E10, knipperlicht voorkant maar niet gemeld.JW"}, {"datum": "", "id": 495, "tekst": "meren zonder helm. Ar"}, {"datum": "", "id": 496, "tekst": "Laad 03-05 in de avond een verkeerde litsped, recht getrokken op 04-05 in de ochtend. JW"}], "S.N.A. van der Meer": [{"datum": "18-01-2022", "id": 497, "tekst": "schade gereden aan hekwerk zuid-steiger en trailer. Trailer kon niet mee.AR"}], "Schooljongens": [{"datum": "Dinsdag  5 September 2017", "id": 498, "tekst": "J de Jonge verslapen 7:45 aanwezig AR."}, {"datum": "Maandag 23-7-2018", "id": 499, "tekst": "Jonge verslapen om 7:20 aanwezig Ar"}, {"datum": "25-1-2023", "id": 500, "tekst": "In de file! Ar"}, {"datum": "26-1-23", "id": 501, "tekst": "in de file! Ar"}, {"datum": "03-08-2017", "id": 502, "tekst": "Jonge verslapen 07.25 aanwezig MvT"}, {"datum": "14-09-2017", "id": 503, "tekst": "Jonge verslapen 07.05 aanwezig MvT"}, {"datum": "20-09-2018", "id": 504, "tekst": "Jonge verslapen niet meer opgekomen"}, {"datum": "28-09-2018", "id": 505, "tekst": "Jonge ziek nadat ik hem gebeld had MvT"}, {"datum": "08-10-2018", "id": 506, "tekst": "Jonge niet opgekomen MvT Laatste waarschuwing gemeld aan Roflex!"}, {"datum": "27-12-2018", "id": 507, "tekst": "P v/d Lichte verslapen. 7:30 aanwezig. AR"}, {"datum": "15-01-2019", "id": 508, "tekst": "J. de Jonge gewaarschuwd voor telefoon gebruik. Laatste waarschuwing. MvT"}, {"datum": "06-02-2019", "id": 509, "tekst": "J de Jonge verslapen 8:20 aanwezig! Ar"}, {"datum": "30-01-2020", "id": 510, "tekst": "T Polatli wakker gebeld om 8:25…aanwezig om"}, {"datum": "30-06-2020", "id": 511, "tekst": "Keens2wijk verslapen. Dag afgeschreven MvT"}, {"datum": "02-11-2020", "id": 512, "tekst": "Gesprek met Polatli over niet ziek melden. Laatste waarschuwing. MvT & AR"}, {"datum": "23-01-2023", "id": 513, "tekst": "Barish te laat, zonder reden 7:10 aanwezig. JW"}, {"datum": "15-11-2023", "id": 514, "tekst": "Sem N te laat op werk (File) Ar"}, {"datum": "17-11-2023", "id": 515, "tekst": "Sem N te laat op werk (Scooter problemen) Ar"}, {"datum": "29-10-2025", "id": 516, "tekst": "Sion ziek maar niet op tijd afgemeld. Ik hem om gebeld. AR"}], "TOS": [{"datum": "21-6-2023", "id": 517, "tekst": "Richard kan niet komen ivm apk auto. Ar"}, {"datum": "18-9-2023", "id": 518, "tekst": "Richard niet komen opdagen ivm geen geld. AR"}, {"datum": "23-06-2022", "id": 519, "tekst": "Alain te laat aanwezig. AR"}, {"datum": "05-07-2022", "id": 520, "tekst": "Richard ochtend niet geweest verkeerd op zn rooster gekeken.AR"}, {"datum": "21-11-2022", "id": 521, "tekst": "Richard zich om 14.45 ziek gemeld. MvT"}, {"datum": "02-12-2022", "id": 522, "tekst": "Mohamad verslapen, 1 uur te laat ochtend. JW"}, {"datum": "15-12-2022", "id": 523, "tekst": "Richard zich om 6:47 ziek gemeld met kiespijn. AR"}, {"datum": "06-04-2023", "id": 524, "tekst": "Thomas te laat door file. 18.00 aanwezig MvT"}], "V. van den Berg": [{"datum": "14-04-2021", "id": 525, "tekst": "verslapen! 0m 8:45 aanwezig AR"}, {"datum": "03-09-2021", "id": 526, "tekst": "MHF 3309 weggedrukt maar niet geladen. AR"}], "V.O. Schipper": [{"datum": "", "id": 527, "tekst": "Meerijden op de trekker bij R Duvel. AR Mondelinge waarschuwing."}, {"datum": "", "id": 528, "tekst": "MFH 3424 weggedrukt maar staat nog op de kade.AR"}, {"datum": "", "id": 529, "tekst": "Dsva 3700629 weggedrukt, maar niet geladen. AR"}, {"datum": "", "id": 530, "tekst": "KN536PP weg gedrukt maar staat in de ochtend nog op de kade, met Somers mee. JW"}, {"datum": "", "id": 531, "tekst": "Niet dragen van His jasje SVDM"}], "Velde W (uit dienst)": [{"datum": "27-09-2011", "id": 532, "tekst": "Na 7 de uur afwezig op school"}, {"datum": "04-10-2011", "id": 533, "tekst": "Na 13.00 uur afwezig op school"}], "Vrieze de S (uit dienst)": [{"datum": "09-12-2010", "id": 534, "tekst": "Zware schade aan de E8 en de Partner, Te hard gereden, Gesprek!!"}], "W. van Geffen": [{"datum": "25-8-2023", "id": 535, "tekst": "ramen en deuren truck openlaten staan en nat geregend. Gaf N v/d Waarde aan … Ar"}, {"datum": "13-6-2024", "id": 536, "tekst": "OT-71-LF weggedrukt maar de OT-70-LF geladen. AR"}, {"datum": "25-05-2022", "id": 537, "tekst": "E 287 weggedrukt , maar niet geladen. AR"}, {"datum": "19-08-2022", "id": 538, "tekst": "Verkeerde trailer geladen DSV422327 ipv DSVA3804372 MvT"}, {"datum": "08-04-2025", "id": 539, "tekst": "Schade gereden aan een trailer 3 lekke banden en hekwerk beschadigt zuid steiger. AR"}, {"datum": "30-06-2026", "id": 540, "tekst": "2 x schade met trailers gereden"}], "Zoon R (uit dienst)": [{"datum": "Woensdag 1 Juni 2011", "id": 541, "tekst": "R Zoon te laat(18:15) begonnen met zn werkzaamheden. Eten en drinken pakken!"}, {"datum": "", "id": 542, "tekst": "SV toestemming te vragen MvT"}, {"datum": "", "id": 543, "tekst": "terwijl er een vuilnisbak in de buurt staat RR"}, {"datum": "Woensdag 16november 2011", "id": 544, "tekst": "Te laat aan boord! De andere medewerkers waren al kettingen aan het losgooien. AH"}, {"datum": "Woensdag 16november 2011", "id": 545, "tekst": "Geen chauffeurs formulier ingeleverd. AH"}, {"datum": "Dinsdag 13december 2011", "id": 546, "tekst": "Door haaks wegdraaien met stenenflat vallen 2 pallets met stenen van de flat >schade (RB)"}, {"datum": "Vrijdag 2maart 2012", "id": 547, "tekst": "Schade gereden op topdek carrier! Bumper eraf! AH"}, {"datum": "30-10-2010", "id": 548, "tekst": "schade gemaakt  van 12500 euro   de rijke trailer"}, {"datum": "31-10-2010", "id": 549, "tekst": "Sleutel in loods laten liggen. Hebben slot moeten openbreken."}, {"datum": "14-12-2010", "id": 550, "tekst": "Schade aan tm 12 gemaakt. Ploegleider verteld dat er na de boot een schadeformulier Gemaakt moet worden maar is niet gedaan door hem."}, {"datum": "23-01-2011", "id": 551, "tekst": "Verslapen Niet meer gekomen."}, {"datum": "16-02-2011", "id": 552, "tekst": "Te laat voor EHBO in de Hoek (25 min)"}, {"datum": "01-03-2011", "id": 553, "tekst": "Loopt heel de avond met een kapotte porto maar zal niet even om een andere vragen."}, {"datum": "11-03-2011", "id": 554, "tekst": "Truck 12 smerig achter gelaten."}, {"datum": "16-03-2011", "id": 555, "tekst": "Te laat voor EHBO in de Hoek. (15 min)"}, {"datum": "16-04-2011", "id": 556, "tekst": "Ziek gemeld. Was niet ziek dus onrechtmatig afwezig is gesprek over geweest."}, {"datum": "17-05-2011", "id": 557, "tekst": "Kantine niet opgeruimd in avonddienst. Was kraanmachinist"}, {"datum": "06-06-2011", "id": 558, "tekst": "Gebruikt geregeld de in/uitgang via de drivers lounge. Natuurlijk weer als laatste naar buiten MvT"}, {"datum": "01-07-2011", "id": 559, "tekst": "aan auto aan het sleutelen tijdens werk boot voor de kant,en laat anwb op het terrein komen zonder"}, {"datum": "11-07-2011", "id": 560, "tekst": "Tugmaster bij einde werktijd draaiend weggezet met een lekke band. (Zondagmorgen) MvT"}, {"datum": "12-07-2011", "id": 561, "tekst": "ruud let nog steeds niet op laad een cooltrailer 6,1 in de put RR"}, {"datum": "14-07-2011", "id": 562, "tekst": "loopt met r duvel naar auto toe gooit zijn koffiebeker gewoon op de terminal weg"}, {"datum": "29-08-2011", "id": 563, "tekst": "Rijd schade aan zelfrijder, stopte niet op tijd voor het signaal radioman. JW"}, {"datum": "05-09-2011", "id": 564, "tekst": "Spiegel kapot gereden en niet gemeld of gerepareerd. MvT"}, {"datum": "16-09-2011", "id": 565, "tekst": "45 minuten lopen zoeken waar hij op de termional was. Volgens hem zijn truck schoonmaken? MvT"}, {"datum": "17-09-2011", "id": 566, "tekst": "Niet op zijn werk gekomen voor de kraan op zaterdag. Pech met auto. MvT"}, {"datum": "27-10-2011", "id": 567, "tekst": "Niet bereikbaar tijdens ziekte. MvT"}, {"datum": "16-11-2011", "id": 568, "tekst": "als laatste uit de kantine terwijl andere al aan los gooien waren r.r,"}, {"datum": "17-01-2012", "id": 569, "tekst": "Geen chauffeurs lijst ingeleverd. MvT"}, {"datum": "15-02-2012", "id": 570, "tekst": "Te laat bij EHBO MvT"}, {"datum": "16-02-2012", "id": 571, "tekst": "Geen chauffeurs lijst ingeleverd. MvT"}, {"datum": "17-02-2012", "id": 572, "tekst": "onder verdachte omstandigheden  met eigen auto op tankplaats met p waardenburg r.r."}, {"datum": "01-03-2012", "id": 573, "tekst": "Geen chauffeurslijst ingeleverd van de kraan MvT"}, {"datum": "02-03-2012", "id": 574, "tekst": "Gebeld stond met warm gelopen moter langs de A15 MvT"}, {"datum": "08-03-2012", "id": 575, "tekst": "Zoon stond met praatpaal zonder tasje bij de boot. Verteld dat gebruikm van tasje verplicht is. MvT"}, {"datum": "08-03-2012", "id": 576, "tekst": "Zat weer op het toilet terwijl iedereen al bezig was met opruimen. Toen alles klaar was kwam hij ook eens. MvT"}, {"datum": "01-04-2012", "id": 577, "tekst": "Niet opgekomen terwijl hij moest werken. RR"}], "Zuur D (uit dienst)": [{"datum": "29-09-2011", "id": 578, "tekst": "Niet op school geweest. Had heftruck examen."}]};
+function pdKey(){ return tk('personeelsdossier_v1'); }
+var PERSONEELSDOSSIER_SEED_HVH = {"D. Hubregtse": [{"datum": "", "id": 108, "tekst": "en geen checklist in geleverd"}, {"datum": "", "id": 109, "tekst": "16-06-2011 geen checklijst in geleverd van de truck"}, {"datum": "", "id": 110, "tekst": "had niets gemeld  ik hem er op aan gesproken R.R."}, {"datum": "Vrijdag 2Maart 2012", "id": 111, "tekst": "Weigeren aan boord te gaan als terugkomdienst AH"}, {"datum": "", "id": 112, "tekst": "meerde trailers  leeg trekken  nu probleem en trailers/chauffeurs al weg nu niets meer kunnen doen"}, {"datum": "vrijdag 28/11 2014", "id": 113, "tekst": "Gesprek met Ralph n.a.v. het kapot rijden van 2 steunpoten vd Rijke uit lekbak,Niet gemerkt"}, {"datum": "", "id": 114, "tekst": "Diit is nu de 3e keer (Sany voorkant en ketting door voorruit van een vrachtauto) Dennis werkt te wild en gaat niet goed om met spullen van een ander. Laaste mondelinge waarschuwing gegeven. Hierna volgt een officiele waarschuwing. RB"}, {"datum": "Maandag 20 Juli 2015", "id": 115, "tekst": "Hij ging weg, omdat zn neefje heel slecht lag/ligt. Halve snip afgeschreven. AR"}, {"datum": "Zaterdag 15 Oktober 2016", "id": 116, "tekst": "Te laat op het werk. Om 07:15 terrein op rijden. AR"}, {"datum": "09-02-2011", "id": 117, "tekst": "heeft niet afgetankt in de avond  zat nog 38 liter in  avonddienst"}, {"datum": "17-03-2011", "id": 118, "tekst": "Kalmar niet afgetankt. Lichten nog aan en hoofdschakelaar nog aan laten staan."}, {"datum": "28-04-2011", "id": 119, "tekst": "TM 9 met lichte schaafschade weggezet aan rechterkant. Geen checklist ingevuld."}, {"datum": "23-06-2011", "id": 120, "tekst": "07.08 op de zaak."}, {"datum": "08-07-2011", "id": 121, "tekst": "trailer geladen op topdeck met geblokkerde band spoor van adr stack tot aan begin van de brug"}, {"datum": "12-07-2011", "id": 122, "tekst": "op erg glad topdeck harde regen schade gemaakt aan trailer fietsen rek"}, {"datum": "18-02-2012", "id": 123, "tekst": "lichten op truck e 12 aan gelaten in de ochtend  heel de dag lichten gebrand van truck  r.r."}, {"datum": "14-05-2012", "id": 124, "tekst": "schade  e 12 gemaakt onder kinkpen door geschoten"}, {"datum": "13-06-2012", "id": 125, "tekst": "schade aan truck e12 gemaakt en s aonds niet gemeld knipperlicht  verf en rode kap"}, {"datum": "30-11-2012", "id": 126, "tekst": "2 banden lek gereden en velgen kapot. Achterkant schip lag niet lekker voor de kant. MvT"}, {"datum": "16-09-2013", "id": 127, "tekst": "schade aan de sany gemaakt en niet gemeld  r.r."}, {"datum": "09-10-2013", "id": 128, "tekst": "d hubregtse verteld dat als er problemen met over lading  direct  sv  roepen  en niet  achteraf"}, {"datum": "15-10-2013", "id": 129, "tekst": "kijk niet goed  pakt gevaarlijke stoffen en zet hem op main deck terwijl er breifjes zijn gemaakt  r.r."}, {"datum": "19-11-2013", "id": 130, "tekst": "Te laat bij Gijbels geen vervoer dus niet gekomen. MvT"}, {"datum": "24-08-2014", "id": 131, "tekst": "Te Laat dacht dat hij vrij was MvT"}, {"datum": "11-08-2015", "id": 132, "tekst": "Gewaarschuwd voor gebruik MB telefoon op tugmaster MvT"}, {"datum": "13-09-2015", "id": 133, "tekst": "Te laat op de zaak 13.10 MvT"}, {"datum": "02-08-2017", "id": 134, "tekst": "Verslapen 7.30 aanwezig MvT"}, {"datum": "13-09-2017", "id": 135, "tekst": "Niet gemeert tewijl boot met veel wind tegen de kant lag. MvT"}, {"datum": "28-12-2018", "id": 136, "tekst": "Verslapen. Hij belde mij om 7:30. Verteld dat hij avonddienst kan lopen. AR"}, {"datum": "19-12-2019", "id": 137, "tekst": "Brief telefoongebruik MvT"}, {"datum": "01-09-2020", "id": 138, "tekst": "te laat verslapen 7.10 binnen. mvT"}, {"datum": "10-10-2021", "id": 139, "tekst": "CFR 135 weggedrukt maar niet geladen. AR"}]}; // Hoek van Holland heeft geen historische data uit het aangeleverde Excel-bestand; wordt opgebouwd via sync + handmatige invoer
+
+function pdHuidigeSeed(){
+  var terminal = sessionStorage.getItem('dj_terminal') || 'EP';
+  return terminal === 'HVH' ? PERSONEELSDOSSIER_SEED_HVH : PERSONEELSDOSSIER_SEED_EP;
+}
+function pdEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+var PD_NAAM_MIGRATIE = {"Ahmetagic": "A. Ahmetagic", "Adamu": "M. Adamu", "Bakker": "R. Bakker", "Berg": "V. van den Berg", "Boer": "Boer (uit dienst)", "Blokland": "J. Blokland", "Brooshooft": "R. Brooshooft", "Du Chatenier G 2010 C": "Du Chatenier G (uit dienst)", "Duvel K 2145 I": "Duvel K (uit dienst)", "Bul": "Bul (uit dienst)", "Burger": "C. Burger", "Dambruck": "D.J.A. Dambruck", "Dammers": "J.C.M.T.H. Dammers", "Duvel": "R.F. Duvel", "Erad H": "H.E. Erad", "Geffen": "W. van Geffen", "Forman": "R. Forman", "Gijbels": "A. Gijbels", "Helden": "S. van der Helden", "Hubregtse": "D. Hubregtse", "Kievit": "M. Kievit", "Kofferman": "Kofferman (uit dienst)", "Laaij": "S. Laaij", "Lauwers": "R.R.T Lauwers", "Lieburg": "M.J. van Lieburg", "Marsbergen": "M. van Marsbergen", "Meer": "S.N.A. van der Meer", "Molenaar": "Molenaar (uit dienst)", "Molendijk": "R. Molendijk", "Punselie": "M.F. Punselie", "Reenen": "J. van Reenen", "Rietdijk jr": "N.E.J. Rietdijk", "Rimon": "S.F. Rimon", "Goedegebuure": "H.C.W. Goedegebuure", "Schipper": "V.O. Schipper", "Soekhoe": "S Soekhoe", "Ozdemir": "H. Ozdemir", "Verwaal": "G.H.M. Verwaal", "Visser": "M. de Visser", "Voormeeren": "G. Voormeeren", "Waarde": "N. van der Waarde", "Waardenburg": "P.H.M. Waardenburg", "Wubben": "R. Wubben", "Zijlstra": "J. Zijlstra", "Zoeteman": "M. Zoeteman", "Velde W": "Velde W (uit dienst)", "Zuur D": "Zuur D (uit dienst)", "Harun": "H. Karagul", "Kruijk": "J. de Kruyk", "Vrieze de S 2125 D": "Vrieze de S (uit dienst)", "Zoon R 2295 F": "Zoon R (uit dienst)"};
+var _pdMigratieGedaan = false;
+function pdMigreerOudeNamen(data){
+  var changed = false;
+  Object.keys(PD_NAAM_MIGRATIE).forEach(function(oud){
+    if (data[oud]) {
+      var nieuw = PD_NAAM_MIGRATIE[oud];
+      if (data[nieuw]) { data[nieuw] = data[nieuw].concat(data[oud]); }
+      else { data[nieuw] = data[oud]; }
+      delete data[oud];
+      changed = true;
+    }
+  });
+  return changed;
+}
+function pdMigreerHubregtseNaarHVH(){
+  // Eenmalige correctie: D. Hubregtse is verhuisd naar Hoek van Holland, maar stond bij een aantal
+  // gebruikers nog in de Europoort-opslag (van vóór deze correctie). Verplaats zijn dossier alsnog.
+  try {
+    var epData = JSON.parse(localStorage.getItem('EP_personeelsdossier_v1') || 'null');
+    if (epData && epData['D. Hubregtse']) {
+      var entries = epData['D. Hubregtse'];
+      delete epData['D. Hubregtse'];
+      localStorage.setItem('EP_personeelsdossier_v1', JSON.stringify(epData));
+      var hvhData = JSON.parse(localStorage.getItem('HVH_personeelsdossier_v1') || 'null') || {};
+      if (hvhData['D. Hubregtse']) { hvhData['D. Hubregtse'] = hvhData['D. Hubregtse'].concat(entries); }
+      else { hvhData['D. Hubregtse'] = entries; }
+      localStorage.setItem('HVH_personeelsdossier_v1', JSON.stringify(hvhData));
+      if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+    }
+  } catch(e) {}
+}
+function pdData(){
+  try {
+    var d = JSON.parse(localStorage.getItem(pdKey()) || 'null');
+    if (d && typeof d === 'object') {
+      if (!_pdMigratieGedaan) {
+        _pdMigratieGedaan = true;
+        pdMigreerHubregtseNaarHVH();
+        // Na de Hubregtse-verplaatsing opnieuw inlezen, want die kan de huidige (EP-)data hebben aangepast
+        d = JSON.parse(localStorage.getItem(pdKey()) || 'null') || d;
+        if (pdMigreerOudeNamen(d)) {
+          localStorage.setItem(pdKey(), JSON.stringify(d));
+          if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+        }
+      }
+      return d;
+    }
+  } catch(e) {}
+  var seed = JSON.parse(JSON.stringify(pdHuidigeSeed()));
+  localStorage.setItem(pdKey(), JSON.stringify(seed));
+  return seed;
+}
+function pdSave(data){
+  localStorage.setItem(pdKey(), JSON.stringify(data));
+  if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+}
+function pdVolgendeId(data){
+  var max = 0;
+  Object.keys(data).forEach(function(naam){
+    (data[naam]||[]).forEach(function(e){ if (e.id > max) max = e.id; });
+  });
+  return max + 1;
+}
+var _pdGeselecteerd = null;
+function pdKnownActiefKey(){ return tk('personeelsdossier_actief_v1'); }
+function pdGetKnownActief(){
+  try {
+    var v = JSON.parse(localStorage.getItem(pdKnownActiefKey()) || 'null');
+    if (Array.isArray(v)) return v;
+  } catch(e) {}
+  return null; // null = nog nooit gesynct, dus geen basis om "uit dienst" op te detecteren
+}
+function pdSaveKnownActief(namen){
+  localStorage.setItem(pdKnownActiefKey(), JSON.stringify(namen));
+}
+function pdSyncVanuitMaandafsluiting(epNamen, hvhNamen){
+  var terminal = sessionStorage.getItem('dj_terminal') || 'EP';
+  var relevantNamen = terminal === 'HVH' ? hvhNamen : epNamen; // alleen de namen van de huidige terminal toevoegen
+  var vreemdeNamen = terminal === 'HVH' ? epNamen : hvhNamen;   // de namen van de ANDERE terminal
+  var data = pdData();
+  var changed = false;
+  (relevantNamen || []).forEach(function(naam){
+    if (naam && !data[naam]) {
+      data[naam] = [];
+      changed = true;
+    }
+  });
+  // Opschonen: eerder per ongeluk toegevoegde medewerkers van de andere terminal weer verwijderen,
+  // maar alleen als er nog geen registraties op staan (data die iemand heeft ingevoerd blijft altijd behouden).
+  (vreemdeNamen || []).forEach(function(naam){
+    if (naam && data[naam] && data[naam].length === 0) {
+      delete data[naam];
+      changed = true;
+    }
+  });
+  // Automatisch "uit dienst" markeren: iemand die eerder wel in de Maandafsluiting-lijst stond,
+  // maar er nu niet meer in staat (bijv. verwijderd uit het salarisbestand), is waarschijnlijk vertrokken.
+  var vorigActief = pdGetKnownActief();
+  if (vorigActief) {
+    var huidigSet = {};
+    (relevantNamen || []).forEach(function(n){ huidigSet[n] = true; });
+    vorigActief.forEach(function(naam){
+      if (!huidigSet[naam] && data[naam] && naam.indexOf('(uit dienst)') === -1) {
+        var nieuweNaam = naam + ' (uit dienst)';
+        if (data[nieuweNaam]) { data[nieuweNaam] = data[nieuweNaam].concat(data[naam]); }
+        else { data[nieuweNaam] = data[naam]; }
+        delete data[naam];
+        changed = true;
+      }
+    });
+  }
+  pdSaveKnownActief(relevantNamen || []);
+  if (changed) {
+    pdSave(data);
+    // Herbouw de lijst meteen als de gebruiker het scherm open heeft staan
+    var lijstEl = document.getElementById('pd-medewerkers-lijst');
+    if (lijstEl) pdRenderLijst();
+  }
+}
+function pdInit(){
+  var zoekEl = document.getElementById('pd-zoek');
+  if (zoekEl) zoekEl.value = '';
+  _pdCategorie = 'actief';
+  ['actief','groep','uit_dienst'].forEach(function(c){
+    var btn = document.getElementById('pd-cat-btn-' + c);
+    if (btn) { btn.style.background = (c === 'actief') ? 'var(--navy)' : '#eef3fa'; btn.style.color = (c === 'actief') ? '#fff' : 'var(--navy)'; }
+  });
+  pdRenderLijst();
+  var detail = document.getElementById('pd-detail');
+  if (detail) detail.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:30px 10px;text-align:center;">Selecteer een medewerker links, of zoek op naam/tekst.</div>';
+}
+function pdDatumSorteerKey(d){
+  var m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(d || '');
+  return m ? (m[3] + m[2] + m[1]) : '00000000';
+}
+var PD_GROEPEN = ['Intercedent', 'Pro Intermediair', 'Schooljongens', 'TOS'];
+var _pdCategorie = 'actief';
+var _pdGroepGeselecteerd = null;
+function pdGroepVanNaam(naam){
+  if (PD_GROEPEN.indexOf(naam) !== -1) return naam;
+  var m = /^(.*) \(([^)]+)\)$/.exec(naam);
+  if (m && PD_GROEPEN.indexOf(m[2]) !== -1) return m[2];
+  return null;
+}
+function pdCategorieVan(naam){
+  if (naam.indexOf('(uit dienst)') !== -1) return 'uit_dienst';
+  if (pdGroepVanNaam(naam)) return 'groep';
+  return 'actief';
+}
+function pdToonCategorie(cat){
+  _pdCategorie = cat;
+  if (cat !== 'groep') _pdGroepGeselecteerd = null;
+  ['actief','groep','uit_dienst'].forEach(function(c){
+    var btn = document.getElementById('pd-cat-btn-' + c);
+    if (btn) { btn.style.background = (c === cat) ? 'var(--navy)' : '#eef3fa'; btn.style.color = (c === cat) ? '#fff' : 'var(--navy)'; }
+  });
+  var zoekEl = document.getElementById('pd-zoek');
+  if (zoekEl) zoekEl.value = '';
+  pdRenderLijst();
+  var detail = document.getElementById('pd-detail');
+  if (detail && (!_pdGeselecteerd || pdCategorieVan(_pdGeselecteerd) !== cat)) {
+    _pdGeselecteerd = null;
+    detail.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:30px 10px;text-align:center;">Selecteer een medewerker links, of zoek op naam/tekst.</div>';
+  }
+}
+function pdOpenGroep(groep){
+  _pdGroepGeselecteerd = groep;
+  _pdGeselecteerd = null;
+  pdRenderLijst();
+  var detail = document.getElementById('pd-detail');
+  if (detail) detail.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:30px 10px;text-align:center;">Selecteer een naam links, of voeg een nieuwe toe.</div>';
+}
+function pdTerugNaarGroepen(){
+  _pdGroepGeselecteerd = null;
+  _pdGeselecteerd = null;
+  pdRenderLijst();
+  var detail = document.getElementById('pd-detail');
+  if (detail) detail.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:30px 10px;text-align:center;">Selecteer een groep links.</div>';
+}
+function pdNieuwGroepslid(){
+  if (!_pdGroepGeselecteerd) return;
+  var naam = prompt('Naam van de nieuwe persoon binnen ' + _pdGroepGeselecteerd + ':');
+  if (!naam || !naam.trim()) return;
+  var volledigeNaam = naam.trim() + ' (' + _pdGroepGeselecteerd + ')';
+  var data = pdData();
+  if (!data[volledigeNaam]) { data[volledigeNaam] = []; pdSave(data); }
+  pdSelecteer(volledigeNaam);
+}
+function pdVerwijderGroepslid(naam){
+  var groep = pdGroepVanNaam(naam);
+  if (!groep || PD_GROEPEN.indexOf(naam) !== -1) return;
+  if (!confirm('Weet je zeker dat je "' + naam.replace(/ \([^)]+\)$/, '') + '" helemaal wilt verwijderen uit ' + groep + '? Alle registraties van deze persoon gaan verloren.')) return;
+  var data = pdData();
+  delete data[naam];
+  pdSave(data);
+  _pdGeselecteerd = null;
+  pdRenderLijst();
+  var detail = document.getElementById('pd-detail');
+  if (detail) detail.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:30px 10px;text-align:center;">Selecteer een naam links, of voeg een nieuwe toe.</div>';
+}
+
+function pdRenderLijst(){
+  var el = document.getElementById('pd-medewerkers-lijst');
+  if (!el) return;
+  var data = pdData();
+
+  if (_pdCategorie === 'groep' && !_pdGroepGeselecteerd) {
+    // Niveau 1: overzicht van de groepen zelf
+    el.innerHTML = PD_GROEPEN.map(function(groep){
+      var leden = Object.keys(data).filter(function(n){ return pdGroepVanNaam(n) === groep && n !== groep; });
+      var totaalRegistraties = (data[groep]||[]).length + leden.reduce(function(a,n){ return a + (data[n]||[]).length; }, 0);
+      return '<div onclick="pdOpenGroep(\'' + groep + '\')" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #f0f2f5;font-size:13px;display:flex;justify-content:space-between;align-items:center;background:#fff;color:#7a5c00;font-weight:700;">' +
+        '<span>&#x1F4C2; ' + pdEsc(groep) + '<div style="font-size:10.5px;color:#999;font-weight:400;">' + leden.length + ' perso' + (leden.length===1?'on':'nen') + '</div></span>' +
+        '<span style="font-size:11px;color:var(--muted);">' + totaalRegistraties + '</span>' +
+        '</div>';
+    }).join('');
+    return;
+  }
+
+  if (_pdCategorie === 'groep' && _pdGroepGeselecteerd) {
+    // Niveau 2: de personen binnen de gekozen groep
+    var groep = _pdGroepGeselecteerd;
+    var namen = Object.keys(data).filter(function(n){ return pdGroepVanNaam(n) === groep; }).sort(function(a,b){
+      if (a === groep) return -1; if (b === groep) return 1; // algemeen/groep-container bovenaan
+      return a.localeCompare(b);
+    });
+    var html = '<div onclick="pdTerugNaarGroepen()" style="padding:8px 14px;cursor:pointer;border-bottom:1px solid #e2e8f0;font-size:12px;color:var(--navy);font-weight:700;background:#f5f8fc;">&#8592; Alle groepen</div>';
+    html += namen.map(function(naam){
+      var actief = naam === _pdGeselecteerd;
+      var isContainer = naam === groep;
+      var label = isContainer ? 'Algemeen (niet op naam)' : naam.replace(/ \([^)]+\)$/, '');
+      return '<div onclick="pdSelecteer(\'' + naam.replace(/'/g, "\\'") + '\')" style="padding:9px 14px;cursor:pointer;border-bottom:1px solid #f0f2f5;font-size:13px;display:flex;justify-content:space-between;align-items:center;' + (actief ? 'background:var(--navy);color:#fff;font-weight:700;' : 'background:#fff;color:' + (isContainer?'#999;font-style:italic;':'#333;')) + '">' +
+        '<span>' + pdEsc(label) + '</span>' +
+        '<span style="font-size:11px;' + (actief ? 'color:#cfe0f2;' : 'color:var(--muted);') + '">' + (data[naam]||[]).length + '</span>' +
+        '</div>';
+    }).join('');
+    html += '<div onclick="pdNieuwGroepslid()" style="padding:10px 14px;cursor:pointer;text-align:center;font-size:12.5px;font-weight:700;color:var(--navy);background:#eef3fa;">+ Naam toevoegen aan ' + pdEsc(groep) + '</div>';
+    el.innerHTML = html;
+    return;
+  }
+
+  // Actief / Uit dienst: platte lijst zoals voorheen
+  var namen = Object.keys(data).filter(function(n){ return pdCategorieVan(n) === _pdCategorie; }).sort(function(a,b){ return a.localeCompare(b); });
+  if (!namen.length) {
+    var leegTekst = _pdCategorie === 'uit_dienst' ? 'Niemand uit dienst.' : 'Geen actieve medewerkers.';
+    el.innerHTML = '<div style="padding:14px;color:var(--muted);font-size:12.5px;text-align:center;">' + leegTekst + '</div>';
+    return;
+  }
+  el.innerHTML = namen.map(function(naam){
+    var actief = naam === _pdGeselecteerd;
+    var uitDienst = _pdCategorie === 'uit_dienst';
+    return '<div onclick="pdSelecteer(\'' + naam.replace(/'/g, "\\'") + '\')" style="padding:9px 14px;cursor:pointer;border-bottom:1px solid #f0f2f5;font-size:13px;display:flex;justify-content:space-between;align-items:center;' + (actief ? 'background:var(--navy);color:#fff;font-weight:700;' : 'background:#fff;' + (uitDienst?'color:#999;font-style:italic;':'color:#333;')) + '">' +
+      '<span>' + pdEsc(naam) + '</span>' +
+      '<span style="font-size:11px;' + (actief ? 'color:#cfe0f2;' : 'color:var(--muted);') + '">' + (data[naam]||[]).length + '</span>' +
+      '</div>';
+  }).join('');
+}
+function pdSelecteer(naam){
+  _pdGeselecteerd = naam;
+  var zoekEl = document.getElementById('pd-zoek');
+  if (zoekEl) zoekEl.value = '';
+  var juisteCategorie = pdCategorieVan(naam);
+  _pdCategorie = juisteCategorie;
+  if (juisteCategorie === 'groep') _pdGroepGeselecteerd = pdGroepVanNaam(naam);
+  ['actief','groep','uit_dienst'].forEach(function(c){
+    var btn = document.getElementById('pd-cat-btn-' + c);
+    if (btn) { btn.style.background = (c === juisteCategorie) ? 'var(--navy)' : '#eef3fa'; btn.style.color = (c === juisteCategorie) ? '#fff' : 'var(--navy)'; }
+  });
+  pdRenderLijst();
+  pdRenderDetail();
+}
+function pdRenderDetail(){
+  var el = document.getElementById('pd-detail');
+  if (!el || !_pdGeselecteerd) return;
+  var data = pdData();
+  var entries = (data[_pdGeselecteerd] || []).slice().sort(function(a,b){ return pdDatumSorteerKey(b.datum).localeCompare(pdDatumSorteerKey(a.datum)); });
+  var isGroepslid = pdGroepVanNaam(_pdGeselecteerd) && PD_GROEPEN.indexOf(_pdGeselecteerd) === -1;
+  var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;">' +
+    '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:19px;font-weight:800;color:var(--navy);">' + pdEsc(_pdGeselecteerd) + '</div>' +
+    '<div style="display:flex;gap:8px;flex-shrink:0;">' +
+    (isGroepslid ? '<button onclick="pdVerwijderGroepslid(\'' + _pdGeselecteerd.replace(/'/g, "\\'") + '\')" title="Deze persoon volledig verwijderen" style="background:#fdecea;color:#c0392b;border:1px solid #f0b8b0;border-radius:6px;padding:8px 12px;cursor:pointer;font-size:12px;font-weight:700;">&#x1F5D1; Verwijderen</button>' : '') +
+    '<button onclick="pdToevoegenPrompt(\'' + _pdGeselecteerd.replace(/'/g, "\\'") + '\')" style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:12px;font-weight:700;">+ Registratie toevoegen</button>' +
+    '</div></div>';
+  if (!entries.length) {
+    html += '<div style="color:var(--muted);font-size:13px;padding:14px 0;">Nog geen registraties voor deze medewerker.</div>';
+  } else {
+    html += '<div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">';
+    entries.forEach(function(e, i){
+      html += '<div style="padding:10px 14px;' + (i>0?'border-top:1px solid #f0f2f5;':'') + 'display:flex;gap:12px;align-items:flex-start;background:' + (i%2?'#fafbfc':'#fff') + ';">' +
+        '<div style="flex:0 0 90px;font-size:12px;font-weight:700;color:var(--navy);white-space:nowrap;">' + pdEsc(e.datum || '&#8211;') + '</div>' +
+        '<div style="flex:1;font-size:13px;color:#333;line-height:1.4;">' + pdEsc(e.tekst) + '</div>' +
+        '<button onclick="pdVerwijder(' + e.id + ')" title="Verwijderen" style="background:none;border:none;color:#c0392b;cursor:pointer;font-size:13px;flex-shrink:0;">&#x2715;</button>' +
+        '</div>';
+    });
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
+function pdToevoegenPrompt(naam){
+  var datumInput = prompt('Datum (dd-mm-jjjj), leeg = vandaag:', new Date().toLocaleDateString('nl-NL', {day:'2-digit',month:'2-digit',year:'numeric'}));
+  if (datumInput === null) return;
+  var tekst = prompt('Omschrijving:');
+  if (!tekst || !tekst.trim()) return;
+  var data = pdData();
+  if (!data[naam]) data[naam] = [];
+  data[naam].push({ id: pdVolgendeId(data), datum: datumInput.trim(), tekst: tekst.trim() });
+  pdSave(data);
+  pdRenderLijst();
+  pdRenderDetail();
+}
+function pdVerwijder(id){
+  if (!_pdGeselecteerd) return;
+  if (!confirm('Deze registratie verwijderen?')) return;
+  var data = pdData();
+  data[_pdGeselecteerd] = (data[_pdGeselecteerd] || []).filter(function(e){ return e.id !== id; });
+  pdSave(data);
+  pdRenderLijst();
+  pdRenderDetail();
+}
+function pdZoek(query){
+  var q = (query || '').trim().toLowerCase();
+  var el = document.getElementById('pd-detail');
+  if (!el) return;
+  if (!q) {
+    pdRenderLijst();
+    if (_pdGeselecteerd) pdRenderDetail();
+    else el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:30px 10px;text-align:center;">Selecteer een medewerker links, of zoek op naam/tekst.</div>';
+    return;
+  }
+  var data = pdData();
+  var lijstEl = document.getElementById('pd-medewerkers-lijst');
+  var namen = Object.keys(data).sort(function(a,b){ return a.localeCompare(b); });
+  var matchendeNamen = namen.filter(function(n){ return n.toLowerCase().indexOf(q) !== -1; });
+  if (lijstEl) {
+    lijstEl.innerHTML = namen.map(function(naam){
+      var matchNaam = naam.toLowerCase().indexOf(q) !== -1;
+      return '<div onclick="pdSelecteer(\'' + naam.replace(/'/g, "\\'") + '\')" style="padding:9px 14px;cursor:pointer;border-bottom:1px solid #f0f2f5;font-size:13px;display:flex;justify-content:space-between;align-items:center;' + (matchNaam ? 'background:#fff7e0;color:#333;font-weight:700;' : 'background:#fff;color:#ccc;') + '">' +
+        '<span>' + pdEsc(naam) + '</span><span style="font-size:11px;color:var(--muted);">' + (data[naam]||[]).length + '</span></div>';
+    }).join('');
+  }
+  // Zoek ook door alle tekst-registraties heen
+  var resultaten = [];
+  namen.forEach(function(naam){
+    (data[naam]||[]).forEach(function(e){
+      if ((e.tekst||'').toLowerCase().indexOf(q) !== -1 || naam.toLowerCase().indexOf(q) !== -1) {
+        resultaten.push({ naam: naam, entry: e });
+      }
+    });
+  });
+  resultaten.sort(function(a,b){ return pdDatumSorteerKey(b.entry.datum).localeCompare(pdDatumSorteerKey(a.entry.datum)); });
+  var html = '<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">' + resultaten.length + ' resultaten voor &quot;' + pdEsc(query) + '&quot;</div>';
+  if (!resultaten.length) {
+    html += '<div style="color:var(--muted);font-size:13px;padding:14px 0;">Geen resultaten gevonden.</div>';
+  } else {
+    html += '<div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">';
+    resultaten.forEach(function(r, i){
+      html += '<div onclick="pdSelecteer(\'' + r.naam.replace(/'/g, "\\'") + '\')" style="padding:10px 14px;cursor:pointer;' + (i>0?'border-top:1px solid #f0f2f5;':'') + 'display:flex;gap:12px;align-items:flex-start;background:' + (i%2?'#fafbfc':'#fff') + ';">' +
+        '<div style="flex:0 0 90px;font-size:12px;font-weight:700;color:var(--navy);white-space:nowrap;">' + pdEsc(r.entry.datum || '&#8211;') + '</div>' +
+        '<div style="flex:0 0 110px;font-size:12px;font-weight:700;color:#555;">' + pdEsc(r.naam) + '</div>' +
+        '<div style="flex:1;font-size:13px;color:#333;line-height:1.4;">' + pdEsc(r.entry.tekst) + '</div>' +
+        '</div>';
+    });
+    html += '</div>';
+  }
+  el.innerHTML = html;
 }
 
 
