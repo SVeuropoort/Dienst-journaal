@@ -3203,10 +3203,15 @@ document.addEventListener('contextmenu', function(e) {
       <div class="card">
         <div class="card-header"><div class="icon">&#x1F9F0;</div><h2>Toolbox</h2></div>
         <div style="padding:16px 20px;">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap;">
             <button onclick="toolboxKiesBestand()" style="background:var(--navy);color:#fff;border:none;border-radius:8px;padding:10px 18px;cursor:pointer;font-size:13px;font-weight:700;white-space:nowrap;">&#x2B; Toolbox toevoegen (PDF)</button>
             <button onclick="toolboxAftekenlijstAfdrukken()" style="background:#eef3fa;color:var(--navy);border:1px solid #ccd6e5;border-radius:8px;padding:10px 18px;cursor:pointer;font-size:13px;font-weight:700;white-space:nowrap;">&#x1F5A8; Aftekenlijst afdrukken</button>
-            <span style="font-size:12px;color:var(--muted);">Bestand blijft op dit apparaat opgeslagen (max. 10 MB per PDF).</span>
+            <button onclick="toolboxAfgetekendKiesBestand()" style="background:#eef3fa;color:var(--navy);border:1px solid #ccd6e5;border-radius:8px;padding:10px 18px;cursor:pointer;font-size:13px;font-weight:700;white-space:nowrap;">&#x2B; Afgetekende lijst uploaden</button>
+            <span style="font-size:12px;color:var(--muted);">Bestand blijft op dit apparaat opgeslagen (max. 10 MB per bestand).</span>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.5;">
+            Druk op <strong>"Aftekenlijst afdrukken"</strong>. Is deze door iedereen ondertekend, scan hem dan in naar je pc.
+            Upload het gescande bestand vervolgens via <strong>"Afgetekende lijst uploaden"</strong> om te archiveren.
           </div>
           <div id="toolbox-lijst"></div>
         </div>
@@ -5159,6 +5164,9 @@ window.addEventListener('resize', () => {
   async function cloudLaden() {
     if (_syncBezig) return;
     _syncBezig = true;
+    // Eerst een eventuele nog niet verzonden wijziging wegschrijven, anders kan
+    // het ophalen hieronder die wijziging alsnog overschrijven.
+    if (window._flushPendingCloudOpslaan) await window._flushPendingCloudOpslaan();
     showSyncStatus('☁️ Ophalen...', 'info');
     try {
       var rowId = getSBRowId();
@@ -5235,10 +5243,57 @@ window.addEventListener('resize', () => {
   window._doCloudOpslaan = function() {
     if (_autoSaveTimer) clearTimeout(_autoSaveTimer);
     _autoSaveTimer = setTimeout(function() {
+      _autoSaveTimer = null;
       cloudOpslaan();
     }, 2000);
   };
   window.autoCloudOpslaan = window._doCloudOpslaan;
+
+  // BEVEILIGING TEGEN DATAVERLIES: als er nog een niet-verzonden wijziging in de
+  // 2-seconden-wachtrij staat, MOET die eerst naar de cloud voordat we ergens
+  // cloud-data ophalen en lokaal overschrijven (setSyncData). Zonder deze check
+  // kon een net getypte certificeringsdatum verloren gaan als er toevallig
+  // binnen die 2 seconden een cloud-ophaal-actie (automatisch of handmatig)
+  // tussenkwam — dat is precies wat er eerder is gebeurd.
+  window._flushPendingCloudOpslaan = async function() {
+    if (_autoSaveTimer) {
+      clearTimeout(_autoSaveTimer);
+      _autoSaveTimer = null;
+      await cloudOpslaan();
+    }
+  };
+
+  // Extra vangnet: sla een wachtende wijziging ook synchroon op zodra de pagina
+  // verdwijnt (tab sluiten, handmatig verversen, app wisselen op mobiel). Een
+  // gewone fetch() wordt bij het verlaten van de pagina niet gegarandeerd
+  // afgemaakt; een synchrone XMLHttpRequest werkt hier wel betrouwbaar voor.
+  function _cloudOpslaanSync() {
+    if (!_autoSaveTimer) return; // niets te doen, alles staat al in de cloud
+    clearTimeout(_autoSaveTimer);
+    _autoSaveTimer = null;
+    try {
+      var rowId = getSBRowId();
+      var data = getSyncData();
+      var pfx = getTerminalPrefix();
+      for (var _si = 0; _si < localStorage.length; _si++) {
+        var _sk = localStorage.key(_si);
+        if (!_sk || !_sk.startsWith(pfx + 'dagplan_')) continue;
+        try {
+          var _se = JSON.parse(localStorage.getItem(_sk));
+          if (_se && ((_se.ochEmps && _se.ochEmps.length > 0) || (_se.avondEmps && _se.avondEmps.length > 0))) data[_sk] = _se;
+        } catch(e2) {}
+      }
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', SB_URL + '/rest/v1/' + SB_TABLE, false); // false = synchroon, bewust
+      xhr.setRequestHeader('apikey', SB_KEY);
+      xhr.setRequestHeader('Authorization', 'Bearer ' + SB_KEY);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.setRequestHeader('Prefer', 'resolution=merge-duplicates,return=minimal');
+      xhr.send(JSON.stringify({ id: rowId, data: data, updated_at: new Date().toISOString() }));
+    } catch(e) { /* best effort — als dit faalt is er niets meer aan te doen op dit moment */ }
+  }
+  window.addEventListener('pagehide', _cloudOpslaanSync);
+  document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'hidden') _cloudOpslaanSync(); });
 
 
 
@@ -5248,6 +5303,9 @@ window.addEventListener('resize', () => {
     // Wacht tot pagina geladen is, haal dan cloud data op
     window.addEventListener('load', function() {
       setTimeout(async function() {
+        // Zelfde beveiliging als bij de handmatige Ophalen-knop: eerst een
+        // eventuele nog niet verzonden wijziging wegschrijven.
+        if (window._flushPendingCloudOpslaan) await window._flushPendingCloudOpslaan();
         showSyncStatus('☁️ Data ophalen...', 'info');
         try {
           var _rowId = getSBRowId();
@@ -22338,6 +22396,58 @@ function toolboxKiesBestand(){
     });
   }, 0);
 }
+// Upload van een ingescande, door iedereen ondertekende aftekenlijst (zie "Aftekenlijst
+// afdrukken"). Werkt verder identiek aan toolboxKiesBestand(), maar accepteert naast PDF
+// ook foto's/scans (jpg/png), omdat een scanner of telefooncamera vaak een afbeelding
+// oplevert in plaats van een PDF. Items krijgen afgetekend:true zodat toolboxRender()
+// ze herkenbaar kan tonen tussen de gewone toolbox-documenten.
+function toolboxAfgetekendKiesBestand(){
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pdf,application/pdf,image/*';
+  input.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;opacity:0;';
+  input.addEventListener('change', function(){
+    var file = input.files && input.files[0];
+    if (input.parentNode) input.parentNode.removeChild(input);
+    if (!file) return;
+    var isPdf = (file.type === 'application/pdf') || /\.pdf$/i.test(file.name);
+    var isImg = (file.type && file.type.indexOf('image/') === 0) || /\.(jpe?g|png|heic|webp)$/i.test(file.name);
+    if (!isPdf && !isImg) {
+      alert('Alleen PDF-bestanden of foto\'s/scans (jpg, png) zijn toegestaan.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Dit bestand is groter dan 10 MB. Comprimeer het bestand en probeer opnieuw.');
+      return;
+    }
+    var reader = new FileReader();
+    reader.onerror = function(){
+      oplToonMelding('✗ Kon het bestand niet inlezen in de browser.', '#7f1d1d');
+    };
+    reader.onload = function(e){
+      var id = Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+      oplToonMelding('⏳ Afgetekende lijst opslaan…', '#075985', 4000);
+      certDbZet(toolboxSleutel(id), { naam: file.name, type: file.type || (isPdf ? 'application/pdf' : 'image/jpeg'), data: e.target.result, opgeslagenOp: new Date().toISOString() }).then(function(){
+        var lijst = toolboxGetData();
+        lijst.unshift({ id: id, naam: file.name, opgeslagenOp: new Date().toISOString(), afgetekend: true });
+        toolboxSaveData(lijst);
+        oplToonMelding('✓ Afgetekende lijst "' + file.name + '" gearchiveerd.', '#166534', 3000);
+        toolboxRender();
+      }).catch(function(idbErr){
+        oplToonMelding('✗ Kon bestand niet opslaan: ' + (idbErr && idbErr.message ? idbErr.message : idbErr), '#7f1d1d', 10000);
+      });
+    };
+    reader.readAsDataURL(file);
+  }, { once: true });
+  document.body.appendChild(input);
+  input.click();
+  setTimeout(function(){
+    window.addEventListener('focus', function tb_focusEenmalig(){
+      window.removeEventListener('focus', tb_focusEenmalig);
+      setTimeout(function(){ if (input.parentNode && !input.files.length) input.parentNode.removeChild(input); }, 500);
+    });
+  }, 0);
+}
 function toolboxBekijk(id){
   var lijst = toolboxGetData();
   var item = lijst.find(function(x){ return x.id === id; });
@@ -22375,7 +22485,9 @@ function toolboxRender(){
       var datum = '';
       try { datum = new Date(item.opgeslagenOp).toLocaleDateString('nl-NL', { day: '2-digit', month: '2-digit', year: 'numeric' }); } catch(e) {}
       return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-bottom:1px solid #f0f2f5;font-size:13px;">' +
-        '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">&#x1F4C4; ' + toolboxEsc(item.naam) + '</span>' +
+        '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">&#x1F4C4; ' + toolboxEsc(item.naam) +
+          (item.afgetekend ? ' <span style="background:#dcfce7;color:#166534;border-radius:5px;padding:1px 7px;font-size:10.5px;font-weight:700;white-space:nowrap;">Afgetekend</span>' : '') +
+        '</span>' +
         '<span style="display:flex;align-items:center;gap:10px;white-space:nowrap;">' +
           '<span style="font-size:11px;color:var(--muted);">' + toolboxEsc(datum) + '</span>' +
           '<button onclick="toolboxBekijk(\'' + item.id + '\')" style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px;font-weight:700;">Bekijken</button>' +
