@@ -3181,6 +3181,10 @@ document.addEventListener('contextmenu', function(e) {
             <input type="text" id="pd-zoek" placeholder="&#x1F50D; Zoek op naam of tekst (bijv. 'verslapen', 'schade', 'Ahmetagic')..." oninput="pdZoek(this.value)" style="flex:1;min-width:260px;padding:10px 14px;border:1px solid #ccd6e5;border-radius:8px;font-size:14px;">
             <button id="pd-nieuwe-medewerker-btn" onclick="pdNieuweMedewerkerPrompt()" style="display:none;background:#eef3fa;color:var(--navy);border:1px solid #ccd6e5;border-radius:8px;padding:10px 16px;cursor:pointer;font-size:13px;font-weight:700;white-space:nowrap;">+ Nieuwe medewerker</button>
           </div>
+          <div id="pd-uitleg-toevoegen" style="font-size:12px;color:var(--muted);background:#f5f8fc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:16px;line-height:1.5;">
+            <strong>Actief</strong>: medewerkers komen hier automatisch bij vanuit de Maandafsluiting &mdash; niets handmatig toevoegen nodig.<br>
+            <strong>Groepen</strong> (Stagiaires, Pro Intermediair, Schooljongens, TOS, e.d.): klik hierboven op "Groepen", open de betreffende groep en klik onderaan op <em>"+ Naam toevoegen aan &lt;groep&gt;"</em>. Deze naam verschijnt daarna ook automatisch bij Opleidingen &rarr; Overzicht Certificeringen.
+          </div>
           <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
             <div style="flex:0 0 240px;max-width:100%;">
               <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:6px;">Medewerkers</div>
@@ -3210,8 +3214,7 @@ document.addEventListener('contextmenu', function(e) {
             <span style="font-size:12px;color:var(--muted);">Bestand blijft op dit apparaat opgeslagen (max. 10 MB per bestand).</span>
           </div>
           <div style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.5;">
-            Druk op <strong>"Aftekenlijst afdrukken"</strong>. Is deze door iedereen ondertekend, scan hem dan in naar je pc.
-            Upload het gescande bestand vervolgens via <strong>"Afgetekende lijst uploaden"</strong> om te archiveren.
+            Druk op "Aftekenlijst afdrukken". Is deze door iedereen ondertekend, scan hem dan in naar je pc. Upload het gescande bestand vervolgens via "Afgetekende lijst uploaden" om te archiveren.
           </div>
           <div id="toolbox-lijst"></div>
         </div>
@@ -12828,7 +12831,7 @@ function oplOverzichtTabelHtml(titel, kleur, rijen, tbodyId, isGroep){
       '</tr>';
   }).join('');
   var legeMelding = isGroep
-    ? '<div style="padding:14px 16px;font-size:12.5px;color:#888;">Nog geen medewerkers in deze groep. Gebruik "+ Medewerker in deze groep" om er een toe te voegen.</div>'
+    ? '<div style="padding:14px 16px;font-size:12.5px;color:#888;">Nog geen medewerkers in deze groep. Voeg iemand toe bij Werkoverdracht &rarr; Personeelsdossier &rarr; Groepen, dat komt automatisch hier terecht.</div>'
     : '<div style="padding:14px 16px;font-size:12.5px;color:#888;">Geen medewerkers.</div>';
   var subtitel = isGroep ? '<div style="padding:6px 16px;font-size:11px;color:#7a5c00;background:#fff8e6;border-bottom:1px solid #f0e0a8;">&#x1F3F7;&#xFE0F; Groep &mdash; niet gekoppeld aan de Maandafsluiting en verschijnt daar ook niet.</div>' : '';
   return '<div style="border:1px solid #bbb;border-radius:6px;margin-bottom:20px;">' +
@@ -12882,17 +12885,18 @@ function oplOverzichtHtml(){
   groepVolgorde.sort(function(a, b){ return a.localeCompare(b); });
 
   var html = '<div style="padding:2px 2px 6px;">';
-  html += '<div style="font-size:11.5px;color:#667;margin-bottom:14px;">Datum van behaalde certificering per medewerker. Leeg = nog niet behaald. Klik op een datumveld om te bewerken (formaat dd/mm/jjjj).</div>';
-  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">' +
-    '<button onclick="oplOverzichtToevoegen()" style="background:#eef3fa;color:var(--navy);border:1px solid #ccd6e5;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:12.5px;font-weight:700;">&#x2B; Nieuwe medewerker</button>' +
-    '<button onclick="oplOverzichtNieuweGroep()" style="background:#fff8e6;color:#7a5c00;border:1px solid #f0e0a8;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:12.5px;font-weight:700;">&#x1F3F7;&#xFE0F; Nieuwe groep (bijv. Stagiaires, Pro Intermediair)</button>' +
-  '</div>';
+  if (t === 'IMM') {
+    html += '<div style="font-size:11.5px;color:#667;margin-bottom:14px;">Date of certification achieved per employee. Blank = not yet achieved. Click a date field to edit (format dd/mm/yyyy).</div>';
+    html += '<div style="font-size:12px;color:var(--muted);background:#f5f8fc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:14px;line-height:1.5;">A new employee is not added separately here: add them under Handover &rarr; Personnel file instead (as Active, or under Groups for Trainees, Temp staff, School pupils, etc.) &mdash; they will then appear here automatically.</div>';
+  } else {
+    html += '<div style="font-size:11.5px;color:#667;margin-bottom:14px;">Datum van behaalde certificering per medewerker. Leeg = nog niet behaald. Klik op een datumveld om te bewerken (formaat dd/mm/jjjj).</div>';
+    html += '<div style="font-size:12px;color:var(--muted);background:#f5f8fc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:14px;line-height:1.5;">Een nieuwe medewerker voeg je hier niet los toe: iedereen komt automatisch binnen vanuit de Maandafsluiting. Hoort iemand bij een groep (Stagiaires, Pro Intermediair, Schooljongens, TOS, e.d.), voeg hem dan toe bij Werkoverdracht &rarr; Personeelsdossier &rarr; Groepen &mdash; die verschijnt daarna vanzelf ook hier.</div>';
+  }
   html += oplOverzichtTabelHtml(titel, kleur, hoofdRijen, 'opl-ovz-tbody');
 
   groepVolgorde.forEach(function(groepNaam, gIdx){
     var tbodyId = 'opl-ovz-tbody-groep-' + gIdx;
     html += oplOverzichtTabelHtml(groepNaam, '#8a6d1a', groepenMap[groepNaam], tbodyId, true);
-    html += '<div style="margin:-12px 0 20px;"><button onclick="oplOverzichtToevoegen(\'' + groepNaam.replace(/'/g, "\\'") + '\')" style="background:transparent;border:1px dashed #ccb87a;color:#7a5c00;font-size:12px;padding:6px 14px;border-radius:4px;cursor:pointer;">&#x2B; Medewerker in deze groep</button></div>';
   });
 
   html += '</div>';
@@ -18920,6 +18924,12 @@ header{background:var(--aow-ink);padding:22px 36px;display:flex;align-items:cent
   <div class="sec-title">AOW-leeftijd berekening <span>op basis van geboortedatum</span></div>
 
   <div class="input-block">
+    <div class="field" style="margin-bottom:14px;">
+      <label>Medewerker selecteren <span class="hint">(vult geboortedatum automatisch, indien bekend)</span></label>
+      <select id="aow-medewerker-select" onchange="aowVulGeboortedatumIn('aow-birthdate', this.value)" style="width:100%;padding:9px 12px;border:1px solid #ccd6e5;border-radius:8px;font-size:14px;">
+        <option value="">— Handmatig invullen —</option>
+      </select>
+    </div>
     <div class="input-grid ig-4">
       <div class="field">
         <label>Geboortedatum</label>
@@ -19037,6 +19047,12 @@ header{background:var(--aow-ink);padding:22px 36px;display:flex;align-items:cent
   <!-- Invoer -->
   <div class="input-block">
     <div style="color:var(--aow-gold-light);font-size:0.72rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:16px">Basisgegevens</div>
+    <div class="field" style="margin-bottom:16px;">
+      <label>Medewerker selecteren <span class="hint">(vult geboortedatum automatisch, indien bekend)</span></label>
+      <select id="sfr-medewerker-select" onchange="aowVulGeboortedatumIn('sfr-birthdate', this.value); updateA30Jaren();" style="width:100%;padding:9px 12px;border:1px solid #ccd6e5;border-radius:8px;font-size:14px;">
+        <option value="">— Handmatig invullen —</option>
+      </select>
+    </div>
     <div class="input-grid ig-3" style="margin-bottom:18px">
       <div class="field">
         <label>Geboortedatum <span class="hint">voor A28 berekening</span></label>
@@ -19887,6 +19903,71 @@ function renderSFRTable(periods, verlofPJ, advPJ, sfrPJ, type, sfrStart, pensioe
 // Enter key
 document.getElementById('aow-birthdate').addEventListener('keypress',e=>{if(e.key==='Enter')calcAOW();});
 document.getElementById('sfr-esw-date').addEventListener('keypress',e=>{if(e.key==='Enter')calcSFR();});
+
+// Vult het geboortedatum-veld (AOW- of SFR-tab) automatisch in op basis van de in
+// Personeelsdossier vastgelegde verjaardag (dag/maand/jaar, zie pdSlaVerjaardagOp).
+// Zonder een vastgelegd geboortejaar kan er geen volledige datum worden samengesteld -
+// dan blijft het veld leeg en vult de gebruiker hem hier handmatig aan.
+function aowVulGeboortedatumIn(inputId, naam){
+  var input = document.getElementById(inputId);
+  if (!input || !naam) return;
+  if (typeof getVerjaardagen !== 'function') return;
+  var e = getVerjaardagen()[naam];
+  if (!e || !e.dag || !e.maand || !e.jaar) {
+    alert('Van "' + naam + '" is geen geboortejaar bekend in Personeelsdossier. Vul dit daar eerst aan (bij Verjaardag: Dag/Mnd/Jaar), of vul de geboortedatum hier handmatig in.');
+    return;
+  }
+  input.value = String(e.dag).padStart(2, '0') + '/' + String(e.maand).padStart(2, '0') + '/' + e.jaar;
+}
+// Vult beide medewerker-dropdowns (AOW- en SFR-tab) met alle namen uit Personeelsdossier
+// die een verjaardag hebben vastgelegd. Draait eenmalig bij het laden van deze module.
+function aowVulMedewerkersDropdowns(){
+  if (typeof getVerjaardagen !== 'function') return;
+  var data = getVerjaardagen();
+  // Medewerkers die in Personeelsdossier als "uit dienst" gemarkeerd staan, horen hier niet meer
+  // in de keuzelijst thuis. Personeelsdossier hernoemt bij uitdiensttreding de sleutel naar
+  // "naam (uit dienst)" (zie pdSyncVanuitMaandafsluiting) — de losse geboortedatum-registratie
+  // (getVerjaardagen) blijft echter onder de oorspronkelijke naam staan, dus we filteren hier op
+  // basis van of er een "(uit dienst)"-variant van de naam in Personeelsdossier bestaat.
+  var pdActief = (typeof pdData === 'function') ? pdData() : null;
+  var namen = Object.keys(data).filter(function(naam){
+    if (naam.indexOf('(uit dienst)') !== -1) return false;
+    if (pdActief && pdActief[naam + ' (uit dienst)']) return false;
+    return true;
+  });
+  // Oudste boven: sorteren op volledige geboortedatum (jaar, dan maand, dan dag) oplopend.
+  // Medewerkers zonder bekend geboortejaar kunnen niet op leeftijd gesorteerd worden en
+  // komen daarom onderaan te staan, onderling alfabetisch.
+  namen.sort(function(a, b){
+    var ea = data[a], eb = data[b];
+    var jaarA = ea && ea.jaar ? parseInt(ea.jaar, 10) : null;
+    var jaarB = eb && eb.jaar ? parseInt(eb.jaar, 10) : null;
+    if (jaarA === null && jaarB === null) return a.localeCompare(b, 'nl');
+    if (jaarA === null) return 1;
+    if (jaarB === null) return -1;
+    if (jaarA !== jaarB) return jaarA - jaarB;
+    var maandA = parseInt(ea.maand, 10) || 0, maandB = parseInt(eb.maand, 10) || 0;
+    if (maandA !== maandB) return maandA - maandB;
+    var dagA = parseInt(ea.dag, 10) || 0, dagB = parseInt(eb.dag, 10) || 0;
+    if (dagA !== dagB) return dagA - dagB;
+    return a.localeCompare(b, 'nl');
+  });
+  ['aow-medewerker-select','sfr-medewerker-select'].forEach(function(selId){
+    var sel = document.getElementById(selId);
+    if (!sel) return;
+    namen.forEach(function(naam){
+      var opt = document.createElement('option');
+      opt.value = naam;
+      opt.textContent = naam + (data[naam] && data[naam].jaar ? '' : ' (geen geboortejaar bekend)');
+      sel.appendChild(opt);
+    });
+  });
+}
+// Uitgesteld tot na het laden van de rest van de pagina: pdData() (Personeelsdossier,
+// nodig voor het "uit dienst"-filter hierboven) staat verderop in het document en
+// bestaat op dit moment van uitvoeren nog niet. Zonder deze vertraging zou het filter
+// stil niets doen (de typeof-check faalt dan geruisloos).
+setTimeout(aowVulMedewerkersDropdowns, 0);
 </script>
 <script>
 (function() {
@@ -20751,7 +20832,13 @@ var DJ_VERTAAL_WOORDENBOEK = {
   "DAGPLANNING": "DAY PLANNING",
   "PUNCTUALITY": "PUNCTUALITY",
   "MATERIEEL": "EQUIPMENT",
-  "WERKOVERDRACHT 🔒": "SHIFT HANDOVER &#x1F512;",
+  "WERKOVERDRACHT 🔒": "SHIFT HANDOVER 🔒",
+  "Toolbox toevoegen (PDF)": "Add toolbox (PDF)",
+  "Aftekenlijst afdrukken": "Print sign-off sheet",
+  "Afgetekende lijst uploaden": "Upload signed sheet",
+  "Bestand blijft op dit apparaat opgeslagen (max. 10 MB per bestand).": "File stays stored on this device (max. 10 MB per file).",
+  "Druk op \"Aftekenlijst afdrukken\". Is deze door iedereen ondertekend, scan hem dan in naar je pc. Upload het gescande bestand vervolgens via \"Afgetekende lijst uploaden\" om te archiveren.": "Press \"Print sign-off sheet\". Once everyone has signed it, scan it to your PC. Then upload the scanned file via \"Upload signed sheet\" to archive it.",
+  "Nog geen toolbox toegevoegd.": "No toolbox added yet.",
   "WERKORDER": "WORK ORDER",
   "TO DO LIST": "TO DO LIST",
   "KPI DASHBOARD": "KPI DASHBOARD",
@@ -22522,7 +22609,9 @@ function toolboxAlleMedewerkersGegroepeerd(){
     return uniek;
   }
   groepVolgorde.sort(function(a, b){ return a.localeCompare(b, 'nl', { sensitivity: 'base' }); });
-  var secties = [{ titel: 'Vaste medewerkers (Maandafsluiting)', namen: dedupSort(vast) }];
+  var terminalVoorTitel = sessionStorage.getItem('dj_terminal') || 'EP';
+  var vasteTitel = terminalVoorTitel === 'IMM' ? 'Employees' : 'Vaste medewerkers (Maandafsluiting)';
+  var secties = [{ titel: vasteTitel, namen: dedupSort(vast) }];
   groepVolgorde.forEach(function(g){
     secties.push({ titel: g, namen: dedupSort(groepenMap[g]) });
   });
@@ -22534,7 +22623,9 @@ function toolboxSluitAftekenlijst(){
   if (el) el.innerHTML = '';
 }
 function toolboxAftekenlijstAfdrukken(){
-  var onderwerp = prompt('Onderwerp van de toolbox (bijv. "Werken met gevaarlijke stoffen"):', '');
+  var terminalVoorTaal = sessionStorage.getItem('dj_terminal') || 'EP';
+  var isEngels = terminalVoorTaal === 'IMM';
+  var onderwerp = prompt(isEngels ? 'Toolbox subject (e.g. "Working with hazardous substances"):' : 'Onderwerp van de toolbox (bijv. "Werken met gevaarlijke stoffen"):', '');
   if (onderwerp === null) return;
   var overlay = document.getElementById('toolbox-print-overlay');
   if (!overlay) { oplToonMelding('✗ Kon de aftekenlijst niet openen (overlay ontbreekt).', '#7f1d1d', 8000); return; }
@@ -22546,11 +22637,16 @@ function toolboxAftekenlijstAfdrukken(){
   // gegarandeerd een directe kind-node is, ongeacht waar hij in de HTML voorkomt.
   document.body.appendChild(overlay);
   try {
-    var vandaag = new Date().toLocaleDateString('nl-NL', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    var terminal = sessionStorage.getItem('dj_terminal') || 'EP';
+    var vandaag = new Date().toLocaleDateString(isEngels ? 'en-GB' : 'nl-NL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    var terminal = terminalVoorTaal;
     var terminalNaam = terminal === 'HVH' ? 'Hoek van Holland' : (terminal === 'IMM' ? 'Immingham' : 'Europoort');
     var secties = toolboxAlleMedewerkersGegroepeerd();
     var teller = 0;
+    // Tekstlabels per taal, omdat deze overlay dynamisch wordt opgebouwd (niet aanwezig bij het
+    // laden van de pagina) en dus niet wordt bereikt door de algemene Engelse vertaling.
+    var lbl = isEngels
+      ? { print: 'Print / Save as PDF', sluiten: 'Close', titel: 'Toolbox sign-off sheet', onderwerp: 'Subject', afgedrukt: 'Printed on', nr: '#', naam: 'Name', datum: 'Date', paraaf: 'Signature', bijz: 'Remarks' }
+      : { print: 'Print / Opslaan als PDF', sluiten: 'Sluiten', titel: 'Toolbox aftekenlijst', onderwerp: 'Onderwerp', afgedrukt: 'Afgedrukt op', nr: '#', naam: 'Naam', datum: 'Datum', paraaf: 'Paraaf', bijz: 'Bijzonderheden' };
     var sectiesHtml = secties.filter(function(s){ return s.namen.length > 0; }).map(function(sectie){
       var rijenHtml = sectie.namen.map(function(naam){
         teller++;
@@ -22564,18 +22660,18 @@ function toolboxAftekenlijstAfdrukken(){
       }).join('');
       return '<h2>' + toolboxEsc(sectie.titel) + ' <span class="aantal">(' + sectie.namen.length + ')</span></h2>' +
         '<table><thead><tr>' +
-          '<th>#</th><th>Naam</th><th>Datum</th><th>Paraaf</th><th>Bijzonderheden</th>' +
+          '<th>' + lbl.nr + '</th><th>' + lbl.naam + '</th><th>' + lbl.datum + '</th><th>' + lbl.paraaf + '</th><th>' + lbl.bijz + '</th>' +
         '</tr></thead><tbody>' + rijenHtml + '</tbody></table>';
     }).join('');
     overlay.innerHTML =
       '<div class="no-print">' +
-        '<button onclick="window.print()" style="background:#0d3b52;color:#fff;border:none;border-radius:6px;padding:10px 20px;font-size:14px;font-weight:700;cursor:pointer;">&#x1F5A8; Print / Opslaan als PDF</button>' +
-        '<button onclick="toolboxSluitAftekenlijst()" style="background:#e8eef5;color:#0d3b52;border:1px solid #ccd6e5;border-radius:6px;padding:10px 20px;font-size:14px;font-weight:700;cursor:pointer;">&#x2715; Sluiten</button>' +
+        '<button onclick="window.print()" style="background:#0d3b52;color:#fff;border:none;border-radius:6px;padding:10px 20px;font-size:14px;font-weight:700;cursor:pointer;">&#x1F5A8; ' + lbl.print + '</button>' +
+        '<button onclick="toolboxSluitAftekenlijst()" style="background:#e8eef5;color:#0d3b52;border:1px solid #ccd6e5;border-radius:6px;padding:10px 20px;font-size:14px;font-weight:700;cursor:pointer;">&#x2715; ' + lbl.sluiten + '</button>' +
       '</div>' +
-      '<h1>Toolbox aftekenlijst &ndash; ' + toolboxEsc(terminalNaam) + '</h1>' +
+      '<h1>' + lbl.titel + ' &ndash; ' + toolboxEsc(terminalNaam) + '</h1>' +
       '<div class="sub">' +
-        (onderwerp ? 'Onderwerp: <b>' + toolboxEsc(onderwerp) + '</b> &nbsp;&bull;&nbsp; ' : '') +
-        'Afgedrukt op: ' + vandaag +
+        (onderwerp ? lbl.onderwerp + ': <b>' + toolboxEsc(onderwerp) + '</b> &nbsp;&bull;&nbsp; ' : '') +
+        lbl.afgedrukt + ': ' + vandaag +
       '</div>' +
       sectiesHtml;
     document.body.classList.add('toolbox-print-actief');
@@ -22692,6 +22788,8 @@ function pdSyncVanuitMaandafsluiting(epNamen, hvhNamen, immNamen){
   Object.keys(lijsten).forEach(function(t){ if (t !== terminal) vreemdeNamen = vreemdeNamen.concat(lijsten[t]); });
   var data = pdData();
   var changed = false;
+  var relevantSet = {};
+  (relevantNamen || []).forEach(function(naam){ if (naam) relevantSet[naam] = true; });
   (relevantNamen || []).forEach(function(naam){
     if (naam && !data[naam]) {
       data[naam] = [];
@@ -22699,9 +22797,12 @@ function pdSyncVanuitMaandafsluiting(epNamen, hvhNamen, immNamen){
     }
   });
   // Opschonen: eerder per ongeluk toegevoegde medewerkers van de andere terminal weer verwijderen,
-  // maar alleen als er nog geen registraties op staan (data die iemand heeft ingevoerd blijft altijd behouden).
+  // maar alleen als er nog geen registraties op staan (data die iemand heeft ingevoerd blijft altijd
+  // behouden) EN de naam niet ook gewoon bij de huidige terminal hoort — iemand die op zowel EP als
+  // HVH werkt (dezelfde naam in beide Maandafsluiting-lijsten) moet namelijk gewoon blijven staan,
+  // en werd hiervoor per abuis meteen weer verwijderd nadat hij net was toegevoegd.
   (vreemdeNamen || []).forEach(function(naam){
-    if (naam && data[naam] && data[naam].length === 0) {
+    if (naam && !relevantSet[naam] && data[naam] && data[naam].length === 0) {
       delete data[naam];
       changed = true;
     }
@@ -22737,6 +22838,19 @@ function pdInit(){
   var terminal = sessionStorage.getItem('dj_terminal') || 'EP';
   var nieuweBtn = document.getElementById('pd-nieuwe-medewerker-btn');
   if (nieuweBtn) nieuweBtn.style.display = (terminal === 'IMM') ? 'inline-block' : 'none';
+  var uitlegEl = document.getElementById('pd-uitleg-toevoegen');
+  if (uitlegEl) {
+    if (terminal === 'IMM') {
+      // Immingham heeft geen Maandafsluiting-koppeling: medewerkers worden hier bewust
+      // handmatig toegevoegd via de "+ New employee"-knop, vandaar de afwijkende (Engelse)
+      // uitleg. Groepen werken wel hetzelfde als op EP/HVH.
+      uitlegEl.innerHTML = '<strong>Active</strong>: add employees manually here using the "+ New employee" button above.<br>' +
+        '<strong>Groups</strong> (Trainees, Temp staff, School pupils, etc.): click "Groups" above, open the relevant group and click "+ Add name to &lt;group&gt;" at the bottom. This name will then also appear automatically under Training &rarr; Certification Overview.';
+    } else {
+      uitlegEl.innerHTML = '<strong>Actief</strong>: medewerkers komen hier automatisch bij vanuit de Maandafsluiting &mdash; niets handmatig toevoegen nodig.<br>' +
+        '<strong>Groepen</strong> (Stagiaires, Pro Intermediair, Schooljongens, TOS, e.d.): klik hierboven op "Groepen", open de betreffende groep en klik onderaan op <em>"+ Naam toevoegen aan &lt;groep&gt;"</em>. Deze naam verschijnt daarna ook automatisch bij Opleidingen &rarr; Overzicht Certificeringen.';
+    }
+  }
   ['actief','groep','uit_dienst'].forEach(function(c){
     var btn = document.getElementById('pd-cat-btn-' + c);
     if (btn) { btn.style.background = (c === 'actief') ? 'var(--navy)' : '#eef3fa'; btn.style.color = (c === 'actief') ? '#fff' : 'var(--navy)'; }
@@ -22823,8 +22937,58 @@ function pdNieuwGroepslid(){
   var volledigeNaam = naam.trim() + ' (' + _pdGroepGeselecteerd + ')';
   var data = pdData();
   if (!data[volledigeNaam]) { data[volledigeNaam] = []; pdSave(data); }
+  if (typeof pdSyncGroepenNaarOpleidingen === 'function') pdSyncGroepenNaarOpleidingen();
   pdSelecteer(volledigeNaam);
 }
+// Neemt medewerkers uit de Groepen in Personeelsdossier (Stagiaires, Pro Intermediair, enz.)
+// automatisch over als rij bij de bijbehorende groep in Opleidingen/Overzicht Certificeringen —
+// zodat iemand die je hier aan een groep toevoegt niet ook nog los in Opleidingen hoeft te
+// worden aangemaakt. Alleen toevoegen: bestaat de naam al in Opleidingen (met eigen
+// certificeringsdata en eventueel een andere groepsindeling), dan blijft die rij ongewijzigd.
+// Neemt medewerkers uit Personeelsdossier automatisch over in Opleidingen/Overzicht
+// Certificeringen: (1) Groepen (Stagiaires, Pro Intermediair, enz.) op elke terminal, en (2)
+// op Immingham ook de gewone "Actief"-medewerkers, omdat Immingham geen Maandafsluiting-koppeling
+// heeft en die medewerkers dus alleen via Personeelsdossier handmatig worden ingevoerd. Alleen
+// toevoegen: bestaat de naam al in Opleidingen, dan blijft die rij (en zijn certificeringsdata)
+// ongewijzigd.
+function pdSyncGroepenNaarOpleidingen(){
+  if (typeof oplOverzichtGetData !== 'function' || typeof oplOverzichtSaveData !== 'function') return;
+  var data = pdData();
+  var lijst = oplOverzichtGetData();
+  var bestaandeNamen = {};
+  lijst.forEach(function(r){ bestaandeNamen[r.naam] = true; });
+  var changed = false;
+  var terminal = sessionStorage.getItem('dj_terminal') || 'EP';
+  Object.keys(data).forEach(function(sleutel){
+    var groep = pdGroepVanNaam(sleutel);
+    if (groep) {
+      if (PD_GROEPEN.indexOf(sleutel) !== -1) return; // de groep-container zelf overslaan
+      var plainNaam = sleutel.replace(/ \([^)]+\)$/, '');
+      if (!bestaandeNamen[plainNaam]) {
+        lijst.push({naam: plainNaam, groep: groep, tt: null, rs: null, hf: null, bhv: null, ehbo: null, pl: null, bb: null, al: null, gs: null});
+        bestaandeNamen[plainNaam] = true;
+        changed = true;
+      }
+    } else if (terminal === 'IMM' && pdCategorieVan(sleutel) === 'actief') {
+      if (!bestaandeNamen[sleutel]) {
+        lijst.push({naam: sleutel, groep: null, tt: null, rs: null, hf: null, bhv: null, ehbo: null, pl: null, bb: null, al: null, gs: null});
+        bestaandeNamen[sleutel] = true;
+        changed = true;
+      }
+    }
+  });
+  if (changed) {
+    lijst.sort(function(a,b){ return a.naam.localeCompare(b.naam); });
+    oplOverzichtSaveData(lijst);
+    if (typeof oplHuidigeTab !== 'undefined' && oplHuidigeTab === 'overzicht' && typeof oplOverzichtHtml === 'function') {
+      var oplContent = document.getElementById('opl-content');
+      if (oplContent) oplContent.innerHTML = oplOverzichtHtml();
+    }
+  }
+}
+// Eenmalig bij het laden van de pagina, om de bestaande achterstand in te halen (mensen die al
+// wel in een Personeelsdossier-groep stonden voordat deze koppeling bestond).
+setTimeout(pdSyncGroepenNaarOpleidingen, 0);
 function pdVerwijderGroepslid(naam){
   var groep = pdGroepVanNaam(naam);
   if (!groep || PD_GROEPEN.indexOf(naam) !== -1) return;
@@ -22836,6 +23000,49 @@ function pdVerwijderGroepslid(naam){
   pdRenderLijst();
   var detail = document.getElementById('pd-detail');
   if (detail) detail.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:30px 10px;text-align:center;">Selecteer een naam links, of voeg een nieuwe toe.</div>';
+}
+// Verwijdert een "uit dienst"-medewerker DEFINITIEF en overal uit het systeem, niet alleen uit
+// Personeelsdossier: ook de verjaardag-registratie (getVerjaardagen) en de rij in Overzicht
+// Certificeringen (oplOverzichtGetData) worden verwijderd, en de naam komt op de
+// uitsluitingslijst zodat een latere sync vanuit Maandafsluiting hem niet weer aanmaakt. Dit is
+// bewust onomkeerbaar (in tegenstelling tot "uit dienst" markeren, wat reversibel is zolang de
+// persoon weer in Maandafsluiting verschijnt) — vandaar de dubbele bevestiging.
+function pdVerwijderDefinitief(naam){
+  var basisNaam = naam.replace(/ \(uit dienst\)$/, '');
+  if (!confirm('"' + basisNaam + '" DEFINITIEF verwijderen uit het hele systeem?\n\nDit verwijdert:\n\u2022 Personeelsdossier (alle registraties)\n\u2022 Verjaardag-gegevens\n\u2022 De rij in Overzicht Certificeringen\n\nDit kan niet ongedaan worden gemaakt.')) return;
+  if (!confirm('Weet je het echt zeker? Er is geen manier om dit terug te draaien.')) return;
+
+  var pdD = pdData();
+  delete pdD[naam];
+  delete pdD[basisNaam]; // defensief, mocht de actieve (niet-uitdienst) variant per ongeluk ook nog bestaan
+  pdSave(pdD);
+
+  if (typeof getVerjaardagen === 'function' && typeof saveVerjaardagen === 'function') {
+    var verjD = getVerjaardagen();
+    delete verjD[naam];
+    delete verjD[basisNaam];
+    saveVerjaardagen(verjD);
+  }
+
+  if (typeof oplOverzichtGetData === 'function' && typeof oplOverzichtSaveData === 'function') {
+    var oplLijst = oplOverzichtGetData().filter(function(r){ return r.naam !== naam && r.naam !== basisNaam; });
+    oplOverzichtSaveData(oplLijst);
+  }
+  if (typeof oplOverzichtVoegUitgeslotenToe === 'function') {
+    oplOverzichtVoegUitgeslotenToe(basisNaam);
+    oplOverzichtVoegUitgeslotenToe(naam);
+  }
+  if (typeof oplHuidigeTab !== 'undefined' && oplHuidigeTab === 'overzicht' && typeof oplOverzichtHtml === 'function') {
+    var oplContent = document.getElementById('opl-content');
+    if (oplContent) oplContent.innerHTML = oplOverzichtHtml();
+  }
+
+  if (_pdGeselecteerd === naam) {
+    _pdGeselecteerd = null;
+    var detail = document.getElementById('pd-detail');
+    if (detail) detail.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:30px 10px;text-align:center;">Selecteer een medewerker links, of zoek op naam/tekst.</div>';
+  }
+  pdRenderLijst();
 }
 
 function pdRenderLijst(){
@@ -22870,7 +23077,10 @@ function pdRenderLijst(){
       var label = isContainer ? 'Algemeen (niet op naam)' : naam.replace(/ \([^)]+\)$/, '');
       return '<div onclick="pdSelecteer(\'' + naam.replace(/'/g, "\\'") + '\')" style="padding:9px 14px;cursor:pointer;border-bottom:1px solid #f0f2f5;font-size:13px;display:flex;justify-content:space-between;align-items:center;' + (actief ? 'background:var(--navy);color:#fff;font-weight:700;' : 'background:#fff;color:' + (isContainer?'#999;font-style:italic;':'#333;')) + '">' +
         '<span>' + pdEsc(label) + '</span>' +
+        '<span style="display:flex;align-items:center;gap:10px;flex-shrink:0;">' +
         '<span style="font-size:11px;' + (actief ? 'color:#cfe0f2;' : 'color:var(--muted);') + '">' + (data[naam]||[]).length + '</span>' +
+        (isContainer ? '' : '<button onclick="event.stopPropagation();pdVerwijderGroepslid(\'' + naam.replace(/'/g, "\\'") + '\')" title="Deze persoon volledig verwijderen uit ' + pdEsc(groep) + '" style="background:none;border:none;color:' + (actief ? '#ffb3ab' : '#c0392b') + ';cursor:pointer;font-size:14px;padding:0;line-height:1;">&#x2715;</button>') +
+        '</span>' +
         '</div>';
     }).join('');
     html += '<div onclick="pdNieuwGroepslid()" style="padding:10px 14px;cursor:pointer;text-align:center;font-size:12.5px;font-weight:700;color:var(--navy);background:#eef3fa;">+ Naam toevoegen aan ' + pdEsc(groep) + '</div>';
@@ -22890,7 +23100,10 @@ function pdRenderLijst(){
     var uitDienst = _pdCategorie === 'uit_dienst';
     return '<div onclick="pdSelecteer(\'' + naam.replace(/'/g, "\\'") + '\')" style="padding:9px 14px;cursor:pointer;border-bottom:1px solid #f0f2f5;font-size:13px;display:flex;justify-content:space-between;align-items:center;' + (actief ? 'background:var(--navy);color:#fff;font-weight:700;' : 'background:#fff;' + (uitDienst?'color:#999;font-style:italic;':'color:#333;')) + '">' +
       '<span>' + pdEsc(naam) + '</span>' +
+      '<span style="display:flex;align-items:center;gap:10px;flex-shrink:0;">' +
       '<span style="font-size:11px;' + (actief ? 'color:#cfe0f2;' : 'color:var(--muted);') + '">' + (data[naam]||[]).length + '</span>' +
+      (uitDienst ? '<button onclick="event.stopPropagation();pdVerwijderDefinitief(\'' + naam.replace(/'/g, "\\'") + '\')" title="Definitief verwijderen uit het hele systeem" style="background:none;border:none;color:#c0392b;cursor:pointer;font-size:14px;padding:0;line-height:1;">&#x2715;</button>' : '') +
+      '</span>' +
       '</div>';
   }).join('');
 }
@@ -22908,6 +23121,55 @@ function pdSelecteer(naam){
   pdRenderLijst();
   pdRenderDetail();
 }
+// Voegt alle registraties van "vanNaam" samen bij een andere naam (bijv. een dubbel dossier
+// door een naamwijziging/schrijfwijze, zoals "H. Karagul" die eigenlijk bij "Harun Karagul"
+// hoort). "vanNaam" wordt na het samenvoegen verwijderd. Ook de verjaardag-registratie gaat
+// mee als het doel er zelf nog geen heeft. Werkt voor zowel actieve als "uit dienst"-namen.
+function pdSamenvoegenMet(vanNaam){
+  var doelNaam = prompt('Registraties van "' + vanNaam + '" samenvoegen met welke medewerker?\n\nTyp de naam exact zoals die in Personeelsdossier staat (zie de lijst links).\nLet op: de naam die je hier intypt blijft over, "' + vanNaam + '" wordt verwijderd.');
+  if (doelNaam === null) return;
+  doelNaam = doelNaam.trim();
+  if (!doelNaam) return;
+  if (doelNaam === vanNaam) { alert('Dit is dezelfde naam.'); return; }
+
+  // Waarschuwing tegen de meest gemaakte fout: een actieve medewerker samenvoegen MET een naam
+  // die als "uit dienst" gemarkeerd staat. Het resultaat erft dan automatisch die categorie
+  // (categorie wordt puur bepaald door de tekst "(uit dienst)" in de naam), waardoor iemand die
+  // nog gewoon in dienst is per ongeluk als vertrokken te boek komt te staan.
+  var vanIsUitDienst = vanNaam.indexOf('(uit dienst)') !== -1;
+  var doelIsUitDienst = doelNaam.indexOf('(uit dienst)') !== -1;
+  if (!vanIsUitDienst && doelIsUitDienst) {
+    if (!confirm('LET OP: "' + doelNaam + '" staat gemarkeerd als "uit dienst", maar "' + vanNaam + '" niet. Na het samenvoegen komt alles onder "' + doelNaam + '" te staan, dus óók onder "Uit dienst" — ook als deze persoon nog gewoon in dienst is.\n\nIs dit echt de bedoeling? Wil je iemand die nog werkt weer terugzetten naar actief, kies dan waarschijnlijk de andere richting: open het "uit dienst"-dossier en voeg dát samen met de actieve naam.\n\nDoorgaan met samenvoegen zoals ingevoerd?')) return;
+  }
+
+  var data = pdData();
+  var bestaatAl = !!data[doelNaam];
+  if (!bestaatAl) {
+    if (!confirm('"' + doelNaam + '" bestaat nog niet in Personeelsdossier. Toch aanmaken en de registraties hierheen verplaatsen?')) return;
+    data[doelNaam] = [];
+  }
+  var aantal = (data[vanNaam] || []).length;
+  if (!confirm('Alle ' + aantal + ' registratie(s) van "' + vanNaam + '" verplaatsen naar "' + doelNaam + '"? "' + vanNaam + '" wordt daarna verwijderd. Dit kan niet ongedaan worden gemaakt.')) return;
+
+  var volgendId = pdVolgendeId(data);
+  (data[vanNaam] || []).forEach(function(e){
+    data[doelNaam].push({ id: volgendId++, datum: e.datum, tekst: e.tekst });
+  });
+  delete data[vanNaam];
+  pdSave(data);
+
+  if (typeof getVerjaardagen === 'function' && typeof saveVerjaardagen === 'function') {
+    var verjD = getVerjaardagen();
+    if (verjD[vanNaam] && !verjD[doelNaam]) verjD[doelNaam] = verjD[vanNaam];
+    delete verjD[vanNaam];
+    saveVerjaardagen(verjD);
+  }
+
+  _pdGeselecteerd = doelNaam;
+  pdRenderLijst();
+  pdRenderDetail();
+  alert('Klaar — de registraties staan nu bij "' + doelNaam + '".');
+}
 function pdRenderDetail(){
   var el = document.getElementById('pd-detail');
   if (!el || !_pdGeselecteerd) return;
@@ -22920,6 +23182,7 @@ function pdRenderDetail(){
     '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:19px;font-weight:800;color:var(--navy);">' + pdEsc(_pdGeselecteerd) + '</div>' +
     '<div style="display:flex;gap:8px;flex-shrink:0;">' +
     (isGroepslid ? '<button onclick="pdVerwijderGroepslid(\'' + _pdGeselecteerd.replace(/'/g, "\\'") + '\')" title="Deze persoon volledig verwijderen" style="background:#fdecea;color:#c0392b;border:1px solid #f0b8b0;border-radius:6px;padding:8px 12px;cursor:pointer;font-size:12px;font-weight:700;">&#x1F5D1; Verwijderen</button>' : '') +
+    '<button onclick="pdSamenvoegenMet(\'' + _pdGeselecteerd.replace(/'/g, "\\'") + '\')" title="Registraties samenvoegen met een andere naam (bijv. bij een dubbel dossier door naamverschil)" style="background:#eef3fa;color:var(--navy);border:1px solid #ccd6e5;border-radius:6px;padding:8px 12px;cursor:pointer;font-size:12px;font-weight:700;">&#x1F500; Samenvoegen</button>' +
     '<button onclick="pdToevoegenPrompt(\'' + _pdGeselecteerd.replace(/'/g, "\\'") + '\')" style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:12px;font-weight:700;">+ Registratie toevoegen</button>' +
     '</div></div>';
   html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:8px 12px;background:#fff8e6;border:1px solid #f0e0a8;border-radius:6px;">' +
@@ -22927,6 +23190,7 @@ function pdRenderDetail(){
     '<span style="font-size:12px;font-weight:700;color:#7a5c00;">Verjaardag</span>' +
     '<input type="number" min="1" max="31" placeholder="Dag" value="' + pdEsc(verjEntry.dag || '') + '" id="pd-verj-dag" onchange="pdSlaVerjaardagOp()" style="width:60px;padding:5px 6px;border:1px solid #ccb87a;border-radius:4px;font-size:12px;text-align:center;">' +
     '<input type="number" min="1" max="12" placeholder="Mnd" value="' + pdEsc(verjEntry.maand || '') + '" id="pd-verj-maand" onchange="pdSlaVerjaardagOp()" style="width:60px;padding:5px 6px;border:1px solid #ccb87a;border-radius:4px;font-size:12px;text-align:center;">' +
+    '<input type="number" min="1900" max="2100" placeholder="Jaar" value="' + pdEsc(verjEntry.jaar || '') + '" id="pd-verj-jaar" onchange="pdSlaVerjaardagOp()" title="Geboortejaar (voor AOW/SFR-berekening)" style="width:70px;padding:5px 6px;border:1px solid #ccb87a;border-radius:4px;font-size:12px;text-align:center;">' +
     '<span id="pd-verj-opgeslagen" style="font-size:11px;color:#166534;opacity:0;transition:opacity 0.4s;">&#10003; Opgeslagen</span>' +
     '</div>';
   if (!entries.length) {
@@ -22954,9 +23218,10 @@ function pdSlaVerjaardagOp(){
   if (!_pdGeselecteerd || typeof getVerjaardagen !== 'function' || typeof saveVerjaardagen !== 'function') return;
   var dag = (document.getElementById('pd-verj-dag') || {}).value || '';
   var maand = (document.getElementById('pd-verj-maand') || {}).value || '';
+  var jaar = (document.getElementById('pd-verj-jaar') || {}).value || '';
   var data = getVerjaardagen();
   if (dag.trim() && maand.trim()) {
-    data[_pdGeselecteerd] = { dag: dag.trim(), maand: maand.trim() };
+    data[_pdGeselecteerd] = { dag: dag.trim(), maand: maand.trim(), jaar: jaar.trim() || null };
   } else {
     delete data[_pdGeselecteerd];
   }
@@ -22992,6 +23257,7 @@ function pdNieuweMedewerkerPrompt(){
   naam = naam.trim();
   var data = pdData();
   if (!data[naam]) { data[naam] = []; pdSave(data); }
+  if (typeof pdSyncGroepenNaarOpleidingen === 'function') pdSyncGroepenNaarOpleidingen();
   pdSelecteer(naam);
 }
 function pdZoek(query){
