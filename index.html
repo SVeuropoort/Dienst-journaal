@@ -2786,7 +2786,7 @@ document.addEventListener('contextmenu', function(e) {
         <option value="IMM">IMMINGHAM</option>
       </select>
     </div>
-    <div style="color:rgba(255,255,255,0.7);font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">Wachtwoord</div>
+    <div id="dj-ww-label" style="color:rgba(255,255,255,0.7);font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">Wachtwoord</div>
     <input type="password" id="dj-ww" placeholder="Wachtwoord..." style="width:100%;padding:12px;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:rgba(255,255,255,0.1);color:#fff;font-size:15px;outline:none;box-sizing:border-box;margin-bottom:10px;">
     <div id="dj-err" style="color:#ff6b6b;font-size:12px;margin-bottom:8px;display:none;">Onjuist wachtwoord.</div>
     <button id="dj-btn" style="width:100%;padding:12px;background:#e8a020;border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;">INLOGGEN</button>
@@ -2797,20 +2797,7 @@ document.addEventListener('contextmenu', function(e) {
   <div style="background:#0d1f38;border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:28px 32px;width:360px;max-width:92vw;max-height:85vh;overflow-y:auto;font-family:Arial,sans-serif;">
     <div style="color:#fff;font-size:16px;font-weight:800;letter-spacing:.5px;margin-bottom:4px;">&#x2699;&#xFE0F; Wachtwoordbeheer</div>
     <div style="color:rgba(255,255,255,0.5);font-size:11px;margin-bottom:18px;">Wijzigingen gelden direct, ook op andere apparaten (na een paginaverversing daar).</div>
-    <div style="color:#e8a020;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Inlogwachtwoord (per terminal)</div>
-    <div style="margin-bottom:10px;"><label style="color:rgba(255,255,255,0.7);font-size:12px;">Europoort</label>
-      <input type="text" id="dj-admin-login-ep" style="width:100%;padding:9px;border:1px solid rgba(255,255,255,0.2);border-radius:6px;background:rgba(255,255,255,0.1);color:#fff;font-size:13px;box-sizing:border-box;"></div>
-    <div style="margin-bottom:10px;"><label style="color:rgba(255,255,255,0.7);font-size:12px;">Hoek van Holland</label>
-      <input type="text" id="dj-admin-login-hvh" style="width:100%;padding:9px;border:1px solid rgba(255,255,255,0.2);border-radius:6px;background:rgba(255,255,255,0.1);color:#fff;font-size:13px;box-sizing:border-box;"></div>
-    <div style="margin-bottom:18px;"><label style="color:rgba(255,255,255,0.7);font-size:12px;">Immingham</label>
-      <input type="text" id="dj-admin-login-imm" style="width:100%;padding:9px;border:1px solid rgba(255,255,255,0.2);border-radius:6px;background:rgba(255,255,255,0.1);color:#fff;font-size:13px;box-sizing:border-box;"></div>
-    <div style="color:#e8a020;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Werkoverdracht-wachtwoord (per terminal)</div>
-    <div style="margin-bottom:10px;"><label style="color:rgba(255,255,255,0.7);font-size:12px;">Europoort</label>
-      <input type="text" id="dj-admin-wo-ep" style="width:100%;padding:9px;border:1px solid rgba(255,255,255,0.2);border-radius:6px;background:rgba(255,255,255,0.1);color:#fff;font-size:13px;box-sizing:border-box;"></div>
-    <div style="margin-bottom:10px;"><label style="color:rgba(255,255,255,0.7);font-size:12px;">Hoek van Holland</label>
-      <input type="text" id="dj-admin-wo-hvh" style="width:100%;padding:9px;border:1px solid rgba(255,255,255,0.2);border-radius:6px;background:rgba(255,255,255,0.1);color:#fff;font-size:13px;box-sizing:border-box;"></div>
-    <div style="margin-bottom:20px;"><label style="color:rgba(255,255,255,0.7);font-size:12px;">Immingham</label>
-      <input type="text" id="dj-admin-wo-imm" style="width:100%;padding:9px;border:1px solid rgba(255,255,255,0.2);border-radius:6px;background:rgba(255,255,255,0.1);color:#fff;font-size:13px;box-sizing:border-box;"></div>
+    <div id="dj-admin-velden"></div>
     <div id="dj-admin-msg" style="color:#4ade80;font-size:12px;margin-bottom:10px;display:none;">&#10003; Opgeslagen.</div>
     <div style="display:flex;gap:8px;">
       <button onclick="djAdminOpslaan()" style="flex:1;padding:11px;background:#e8a020;border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;">Opslaan</button>
@@ -2840,9 +2827,8 @@ document.addEventListener('contextmenu', function(e) {
   }
   function djLogin(){
     var terminal = sessionStorage.getItem('dj_terminal') || 'EP';
-    var correct = djWachtwoordLogin(terminal);
     var ingevoerd = document.getElementById('dj-ww').value;
-    if(ingevoerd === correct || ingevoerd === 'stena'){
+    if(djWwCheck(ingevoerd, 'login_' + terminal)){
       sessionStorage.setItem('dj_auth','1');
       // Herlaad pagina zodat alle terminal-sleutels opnieuw berekend worden
       location.reload();
@@ -2858,24 +2844,73 @@ document.addEventListener('contextmenu', function(e) {
 // De opgeslagen versie staat, net als de rest van de app-data, gewoon in localStorage —
 // vandaar dat de code hieronder (13111982) de enige echte beveiliging is: wie de broncode
 // leest kan deze standaardwaarden altijd al zien, dat verandert dit paneel niet.
-var DJ_WW_STANDAARD_LOGIN = { EP: 'SVeuropoort2026', HVH: 'SVhvh2026', IMM: 'SVimmingham2026' };
-var DJ_WW_STANDAARD_WERKOVERDRACHT = { EP: 'SVeuropoort', HVH: 'svhvh', IMM: 'svimmingham' };
-function djWachtwoordLogin(terminal){
-  return localStorage.getItem('dj_ww_login_' + terminal) || DJ_WW_STANDAARD_LOGIN[terminal];
+//
+// Verwarde opslag: waarden staan hier (en in localStorage) niet als leesbare tekst, maar als
+// Base64 met omgekeerde tekenvolgorde. Dit is bewust verwarring, geen echte versleuteling.
+function djObf(tekst){
+  try { return btoa(unescape(encodeURIComponent(tekst))).split('').reverse().join(''); }
+  catch(e){ return ''; }
 }
-function djWachtwoordWerkoverdracht(terminal){
-  return localStorage.getItem('dj_ww_werkoverdracht_' + terminal) || DJ_WW_STANDAARD_WERKOVERDRACHT[terminal];
+function djDeobf(verward){
+  try { return decodeURIComponent(escape(atob(verward.split('').reverse().join('')))); }
+  catch(e){ return ''; }
 }
+// Alle wachtwoorden in het systeem, op dezelfde manier behandeld. "standaard" staat hier al
+// verward (djObf) opgeslagen, precies zoals een aangepast wachtwoord dat ook zou zijn.
+var DJ_WW_DEFS = [
+  { sleutel: 'beheercode', label: 'Beheercode (voor dit paneel zelf)', standaard: djObf('13111982') },
+  { sleutel: 'login_EP', label: 'Inlogwachtwoord \u2014 Europoort', standaard: djObf('SVeuropoort2026') },
+  { sleutel: 'login_HVH', label: 'Inlogwachtwoord \u2014 Hoek van Holland', standaard: djObf('SVhvh2026') },
+  { sleutel: 'login_IMM', label: 'Inlogwachtwoord \u2014 Immingham', standaard: djObf('SVimmingham2026') },
+  { sleutel: 'werkoverdracht_EP', label: 'Werkoverdracht \u2014 Europoort', standaard: djObf('SVeuropoort') },
+  { sleutel: 'werkoverdracht_HVH', label: 'Werkoverdracht \u2014 Hoek van Holland', standaard: djObf('svhvh') },
+  { sleutel: 'werkoverdracht_IMM', label: 'Werkoverdracht \u2014 Immingham', standaard: djObf('svimmingham') },
+  { sleutel: 'master', label: 'Meesterwachtwoord (werkt overal, naast inlogwachtwoord)', standaard: djObf('stena') },
+  { sleutel: 'anets_certificeringen', label: 'Certificeringen ontgrendelen', standaard: djObf('anets') },
+  { sleutel: 'anets_maandafsluiting', label: 'Maandafsluiting ontgrendelen', standaard: djObf('anets') },
+  { sleutel: 'anets_ort', label: 'ORT/Basisrooster ontgrendelen', standaard: djObf('anets') },
+  { sleutel: 'salaris', label: 'Maandafsluiting \u2192 Instellingen (loongroepen)', standaard: djObf('Salaris') },
+  { sleutel: 'ort_intern', label: 'ORT Rekentool (intern tabblad)', standaard: djObf('SVeuropoort') }
+];
+function djWwGet(sleutel){
+  var def = DJ_WW_DEFS.filter(function(d){ return d.sleutel === sleutel; })[0];
+  var opgeslagen = localStorage.getItem('dj_ww_' + sleutel);
+  return djDeobf(opgeslagen || (def ? def.standaard : ''));
+}
+function djWwSet(sleutel, waarde){
+  if (waarde && waarde.trim()) localStorage.setItem('dj_ww_' + sleutel, djObf(waarde.trim()));
+  else localStorage.removeItem('dj_ww_' + sleutel); // leeg laten = terug naar standaardwachtwoord
+}
+// Controleert een ingevoerd wachtwoord tegen het wachtwoord van "sleutel" OF tegen het
+// meesterwachtwoord (overbrugt dus elk voorkomend wachtwoord in de app). Het beheerpaneel zelf
+// (de code 13111982) loopt hier bewust niet doorheen en blijft dus als enige altijd apart
+// beveiligd, ook voor wie het meesterwachtwoord kent.
+function djWwCheck(ingevoerd, sleutel){
+  if (!ingevoerd) return false;
+  return ingevoerd === djWwGet(sleutel) || ingevoerd === djWwGet('master');
+}
+// Backwards-compatible helpers: bestaande checks in de rest van de app (login, Werkoverdracht,
+// Certificeringen, Maandafsluiting, ORT) blijven deze functienamen aanroepen, maar ze lopen nu
+// allemaal via hetzelfde djWwGet-mechanisme hierboven.
+function djWachtwoordLogin(terminal){ return djWwGet('login_' + terminal); }
+function djWachtwoordWerkoverdracht(terminal){ return djWwGet('werkoverdracht_' + terminal); }
+function djWachtwoordAnetsCertificeringen(){ return djWwGet('anets_certificeringen'); }
+function djWachtwoordAnetsMaandafsluiting(){ return djWwGet('anets_maandafsluiting'); }
+function djWachtwoordAnetsOrt(){ return djWwGet('anets_ort'); }
+function djWachtwoordSalaris(){ return djWwGet('salaris'); }
+function djWachtwoordMaster(){ return djWwGet('master'); }
+function djWachtwoordOrtIntern(){ return djWwGet('ort_intern'); }
 function djAdminOpenen(){
   var code = prompt('Beheercode:');
   if (code === null) return;
-  if (code !== '13111982') { alert('Onjuiste code.'); return; }
-  document.getElementById('dj-admin-login-ep').value = djWachtwoordLogin('EP');
-  document.getElementById('dj-admin-login-hvh').value = djWachtwoordLogin('HVH');
-  document.getElementById('dj-admin-login-imm').value = djWachtwoordLogin('IMM');
-  document.getElementById('dj-admin-wo-ep').value = djWachtwoordWerkoverdracht('EP');
-  document.getElementById('dj-admin-wo-hvh').value = djWachtwoordWerkoverdracht('HVH');
-  document.getElementById('dj-admin-wo-imm').value = djWachtwoordWerkoverdracht('IMM');
+  if (code !== djWwGet('beheercode')) { alert('Onjuiste code.'); return; }
+  var container = document.getElementById('dj-admin-velden');
+  if (container) {
+    container.innerHTML = DJ_WW_DEFS.map(function(def){
+      return '<div style="margin-bottom:10px;"><label style="color:rgba(255,255,255,0.7);font-size:12px;">' + def.label + '</label>' +
+        '<input type="text" data-ww-sleutel="' + def.sleutel + '" value="' + djWwGet(def.sleutel).replace(/"/g, '&quot;') + '" style="width:100%;padding:9px;border:1px solid rgba(255,255,255,0.2);border-radius:6px;background:rgba(255,255,255,0.1);color:#fff;font-size:13px;box-sizing:border-box;"></div>';
+    }).join('');
+  }
   var msg = document.getElementById('dj-admin-msg');
   if (msg) msg.style.display = 'none';
   document.getElementById('dj-admin-modal').style.display = 'flex';
@@ -2884,19 +2919,12 @@ function djAdminSluiten(){
   document.getElementById('dj-admin-modal').style.display = 'none';
 }
 function djAdminOpslaan(){
-  var velden = {
-    'dj_ww_login_EP': 'dj-admin-login-ep',
-    'dj_ww_login_HVH': 'dj-admin-login-hvh',
-    'dj_ww_login_IMM': 'dj-admin-login-imm',
-    'dj_ww_werkoverdracht_EP': 'dj-admin-wo-ep',
-    'dj_ww_werkoverdracht_HVH': 'dj-admin-wo-hvh',
-    'dj_ww_werkoverdracht_IMM': 'dj-admin-wo-imm'
-  };
-  Object.keys(velden).forEach(function(sleutel){
-    var waarde = (document.getElementById(velden[sleutel]) || {}).value || '';
-    if (waarde.trim()) localStorage.setItem(sleutel, waarde.trim());
-    else localStorage.removeItem(sleutel); // leeg laten = terug naar standaardwachtwoord
-  });
+  var container = document.getElementById('dj-admin-velden');
+  if (container) {
+    container.querySelectorAll('input[data-ww-sleutel]').forEach(function(input){
+      djWwSet(input.getAttribute('data-ww-sleutel'), input.value);
+    });
+  }
   var msg = document.getElementById('dj-admin-msg');
   if (msg) { msg.style.display = 'block'; setTimeout(function(){ msg.style.display = 'none'; }, 2500); }
 }
@@ -5041,6 +5069,17 @@ window.addEventListener('resize', () => {
     // Login dropdown
     var select = document.getElementById('terminal-select');
     if (select) select.value = t;
+    // Inlogscherm zelf: expliciet bijwerken in plaats van te vertrouwen op de algemene
+    // Engelse vertaling, want die draait pas op de hoofdpagina na inloggen en bereikt het
+    // inlogscherm zelf niet betrouwbaar.
+    var wwLabel = document.getElementById('dj-ww-label');
+    if (wwLabel) wwLabel.textContent = (t === 'IMM') ? 'Password' : 'Wachtwoord';
+    var wwInput = document.getElementById('dj-ww');
+    if (wwInput) wwInput.placeholder = (t === 'IMM') ? 'Password...' : 'Wachtwoord...';
+    var wwBtn = document.getElementById('dj-btn');
+    if (wwBtn) wwBtn.textContent = (t === 'IMM') ? 'LOG IN' : 'INLOGGEN';
+    var wwErr = document.getElementById('dj-err');
+    if (wwErr) wwErr.textContent = (t === 'IMM') ? 'Incorrect password.' : 'Onjuist wachtwoord.';
     // Sommige onderdelen zijn (nog) niet van toepassing voor Immingham (NL-specifieke CAO/loonregels)
     if (typeof djVerbergTabsVoorTerminal === 'function') djVerbergTabsVoorTerminal();
     if (typeof verversWeerGetijdenTitels === 'function') verversWeerGetijdenTitels();
@@ -11920,10 +11959,11 @@ function initOpleidingen(){
 var _oplCertificeringenOntgrendeld = false; // blijft ontgrendeld voor de rest van deze sessie
 function oplToonTab(id){
   if (id === 'overzicht' && !_oplCertificeringenOntgrendeld) {
-    var ww = prompt('Certificeringen bevat persoonlijke gegevens.\nVoer het wachtwoord in:');
+    var isEngelsOpl = (sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM';
+    var ww = prompt(isEngelsOpl ? 'Certifications contain personal data.\nEnter the password:' : 'Certificeringen bevat persoonlijke gegevens.\nVoer het wachtwoord in:');
     if (ww === null) return; // geannuleerd: blijf op de huidige tab
-    if (ww !== 'anets') {
-      alert('Onjuist wachtwoord.');
+    if (!djWwCheck(ww, 'anets_certificeringen')) {
+      alert(isEngelsOpl ? 'Incorrect password.' : 'Onjuist wachtwoord.');
       return;
     }
     _oplCertificeringenOntgrendeld = true;
@@ -13863,7 +13903,7 @@ function closePwModal() {
 }
 function submitPwModal() {
   const invoer = document.getElementById(&quot;pw-modal-input&quot;).value;
-  if (invoer === &quot;Salaris&quot;) {
+  if (window.parent.djWwCheck ? window.parent.djWwCheck(invoer, &quot;salaris&quot;) : invoer === &quot;Salaris&quot;) {
     closePwModal();
     openSettings();
   } else {
@@ -15684,7 +15724,7 @@ renderAll();
     if (_ww) return true;
     var pw = prompt('Voer het wachtwoord in voor Werkoverdracht:');
     if (pw === null) return false; // cancelled
-    if (pw === 'SVeuropoort') {
+    if (djWwCheck(pw, 'ort_intern')) {
       _ww = true;
       return true;
     }
@@ -18617,7 +18657,7 @@ function wisselPunctualityDatum(dateStr) {
     var lock = document.getElementById('ma-lock');
     var iframe = document.getElementById('ma-iframe');
     if (!inp) return;
-    if (inp.value === 'anets') {
+    if (djWwCheck(inp.value, 'anets_maandafsluiting')) {
       lock.style.display = 'none';
       iframe.style.display = 'block';
       iframe.style.width = '99%';
@@ -18635,7 +18675,7 @@ function wisselPunctualityDatum(dateStr) {
     var lock = document.getElementById('ort-lock');
     var iframe = document.getElementById('ort-iframe');
     if (!inp) return;
-    if (inp.value === 'anets') {
+    if (djWwCheck(inp.value, 'anets_ort')) {
       lock.style.display = 'none';
       iframe.style.display = 'block';
       iframe.style.width = '99%';
@@ -22468,11 +22508,11 @@ function renderTruckChart(maand, jaar) {
 })();
 
 function navWerkoverdracht(label, btn, subtab, callback) {
-  var ww = prompt('Wachtwoord vereist voor Werkoverdracht:');
-  if (ww === null) return;
   var terminal = sessionStorage.getItem('dj_terminal') || 'EP';
-  var correct = djWachtwoordWerkoverdracht(terminal);
-  if (ww !== correct) { alert('Onjuist wachtwoord.'); return; }
+  var isEngels = terminal === 'IMM';
+  var ww = prompt(isEngels ? 'Password required for Shift Handover:' : 'Wachtwoord vereist voor Werkoverdracht:');
+  if (ww === null) return;
+  if (!djWwCheck(ww, 'werkoverdracht_' + terminal)) { alert(isEngels ? 'Incorrect password.' : 'Onjuist wachtwoord.'); return; }
   navTo('nieuw', label, btn);
   if (subtab) setTimeout(function(){
     if (typeof nieuwToonTab === 'function') nieuwToonTab(subtab);
