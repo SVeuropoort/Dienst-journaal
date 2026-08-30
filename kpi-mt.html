@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KPI Dashboard — MT | Dienst Journaal</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: Arial, sans-serif; background:#f4f7fb; color:#1a2a4a; }
+  :root { --navy:#003366; --muted:#5a7090; --surface: rgba(255,255,255,0.88); --surface2: rgba(220,232,246,0.85); --border: #c8d7e8; }
+
+  /* ── Login scherm ── */
+  #mt-login{position:fixed;inset:0;background:#001830;z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px;}
+  #mt-login .box{background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:32px 40px;width:300px;}
+  #mt-login input{width:100%;padding:12px;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:rgba(255,255,255,0.1);color:#fff;font-size:15px;outline:none;box-sizing:border-box;margin-bottom:10px;}
+  #mt-login button{width:100%;padding:12px;background:#e8a020;border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;}
+  #mt-login .lbl{color:rgba(255,255,255,0.7);font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;}
+  #mt-err{color:#ff6b6b;font-size:12px;margin-bottom:8px;display:none;}
+
+  /* ── App shell ── */
+  #mt-app{display:none;}
+  header.mt-top{background:var(--navy);color:#fff;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+  header.mt-top h1{font-size:18px;margin:0;font-weight:800;letter-spacing:.5px;}
+  header.mt-top .sub{font-size:11px;color:rgba(255,255,255,0.6);margin-top:2px;}
+  .terminal-switch{display:flex;gap:6px;background:rgba(255,255,255,0.08);padding:4px;border-radius:8px;}
+  .terminal-switch button{background:transparent;border:none;color:rgba(255,255,255,0.7);padding:8px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;letter-spacing:.5px;}
+  .terminal-switch button.active{background:#e8a020;color:#fff;}
+  .mt-status{font-size:11px;color:rgba(255,255,255,0.6);display:flex;align-items:center;gap:8px;}
+  .mt-status button{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:11px;}
+  main{padding:24px;max-width:1200px;margin:0 auto;}
+  .card{background:#fff;border-radius:10px;border:1px solid #dde6f0;margin-bottom:20px;overflow:hidden;}
+  .card-header{padding:14px 20px;border-bottom:1px solid #eef2f7;display:flex;align-items:center;gap:8px;}
+  .card-header h2{font-size:15px;margin:0;color:var(--navy);}
+  #kpi-placeholder{color:var(--muted);font-size:13px;padding:40px;text-align:center;}
+  #kpi-content{transition:opacity 0.25s ease;}
+  footer.mt-foot{max-width:1200px;margin:0 auto;padding:0 24px 32px;color:var(--muted);font-size:11px;text-align:center;}
+</style>
+</head>
+<body>
+
+<!-- ══════════════ LOGIN ══════════════ -->
+<div id="mt-login">
+  <div style="text-align:center;">
+    <div style="font-size:44px;">&#x1F4CA;</div>
+    <div style="color:#fff;font-size:24px;font-weight:800;letter-spacing:1px;margin-top:6px;">KPI DASHBOARD</div>
+    <div style="color:rgba(255,255,255,0.5);font-size:12px;letter-spacing:2px;margin-top:2px;">MT &mdash; STENA LINE</div>
+  </div>
+  <div class="box">
+    <div class="lbl">Wachtwoord</div>
+    <input type="password" id="mt-ww" placeholder="Wachtwoord..." onkeydown="if(event.key==='Enter')mtLogin()">
+    <div id="mt-err">Onjuist wachtwoord.</div>
+    <button onclick="mtLogin()">INLOGGEN</button>
+  </div>
+</div>
+
+<!-- ══════════════ APP ══════════════ -->
+<div id="mt-app">
+  <header class="mt-top">
+    <div>
+      <h1>&#x1F4CA; KPI Dashboard &mdash; MT</h1>
+      <div class="sub" id="mt-terminal-naam">Europoort</div>
+    </div>
+    <div class="terminal-switch" id="mt-terminal-switch">
+      <button onclick="mtWisselTerminal('EP')" data-terminal="EP">EUROPOORT</button>
+      <button onclick="mtWisselTerminal('HVH')" data-terminal="HVH">HOEK VAN HOLLAND</button>
+      <button onclick="mtWisselTerminal('IMM')" data-terminal="IMM">IMMINGHAM</button>
+    </div>
+    <div class="mt-status">
+      <span id="mt-laatst-bijgewerkt">&#8212;</span>
+      <button onclick="mtVerversNu()">&#x21BB; Ververs</button>
+      <button onclick="mtWachtwoordWijzigen()" title="Wachtwoord wijzigen">&#x2699;&#xFE0F;</button>
+    </div>
+  </header>
+  <main>
+    <div id="kpi-content">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap;">
+        <button onclick="mtKpiStapMaand(-1)" style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:16px;">&#8592;</button>
+        <div style="font-size:22px;font-weight:700;color:var(--navy);min-width:160px;text-align:center;" id="kpi-maand-label">&#x2014;</div>
+        <button onclick="mtKpiStapMaand(1)" style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:16px;">&#8594;</button>
+        <span id="kpi-dagen-label" style="font-size:12px;color:var(--muted);margin-left:8px;"></span>
+      </div>
+      <div id="kpi-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:20px;"></div>
+
+      <div class="card">
+        <div class="card-header"><div>&#x1F465;</div><h2>Personeelsbezetting per dag</h2></div>
+        <div style="overflow-x:auto;padding:16px;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead>
+              <tr style="background:var(--navy);color:#fff;">
+                <th style="padding:8px 10px;text-align:left;">Datum</th>
+                <th style="padding:6px 8px;text-align:center;background:#3a5a7a;font-size:10px;">Std Och</th>
+                <th style="padding:6px 8px;text-align:center;background:#5a4a3a;font-size:10px;">Std Av</th>
+                <th style="padding:8px 10px;text-align:center;background:#4a8ed6;">Ochtend FTE</th>
+                <th style="padding:8px 10px;text-align:center;background:#e6b800;color:#333;">Inhuur och.</th>
+                <th style="padding:8px 10px;text-align:center;background:#6aaa3a;">Stage och.</th>
+                <th style="padding:8px 10px;text-align:center;background:#e08030;">Avond FTE</th>
+                <th style="padding:8px 10px;text-align:center;background:#e07010;color:#fff;">Inhuur av.</th>
+                <th style="padding:8px 10px;text-align:center;background:#7aaa5a;">Stage av.</th>
+                <th style="padding:8px 10px;text-align:center;background:#a855f7;color:#fff;">Extra och.</th>
+                <th style="padding:8px 10px;text-align:center;background:#9333ea;color:#fff;">Extra av.</th>
+                <th style="padding:8px 10px;text-align:center;">Totaal uren</th>
+              </tr>
+            </thead>
+            <tbody id="kpi-personeel-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div>&#x1F550;</div><h2>Gemiddelde Vaarschema Tijden</h2></div>
+        <div style="overflow-x:auto;padding:16px;">
+          <table style="width:100%;border-collapse:collapse;min-width:700px;"><thead><tr id="kpi-tijden-hdr"></tr></thead><tbody id="kpi-tijden-body"></tbody></table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div>&#x1F4E6;</div><h2>Totaal Geladen &amp; Gelost per Route</h2></div>
+        <div style="overflow-x:auto;padding:16px;">
+          <table style="width:100%;border-collapse:collapse;"><thead><tr id="kpi-units-hdr"></tr></thead><tbody id="kpi-units-body"></tbody></table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div>&#x1F4C5;</div><h2>Dagenoverzicht</h2></div>
+        <div style="overflow-x:auto;padding:16px;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead><tr style="background:var(--navy);color:#fff;"><th style="padding:8px 10px;text-align:left;">Datum</th><th style="padding:8px 10px;text-align:center;">Lossen</th><th style="padding:8px 10px;text-align:center;">Laden</th><th style="padding:8px 10px;text-align:center;">Tijden</th></tr></thead>
+            <tbody id="kpi-dag-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" id="kpi-normen-card" style="display:none;">
+        <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:8px;"><div>&#x1F6A8;</div><h2>Dagen buiten de normen</h2><span id="normen-count-badge" style="background:#c0392b;color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:4px;"></span></div>
+        </div>
+        <div style="overflow-x:auto;padding:16px;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead><tr style="background:#c0392b;color:#fff;"><th style="padding:8px 10px;text-align:left;">Datum</th><th style="padding:8px 10px;text-align:left;">Route</th><th style="padding:8px 10px;text-align:left;">Kolom</th><th style="padding:8px 10px;text-align:center;">Werkelijk</th><th style="padding:8px 10px;text-align:center;">Norm</th><th style="padding:8px 10px;text-align:center;">Afwijking</th><th style="padding:8px 10px;text-align:left;">Opmerking</th></tr></thead>
+            <tbody id="kpi-normen-body-tbl"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" style="padding:20px 24px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+          <div style="width:32px;height:32px;background:#1a2a4a;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;">&#x1F69A;</div>
+          <h2 style="margin:0;font-size:16px;font-weight:700;color:#1a2a4a;">Gemiddeld Trucks per Dienst</h2>
+          <span id="truckChartSubtitle" style="font-size:11px;color:#888;margin-left:8px;"></span>
+          <button onclick="mtRenderTruckChart(_kpiM,_kpiY)" style="font-size:11px;padding:4px 10px;border:1px solid #1a4a8a;border-radius:4px;background:#e8f0fb;color:#1a4a8a;cursor:pointer;margin-left:8px;font-weight:600;">&#8635; Herbereken</button>
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:200px;background:#e8f0fb;border:2px solid #1a4a8a;border-radius:8px;padding:16px 20px;">
+            <div style="font-size:12px;font-weight:800;color:#1a4a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;">&#x1F305; Ochtend</div>
+            <div style="display:flex;gap:24px;flex-wrap:wrap;">
+              <div style="text-align:center;"><div id="kpi-och-trucks" style="font-size:36px;font-weight:800;color:#1a4a8a;">&#8211;</div><div style="font-size:11px;color:#555;margin-top:2px;">&#x1F69A; gem. trucks</div></div>
+              <div style="text-align:center;"><div id="kpi-och-cf" style="font-size:36px;font-weight:800;color:#e74c3c;">&#8211;</div><div style="font-size:11px;color:#555;margin-top:2px;">&#x25CF; CF laden</div></div>
+            </div>
+          </div>
+          <div style="flex:1;min-width:200px;background:#fff3e8;border:2px solid #c05a10;border-radius:8px;padding:16px 20px;">
+            <div style="font-size:12px;font-weight:800;color:#c05a10;text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;">&#x1F306; Avond</div>
+            <div style="display:flex;gap:24px;flex-wrap:wrap;">
+              <div style="text-align:center;"><div id="kpi-av-trucks" style="font-size:36px;font-weight:800;color:#c05a10;">&#8211;</div><div style="font-size:11px;color:#555;margin-top:2px;">&#x1F69A; gem. trucks</div></div>
+              <div style="text-align:center;"><div id="kpi-av-cf" style="font-size:36px;font-weight:800;color:#e74c3c;">&#8211;</div><div style="font-size:11px;color:#555;margin-top:2px;">&#x25CF; CF laden</div></div>
+            </div>
+          </div>
+        </div>
+        <div id="truckChartNoData" style="display:none;color:#aaa;font-size:13px;padding:12px 0 0;">Geen truckdata voor deze maand.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div>&#x1F967;</div><h2 id="bez-chart-titel">Personeelsverdeling maand</h2></div>
+        <div style="padding:16px;">
+          <div style="display:flex;gap:32px;flex-wrap:wrap;justify-content:center;align-items:flex-start;">
+            <div style="text-align:center;">
+              <div style="font-weight:700;color:var(--navy);margin-bottom:8px;font-size:14px;">&#x1F305; OCHTEND</div>
+              <canvas id="pie-ochtend" width="200" height="200"></canvas>
+              <div id="legend-ochtend" style="margin-top:10px;font-size:12px;text-align:left;"></div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-weight:700;color:var(--navy);margin-bottom:8px;font-size:14px;">&#x1F306; AVOND</div>
+              <canvas id="pie-avond" width="200" height="200"></canvas>
+              <div id="legend-avond" style="margin-top:10px;font-size:12px;text-align:left;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div>&#x1F69B;</div><h2>Kade bezetting (rePort)</h2></div>
+        <div id="tolynx-kade-body" style="padding:16px;"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div>&#x1F4F8;</div><h2>Opgeslagen maandoverzichten</h2></div>
+        <div style="padding:16px;color:var(--muted);font-size:13px;">Deze maandoverzichten worden niet naar de cloud gesynchroniseerd door de hoofdapp en zijn daarom hier niet beschikbaar. Ze zijn wel te vinden in het KPI Dashboard van de hoofdapp zelf, per apparaat.</div>
+      </div>
+    </div>
+  </main>
+  <footer class="mt-foot">Alleen-lezen weergave &mdash; wijzigingen maak je in Dienst Journaal zelf. Ververst automatisch elke 60 seconden.</footer>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// Verwarde opslag voor het MT-wachtwoord (zelfde techniek als het
+// beheerpaneel in de hoofdapp, maar bewust een HELEMAAL LOS wachtwoord —
+// dit dashboard deelt geen wachtwoorden met Dienst Journaal zelf).
+// ══════════════════════════════════════════════════════════════════
+function mtObf(t){ try { return btoa(unescape(encodeURIComponent(t))).split('').reverse().join(''); } catch(e){ return ''; } }
+function mtDeobf(v){ try { return decodeURIComponent(escape(atob(v.split('').reverse().join('')))); } catch(e){ return ''; } }
+var MT_WW_STANDAARD = mtObf('MTeuropoort2026'); // eerste keer inloggen; daarna direct wijzigen via het tandwiel
+function mtWwGet(){ return mtDeobf(localStorage.getItem('kpi_mt_ww_v1') || MT_WW_STANDAARD); }
+function mtWwSet(w){ localStorage.setItem('kpi_mt_ww_v1', mtObf(w)); }
+
+function mtLogin(){
+  var ingevoerd = document.getElementById('mt-ww').value;
+  if (ingevoerd === mtWwGet()) {
+    sessionStorage.setItem('kpi_mt_auth', '1');
+    document.getElementById('mt-login').style.display = 'none';
+    document.getElementById('mt-app').style.display = 'block';
+    mtInit();
+  } else {
+    document.getElementById('mt-err').style.display = 'block';
+    document.getElementById('mt-ww').value = '';
+  }
+}
+function mtWachtwoordWijzigen(){
+  var huidig = prompt('Huidig wachtwoord ter bevestiging:');
+  if (huidig === null) return;
+  if (huidig !== mtWwGet()) { alert('Onjuist huidig wachtwoord.'); return; }
+  var nieuw = prompt('Nieuw wachtwoord:');
+  if (nieuw === null || !nieuw.trim()) return;
+  var nieuw2 = prompt('Herhaal nieuw wachtwoord:');
+  if (nieuw !== nieuw2) { alert('De twee wachtwoorden komen niet overeen. Niets gewijzigd.'); return; }
+  mtWwSet(nieuw.trim());
+  alert('Wachtwoord gewijzigd.');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// Supabase (zelfde database als de hoofdapp, hier alleen-lezen gebruikt)
+// ══════════════════════════════════════════════════════════════════
+var SB_URL   = 'https://xgqtiseknvjwaqapwjdt.supabase.co';
+var SB_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhncXRpc2VrbnZqd2FxYXB3amR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODYxNzIsImV4cCI6MjA5NjE2MjE3Mn0.DdBJ6OzEVC-l_9qbJE-bVlv1WdxFkB1C2tjEHXqh5SE';
+var SB_TABLE = 'sync_data';
+
+var mtTerminal = sessionStorage.getItem('kpi_mt_terminal') || 'EP';
+// Gesimuleerd "localStorage" gevuld vanuit de cloud-data van de gekozen terminal. De
+// KPI-renderfuncties (toegevoegd in latere fases) lezen via LS.getItem(...) in plaats van
+// het echte localStorage, zodat we altijd de data van de GESELECTEERDE terminal tonen, ook al
+// staat dit dashboard los van de hoofdapp (die zijn eigen, actieve terminal in sessionStorage
+// heeft staan).
+var CLOUD_DATA = {};
+var LS = {
+  getItem: function(key){
+    if (!(key in CLOUD_DATA)) return null;
+    var v = CLOUD_DATA[key];
+    return (typeof v === 'string') ? v : JSON.stringify(v);
+  },
+  setItem: function(){ /* alleen-lezen dashboard: bewust een no-op */ }
+};
+function mtTerminalPrefix(){ return mtTerminal + '_'; }
+function mtTk(key){ return mtTerminalPrefix() + key; }
+
+function mtTerminalNaam(t){
+  return t === 'HVH' ? 'Hoek van Holland' : (t === 'IMM' ? 'Immingham' : 'Europoort');
+}
+
+async function mtLaadTerminalData(terminal){
+  var content = document.getElementById('kpi-content');
+  content.style.opacity = '0.45';
+  document.getElementById('mt-laatst-bijgewerkt').textContent = 'Laden\u2026';
+  try {
+    var rowId = terminal + '_main';
+    var resp = await fetch(SB_URL + '/rest/v1/' + SB_TABLE + '?id=eq.' + rowId + '&select=data,updated_at', {
+      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var rows = await resp.json();
+    CLOUD_DATA = (rows && rows[0] && rows[0].data) ? rows[0].data : {};
+    var bijgewerkt = (rows && rows[0] && rows[0].updated_at) ? new Date(rows[0].updated_at) : null;
+    document.getElementById('mt-laatst-bijgewerkt').textContent = bijgewerkt
+      ? ('Bijgewerkt: ' + bijgewerkt.toLocaleDateString('nl-NL') + ' ' + bijgewerkt.toLocaleTimeString('nl-NL', {hour:'2-digit', minute:'2-digit'}))
+      : 'Geen data gevonden';
+    if (typeof mtRenderKpi === 'function') {
+      mtRenderKpi();
+    } else {
+      content.innerHTML = '<div id="kpi-placeholder">Basis werkt. Cloud-data voor ' + mtTerminalNaam(terminal) + ' geladen (' + Object.keys(CLOUD_DATA).length + ' sleutels). De KPI-inhoud zelf volgt in de volgende fase.</div>';
+    }
+    content.style.opacity = '1';
+  } catch (e) {
+    content.style.opacity = '1';
+    document.getElementById('mt-laatst-bijgewerkt').textContent = 'Fout bij laden';
+    content.innerHTML = '<div id="kpi-placeholder" style="color:#c0392b;">Kon geen data ophalen: ' + (e && e.message ? e.message : e) + '</div>';
+  }
+}
+
+function mtWisselTerminal(t){
+  mtTerminal = t;
+  sessionStorage.setItem('kpi_mt_terminal', t);
+  _mtTolynxIdx = null; // begin bij de meest recente tolynx-snapshot van de nieuwe terminal
+  document.querySelectorAll('#mt-terminal-switch button').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('data-terminal') === t);
+  });
+  document.getElementById('mt-terminal-naam').textContent = mtTerminalNaam(t);
+  mtLaadTerminalData(t);
+}
+
+function mtVerversNu(){ mtLaadTerminalData(mtTerminal); }
+
+function mtInit(){
+  mtWisselTerminal(mtTerminal);
+  // Automatisch verversen elke 60 seconden, zoals bij de materieel-garage-pagina.
+  setInterval(function(){ mtLaadTerminalData(mtTerminal); }, 60000);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// FASE 2 — kerncijfers. Geport vanuit renderKPI() in de hoofdapp; leest via de
+// LS-shim (gevuld met clouddata van de geselecteerde terminal) in plaats van
+// het echte localStorage, en gebruikt mtTerminal in plaats van de sessionStorage
+// van de hoofdapp.
+// ══════════════════════════════════════════════════════════════════
+var _kpiM = new Date().getMonth(), _kpiY = new Date().getFullYear();
+var _TC = ['Eerste lijn','Klep neer','Aanvang lossen','Schip leeg','Eerste eigen rijder','Laden compleet','Ramp op','Vertrek'];
+function mt_ML(){ return mtTerminal==='IMM' ? ['January','February','March','April','May','June','July','August','September','October','November','December'] : ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December']; }
+function mt_RT(){ return mtTerminal==='IMM' ? ['To Hoek van Holland','To Europoort'] : ['Harwich Ochtend','Harwich Middag','Immingham']; }
+function mt_t2m(t){ if(!t) return null; var p=t.split(':'); if(p.length!==2) return null; return parseInt(p[0])*60+parseInt(p[1]); }
+function mt_m2t(m){ if(m===null||isNaN(m)) return '\u2014'; return String(Math.floor(m/60)%24).padStart(2,'0')+':'+String(Math.round(m%60)).padStart(2,'0'); }
+function mtGetKpiNormen(){ try{ var s=JSON.parse(LS.getItem('kpi_normen_v1')); if(s) return s; }catch(e){} return {}; }
+function mtGetStdBezetting(){ try{ return JSON.parse(LS.getItem('std_bezetting_v1')||'{}'); }catch(e){ return {}; } }
+function mt_vsGet(){ try{ return JSON.parse(LS.getItem(mtTk('vs_data_v1'))||'{}'); }catch(e){ return {}; } }
+
+function mtKpiStapMaand(d){
+  _kpiM += d;
+  if (_kpiM > 11) { _kpiM = 0; _kpiY++; }
+  if (_kpiM < 0) { _kpiM = 11; _kpiY--; }
+  mtRenderKpi();
+}
+
+function mtRenderKpi(){
+  mtRenderTolynxKade();
+  var _ML = mt_ML(), _RT = mt_RT();
+  var isImm = mtTerminal === 'IMM';
+  var lbl = document.getElementById('kpi-maand-label');
+  if (lbl) lbl.textContent = _ML[_kpiM] + ' ' + _kpiY;
+
+  var all = mt_vsGet();
+  var entries = Object.values(all).filter(function(e){
+    if (!e.datum) return false;
+    var p = e.datum.split('/');
+    return p.length === 3 && parseInt(p[1]) === _kpiM+1 && parseInt(p[2]) === _kpiY;
+  });
+  var dl = document.getElementById('kpi-dagen-label');
+  if (dl) dl.textContent = isImm ? (entries.length+' day'+(entries.length!==1?'s':'')+' with data') : (entries.length+' dag'+(entries.length!==1?'en':'')+' met data');
+
+  // KPI-kaarten
+  var totL=0, totLd=0, totT=0, fields=['trailers','eigen','containers','trade'];
+  entries.forEach(function(e){
+    fields.forEach(function(f){ [1,2,3].forEach(function(n){ totL += parseInt((e.units||{})['in-'+f+'-'+n]||0); totLd += parseInt((e.units||{})['out-'+f+'-'+n]||0); }); });
+    _RT.forEach(function(r,ri){ ((e.tijden||[])[ri]||{tijden:[]}).tijden.forEach(function(t){ if(t) totT++; }); });
+  });
+  var cards = document.getElementById('kpi-cards');
+  if (cards) cards.innerHTML = (isImm
+    ? [{l:'Days with data',v:entries.length,i:'&#x1F4C5;',c:'#003366'},{l:'Total unloaded',v:totL,i:'&#x2B07;&#xFE0F;',c:'#1a5c9a'},{l:'Total loaded',v:totLd,i:'&#x2B06;&#xFE0F;',c:'#1a7a40'},{l:'Times filled in',v:totT,i:'&#x1F550;',c:'#8b4513'}]
+    : [{l:'Dagen met data',v:entries.length,i:'&#x1F4C5;',c:'#003366'},{l:'Totaal gelost',v:totL,i:'&#x2B07;&#xFE0F;',c:'#1a5c9a'},{l:'Totaal geladen',v:totLd,i:'&#x2B06;&#xFE0F;',c:'#1a7a40'},{l:'Tijden ingevuld',v:totT,i:'&#x1F550;',c:'#8b4513'}]
+  ).map(function(k){ return '<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:20px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:28px;margin-bottom:6px;">'+k.i+'</div><div style="font-size:32px;font-weight:700;color:'+k.c+';">'+k.v+'</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:4px;">'+k.l+'</div></div>'; }).join('');
+
+  // === PERSONEELSBEZETTING ===
+  var pBody = document.getElementById('kpi-personeel-body');
+  var dagRows = [];
+  if (pBody) {
+    var _allDagSources = {};
+    var _pfxDag = mtTerminalPrefix() + 'dagplan_';
+    Object.keys(CLOUD_DATA).forEach(function(_sk){
+      if (!_sk.startsWith(_pfxDag)) return;
+      var _sv = CLOUD_DATA[_sk];
+      if (_sv) _allDagSources[_sk.replace(_pfxDag,'')] = _sv;
+    });
+    try {
+      var _st = JSON.parse(LS.getItem(mtTk('dagPlanning_v2_state'))||'null');
+      if (_st && _st.planDate && ((_st.ochEmps&&_st.ochEmps.length>0) || (_st.avondEmps&&_st.avondEmps.length>0))) {
+        var _ex = _allDagSources[_st.planDate];
+        var _exOch = (_ex&&_ex.ochEmps&&_ex.ochEmps.length) || 0;
+        var _stOch = (_st.ochEmps&&_st.ochEmps.length) || 0;
+        if (!_ex || _exOch === 0 || _stOch > _exOch) {
+          _allDagSources[_st.planDate] = { allEmps:_st.allEmps||[], ochEmps:_st.ochEmps||[], avondEmps:_st.avondEmps||[], pos:_st.pos||{}, texts:_st.texts||{} };
+        }
+      }
+    } catch(e) {}
+
+    var _dagSourceKeys = Object.keys(_allDagSources).map(function(dt){ return 'dagplan_'+dt; });
+    for (var i = 0; i < _dagSourceKeys.length; i++) {
+      var key = _dagSourceKeys[i];
+      var dateStr = key.replace('dagplan_', '');
+      var parts = dateStr.split('-');
+      if (parts.length !== 3) continue;
+      if (parseInt(parts[1]) !== _kpiM+1 || parseInt(parts[0]) !== _kpiY) continue;
+      try {
+        var dp = _allDagSources[dateStr];
+        if (!dp) continue;
+        var oeAll = dp.ochEmps || [], aeAll = dp.avondEmps || [], dpPos = dp.pos || {};
+        var selOch2 = new Set(), selAvond2 = new Set();
+        Object.keys(dpPos).forEach(function(k){ var v=dpPos[k]; if(!v) return; if(k.startsWith('a_')||k.startsWith('av_')) selAvond2.add(v); else selOch2.add(v); });
+        var oe = oeAll.filter(function(e){ return selOch2.has(e.name); });
+        var ae = aeAll.filter(function(e){ return selAvond2.has(e.name); });
+        var _isEx = function(e){ return (e.type||'').toUpperCase().includes('EX'); };
+        var exO = oe.filter(_isEx).length, exA = ae.filter(_isEx).length;
+        var inhO = oe.filter(function(e){ return !_isEx(e) && (e.type||'').toLowerCase().includes('inhuur'); }).length;
+        var stO  = oe.filter(function(e){ return !_isEx(e) && ((e.section||'').toLowerCase().includes('stage')||(e.type||'').toLowerCase().includes('stage')); }).length;
+        var inhA = ae.filter(function(e){ return !_isEx(e) && (e.type||'').toLowerCase().includes('inhuur'); }).length;
+        var stA  = ae.filter(function(e){ return !_isEx(e) && ((e.section||'').toLowerCase().includes('stage')||(e.type||'').toLowerCase().includes('stage')); }).length;
+        var hO = oe.reduce(function(s,e){ return s+(e.uren||0); },0);
+        var hA = ae.reduce(function(s,e){ return s+(e.uren||0); },0);
+        var fteO = oe.length - exO - inhO - stO;
+        var fteA = ae.length - exA - inhA - stA;
+        dagRows.push({ datum:dateStr, fteO:fteO, inhO:inhO, stO:stO, exO:exO||0, fteA:fteA, inhA:inhA, stA:stA, exA:exA||0, uren:(hO+hA).toFixed(1) });
+      } catch(e) {}
+    }
+
+    if (!dagRows.length) {
+      pBody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:20px;color:var(--muted);">' + (isImm ? 'No staffing data for this month' : 'Geen personeelsdata voor deze maand') + '</td></tr>';
+    } else {
+      dagRows.sort(function(a,b){ return a.datum.localeCompare(b.datum); });
+      pBody.innerHTML = dagRows.map(function(r, i) {
+        var bg = i%2===0 ? 'var(--surface)' : 'var(--surface2)';
+        var d = r.datum.split('-'); var datumFmt = d[2]+'-'+d[1]+'-'+d[0];
+        var _sb = mtGetStdBezetting();
+        var _dn = ['','Ma','Di','Wo','Do','Vr','Za','Zo'];
+        var _std = _sb[_dn[new Date(r.datum).getDay()]] || {};
+        var _sO = _std.och_totaal||0, _sA = _std.av_totaal||0;
+        var _tO = r.fteO+r.inhO+r.stO+(r.exO||0), _tA = r.fteA+r.inhA+r.stA+(r.exA||0);
+        var _cO = _sO>0 ? (_tO>=_sO?'color:#1a7a40;font-weight:700;':'color:#c0392b;font-weight:700;') : 'color:#aaa;';
+        var _cA = _sA>0 ? (_tA>=_sA?'color:#1a7a40;font-weight:700;':'color:#c0392b;font-weight:700;') : 'color:#aaa;';
+        return '<tr style="background:'+bg+'"><td style="padding:7px 10px;border:1px solid var(--border);font-weight:600;color:var(--navy);">'+datumFmt+'</td>'+
+          '<td style="text-align:center;padding:7px;border:1px solid var(--border);'+_cO+'">'+(_sO||'&#x2014;')+'</td>'+
+          '<td style="text-align:center;padding:7px;border:1px solid var(--border);'+_cA+'">'+(_sA||'&#x2014;')+'</td>'+
+          '<td style="text-align:center;padding:7px;border:1px solid var(--border);color:#4a8ed6;font-weight:700;">'+r.fteO+'</td>'+
+          '<td style="text-align:center;padding:7px;border:1px solid var(--border);color:#b8960a;font-weight:600;">'+r.inhO+'</td>'+
+          '<td style="text-align:center;padding:7px;border:1px solid var(--border);color:#5a9a2a;font-weight:600;">'+r.stO+'</td>'+
+          '<td style="text-align:center;padding:7px;border:1px solid var(--border);color:#e08030;font-weight:700;">'+r.fteA+'</td>'+
+          '<td style="text-align:center;padding:7px;border:1px solid var(--border);color:#c06010;font-weight:600;">'+r.inhA+'</td>'+
+          '<td style="text-align:center;padding:7px;border:1px solid var(--border);color:#5a9a2a;font-weight:600;">'+r.stA+'</td>'+
+          '<td style="text-align:center;padding:7px;border:1px solid var(--border);color:#a855f7;font-weight:600;">'+(r.exO||0)+'</td>'+
+          '<td style="text-align:center;padding:7px;border:1px solid var(--border);color:#9333ea;font-weight:600;">'+(r.exA||0)+'</td>'+
+          '<td style="text-align:center;padding:7px;border:1px solid var(--border);color:var(--navy);">'+r.uren+'</td></tr>';
+      }).join('');
+    }
+  }
+
+  // === CIRKELDIAGRAM MAANDOVERZICHT ===
+  (function() {
+    var totFteO=0, totInhO=0, totStO=0, totExO=0;
+    var totFteA=0, totInhA=0, totStA=0, totExA=0;
+    dagRows.forEach(function(r) {
+      totFteO += r.fteO||0; totInhO += r.inhO||0; totStO += r.stO||0; totExO += r.exO||0;
+      totFteA += r.fteA||0; totInhA += r.inhA||0; totStA += r.stA||0; totExA += r.exA||0;
+    });
+    var maandNaam = (_ML[_kpiM]||'') + ' ' + _kpiY;
+    var aantalDagen = dagRows.length;
+    var titel = document.getElementById('bez-chart-titel');
+    if (titel) titel.textContent = isImm ? ('Staff distribution ' + maandNaam + ' \u2014 ' + aantalDagen + ' day' + (aantalDagen!==1?'s':'') + ' filled in') : ('Personeelsverdeling ' + maandNaam + ' \u2014 ' + aantalDagen + ' dag' + (aantalDagen!==1?'en':'') + ' ingevuld');
+
+    function drawPie(canvasId, legendId, data) {
+      var canvas = document.getElementById(canvasId);
+      var legend = document.getElementById(legendId);
+      if (!canvas || !legend) return;
+      var ctx = canvas.getContext('2d');
+      var total = data.reduce(function(s,d){ return s+d.v; }, 0);
+      ctx.clearRect(0,0,200,200);
+      if (total === 0) {
+        ctx.fillStyle = '#e2e8f0'; ctx.beginPath(); ctx.arc(100,100,90,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#94a3b8'; ctx.font = '13px Arial'; ctx.textAlign = 'center';
+        ctx.fillText(isImm ? 'No data' : 'Geen data', 100, 105);
+        legend.innerHTML = ''; return;
+      }
+      var startAngle = -Math.PI/2;
+      data.forEach(function(d) {
+        if (d.v === 0) return;
+        var slice = (d.v / total) * Math.PI * 2;
+        ctx.beginPath(); ctx.moveTo(100,100); ctx.arc(100,100,90,startAngle,startAngle+slice); ctx.closePath();
+        ctx.fillStyle = d.c; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+        var midAngle = startAngle + slice/2;
+        var pct = Math.round(d.v/total*100);
+        if (pct >= 8) {
+          ctx.fillStyle = '#fff'; ctx.font = 'bold 13px Arial'; ctx.textAlign = 'center';
+          ctx.fillText(pct+'%', 100+Math.cos(midAngle)*55, 105+Math.sin(midAngle)*55);
+        }
+        startAngle += slice;
+      });
+      legend.innerHTML = data.filter(function(d){ return d.v>0; }).map(function(d) {
+        var pct = Math.round(d.v/total*100);
+        return '<div style="display:flex;align-items:center;gap:6px;margin:3px 0;"><span style="width:14px;height:14px;border-radius:3px;background:'+d.c+';display:inline-block;flex-shrink:0"></span><span style="color:#334155;"><b>'+d.label+':</b> '+d.v+' ('+pct+'%)</span></div>';
+      }).join('');
+    }
+
+    drawPie('pie-ochtend','legend-ochtend',[
+      {label:'FTE', v:totFteO, c:'#4a8ed6'},
+      {label:(isImm?'Temp':'Inhuur'), v:totInhO, c:'#ffd700'},
+      {label:'Stage', v:totStO, c:'#90c36a'},
+      {label:'Extra', v:totExO, c:'#a855f7'}
+    ]);
+    drawPie('pie-avond','legend-avond',[
+      {label:'FTE', v:totFteA, c:'#4a8ed6'},
+      {label:(isImm?'Temp':'Inhuur'), v:totInhA, c:'#ffd700'},
+      {label:'Stage', v:totStA, c:'#90c36a'},
+      {label:'Extra', v:totExA, c:'#a855f7'}
+    ]);
+  })();
+
+  // Tijden tabel
+  var tH = document.getElementById('kpi-tijden-hdr'), tB = document.getElementById('kpi-tijden-body');
+  var nm = mtGetKpiNormen();
+  if (tH && tB) {
+    tH.innerHTML = '<th style="background:var(--navy);color:#fff;padding:8px 10px;text-align:left;font-size:11px;">Route</th>' + _TC.map(function(h,hi){ var nv=nm[_RT[0]+'_'+hi]; var ns=nv&&nv.tijd?'<br><small style="color:#a8c4e8;font-weight:400;">'+nv.tijd+(nv.marge?'&#177;'+nv.marge+'m':'')+'</small>':''; return '<th style="background:var(--navy);color:#fff;padding:8px 6px;font-size:10px;text-align:center;white-space:nowrap;">'+h+ns+'</th>'; }).join('');
+    tB.innerHTML = _RT.map(function(route,ri){
+      var sums=new Array(8).fill(0), cnts=new Array(8).fill(0);
+      entries.forEach(function(e){ var rij=(e.tijden||[])[ri]; if(!rij) return; (rij.tijden||[]).forEach(function(t,ti){ var m=mt_t2m(t); if(m!==null){ sums[ti]+=m; cnts[ti]++; } }); });
+      var bg = ri%2===0 ? 'var(--surface)' : 'var(--surface2)';
+      return '<tr><td style="padding:8px 10px;font-weight:600;color:var(--navy);background:var(--surface2);border:1px solid var(--border);white-space:nowrap;">'+route+'</td>'+sums.map(function(s,i){
+        var avg = cnts[i]>0 ? mt_m2t(s/cnts[i]) : '&#x2014;';
+        var sub = cnts[i]>0 ? '<br><small style="color:var(--muted);font-weight:400;">n='+cnts[i]+'</small>' : '';
+        var cb=bg, cc=cnts[i]>0?'var(--navy)':'var(--muted)', cbr='1px solid var(--border)';
+        if (cnts[i]>0) { var nv=nm[route+'_'+i]; if (nv&&nv.tijd) { var nm2=mt_t2m(nv.tijd), mg=nv.marge?parseInt(nv.marge):0, av=s/cnts[i]; if (nm2!==null) { if (av<=nm2+mg) { cb='#d4f5e2'; cc='#1a7a40'; cbr='2px solid #1a7a40'; } else { cb='#fde8e8'; cc='#c0392b'; cbr='2px solid #c0392b'; } } } }
+        return '<td style="text-align:center;padding:7px 6px;border:'+cbr+';background:'+cb+';font-weight:'+(cnts[i]>0?'700':'400')+';color:'+cc+';">'+avg+sub+'</td>';
+      }).join('') + '</tr>';
+    }).join('');
+  }
+
+  // Units tabel (geladen/gelost per route)
+  var uH = document.getElementById('kpi-units-hdr'), uB = document.getElementById('kpi-units-body');
+  if (uH && uB) {
+    uH.innerHTML = '<th style="background:var(--navy);color:#fff;padding:8px 10px;text-align:left;font-size:11px;">Route</th>' + (isImm?['Trailers','Units with a driver','Containers','Trade']:['Trailers','Eigenrijder','Containers','Trade']).map(function(h){ return '<th style="background:#1a5c9a;color:#fff;padding:8px 8px;font-size:10px;text-align:center;">'+h+'<br><small>'+(isImm?'unloading':'lossen')+'</small></th>'; }).join('') + (isImm?['Trailers','Units with a driver','Containers','Trade']:['Trailers','Eigenrijder','Containers','Trade']).map(function(h){ return '<th style="background:#1a7a40;color:#fff;padding:8px 8px;font-size:10px;text-align:center;">'+h+'<br><small>'+(isImm?'loading':'laden')+'</small></th>'; }).join('') + '<th style="background:#444;color:#fff;padding:8px;font-size:10px;text-align:center;">'+(isImm?'Total<br><small>in</small>':'Tot<br><small>los</small>')+'</th><th style="background:#222;color:#fff;padding:8px;font-size:10px;text-align:center;">'+(isImm?'Total<br><small>out</small>':'Tot<br><small>lad</small>')+'</th>';
+    uB.innerHTML = _RT.map(function(route,ri){
+      var bg = ri%2===0?'var(--surface)':'var(--surface2)', iT=0, oT=0;
+      var iC = fields.map(function(f){ var s=entries.reduce(function(a,e){ return a+(parseInt((e.units||{})['in-'+f+'-'+(ri+1)])||0); },0); iT+=s; return s; });
+      var oC = fields.map(function(f){ var s=entries.reduce(function(a,e){ return a+(parseInt((e.units||{})['out-'+f+'-'+(ri+1)])||0); },0); oT+=s; return s; });
+      return '<tr><td style="padding:8px 10px;font-weight:600;color:var(--navy);background:var(--surface2);border:1px solid var(--border);white-space:nowrap;">'+route+'</td>'+iC.map(function(v){ return '<td style="text-align:center;padding:7px 8px;border:1px solid var(--border);background:'+bg+';color:#1a5c9a;font-weight:600;">'+(v||0)+'</td>'; }).join('')+oC.map(function(v){ return '<td style="text-align:center;padding:7px 8px;border:1px solid var(--border);background:'+bg+';color:#1a7a40;font-weight:600;">'+(v||0)+'</td>'; }).join('')+'<td style="text-align:center;padding:7px 8px;border:1px solid var(--border);background:'+bg+';font-weight:700;color:#1a5c9a;">'+iT+'</td><td style="text-align:center;padding:7px 8px;border:1px solid var(--border);background:'+bg+';font-weight:700;color:#1a7a40;">'+oT+'</td></tr>';
+    }).join('');
+  }
+
+  // Dagenoverzicht
+  var dB = document.getElementById('kpi-dag-body');
+  if (dB) {
+    if (!entries.length) { dB.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--muted);">'+(isImm?'No data for this month':'Geen data voor deze maand')+'</td></tr>'; }
+    else {
+      var sorted = entries.slice().sort(function(a,b){ return a.datum.split('/').reverse().join('-').localeCompare(b.datum.split('/').reverse().join('-')); });
+      dB.innerHTML = sorted.map(function(e,i){
+        var bg=i%2===0?'var(--surface)':'var(--surface2)', l=0, ld=0, t=0;
+        fields.forEach(function(f){ [1,2,3].forEach(function(n){ l+=parseInt((e.units||{})['in-'+f+'-'+n]||0); ld+=parseInt((e.units||{})['out-'+f+'-'+n]||0); }); });
+        _RT.forEach(function(r,ri){ ((e.tijden||[])[ri]||{tijden:[]}).tijden.forEach(function(v){ if(v) t++; }); });
+        return '<tr style="background:'+bg+';"><td style="padding:7px 10px;border:1px solid var(--border);font-weight:600;color:var(--navy);">'+e.datum+'</td><td style="text-align:center;padding:7px;border:1px solid var(--border);color:#1a5c9a;font-weight:600;">'+l+'</td><td style="text-align:center;padding:7px;border:1px solid var(--border);color:#1a7a40;font-weight:600;">'+ld+'</td><td style="text-align:center;padding:7px;border:1px solid var(--border);">'+t+'</td></tr>';
+      }).join('');
+    }
+  }
+
+  // Dagen buiten de normen
+  var nT = document.getElementById('kpi-normen-body-tbl'), nC = document.getElementById('kpi-normen-card');
+  if (nT && nC) {
+    var normen = mtGetKpiNormen(), bRows = [];
+    entries.forEach(function(e){ _RT.forEach(function(route,ri){ var rij=(e.tijden||[])[ri]; if(!rij) return; (rij.tijden||[]).forEach(function(t,ti){ if(!t) return; var _d=e.datum?e.datum.split('/'):[], _isWE=false; if(_d.length===3){ var _wd=new Date(parseInt(_d[2]),parseInt(_d[1])-1,parseInt(_d[0])); _isWE=_wd.getDay()===0||_wd.getDay()===6; } var _nk=route+'_'+ti+(_isWE&&normen[route+'_'+ti+'_we']?'_we':''); var nv=normen[_nk]; if(!nv||!nv.tijd) return; var nm2=mt_t2m(nv.tijd); if(nm2===null) return; var mg=nv.marge?parseInt(nv.marge):0, tM=mt_t2m(t); if(tM===null) return; var afw=tM-nm2; if(afw>mg) bRows.push({datum:e.datum, route:route, kolom:_TC[ti], werkelijk:t, norm:nv.tijd, marge:mg, afwijking:afw, isWE:_isWE, opm:[(e.sjor&&(e.sjor.opm||e.sjor['opm']))||(e.units&&e.units['opmerking-lossing'])||(e.units&&e.units['opmerking-lading'])].filter(Boolean).join(' | ')}); }); }); });
+    if (!bRows.length) { nC.style.display = 'none'; }
+    else {
+      nC.style.display = 'block';
+      var _nb = document.getElementById('normen-count-badge');
+      if (_nb) _nb.textContent = isImm ? (bRows.length+' row'+(bRows.length===1?'':'s')) : (bRows.length+' regel'+(bRows.length===1?'':'s'));
+      nT.innerHTML = bRows.map(function(r,i){
+        var bg = r.isWE ? (i%2===0?'#fff3cd':'#ffeaa7') : (i%2===0?'#fff5f5':'#fde8e8');
+        var aw = (r.afwijking>0?'+':'')+r.afwijking+' min';
+        var weBadge = r.isWE ? '<span style="background:#e67e22;color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:5px;vertical-align:middle;">WE</span>' : '';
+        return '<tr style="background:'+bg+';"><td style="padding:7px 10px;border:1px solid #f5b7b1;font-weight:700;color:var(--navy);">'+r.datum+weBadge+'</td><td style="padding:7px 10px;border:1px solid #f5b7b1;">'+r.route+'</td><td style="padding:7px 10px;border:1px solid #f5b7b1;">'+r.kolom+'</td><td style="text-align:center;padding:7px 10px;border:1px solid #f5b7b1;font-weight:700;color:#c0392b;">'+r.werkelijk+'</td><td style="text-align:center;padding:7px 10px;border:1px solid #f5b7b1;color:#555;">'+r.norm+'&#177;'+r.marge+'m</td><td style="text-align:center;padding:7px 10px;border:1px solid #f5b7b1;font-weight:700;color:#c0392b;">'+aw+'</td><td style="padding:7px 10px;border:1px solid #f5b7b1;color:'+(r.opm?'var(--navy)':'#aaa')+';font-style:'+(r.opm?'normal':'italic')+';">'+(r.opm||'&#x2014;')+'</td></tr>';
+      }).join('');
+    }
+  }
+
+  setTimeout(function(){ mtRenderTruckChart(_kpiM, _kpiY); }, 200);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// FASE 3 — Truckproductiviteit. Geport vanuit renderTruckChart() in de
+// hoofdapp.
+// ══════════════════════════════════════════════════════════════════
+function mtRenderTruckChart(maand, jaar){
+  var ochCFKeys  = ['o_tr_cf_td1','o_tr_cf_td2','o_tr_cf_td3','o_tr_cf_md1','o_tr_cf_md2','o_tr_cf_md3','o_tr_cf_pit1','o_tr_cf_pit2','o_tr_cf_pit3'];
+  var ochALKeys  = ['o_tr_al_td1','o_tr_al_td2','o_tr_al_td3','o_tr_al_md1','o_tr_al_md2','o_tr_al_md3','o_tr_al_pit1','o_tr_al_pit2','o_tr_al_pit3'];
+  var ochIMMKeys = ['o_tr_imm_cf1a','o_tr_imm_cf1b','o_tr_imm_cf2a','o_tr_imm_cf2b','o_tr_imm_md1a','o_tr_imm_md1b','o_tr_imm_tw0a','o_tr_imm_tw0b','o_tr_imm_tw1a','o_tr_imm_tw1b','o_tr_imm_pit0a','o_tr_imm_pit0b','o_tr_imm_pit2a','o_tr_imm_pit2b','o_tr_imm_pit3a','o_tr_imm_pit3b'];
+  var avCFKeys   = ['a_tr_cf_td1','a_tr_cf_td2','a_tr_cf_td3','a_tr_cf_md1','a_tr_cf_md2','a_tr_cf_md3','a_tr_cf_pit1','a_tr_cf_pit2','a_tr_cf_pit3','a_tr_imm_cf1a','a_tr_imm_cf1b','a_tr_imm_cf2a','a_tr_imm_cf2b'];
+  var avALKeys   = ['a_tr_al_td1','a_tr_al_td2','a_tr_al_td3','a_tr_al_md1','a_tr_al_md2','a_tr_al_md3','a_tr_al_pit1','a_tr_al_pit2','a_tr_al_pit3'];
+  var avOthKeys  = ['a_tr_imm_md1a','a_tr_imm_md1b','a_tr_imm_tw1a','a_tr_imm_tw1b','a_tr_imm_pit0a','a_tr_imm_pit0b','a_tr_imm_pit1a','a_tr_imm_pit1b','a_tr_imm_pit2a','a_tr_imm_pit2b','a_tr_imm_pit3a','a_tr_imm_pit3b'];
+  var allOch = ochCFKeys.concat(ochALKeys).concat(ochIMMKeys);
+  var allAv  = avCFKeys.concat(avALKeys).concat(avOthKeys);
+  var isImm = mtTerminal === 'IMM';
+
+  function countUniq(keys, p) {
+    var seen = {}, n = 0;
+    for (var i=0;i<keys.length;i++){ var v=p[keys[i]]; if(v&&!seen[v]){ seen[v]=1; n++; } }
+    return n;
+  }
+
+  var nd  = document.getElementById('truckChartNoData');
+  var elOT = document.getElementById('kpi-och-trucks');
+  var elOC = document.getElementById('kpi-och-cf');
+  var elAT = document.getElementById('kpi-av-trucks');
+  var elAC = document.getElementById('kpi-av-cf');
+  var elSub= document.getElementById('truckChartSubtitle');
+  if (nd) nd.style.display = 'none';
+
+  var maandStr = String(maand+1).padStart(2,'0');
+  var prefix   = jaar+'-'+maandStr+'-';
+  var posPerDag = {};
+  var _pfxDag = mtTerminalPrefix() + 'dagplan_';
+
+  Object.keys(CLOUD_DATA).forEach(function(k){
+    // Bron 1: <terminal>_dagplan_YYYY-MM-DD
+    if (k.startsWith(_pfxDag)) {
+      var dt = k.slice(_pfxDag.length);
+      if (dt.startsWith(prefix)) {
+        try { var e = CLOUD_DATA[k]; if (e && e.pos) posPerDag[dt] = e.pos; } catch(ex) {}
+      }
+    }
+    // Bron 2: ls_TERMINAL_pos_YYYY-MM-DD_d0 (fallback als geen dagplan_)
+    if (k.startsWith('ls_') && (k.indexOf('_pos_') !== -1)) {
+      var kStrip = k.slice(3);
+      if (kStrip.startsWith('EP_')) kStrip = kStrip.slice(3);
+      else if (kStrip.startsWith('HVH_')) kStrip = kStrip.slice(4);
+      else if (kStrip.startsWith('IMM_')) kStrip = kStrip.slice(4);
+      if (kStrip.startsWith('pos_')) {
+        var rest = kStrip.slice(4);
+        var dt2 = rest.indexOf('_d') > -1 ? rest.slice(0, rest.lastIndexOf('_d')) : rest;
+        if (dt2.startsWith(prefix) && !posPerDag[dt2]) {
+          try { var p2 = CLOUD_DATA[k]; if (p2 && typeof p2 === 'object') posPerDag[dt2] = p2; } catch(ex) {}
+        }
+      }
+    }
+  });
+
+  var datums = Object.keys(posPerDag);
+  if (!datums.length) {
+    if (nd) nd.style.display = 'block';
+    if (elOT) elOT.textContent = '\u2013'; if (elOC) elOC.textContent = '\u2013';
+    if (elAT) elAT.textContent = '\u2013'; if (elAC) elAC.textContent = '\u2013';
+    if (elSub) elSub.textContent = isImm ? 'no data for this month' : 'geen data voor deze maand';
+    return;
+  }
+
+  var days=0, totOchTrucks=0, totOchCF=0, totAvTrucks=0, totAvCF=0;
+  datums.forEach(function(dt){
+    var p = posPerDag[dt];
+    var ochT = new Set(allOch.map(function(k){ return p[k]; }).filter(Boolean)).size;
+    var avT  = new Set(allAv.map(function(k){ return p[k]; }).filter(Boolean)).size;
+    if (ochT===0 && avT===0) return;
+    days++;
+    totOchTrucks += ochT;
+    totOchCF     += countUniq(ochCFKeys, p);
+    totAvTrucks  += avT;
+    totAvCF      += countUniq(avCFKeys, p);
+  });
+
+  if (!days) {
+    if (nd) nd.style.display = 'block';
+    if (elSub) elSub.textContent = isImm ? 'no truck data for this month' : 'geen truckdata voor deze maand';
+    return;
+  }
+
+  function avg(n){ return Math.round(n/days*10)/10; }
+  if (elOT) elOT.textContent = avg(totOchTrucks);
+  if (elOC) elOC.textContent = avg(totOchCF);
+  if (elAT) elAT.textContent = avg(totAvTrucks);
+  if (elAC) elAC.textContent = avg(totAvCF);
+  if (elSub) elSub.textContent = isImm ? ('average over '+days+' day'+(days===1?'':'s')) : ('gemiddelde over '+days+' dag'+(days===1?'':'en'));
+}
+
+// ══════════════════════════════════════════════════════════════════
+// FASE 4 (vervolg) — Kade bezetting (rePort/tolynx). Geport vanuit
+// renderTolynxKade() en omgeving. Toont dezelfde cijfers en geschiedenis-
+// navigatie als de hoofdapp; de aangepaste icoontjes zijn vervangen door
+// tekstlabels om het bestand niet nodeloos groot te maken.
+// ══════════════════════════════════════════════════════════════════
+var TOLYNX_RIJ_LABELS = ['Totaal', 'Trekker', 'Chauffeur', 'Trailer/Reachstacker', 'Tugmaster', 'Heftruck'];
+var _mtTolynxIdx = null;
+function mtTolynxKadeKey(){ return mtTk('kpi_tolynx_kade_v1'); }
+function mtTolynxMaxKey(){ return mtTk('kpi_tolynx_max_v1'); }
+function mtGetTolynxKadeHistorie(){
+  try {
+    var d = JSON.parse(LS.getItem(mtTolynxKadeKey()) || 'null');
+    if (d && Array.isArray(d.historie)) return d.historie;
+    if (d && d.import && d.export) return [{ tijdstip: d.bijgewerkt || '(onbekend tijdstip)', import: d.import, export: d.export }];
+  } catch(e) {}
+  return [];
+}
+function mtGetTolynxMax(){
+  try { var v = JSON.parse(LS.getItem(mtTolynxMaxKey()) || 'null'); if (typeof v === 'number' && v > 0) return v; } catch(e) {}
+  return null;
+}
+function mtOplEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function mtTolynxTabelHtml(titel, rijen){
+  var html = '<div style="flex:1;min-width:260px;"><div style="text-align:center;font-weight:700;color:var(--navy);margin-bottom:8px;">'+titel+'</div><table style="width:100%;border-collapse:collapse;font-size:12.5px;">';
+  rijen.forEach(function(rij, rIdx){
+    html += '<tr style="border-top:1px solid #eee;"><td style="padding:7px 8px;color:var(--muted);white-space:nowrap;">'+TOLYNX_RIJ_LABELS[rIdx]+'</td>'+
+      rij.map(function(v){ return '<td style="text-align:center;padding:7px 4px;font-weight:'+(rIdx===0?'800':'500')+';color:'+(rIdx===0?'var(--navy)':'#333')+';">'+v+'</td>'; }).join('') + '</tr>';
+  });
+  html += '</table></div>';
+  return html;
+}
+function mtTolynxTotaalHtml(snapshot){
+  var totaal = (snapshot.import[0][0] || 0) + (snapshot.export[0][0] || 0);
+  var max = mtGetTolynxMax();
+  var overschreden = max !== null && totaal > max;
+  var kleurBg = overschreden ? '#c0392b' : '#eef3fa';
+  var kleurTxt = overschreden ? '#fff' : 'var(--navy)';
+  var html = '<div style="display:flex;justify-content:center;margin-bottom:16px;"><div style="background:'+kleurBg+';border-radius:10px;padding:12px 28px;text-align:center;min-width:220px;'+(overschreden?'box-shadow:0 0 0 2px #c0392b;':'border:1px solid #ccd6e5;')+'">';
+  html += '<div style="font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:'+(overschreden?'#fdd':'var(--muted)')+';font-weight:700;">Totaal op kade</div>';
+  html += '<div style="font-size:32px;font-weight:800;color:'+kleurTxt+';line-height:1.2;">'+totaal+'</div>';
+  if (max !== null) html += '<div style="font-size:10.5px;color:'+(overschreden?'#fee':'var(--muted)')+';">'+(overschreden?'&#9888; boven maximum van '+max:'max. '+max)+'</div>';
+  html += '</div></div>';
+  return html;
+}
+function mtRenderTolynxKade(){
+  var el = document.getElementById('tolynx-kade-body');
+  if (!el) return;
+  var historie = mtGetTolynxKadeHistorie();
+  if (!historie.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:13px;">Nog geen data ingevoerd voor deze terminal.</div>';
+    return;
+  }
+  if (_mtTolynxIdx === null || _mtTolynxIdx >= historie.length) _mtTolynxIdx = historie.length - 1;
+  var snapshot = historie[_mtTolynxIdx];
+  var isLaatste = _mtTolynxIdx === historie.length - 1;
+  var html = '<div style="display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:10px;">'+
+    '<button onclick="mtTolynxNavigeer(-1)" '+(_mtTolynxIdx===0?'disabled style="opacity:.3;"':'')+' style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:14px;">&#8592;</button>'+
+    '<div style="text-align:center;"><div style="font-weight:700;color:var(--navy);font-size:14px;">'+mtOplEsc(snapshot.tijdstip)+'</div>'+
+    '<div style="font-size:11px;color:var(--muted);">'+(_mtTolynxIdx+1)+' van '+historie.length+(isLaatste?' &middot; meest recent':'')+'</div></div>'+
+    '<button onclick="mtTolynxNavigeer(1)" '+(isLaatste?'disabled style="opacity:.3;"':'')+' style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:14px;">&#8594;</button></div>';
+  html += mtTolynxTotaalHtml(snapshot);
+  html += '<div style="display:flex;gap:24px;flex-wrap:wrap;">'+mtTolynxTabelHtml('&#9664;&#9664; Import', snapshot.import)+mtTolynxTabelHtml('Export &#9654;&#9654;', snapshot.export)+'</div>';
+  if (!isLaatste) html += '<div style="margin-top:10px;text-align:center;"><button onclick="_mtTolynxIdx=null;mtRenderTolynxKade();" style="background:none;border:1px solid #ccd6e5;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:11.5px;color:var(--navy);">&#8635; Naar meest recente</button></div>';
+  el.innerHTML = html;
+}
+function mtTolynxNavigeer(richting){
+  var historie = mtGetTolynxKadeHistorie();
+  if (_mtTolynxIdx === null) _mtTolynxIdx = historie.length - 1;
+  var nieuw = _mtTolynxIdx + richting;
+  if (nieuw < 0 || nieuw >= historie.length) return;
+  _mtTolynxIdx = nieuw;
+  mtRenderTolynxKade();
+}
+
+// Direct inloggen als deze sessie al eerder is ontgrendeld.
+(function(){
+  if (sessionStorage.getItem('kpi_mt_auth') === '1') {
+    document.getElementById('mt-login').style.display = 'none';
+    document.getElementById('mt-app').style.display = 'block';
+    mtInit();
+  } else {
+    setTimeout(function(){ document.getElementById('mt-ww').focus(); }, 100);
+  }
+})();
+</script>
+</body>
+</html>
