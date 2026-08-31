@@ -82,7 +82,10 @@
       <div id="kpi-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:20px;"></div>
 
       <div class="card">
-        <div class="card-header"><div>&#x1F465;</div><h2>Personeelsbezetting per dag</h2></div>
+        <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:8px;"><div>&#x1F465;</div><h2>Personeelsbezetting per dag</h2></div>
+          <button id="kpi-personeel-toggle" onclick="mtToggleLegeDagen()" style="font-size:11px;padding:5px 10px;border:1px solid #ccd6e5;border-radius:6px;background:#eef3fa;color:var(--navy);cursor:pointer;font-weight:600;"></button>
+        </div>
         <div style="overflow-x:auto;padding:16px;">
           <table style="width:100%;border-collapse:collapse;font-size:12px;">
             <thead>
@@ -140,6 +143,11 @@
             <tbody id="kpi-normen-body-tbl"></tbody>
           </table>
         </div>
+      </div>
+
+      <div class="card" id="kpi-chart-card" style="display:none;">
+        <div class="card-header"><div>&#x25D5;</div><h2>Punctualiteit per meetpunt</h2></div>
+        <div id="kpi-charts-wrap" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;padding:16px;"></div>
       </div>
 
       <div class="card" style="padding:20px 24px;">
@@ -320,6 +328,7 @@ function mtInit(){
 // van de hoofdapp.
 // ══════════════════════════════════════════════════════════════════
 var _kpiM = new Date().getMonth(), _kpiY = new Date().getFullYear();
+var mtToonLegeDagen = false; // lege dagen (alles op nul) staan standaard ingeklapt
 var _TC = ['Eerste lijn','Klep neer','Aanvang lossen','Schip leeg','Eerste eigen rijder','Laden compleet','Ramp op','Vertrek'];
 function mt_ML(){ return mtTerminal==='IMM' ? ['January','February','March','April','May','June','July','August','September','October','November','December'] : ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December']; }
 function mt_RT(){ return mtTerminal==='IMM' ? ['To Hoek van Holland','To Europoort'] : ['Harwich Ochtend','Harwich Middag','Immingham']; }
@@ -329,6 +338,10 @@ function mtGetKpiNormen(){ try{ var s=JSON.parse(LS.getItem('kpi_normen_v1')); i
 function mtGetStdBezetting(){ try{ return JSON.parse(LS.getItem('std_bezetting_v1')||'{}'); }catch(e){ return {}; } }
 function mt_vsGet(){ try{ return JSON.parse(LS.getItem(mtTk('vs_data_v1'))||'{}'); }catch(e){ return {}; } }
 
+function mtToggleLegeDagen(){
+  mtToonLegeDagen = !mtToonLegeDagen;
+  mtRenderKpi();
+}
 function mtKpiStapMaand(d){
   _kpiM += d;
   if (_kpiM > 11) { _kpiM = 0; _kpiY++; }
@@ -418,9 +431,23 @@ function mtRenderKpi(){
 
     if (!dagRows.length) {
       pBody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:20px;color:var(--muted);">' + (isImm ? 'No staffing data for this month' : 'Geen personeelsdata voor deze maand') + '</td></tr>';
+      var _tgBtn0 = document.getElementById('kpi-personeel-toggle'); if (_tgBtn0) _tgBtn0.style.display = 'none';
     } else {
       dagRows.sort(function(a,b){ return a.datum.localeCompare(b.datum); });
-      pBody.innerHTML = dagRows.map(function(r, i) {
+      var _isLeg = function(r){ return !(r.fteO||r.inhO||r.stO||r.exO||r.fteA||r.inhA||r.stA||r.exA||parseFloat(r.uren)); };
+      var _legeAantal = dagRows.filter(_isLeg).length;
+      var _tgBtn = document.getElementById('kpi-personeel-toggle');
+      if (_tgBtn) {
+        if (_legeAantal === 0) { _tgBtn.style.display = 'none'; }
+        else {
+          _tgBtn.style.display = 'inline-block';
+          _tgBtn.textContent = mtToonLegeDagen
+            ? (isImm ? 'Hide '+_legeAantal+' empty day'+(_legeAantal===1?'':'s') : _legeAantal+' lege dag'+(_legeAantal===1?'':'en')+' verbergen')
+            : (isImm ? 'Show '+_legeAantal+' empty day'+(_legeAantal===1?'':'s') : _legeAantal+' lege dag'+(_legeAantal===1?'':'en')+' tonen');
+        }
+      }
+      var dagRowsZichtbaar = mtToonLegeDagen ? dagRows : dagRows.filter(function(r){ return !_isLeg(r); });
+      pBody.innerHTML = dagRowsZichtbaar.map(function(r, i) {
         var bg = i%2===0 ? 'var(--surface)' : 'var(--surface2)';
         var d = r.datum.split('-'); var datumFmt = d[2]+'-'+d[1]+'-'+d[0];
         var _sb = mtGetStdBezetting();
@@ -570,6 +597,72 @@ function mtRenderKpi(){
       }).join('');
     }
   }
+
+  // === PUNCTUALITEIT PER MEETPUNT (donut-grid) ===
+  (function(){
+    var cC = document.getElementById('kpi-chart-card'), cW = document.getElementById('kpi-charts-wrap');
+    if (!cC || !cW) return;
+    var normen2 = mtGetKpiNormen();
+    var colStats = [];
+    _TC.forEach(function(kolom, ci){
+      _RT.forEach(function(route, ri){
+        var bin=0, buit=0, gn=0, leeg=0, normT=null, normM=0, hasN=false;
+        var nv = normen2[route+'_'+ci];
+        if (nv && nv.tijd) { normT = nv.tijd; normM = nv.marge?parseInt(nv.marge):0; hasN = true; }
+        entries.forEach(function(e){
+          var _d = e.datum?e.datum.split('/'):[], _isWE = false;
+          if (_d.length===3) { var _wd = new Date(parseInt(_d[2]), parseInt(_d[1])-1, parseInt(_d[0])); _isWE = _wd.getDay()===0||_wd.getDay()===6; }
+          var rij = (e.tijden||[])[ri];
+          if (!rij) { leeg++; return; }
+          var t = (rij.tijden||[])[ci];
+          if (!t) { leeg++; return; }
+          var tM = mt_t2m(t);
+          if (tM===null) { leeg++; return; }
+          var _nk = route+'_'+ci+(_isWE && normen2[route+'_'+ci+'_we'] ? '_we' : '');
+          var nv2 = normen2[_nk] || normen2[route+'_'+ci];
+          if (!nv2 || !nv2.tijd) { gn++; }
+          else { var nm2=mt_t2m(nv2.tijd), mg2=nv2.marge?parseInt(nv2.marge):0; if (tM<=nm2+mg2) bin++; else buit++; }
+        });
+        if (bin+buit+gn+leeg>0) colStats.push({kolom:kolom, route:route, bin:bin, buit:buit, gn:gn, leeg:leeg, normT:normT, normM:normM, hasN:hasN});
+      });
+    });
+    colStats = colStats.filter(function(s){ return s.hasN; });
+    var tolynxKaartHtml = mtTolynxMaandDonutKaartHtml();
+    if (!colStats.length && !tolynxKaartHtml) { cC.style.display = 'none'; return; }
+    cC.style.display = 'block';
+    cW.innerHTML = colStats.map(function(s){
+      var tot = s.bin+s.buit+(s.gn||0)+s.leeg;
+      var ingevuld = s.bin+s.buit+(s.gn||0);
+      var pct = s.hasN ? (ingevuld>0 ? Math.round(s.bin/ingevuld*100) : 0) : null;
+      var ok = !s.hasN || pct>=80;
+      var kc = !s.hasN ? '#3498db' : pct>=80 ? '#1a7a40' : pct>=60 ? '#e67e22' : '#c0392b';
+      var segs = s.hasN
+        ? [s.bin>0?{l:(isImm?'On time':'Op tijd'),v:s.bin,c:'#27ae60'}:null, s.buit>0?{l:(isImm?'Late':'Te laat'),v:s.buit,c:'#e74c3c'}:null, s.leeg>0?{l:(isImm?'Not filled in':'Niet ingevuld'),v:s.leeg,c:'#cccccc'}:null].filter(Boolean)
+        : [s.gn>0?{l:(isImm?'Filled in':'Ingevuld'),v:s.gn,c:'#3498db'}:null, s.leeg>0?{l:(isImm?'Not filled in':'Niet ingevuld'),v:s.leeg,c:'#cccccc'}:null].filter(Boolean);
+      var R=60,cx=100,cy=90,W=200,H=210,cum=-90,paths='',lbls='',totDeg=0;
+      segs.forEach(function(seg,si){
+        var sw = si===segs.length-1 ? (360-totDeg) : Math.round(seg.v/tot*3600)/10;
+        totDeg += sw;
+        var r1=cum*Math.PI/180, r2=(cum+sw)*Math.PI/180;
+        var x1=cx+R*Math.cos(r1), y1=cy+R*Math.sin(r1), x2=cx+R*Math.cos(r2), y2=cy+R*Math.sin(r2);
+        if (sw>=359.9) paths += '<circle cx="'+cx+'" cy="'+cy+'" r="'+R+'" fill="'+seg.c+'"/>';
+        else paths += '<path d="M'+cx+','+cy+' L'+x1.toFixed(1)+','+y1.toFixed(1)+' A'+R+','+R+' 0 '+(sw>180?1:0)+',1 '+x2.toFixed(1)+','+y2.toFixed(1)+' Z" fill="'+seg.c+'" stroke="#fff" stroke-width="2"/>';
+        var mr=(cum+sw/2)*Math.PI/180, lx=cx+(R+26)*Math.cos(mr), ly=cy+(R+26)*Math.sin(mr), anch=lx>cx?'start':'end', sp=Math.round(seg.v/tot*100);
+        lbls += '<line x1="'+(cx+R*Math.cos(mr)).toFixed(1)+'" y1="'+(cy+R*Math.sin(mr)).toFixed(1)+'" x2="'+(cx+(R+18)*Math.cos(mr)).toFixed(1)+'" y2="'+(cy+(R+18)*Math.sin(mr)).toFixed(1)+'" stroke="#666" stroke-width="1.2"/><text x="'+lx.toFixed(1)+'" y="'+(ly-4).toFixed(1)+'" text-anchor="'+anch+'" font-size="8" font-weight="700" fill="'+seg.c+'">'+sp+'%</text><text x="'+lx.toFixed(1)+'" y="'+(ly+7).toFixed(1)+'" text-anchor="'+anch+'" font-size="7" fill="#555">'+seg.l+'</text>';
+        cum += sw;
+      });
+      var cp = pct!==null ? pct+'%' : ingevuld+'x';
+      var cl = !s.hasN ? (isImm?'No norm':'Geen norm') : (ok ? '&#x2713; KPI OK' : (isImm?'&#x2717; ATTENTION':'&#x2717; AANDACHT'));
+      var donut = '<circle cx="'+cx+'" cy="'+cy+'" r="'+(R-24)+'" fill="#fff" stroke="#eee" stroke-width="1"/><text x="'+cx+'" y="'+(cy-7)+'" text-anchor="middle" font-size="15" font-weight="800" fill="'+kc+'">'+cp+'</text><text x="'+cx+'" y="'+(cy+8)+'" text-anchor="middle" font-size="8" font-weight="600" fill="'+kc+'">'+cl+'</text>';
+      var leg = segs.map(function(seg){ return '<span style="font-size:9px;color:'+seg.c+';font-weight:700;"><svg width="12" height="12" style="vertical-align:middle;margin-right:3px;"><circle cx="6" cy="6" r="5" fill="'+seg.c+'"/></svg>'+seg.l+' ('+seg.v+')</span>'; }).join(' &nbsp;');
+      return '<div style="background:#fff;border:2px solid '+(ok?'#1a7a40':'#c0392b')+';border-radius:10px;padding:8px 6px 8px;box-shadow:0 3px 12px rgba(0,0,0,0.1);display:flex;flex-direction:column;align-items:center;">'+
+        '<div style="font-size:10px;font-weight:700;color:#003366;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:1px;text-align:center;">'+s.kolom+'</div>'+
+        '<div style="font-size:9px;color:#888;font-weight:600;margin-bottom:2px;">'+s.route+'</div>'+
+        '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">'+paths+donut+lbls+'</svg>'+
+        '<div style="font-size:9px;color:#999;margin-top:1px;">'+(s.hasN?'norm '+s.normT+(s.normM?'&#177;'+s.normM+'m':'')+'  &#x2022;  ':'')+tot+(isImm?' data points':' meetpunten')+'</div>'+
+        '<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;justify-content:center;">'+leg+'</div></div>';
+    }).join('') + tolynxKaartHtml;
+  })();
 
   setTimeout(function(){ mtRenderTruckChart(_kpiM, _kpiY); }, 200);
 }
@@ -741,6 +834,56 @@ function mtTolynxNavigeer(richting){
   if (nieuw < 0 || nieuw >= historie.length) return;
   _mtTolynxIdx = nieuw;
   mtRenderTolynxKade();
+}
+function mtTolynxMaandTijdstipMatch(tijdstip, maand, jaar){
+  var m = /^(\d{2})-(\d{2})-(\d{4})/.exec(tijdstip || '');
+  if (!m) return false;
+  return (parseInt(m[2], 10) - 1) === maand && parseInt(m[3], 10) === jaar;
+}
+function mtTolynxMaandDonutKaartHtml(){
+  var historie = mtGetTolynxKadeHistorie();
+  var max = mtGetTolynxMax();
+  var maandEntries = historie.filter(function(h){ return mtTolynxMaandTijdstipMatch(h.tijdstip, _kpiM, _kpiY); });
+  var tot = maandEntries.length;
+  var binnen = 0, boven = 0;
+  maandEntries.forEach(function(e){
+    var totaalKade = (e.import[0][0] || 0) + (e.export[0][0] || 0);
+    if (max !== null && totaalKade > max) boven++; else binnen++;
+  });
+  var isImm = mtTerminal === 'IMM';
+  var segs;
+  if (tot === 0) segs = [{ l: (isImm?'No data':'Geen data'), v: 1, c: '#e0e0e0' }];
+  else if (max !== null) segs = [binnen>0?{l:(isImm?'Within maximum':'Binnen maximum'),v:binnen,c:'#27ae60'}:null, boven>0?{l:(isImm?'Above maximum':'Boven maximum'),v:boven,c:'#c0392b'}:null].filter(Boolean);
+  else segs = [{ l: (isImm?'Entered':'Ingevoerd'), v: tot, c: '#3498db' }];
+
+  var R=60,cx=100,cy=90,W=200,H=210,cum=-90,paths='',lbls='',totDeg=0;
+  var som = segs.reduce(function(a,s){ return a+s.v; }, 0);
+  segs.forEach(function(seg,si){
+    var sw = si===segs.length-1 ? (360-totDeg) : Math.round(seg.v/som*3600)/10;
+    totDeg += sw;
+    var r1=cum*Math.PI/180, r2=(cum+sw)*Math.PI/180;
+    var x1=cx+R*Math.cos(r1), y1=cy+R*Math.sin(r1), x2=cx+R*Math.cos(r2), y2=cy+R*Math.sin(r2);
+    if (sw>=359.9) paths += '<circle cx="'+cx+'" cy="'+cy+'" r="'+R+'" fill="'+seg.c+'"/>';
+    else paths += '<path d="M'+cx+','+cy+' L'+x1.toFixed(1)+','+y1.toFixed(1)+' A'+R+','+R+' 0 '+(sw>180?1:0)+',1 '+x2.toFixed(1)+','+y2.toFixed(1)+' Z" fill="'+seg.c+'" stroke="#fff" stroke-width="2"/>';
+    if (tot>0) {
+      var mr=(cum+sw/2)*Math.PI/180, lx=cx+(R+26)*Math.cos(mr), ly=cy+(R+26)*Math.sin(mr), anch=lx>cx?'start':'end', sp=Math.round(seg.v/som*100);
+      lbls += '<line x1="'+(cx+R*Math.cos(mr)).toFixed(1)+'" y1="'+(cy+R*Math.sin(mr)).toFixed(1)+'" x2="'+(cx+(R+18)*Math.cos(mr)).toFixed(1)+'" y2="'+(cy+(R+18)*Math.sin(mr)).toFixed(1)+'" stroke="#666" stroke-width="1.2"/><text x="'+lx.toFixed(1)+'" y="'+(ly-4).toFixed(1)+'" text-anchor="'+anch+'" font-size="8" font-weight="700" fill="'+seg.c+'">'+sp+'%</text><text x="'+lx.toFixed(1)+'" y="'+(ly+7).toFixed(1)+'" text-anchor="'+anch+'" font-size="7" fill="#555">'+seg.l+'</text>';
+    }
+    cum += sw;
+  });
+  var pct = (max!==null && tot>0) ? Math.round(binnen/tot*100) : null;
+  var kc = tot===0 ? '#999' : (max===null ? '#3498db' : (boven===0 ? '#1a7a40' : (pct>=80?'#1a7a40':pct>=60?'#e67e22':'#c0392b')));
+  var cp = tot===0 ? '&#8211;' : (pct!==null ? pct+'%' : tot+'x');
+  var cl = tot===0 ? (isImm?'No data':'Geen data') : (max===null ? (isImm?'No maximum':'Geen maximum') : (boven===0 ? '&#x2713; KPI OK' : (isImm?'&#x2717; ATTENTION':'&#x2717; AANDACHT')));
+  var donut = '<circle cx="'+cx+'" cy="'+cy+'" r="'+(R-24)+'" fill="#fff" stroke="#eee" stroke-width="1"/><text x="'+cx+'" y="'+(cy-7)+'" text-anchor="middle" font-size="15" font-weight="800" fill="'+kc+'">'+cp+'</text><text x="'+cx+'" y="'+(cy+8)+'" text-anchor="middle" font-size="8" font-weight="600" fill="'+kc+'">'+cl+'</text>';
+  var leg = segs.map(function(seg){ return '<span style="font-size:9px;color:'+seg.c+';font-weight:700;"><svg width="12" height="12" style="vertical-align:middle;margin-right:3px;"><circle cx="6" cy="6" r="5" fill="'+seg.c+'"/></svg>'+seg.l+' ('+seg.v+')</span>'; }).join(' &nbsp;');
+  var ok = tot===0 || max===null || boven===0;
+  return '<div style="background:#fff;border:2px solid '+(ok?'#1a7a40':'#c0392b')+';border-radius:10px;padding:8px 6px 8px;box-shadow:0 3px 12px rgba(0,0,0,0.1);display:flex;flex-direction:column;align-items:center;">'+
+    '<div style="font-size:10px;font-weight:700;color:#003366;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:1px;text-align:center;">Kade bezetting</div>'+
+    '<div style="font-size:9px;color:#888;font-weight:600;margin-bottom:2px;">'+mt_ML()[_kpiM]+' '+_kpiY+'</div>'+
+    '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">'+paths+donut+lbls+'</svg>'+
+    '<div style="font-size:9px;color:#999;margin-top:1px;">'+(max!==null?'max. '+max+'  &#x2022;  ':'')+tot+' screenshot'+(tot===1?'':'s')+' ingevoerd</div>'+
+    '<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;justify-content:center;">'+leg+'</div></div>';
 }
 
 // Direct inloggen als deze sessie al eerder is ontgrendeld.
