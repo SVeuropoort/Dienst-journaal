@@ -51,6 +51,10 @@
     <div id="mt-err">Onjuist wachtwoord.</div>
     <button onclick="mtLogin()">INLOGGEN</button>
   </div>
+  <div style="display:flex;gap:18px;margin-top:18px;">
+    <a href="https://sveuropoort.github.io/Dienst-journaal/index.html" style="color:rgba(255,255,255,0.55);font-size:12px;text-decoration:none;display:flex;align-items:center;gap:5px;">&#x1F6A2; Dienst Journaal</a>
+    <a href="https://sveuropoort.github.io/Dienst-journaal/materieel-garage.html" style="color:rgba(255,255,255,0.55);font-size:12px;text-decoration:none;display:flex;align-items:center;gap:5px;">&#x1F697; Materieel-garage</a>
+  </div>
 </div>
 
 <!-- ══════════════ APP ══════════════ -->
@@ -709,12 +713,13 @@ function mtRenderTruckChart(maand, jaar){
         try { var e = CLOUD_DATA[k]; if (e && e.pos) posPerDag[dt] = e.pos; } catch(ex) {}
       }
     }
-    // Bron 2: ls_TERMINAL_pos_YYYY-MM-DD_d0 (fallback als geen dagplan_)
+    // Bron 2: ls_TERMINAL_pos_YYYY-MM-DD_d0 (fallback als geen dagplan_), alleen van de
+    // HUIDIGE terminal — anders telt data van een andere terminal (die toevallig ook in deze
+    // cloud-rij is meegesynced) hier per ongeluk mee.
     if (k.startsWith('ls_') && (k.indexOf('_pos_') !== -1)) {
       var kStrip = k.slice(3);
-      if (kStrip.startsWith('EP_')) kStrip = kStrip.slice(3);
-      else if (kStrip.startsWith('HVH_')) kStrip = kStrip.slice(4);
-      else if (kStrip.startsWith('IMM_')) kStrip = kStrip.slice(4);
+      if (kStrip.startsWith(mtTerminalPrefix())) kStrip = kStrip.slice(mtTerminalPrefix().length);
+      else return;
       if (kStrip.startsWith('pos_')) {
         var rest = kStrip.slice(4);
         var dt2 = rest.indexOf('_d') > -1 ? rest.slice(0, rest.lastIndexOf('_d')) : rest;
