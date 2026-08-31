@@ -2874,7 +2874,8 @@ var DJ_WW_DEFS = [
   { sleutel: 'anets_maandafsluiting', label: 'Maandafsluiting ontgrendelen', standaard: djObf('anets') },
   { sleutel: 'anets_ort', label: 'ORT/Basisrooster ontgrendelen', standaard: djObf('anets') },
   { sleutel: 'salaris', label: 'Maandafsluiting \u2192 Instellingen (loongroepen)', standaard: djObf('Salaris') },
-  { sleutel: 'ort_intern', label: 'ORT Rekentool (intern tabblad)', standaard: djObf('SVeuropoort') }
+  { sleutel: 'ort_intern', label: 'ORT Rekentool (intern tabblad)', standaard: djObf('SVeuropoort') },
+  { sleutel: 'kpi_mt', label: 'KPI Dashboard (MT) \u2014 los bestand kpi-mt.html', standaard: djObf('MTeuropoort2026') }
 ];
 function djWwGet(sleutel){
   var def = DJ_WW_DEFS.filter(function(d){ return d.sleutel === sleutel; })[0];

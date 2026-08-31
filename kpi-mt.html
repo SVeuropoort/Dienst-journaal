@@ -221,8 +221,19 @@
 function mtObf(t){ try { return btoa(unescape(encodeURIComponent(t))).split('').reverse().join(''); } catch(e){ return ''; } }
 function mtDeobf(v){ try { return decodeURIComponent(escape(atob(v.split('').reverse().join('')))); } catch(e){ return ''; } }
 var MT_WW_STANDAARD = mtObf('MTeuropoort2026'); // eerste keer inloggen; daarna direct wijzigen via het tandwiel
-function mtWwGet(){ return mtDeobf(localStorage.getItem('kpi_mt_ww_v1') || MT_WW_STANDAARD); }
-function mtWwSet(w){ localStorage.setItem('kpi_mt_ww_v1', mtObf(w)); }
+// Gedeelde opslagsleutel met het Wachtwoordbeheer-paneel in de hoofdapp (index.html), zodat dit
+// wachtwoord daar ook beheerd kan worden. "kpi_mt_ww_v1" is de oude, aparte sleutel van vóór die
+// koppeling — als iemand het wachtwoord destijds al via het tandwiel hier had gewijzigd, wordt
+// die waarde hieronder nog als fallback gelezen (en meteen naar de nieuwe sleutel gemigreerd),
+// zodat niemand per ongeluk buitengesloten raakt.
+function mtWwGet(){
+  var nieuw = localStorage.getItem('dj_ww_kpi_mt');
+  if (nieuw) return mtDeobf(nieuw);
+  var oud = localStorage.getItem('kpi_mt_ww_v1');
+  if (oud) { localStorage.setItem('dj_ww_kpi_mt', oud); return mtDeobf(oud); }
+  return mtDeobf(MT_WW_STANDAARD);
+}
+function mtWwSet(w){ localStorage.setItem('dj_ww_kpi_mt', mtObf(w)); }
 
 function mtLogin(){
   var ingevoerd = document.getElementById('mt-ww').value;
