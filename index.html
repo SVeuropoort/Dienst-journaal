@@ -2791,6 +2791,10 @@ document.addEventListener('contextmenu', function(e) {
     <div id="dj-err" style="color:#ff6b6b;font-size:12px;margin-bottom:8px;display:none;">Onjuist wachtwoord.</div>
     <button id="dj-btn" style="width:100%;padding:12px;background:#e8a020;border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;">INLOGGEN</button>
   </div>
+  <div style="display:flex;gap:18px;margin-top:18px;">
+    <a href="https://sveuropoort.github.io/Dienst-journaal/kpi-mt.html" id="dj-link-kpi" style="color:rgba(255,255,255,0.55);font-size:12px;text-decoration:none;display:flex;align-items:center;gap:5px;">&#x1F4CA; KPI Dashboard (MT)</a>
+    <a href="https://sveuropoort.github.io/Dienst-journaal/materieel-garage.html" id="dj-link-mat" style="color:rgba(255,255,255,0.55);font-size:12px;text-decoration:none;display:flex;align-items:center;gap:5px;">&#x1F697; Materieel-garage</a>
+  </div>
 </div>
 <!-- Beheerpaneel wachtwoorden: alleen bereikbaar via het tandwiel + code, vanaf de inlogpagina -->
 <div id="dj-admin-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:100000;align-items:center;justify-content:center;">
@@ -5080,6 +5084,10 @@ window.addEventListener('resize', () => {
     if (wwBtn) wwBtn.textContent = (t === 'IMM') ? 'LOG IN' : 'INLOGGEN';
     var wwErr = document.getElementById('dj-err');
     if (wwErr) wwErr.textContent = (t === 'IMM') ? 'Incorrect password.' : 'Onjuist wachtwoord.';
+    var linkKpi = document.getElementById('dj-link-kpi');
+    if (linkKpi) linkKpi.innerHTML = (t === 'IMM') ? '&#x1F4CA; KPI Dashboard (MT)' : '&#x1F4CA; KPI Dashboard (MT)';
+    var linkMat = document.getElementById('dj-link-mat');
+    if (linkMat) linkMat.innerHTML = (t === 'IMM') ? '&#x1F697; Equipment garage' : '&#x1F697; Materieel-garage';
     // Sommige onderdelen zijn (nog) niet van toepassing voor Immingham (NL-specifieke CAO/loonregels)
     if (typeof djVerbergTabsVoorTerminal === 'function') djVerbergTabsVoorTerminal();
     if (typeof verversWeerGetijdenTitels === 'function') verversWeerGetijdenTitels();
@@ -21446,10 +21454,10 @@ var DJ_VERTAAL_WOORDENBOEK = {
   "Navigeer naar een andere maand om de huidige maand op te slaan als snapshot.": "Navigate to another month to save the current month as a snapshot.",
   "Gemiddeld Trucks per Dienst": "Average Trucks per Shift",
   "↻ Herbereken": "↻ Recalculate",
-  "🌅 Ochtend": "&#x1F305; Morning",
-  "🚚 gem. trucks": "&#x1F69A; avg. trucks",
-  "● CF laden": "&#x25CF; CF loading",
-  "🌆 Avond": "&#x1F306; Evening",
+  "🌅 Ochtend": "🌅 Morning",
+  "🚚 gem. trucks": "🚚 avg. trucks",
+  "● CF laden": "● CF loading",
+  "🌆 Avond": "🌆 Evening",
   "Geen truckdata voor deze maand.": "No truck data for this month.",
   "Vorige dag": "Previous day",
   "Volgende dag": "Next day",
@@ -22439,23 +22447,27 @@ function renderTruckChart(maand, jaar) {
   var maandStr = String(maand+1).padStart(2,'0');
   var prefix   = jaar+'-'+maandStr+'-';
   var posPerDag = {};
+  var _pfxDagTruck = getTerminalPrefix() + 'dagplan_'; // bijv. 'IMM_dagplan_' — voorkomt dat oude,
+  // niet-geprefixte data (van vóór de terminal-koppeling) hier per ongeluk wordt meegeteld,
+  // ongeacht welke terminal nu geselecteerd is.
 
   try {
     for(var i=0;i<localStorage.length;i++){
       var k=localStorage.key(i);
       if(!k) continue;
-      // Bron 1: dagplan_YYYY-MM-DD
-      if(k.startsWith('dagplan_')){
-        var dt=k.slice(8);
+      // Bron 1: <terminal>_dagplan_YYYY-MM-DD
+      if(k.startsWith(_pfxDagTruck)){
+        var dt=k.slice(_pfxDagTruck.length);
         if(dt.startsWith(prefix)){
           try{ var e=JSON.parse(localStorage.getItem(k)); if(e&&e.pos) posPerDag[dt]=e.pos; }catch(ex){}
         }
       }
-      // Bron 2: ls_TERMINAL_pos_YYYY-MM-DD_d0 (fallback als geen dagplan_)
+      // Bron 2: ls_TERMINAL_pos_YYYY-MM-DD_d0 (fallback als geen dagplan_), alleen van de
+      // HUIDIGE terminal — anders telt data van een andere terminal hier per ongeluk mee.
       if(k.startsWith('ls_')&&(k.indexOf('_pos_')!==-1)){
         var kStrip=k.slice(3);
-        if(kStrip.startsWith('EP_')) kStrip=kStrip.slice(3);
-        else if(kStrip.startsWith('HVH_')) kStrip=kStrip.slice(4);
+        if(kStrip.startsWith(getTerminalPrefix())) kStrip=kStrip.slice(getTerminalPrefix().length);
+        else continue;
         if(kStrip.startsWith('pos_')){
           var rest=kStrip.slice(4);
           var dt2=rest.indexOf('_d')>-1?rest.slice(0,rest.lastIndexOf('_d')):rest;
