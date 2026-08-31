@@ -233,7 +233,28 @@ function mtWwGet(){
   if (oud) { localStorage.setItem('dj_ww_kpi_mt', oud); return mtDeobf(oud); }
   return mtDeobf(MT_WW_STANDAARD);
 }
-function mtWwSet(w){ localStorage.setItem('dj_ww_kpi_mt', mtObf(w)); }
+function mtWwSet(w){ localStorage.setItem('dj_ww_kpi_mt', mtObf(w)); mtWwCloudPush(); }
+// Zelfde gedeelde, terminal-onafhankelijke wachtwoorden-cloudrij als in de hoofdapp
+// (index.html), zodat een wachtwoordwijziging hier of daar altijd overal doorwerkt.
+var DJ_WW_CLOUD_ROW = 'dj_wachtwoorden_global';
+function mtWwCloudPush(){
+  var payload = {};
+  Object.keys(localStorage).forEach(function(k){ if (k.indexOf('dj_ww_') === 0) payload[k] = localStorage.getItem(k); });
+  fetch(SB_URL + '/rest/v1/' + SB_TABLE, {
+    method: 'POST',
+    headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' },
+    body: JSON.stringify({ id: DJ_WW_CLOUD_ROW, data: payload, updated_at: new Date().toISOString() })
+  }).catch(function(){});
+}
+async function mtWwCloudPull(){
+  try {
+    var resp = await fetch(SB_URL + '/rest/v1/' + SB_TABLE + '?id=eq.' + DJ_WW_CLOUD_ROW + '&select=data', { headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY } });
+    var rows = await resp.json();
+    if (rows && rows[0] && rows[0].data) {
+      Object.keys(rows[0].data).forEach(function(k){ if (k.indexOf('dj_ww_') === 0) localStorage.setItem(k, rows[0].data[k]); });
+    }
+  } catch(e) {}
+}
 
 function mtLogin(){
   var ingevoerd = document.getElementById('mt-ww').value;
@@ -265,6 +286,7 @@ function mtWachtwoordWijzigen(){
 var SB_URL   = 'https://xgqtiseknvjwaqapwjdt.supabase.co';
 var SB_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhncXRpc2VrbnZqd2FxYXB3amR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODYxNzIsImV4cCI6MjA5NjE2MjE3Mn0.DdBJ6OzEVC-l_9qbJE-bVlv1WdxFkB1C2tjEHXqh5SE';
 var SB_TABLE = 'sync_data';
+mtWwCloudPull(); // meteen bij laden de nieuwste wachtwoorden ophalen, vóór het inloggen
 
 var mtTerminal = sessionStorage.getItem('kpi_mt_terminal') || 'EP';
 // Gesimuleerd "localStorage" gevuld vanuit de cloud-data van de gekozen terminal. De

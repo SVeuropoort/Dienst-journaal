@@ -2892,6 +2892,37 @@ function djWwGet(sleutel){
 function djWwSet(sleutel, waarde){
   if (waarde && waarde.trim()) localStorage.setItem('dj_ww_' + sleutel, djObf(waarde.trim()));
   else localStorage.removeItem('dj_ww_' + sleutel); // leeg laten = terug naar standaardwachtwoord
+  djWwCloudPush();
+}
+// ══════════════════════════════════════════════════════════════════
+// Wachtwoorden zijn bewust NIET terminal-gebonden (hetzelfde meesterwachtwoord
+// hoort overal te werken), maar de normale cloud-sync IS terminal-gebonden
+// (elke terminal heeft zijn eigen rij in Supabase). Daarom krijgen wachtwoorden
+// hier hun EIGEN, aparte rij ("dj_wachtwoorden_global") die los van de
+// gekozen terminal wordt bijgewerkt en opgehaald — zo werkt een wijziging op
+// één apparaat altijd door naar alle andere apparaten, ongeacht welke
+// terminal daar toevallig actief is.
+// ══════════════════════════════════════════════════════════════════
+var DJ_WW_CLOUD_ROW = 'dj_wachtwoorden_global';
+function djWwCloudPush(){
+  if (typeof SB_URL === 'undefined' || typeof SB_KEY === 'undefined' || typeof SB_TABLE === 'undefined') return;
+  var payload = {};
+  Object.keys(localStorage).forEach(function(k){ if (k.indexOf('dj_ww_') === 0) payload[k] = localStorage.getItem(k); });
+  fetch(SB_URL + '/rest/v1/' + SB_TABLE, {
+    method: 'POST',
+    headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' },
+    body: JSON.stringify({ id: DJ_WW_CLOUD_ROW, data: payload, updated_at: new Date().toISOString() })
+  }).catch(function(){});
+}
+async function djWwCloudPull(){
+  if (typeof SB_URL === 'undefined' || typeof SB_KEY === 'undefined' || typeof SB_TABLE === 'undefined') return;
+  try {
+    var resp = await fetch(SB_URL + '/rest/v1/' + SB_TABLE + '?id=eq.' + DJ_WW_CLOUD_ROW + '&select=data', { headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY } });
+    var rows = await resp.json();
+    if (rows && rows[0] && rows[0].data) {
+      Object.keys(rows[0].data).forEach(function(k){ if (k.indexOf('dj_ww_') === 0) localStorage.setItem(k, rows[0].data[k]); });
+    }
+  } catch(e) {}
 }
 // Controleert een ingevoerd wachtwoord tegen het wachtwoord van "sleutel" OF tegen het
 // meesterwachtwoord (overbrugt dus elk voorkomend wachtwoord in de app). Het beheerpaneel zelf
@@ -2912,10 +2943,11 @@ function djWachtwoordAnetsOrt(){ return djWwGet('anets_ort'); }
 function djWachtwoordSalaris(){ return djWwGet('salaris'); }
 function djWachtwoordMaster(){ return djWwGet('master'); }
 function djWachtwoordOrtIntern(){ return djWwGet('ort_intern'); }
-function djAdminOpenen(){
+async function djAdminOpenen(){
   var code = prompt('Beheercode:');
   if (code === null) return;
   if (code !== djWwGet('beheercode')) { alert('Onjuiste code.'); return; }
+  await djWwCloudPull(); // haal de nieuwste waarden op, mocht een ander apparaat net iets gewijzigd hebben
   var container = document.getElementById('dj-admin-velden');
   if (container) {
     container.innerHTML = DJ_WW_DEFS.map(function(def){
@@ -5245,6 +5277,9 @@ window.addEventListener('resize', () => {
   var SB_URL  = 'https://xgqtiseknvjwaqapwjdt.supabase.co';
   var SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhncXRpc2VrbnZqd2FxYXB3amR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODYxNzIsImV4cCI6MjA5NjE2MjE3Mn0.DdBJ6OzEVC-l_9qbJE-bVlv1WdxFkB1C2tjEHXqh5SE';
   var SB_TABLE = 'sync_data';
+  // Direct bij het laden van de pagina de laatste wachtwoorden ophalen, ruim vóór iemand
+  // daadwerkelijk kan inloggen of het beheerpaneel kan openen.
+  if (typeof djWwCloudPull === 'function') djWwCloudPull();
   var _syncBezig = false;
   
 
