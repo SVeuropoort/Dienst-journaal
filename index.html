@@ -18769,9 +18769,10 @@ function wisselPunctualityDatum(dateStr) {
             if(!t){leeg++;return;}
             var tM=_t2m(t);
             if(tM===null){leeg++;return;}
-            // gebruik weekend-norm indien beschikbaar
+            // gebruik weekend-norm indien beschikbaar (en die daadwerkelijk een tijd heeft ingevuld —
+            // anders valt terug op de basisnorm, ook al bestaat er wel een leeg weekend-object)
             var _nk=route+'_'+ci+(_isWE&&normen2[route+'_'+ci+'_we']?'_we':'');
-            var nv2=normen2[_nk]||normen2[route+'_'+ci];
+            var nv2=(normen2[_nk]&&normen2[_nk].tijd)?normen2[_nk]:normen2[route+'_'+ci];
             if(!nv2||!nv2.tijd){gn++;}
             else{var nm2=_t2m(nv2.tijd),mg2=nv2.marge?parseInt(nv2.marge):0;if(tM<=nm2+mg2)bin++;else buit++;}
           });
@@ -18795,6 +18796,7 @@ function wisselPunctualityDatum(dateStr) {
           var segs=s.hasN
             ?[s.bin>0?{l:(_immPie?'On time':'Op tijd'),v:s.bin,c:'#27ae60'}:null,
               s.buit>0?{l:(_immPie?'Late':'Te laat'),v:s.buit,c:'#e74c3c'}:null,
+              s.gn>0?{l:(_immPie?'No matching norm':'Geen passende norm'),v:s.gn,c:'#f39c12'}:null,
               s.leeg>0?{l:(_immPie?'Not filled in':'Niet ingevuld'),v:s.leeg,c:'#cccccc'}:null].filter(Boolean)
             :[s.gn>0?{l:(_immPie?'Filled in':'Ingevuld'),v:s.gn,c:'#3498db'}:null,
               s.leeg>0?{l:(_immPie?'Not filled in':'Niet ingevuld'),v:s.leeg,c:'#cccccc'}:null].filter(Boolean);
