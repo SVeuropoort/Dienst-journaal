@@ -3726,7 +3726,7 @@ function djHerstelVaarschema(){
 <!-- Tolynx kade bezetting -->
       <div class="card" style="margin-bottom:20px;">
         <div class="card-header" onclick="toggleTolynxKade('punct')" style="cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;">
-          <div style="display:flex;align-items:center;gap:8px;"><div class="icon">&#x1F69B;</div><h2>Kade bezetting (rePort)</h2></div>
+          <div style="display:flex;align-items:center;gap:8px;"><div class="icon">&#x1F69B;</div><h2>Kade capaciteit (rePort)</h2></div>
           <div style="display:flex;align-items:center;gap:10px;">
               <button onclick="event.stopPropagation();openTolynxKadeModal()" title="Aantallen bijwerken" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--navy);padding:0;">&#x2699;&#xFE0F;</button>
               <span id="tolynx-kade-toggle-icon-punct" style="font-size:14px;color:var(--muted);">&#x25BC;</span>
@@ -8752,7 +8752,7 @@ document.getElementById('archOverlay').addEventListener('click',function(e){
 <!-- Tolynx kade bezetting -->
       <div class="card" style="margin-bottom:20px;">
         <div class="card-header" onclick="toggleTolynxKade('kpi')" style="cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;">
-          <div style="display:flex;align-items:center;gap:8px;"><div class="icon">&#x1F69B;</div><h2>Kade bezetting (rePort)</h2></div>
+          <div style="display:flex;align-items:center;gap:8px;"><div class="icon">&#x1F69B;</div><h2>Kade capaciteit (rePort)</h2></div>
           <div style="display:flex;align-items:center;gap:10px;">
               <button onclick="event.stopPropagation();openTolynxKadeModal()" title="Aantallen bijwerken" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--navy);padding:0;">&#x2699;&#xFE0F;</button>
               <span id="tolynx-kade-toggle-icon-kpi" style="font-size:14px;color:var(--muted);">&#x25BC;</span>
@@ -21119,7 +21119,7 @@ var DJ_VERTAAL_WOORDENBOEK = {
   "✓ Opgeslagen": "&#10003; Saved",
   "Vergrendelen / Ontgrendelen": "Lock / Unlock",
   "Aantallen bijwerken": "Update quantities",
-  "Kade bezetting (rePort)": "Quay Occupancy (rePort)",
+  "Kade capaciteit (rePort)": "Quay Capacity (rePort)",
   "HOME": "HOME",
   "DAGPLANNING": "DAY PLANNING",
   "PUNCTUALITY": "PUNCTUALITY",
@@ -21545,7 +21545,7 @@ var DJ_VERTAAL_WOORDENBOEK = {
   "Totaal": "Total",
   "Trekker": "Tractor unit",
   "Chauffeur": "Driver",
-  "🚛 KADE BEZETTING BIJWERKEN": "&#x1F69B; UPDATE QUAY OCCUPANCY",
+  "🚛 KADE CAPACITEIT BIJWERKEN": "&#x1F69B; UPDATE QUAY CAPACITY",
   "Vul hier de aantallen in van de rePort-screenshot (Import/Export). De kolomvolgorde en iconen komen overeen met rePort: totaal, on hold, gevaarlijke stoffen, reefer, geblokkeerd.": "Enter the numbers from the rePort screenshot here (Import/Export). The column order and icons match rePort: total, on hold, dangerous goods, reefer, blocked.",
   "Maximum totaal op kade (Import+Export):": "Maximum total on quay (Import+Export):",
   "geen maximum": "no maximum",
@@ -21798,7 +21798,7 @@ function djVertaalPaginaEngels(){
   });
   }
   vertaalScope(scope);
-  // Gedeelde modals die buiten de .view-structuur staan (bijv. Kade bezetting-modal,
+  // Gedeelde modals die buiten de .view-structuur staan (bijv. Kade capaciteit-modal,
   // bereikbaar vanaf Punctuality/Dagplanning/KPI) worden hier apart meegenomen zodat
   // ze ook vertaald zijn ongeacht welke view actief is.
   var tolynxModal = document.getElementById('tolynx-kade-modal');
@@ -22199,7 +22199,7 @@ function tolynxMaandDonutKaartHtml(){
 
   var ok = tot === 0 || max === null || boven === 0;
   var html = '<div style="background:#fff;border:2px solid ' + (ok ? '#1a7a40' : '#c0392b') + ';border-radius:10px;padding:8px 6px 8px;box-shadow:0 3px 12px rgba(0,0,0,0.1);display:flex;flex-direction:column;align-items:center;">' +
-    '<div style="font-size:10px;font-weight:700;color:#003366;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:1px;text-align:center;">Kade bezetting</div>' +
+    '<div style="font-size:10px;font-weight:700;color:#003366;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:1px;text-align:center;">Kade capaciteit</div>' +
     '<div style="font-size:9px;color:#888;font-weight:600;margin-bottom:2px;">' + _ML[_kpiM] + ' ' + _kpiY + '</div>' +
     '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">' + paths + donut + lbls + '</svg>' +
     '<div style="font-size:9px;color:#999;margin-top:1px;">' + (max !== null ? 'max. ' + max + '  &#x2022;  ' : '') + tot + ' screenshot' + (tot === 1 ? '' : 's') + ' ingevoerd</div>' +
@@ -23879,11 +23879,11 @@ function pdZoek(query){
   </div>
 </div>
 
-<!-- TOLYNX KADE BEZETTING MODAL -->
+<!-- TOLYNX KADE CAPACITEIT MODAL -->
 <div id="tolynx-kade-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:99000;align-items:center;justify-content:center;">
   <div style="background:#fff;border-radius:12px;width:640px;max-width:96vw;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,0.35);">
     <div style="background:#003366;color:#fff;padding:16px 20px;border-radius:12px 12px 0 0;display:flex;align-items:center;justify-content:space-between;">
-      <span style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:800;letter-spacing:1px;">&#x1F69B; KADE BEZETTING BIJWERKEN</span>
+      <span style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:800;letter-spacing:1px;">&#x1F69B; KADE CAPACITEIT BIJWERKEN</span>
       <button onclick="closeTolynxKadeModal()" style="background:rgba(255,255,255,0.15);border:none;color:#fff;border-radius:6px;padding:5px 11px;cursor:pointer;font-size:17px;">&#x2715;</button>
     </div>
     <div style="padding:12px 20px;background:#f0f4ff;border-bottom:1px solid #dde;font-size:12px;color:#555;">
