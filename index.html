@@ -5212,7 +5212,8 @@ window.addEventListener('resize', () => {
     'personeelsdossier_v1',
     'personeelsdossier_actief_v1',
     'opleiding_overzicht_v1',
-    'werkoverdracht_toolbox_v1'
+    'werkoverdracht_toolbox_v1',
+    'std_bezetting_v1'
   ];
 
   function getTerminalPrefix() {
@@ -5257,6 +5258,30 @@ window.addEventListener('resize', () => {
       }
     });
     if (migrated) localStorage.setItem('dj_ep_migrated', '1');
+  })();
+
+  // ── Aanvullende eenmalige migratie (v2): std_bezetting_v1 en kpi_snapshot_*
+  // waren aanvankelijk niet terminal-specifiek. Draait via een eigen vlag, los van
+  // de migratie hierboven, zodat bestaande data op Europoort niet verloren gaat. ──
+  (function migrateEPDataV2() {
+    if (localStorage.getItem('dj_ep_migrated_v2')) return;
+    var migrated = false;
+    var val = localStorage.getItem('std_bezetting_v1');
+    if (val !== null && !localStorage.getItem('EP_std_bezetting_v1')) {
+      localStorage.setItem('EP_std_bezetting_v1', val);
+      migrated = true;
+    }
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (k && k.startsWith('kpi_snapshot_') && !k.startsWith('EP_') && !k.startsWith('HVH_') && !k.startsWith('IMM_')) {
+        var v = localStorage.getItem(k);
+        if (v !== null && !localStorage.getItem('EP_' + k)) {
+          localStorage.setItem('EP_' + k, v);
+          migrated = true;
+        }
+      }
+    }
+    localStorage.setItem('dj_ep_migrated_v2', '1');
   })();
 
   window.wisselTerminal = function() {
@@ -5384,7 +5409,8 @@ window.addEventListener('resize', () => {
     'personeelsdossier_v1',
     'personeelsdossier_actief_v1',
     'opleiding_overzicht_v1',
-    'werkoverdracht_toolbox_v1'
+    'werkoverdracht_toolbox_v1',
+    'std_bezetting_v1'
   ];
 
   function getSyncData() {
@@ -5401,10 +5427,12 @@ window.addEventListener('resize', () => {
     });
     // Alle dagplan_ sleutels van deze terminal
     var pfxDag = prefix + 'dagplan_';
+    var pfxKpiSnap = prefix + 'kpi_snapshot_';
     for (var i = 0; i < localStorage.length; i++) {
       var k = localStorage.key(i);
       if (!k) continue;
       if (k.startsWith(pfxDag) ||
+          k.startsWith(pfxKpiSnap) ||
           k.startsWith('ls_') ||
           k.startsWith('dagPlanning_arch_') ||
           k === 'dagPlanning_archIdx' ||
@@ -18330,7 +18358,7 @@ function wisselPunctualityDatum(dateStr) {
 
   function kpiStapMaand(d){_kpiM+=d;if(_kpiM>11){_kpiM=0;_kpiY++;}if(_kpiM<0){_kpiM=11;_kpiY--;}renderKPI();}
 
-  function _kpiSnapshotKey(m, y) { return 'kpi_snapshot_' + y + '_' + String(m+1).padStart(2,'0'); }
+  function _kpiSnapshotKey(m, y) { return getTerminalPrefix() + 'kpi_snapshot_' + y + '_' + String(m+1).padStart(2,'0'); }
 
   function _slaKpiSnapshotOp() {
     // Only save if there's actual data for this month
@@ -22462,7 +22490,7 @@ function tolynxVerwerkGeuploadBestand(file){
     if (preview) { preview.src = e.target.result; preview.style.display = 'block'; }
     tolynxOcrStatus('&#8987; Bezig met automatisch inlezen van de cijfers&hellip;', '#888');
     tolynxLaadTesseract().then(function(){
-      return Tesseract.recognize(e.target.result, 'eng');
+      return Tesseract.recognize(e.target.result, 'eng', { tessedit_char_whitelist: '0123456789' });
     }).then(function(result){
       tolynxOcrVerwerkResultaat(result);
     }).catch(function(err){
@@ -22567,9 +22595,69 @@ function tolynxOcrVerwerkResultaat(result){
 
   var nieuw = { import: [], export: [] };
   var onvolledig = false;
+
+  // ── Kolomposities één keer globaal vaststellen (in plaats van per rij gokken) ──
+  // Zoek de rij met de meeste herkende getallen (bij voorkeur precies 10) en gebruik
+  // die x-posities als vaste ankers voor alle rijen. Dit voorkomt dat een rij met een
+  // gemist getal alle volgende getallen in die rij een kolom laat opschuiven.
+  var beste = kandidaten.slice().sort(function(a,b){ return b.woorden.length - a.woorden.length; })[0];
+  var kolomAnchors = null;
+  if (beste && beste.woorden.length >= 8) {
+    kolomAnchors = beste.woorden.slice().sort(function(a,b){ return a.xc - b.xc; }).map(function(w){ return w.xc; });
+    if (kolomAnchors.length > 10) {
+      // Grootste kloof zoeken om Import/Export te scheiden en overtollige ruis aan de randen te negeren
+      var grootsteKloofA = 0, kloofIdxA = 5;
+      for (var gi = 1; gi < kolomAnchors.length; gi++) {
+        var dg = kolomAnchors[gi] - kolomAnchors[gi-1];
+        if (dg > grootsteKloofA) { grootsteKloofA = dg; kloofIdxA = gi; }
+      }
+      var linksA = kolomAnchors.slice(0, kloofIdxA), rechtsA = kolomAnchors.slice(kloofIdxA);
+      if (linksA.length > 5) linksA = linksA.slice(linksA.length - 5);
+      if (rechtsA.length > 5) rechtsA = rechtsA.slice(0, 5);
+      kolomAnchors = (linksA.length === 5 && rechtsA.length === 5) ? linksA.concat(rechtsA) : null;
+    } else if (kolomAnchors.length < 10) {
+      kolomAnchors = null; // te onbetrouwbaar om als anker te gebruiken, val terug op de oude methode
+    }
+  }
+
   kandidaten.forEach(function(rij){
     rij.woorden.sort(function(a, b){ return a.xc - b.xc; });
     var lijst = rij.woorden;
+
+    if (kolomAnchors) {
+      // Elk getal aan de dichtstbijzijnde vaste kolompositie toewijzen, in plaats van
+      // te vertrouwen op de positie-in-de-rij (die verschuift als er een getal mist).
+      var kolomWaarden = [0,0,0,0,0,0,0,0,0,0];
+      var kolomBezet = [false,false,false,false,false,false,false,false,false,false];
+      var kandidatenPaar = [];
+      lijst.forEach(function(w){
+        var besteIdx = -1, besteAfstand = Infinity;
+        kolomAnchors.forEach(function(ax, idx){
+          var d = Math.abs(w.xc - ax);
+          if (d < besteAfstand) { besteAfstand = d; besteIdx = idx; }
+        });
+        kandidatenPaar.push({ w: w, idx: besteIdx, afstand: besteAfstand });
+      });
+      // Bij een botsing (twee getallen claimen dezelfde kolom) wint de dichtstbijzijnde;
+      // de andere gaat naar de eerstvolgende vrije kolom die het dichtst in de buurt ligt.
+      kandidatenPaar.sort(function(a,b){ return a.afstand - b.afstand; });
+      kandidatenPaar.forEach(function(p){
+        var idx = p.idx;
+        if (kolomBezet[idx]) {
+          var vrij = -1, vrijAfstand = Infinity;
+          for (var ci = 0; ci < 10; ci++) {
+            if (!kolomBezet[ci]) { var d = Math.abs(p.w.xc - kolomAnchors[ci]); if (d < vrijAfstand) { vrijAfstand = d; vrij = ci; } }
+          }
+          idx = vrij;
+        }
+        if (idx >= 0) { kolomWaarden[idx] = p.w.n; kolomBezet[idx] = true; }
+      });
+      if (kolomBezet.indexOf(false) >= 0) onvolledig = true;
+      nieuw.import.push(kolomWaarden.slice(0, 5));
+      nieuw.export.push(kolomWaarden.slice(5, 10));
+      return;
+    }
+
     if (lijst.length !== 10) {
       // Probeer de grootste x-kloof te vinden om Import/Export te scheiden en overtollige ruis aan de randen te negeren
       if (lijst.length > 10) {
@@ -23817,7 +23905,7 @@ function pdZoek(query){
   };
 
   var STD_BEZ_KEY = 'std_bezetting_v1';
-  function getStdBezetting(){ try{ return JSON.parse(localStorage.getItem(STD_BEZ_KEY)||'{}'); }catch(e){ return {}; } }
+  function getStdBezetting(){ try{ return JSON.parse(localStorage.getItem(tk(STD_BEZ_KEY))||'{}'); }catch(e){ return {}; } }
   function openStdBezetting(){
     var d=getStdBezetting(), days=['Ma','Di','Wo','Do','Vr','Za','Zo'];
     var _immStd = (sessionStorage.getItem('dj_terminal')||'EP')==='IMM';
@@ -23843,7 +23931,7 @@ function pdZoek(query){
       if(!d[dag])d[dag]={};
       d[dag][field]=parseInt(inp.value)||0;
     });
-    localStorage.setItem(STD_BEZ_KEY,JSON.stringify(d));
+    localStorage.setItem(tk(STD_BEZ_KEY),JSON.stringify(d));
     try{ var mat=JSON.parse(localStorage.getItem(tk('mat_standalone_v2'))||'{}'); mat['std_bezetting']=d; localStorage.setItem(tk('mat_standalone_v2'),JSON.stringify(mat)); if(typeof cloudOpslaan==='function') setTimeout(function(){ cloudOpslaan(); },300); }catch(e){}
     closeStdBezetting();
     if(typeof renderKPI==='function') renderKPI();
