@@ -2946,7 +2946,7 @@ function spInit(){
     .catch(function(e){ _spInitPromise = null; throw e; }); // bij mislukking opnieuw proberen toestaan
   return _spInitPromise;
 }
-function _spMaakInstance(){
+async function _spMaakInstance(){
   _spMsalInstance = new msal.PublicClientApplication({
     auth: {
       clientId: SP_CLIENT_ID,
@@ -2955,6 +2955,7 @@ function _spMaakInstance(){
     },
     cache: { cacheLocation: 'localStorage' }
   });
+  await _spMsalInstance.initialize(); // vereist sinds MSAL browser v3
   return _spMsalInstance;
 }
 
