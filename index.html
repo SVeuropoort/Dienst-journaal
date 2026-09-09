@@ -3271,9 +3271,6 @@ async function djAdminOpenen(){
     alert('Het beheerpaneel is alleen toegankelijk voor specifieke accounts. Log in met Microsoft (rechtsboven) met een geautoriseerd account om verder te gaan.');
     return;
   }
-  var code = prompt('Beheercode:');
-  if (code === null) return;
-  if (code !== djWwGet('beheercode')) { alert('Onjuiste code.'); return; }
   try { await djWwCloudPull(); } catch(e) { console.error('SharePoint ophalen bij openen paneel mislukt:', e); } // haal de nieuwste waarden op, mocht een ander apparaat net iets gewijzigd hebben
   if (typeof spIngelogd === 'function' && spIngelogd()) djSpStatusTonen('Ingelogd bij SharePoint.', '#3fb950');
   djAdminAccountsRender();
