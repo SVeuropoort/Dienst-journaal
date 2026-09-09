@@ -2963,6 +2963,7 @@ async function _spMaakInstance(){
 async function spLogin(){
   await spInit();
   var result = await _spMsalInstance.loginPopup({ scopes: SP_SCOPES });
+  localStorage.setItem('dj_sp_account_username', result.account.username);
   return result.account;
 }
 
@@ -2971,15 +2972,22 @@ async function spLogin(){
 async function spGetToken(){
   await spInit();
   var accounts = _spMsalInstance.getAllAccounts();
-  if (!accounts.length) {
-    var account = await spLogin();
-    accounts = [account];
+  var voorkeurUsername = localStorage.getItem('dj_sp_account_username');
+  var account = null;
+  if (accounts.length) {
+    account = voorkeurUsername ? accounts.find(function(a){ return a.username === voorkeurUsername; }) : null;
+    if (!account) account = accounts[0];
   }
+  if (!account) {
+    account = await spLogin();
+  }
+  localStorage.setItem('dj_sp_account_username', account.username);
   try {
-    var result = await _spMsalInstance.acquireTokenSilent({ scopes: SP_SCOPES, account: accounts[0] });
+    var result = await _spMsalInstance.acquireTokenSilent({ scopes: SP_SCOPES, account: account });
     return result.accessToken;
   } catch (e) {
     var result2 = await _spMsalInstance.acquireTokenPopup({ scopes: SP_SCOPES });
+    localStorage.setItem('dj_sp_account_username', result2.account.username);
     return result2.accessToken;
   }
 }
