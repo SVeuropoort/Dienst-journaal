@@ -2813,6 +2813,15 @@ document.addEventListener('contextmenu', function(e) {
       <div id="dj-sp-status" style="color:rgba(255,255,255,0.6);font-size:12px;margin-bottom:8px;">Nog niet ingelogd.</div>
       <button onclick="djSpLoginKlik()" style="width:100%;padding:10px;background:#0f6cbd;border:none;border-radius:8px;color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;">&#x1F310; Login met Microsoft (SharePoint)</button>
     </div>
+    <div style="border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:12px;margin-bottom:16px;">
+      <div style="color:#e8a020;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Toegang beheerpaneel</div>
+      <div style="color:rgba(255,255,255,0.5);font-size:11px;margin-bottom:10px;">Alleen deze Microsoft-accounts mogen dit paneel openen.</div>
+      <div id="dj-admin-accounts-lijst" style="margin-bottom:10px;"></div>
+      <div style="display:flex;gap:6px;">
+        <input type="text" id="dj-admin-account-nieuw" placeholder="naam@stenaline.com" style="flex:1;padding:8px;border:1px solid rgba(255,255,255,0.2);border-radius:6px;background:rgba(255,255,255,0.1);color:#fff;font-size:12.5px;box-sizing:border-box;">
+        <button onclick="djAdminAccountToevoegen()" style="padding:8px 14px;background:#1e7d34;border:none;border-radius:6px;color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;">+</button>
+      </div>
+    </div>
     <div id="dj-admin-velden"></div>
     <div style="border-top:1px solid rgba(255,255,255,0.15);margin:16px 0 14px;padding-top:14px;">
       <div style="color:#e8a020;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Tijdelijk: herstelactie</div>
@@ -3196,7 +3205,57 @@ function djWachtwoordAnetsOrt(){ return djWwGet('anets_ort'); }
 function djWachtwoordSalaris(){ return djWwGet('salaris'); }
 function djWachtwoordMaster(){ return djWwGet('master'); }
 function djWachtwoordOrtIntern(){ return djWwGet('ort_intern'); }
-var DJ_ADMIN_TOEGESTAAN = ['sebastian.vander.meer@stenaline.com'];
+// ── Beheer-toegestane accounts: beheerbaar vanuit het paneel zelf, opgeslagen in
+// SharePoint (admin_accounts.json), zodat de lijst overal blijft gelden. ──
+var DJ_ADMIN_STANDAARD = ['sebastian.vander.meer@stenaline.com'];
+function djAdminAccountsGet(){
+  try {
+    var lijst = JSON.parse(localStorage.getItem('dj_admin_accounts') || 'null');
+    return (Array.isArray(lijst) && lijst.length) ? lijst : DJ_ADMIN_STANDAARD.slice();
+  } catch(e) { return DJ_ADMIN_STANDAARD.slice(); }
+}
+function djAdminAccountsSet(lijst){
+  localStorage.setItem('dj_admin_accounts', JSON.stringify(lijst));
+  spOpslaanBestand('admin_accounts.json', { data: lijst, updated_at: new Date().toISOString() }).catch(function(e){ console.error('SharePoint opslaan admin-accounts mislukt:', e); });
+}
+async function djAdminAccountsCloudPull(){
+  try {
+    var result = await spOphalenBestand('admin_accounts.json');
+    if (result && Array.isArray(result.data) && result.data.length) {
+      localStorage.setItem('dj_admin_accounts', JSON.stringify(result.data));
+    }
+  } catch(e) { console.error('SharePoint ophalen admin-accounts mislukt:', e); }
+}
+function djAdminAccountsRender(){
+  var container = document.getElementById('dj-admin-accounts-lijst');
+  if (!container) return;
+  var lijst = djAdminAccountsGet();
+  container.innerHTML = lijst.map(function(email, idx){
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.08);">' +
+      '<span style="color:#fff;font-size:12.5px;">' + email.replace(/[<>]/g, '') + '</span>' +
+      (lijst.length > 1 ? '<button onclick="djAdminAccountVerwijderen(' + idx + ')" style="background:none;border:none;color:#ff8080;font-size:14px;cursor:pointer;padding:2px 6px;">&#10005;</button>' : '') +
+      '</div>';
+  }).join('');
+}
+function djAdminAccountToevoegen(){
+  var input = document.getElementById('dj-admin-account-nieuw');
+  var email = input ? input.value.trim().toLowerCase() : '';
+  if (!email || email.indexOf('@') === -1) { alert('Vul een geldig e-mailadres in.'); return; }
+  var lijst = djAdminAccountsGet();
+  if (lijst.map(function(a){return a.toLowerCase();}).indexOf(email) !== -1) { alert('Dit account staat er al in.'); return; }
+  lijst.push(email);
+  djAdminAccountsSet(lijst);
+  if (input) input.value = '';
+  djAdminAccountsRender();
+}
+function djAdminAccountVerwijderen(idx){
+  var lijst = djAdminAccountsGet();
+  if (lijst.length <= 1) { alert('Er moet minstens één account overblijven.'); return; }
+  if (!confirm('Toegang voor "' + lijst[idx] + '" intrekken?')) return;
+  lijst.splice(idx, 1);
+  djAdminAccountsSet(lijst);
+  djAdminAccountsRender();
+}
 async function djAdminOpenen(){
   if (typeof spInit === 'function') { try { await spInit(); } catch(e) {} }
   var actiefAccount = null;
@@ -3205,8 +3264,10 @@ async function djAdminOpenen(){
     var voorkeurUsername = localStorage.getItem('dj_sp_account_username');
     var actief = (voorkeurUsername && accounts.find(function(a){ return a.username === voorkeurUsername; })) || accounts[0];
     actiefAccount = actief ? actief.username : null;
+    try { await djAdminAccountsCloudPull(); } catch(e) {} // meest actuele lijst ophalen vóór de check
   }
-  if (!actiefAccount || DJ_ADMIN_TOEGESTAAN.indexOf(actiefAccount.toLowerCase()) === -1) {
+  var toegestaan = djAdminAccountsGet();
+  if (!actiefAccount || toegestaan.map(function(a){return a.toLowerCase();}).indexOf(actiefAccount.toLowerCase()) === -1) {
     alert('Het beheerpaneel is alleen toegankelijk voor specifieke accounts. Log in met Microsoft (rechtsboven) met een geautoriseerd account om verder te gaan.');
     return;
   }
@@ -3215,6 +3276,7 @@ async function djAdminOpenen(){
   if (code !== djWwGet('beheercode')) { alert('Onjuiste code.'); return; }
   try { await djWwCloudPull(); } catch(e) { console.error('SharePoint ophalen bij openen paneel mislukt:', e); } // haal de nieuwste waarden op, mocht een ander apparaat net iets gewijzigd hebben
   if (typeof spIngelogd === 'function' && spIngelogd()) djSpStatusTonen('Ingelogd bij SharePoint.', '#3fb950');
+  djAdminAccountsRender();
   var container = document.getElementById('dj-admin-velden');
   if (container) {
     container.innerHTML = DJ_WW_DEFS.map(function(def){
