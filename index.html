@@ -3060,7 +3060,9 @@ function djSpHeaderRefresh(){
   if (!btn) return;
   if (typeof spIngelogd === 'function' && spIngelogd()) {
     var accounts = _spMsalInstance.getAllAccounts();
-    var naam = accounts.length ? (accounts[0].username || accounts[0].name || 'Ingelogd') : 'Ingelogd';
+    var voorkeurUsername = localStorage.getItem('dj_sp_account_username');
+    var actief = (voorkeurUsername && accounts.find(function(a){ return a.username === voorkeurUsername; })) || accounts[0];
+    var naam = actief ? (actief.username || actief.name || 'Ingelogd') : 'Ingelogd';
     btn.innerHTML = '&#9989; ' + naam;
     btn.style.background = '#1e7d34';
     btn.title = 'Klik om met een ander account in te loggen';
