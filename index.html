@@ -2771,6 +2771,15 @@ document.addEventListener('contextmenu', function(e) {
 </head>
 <body>
 <div id="google_translate_element"></div>
+<div id="dj-ms-gate" style="position:fixed;inset:0;background:#0a1628;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200000;gap:24px;">
+  <div style="text-align:center;">
+    <div style="font-size:48px;">&#x1F6A2;</div>
+    <div style="color:#fff;font-size:26px;font-weight:800;letter-spacing:2px;margin-top:8px;">DIENST JOURNAAL</div>
+    <div style="color:rgba(255,255,255,0.5);font-size:13px;margin-top:10px;max-width:320px;">Log in met je Stena-account om verder te gaan.</div>
+  </div>
+  <button id="djMsGateBtn" onclick="djMsGateLoginKlik()" style="padding:14px 28px;background:#0f6cbd;border:none;border-radius:10px;color:#fff;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:10px;">&#x1F310; Login met Microsoft</button>
+  <div id="djMsGateStatus" style="color:rgba(255,255,255,0.55);font-size:12px;min-height:16px;max-width:340px;text-align:center;"></div>
+</div>
 <div id="dj-login">
   <button id="dj-admin-gear" onclick="djAdminOpenen()" title="Beheer" style="position:fixed;top:16px;left:16px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.55);border-radius:8px;width:38px;height:38px;font-size:16px;cursor:pointer;">&#x2699;&#xFE0F;</button>
   <div style="text-align:center;">
@@ -3072,6 +3081,32 @@ function djSpHeaderRefresh(){
     btn.title = 'Inloggen met je Stena-account (nodig om data te synchroniseren)';
   }
 }
+// ══════════════════════════════════════════════════════════════════
+// Verplichte Microsoft-login vóór de rest van de app. Draait naast het bestaande
+// terminal-wachtwoordscherm (dat blijft ongewijzigd bestaan) totdat dat systeem
+// overbodig wordt. Zonder geldige Microsoft-login is er helemaal niets anders
+// te zien — dit scherm ligt met een hogere z-index over alles heen.
+// ══════════════════════════════════════════════════════════════════
+function djMsGateVerberg(){
+  var gate = document.getElementById('dj-ms-gate');
+  if (gate) gate.style.display = 'none';
+}
+async function djMsGateLoginKlik(){
+  var btn = document.getElementById('djMsGateBtn');
+  var status = document.getElementById('djMsGateStatus');
+  if (btn) btn.innerHTML = '&#8987; Bezig met inloggen…';
+  if (status) { status.textContent = ''; status.style.color = 'rgba(255,255,255,0.55)'; }
+  try {
+    await spLogin();
+    djSpHeaderRefresh();
+    djMsGateVerberg();
+  } catch (e) {
+    console.error('Microsoft-login mislukt:', e);
+    var detail = (e && (e.errorMessage || e.message)) || 'onbekende fout';
+    if (status) { status.textContent = 'Inloggen mislukt: ' + detail; status.style.color = '#ff8080'; }
+    if (btn) btn.innerHTML = '&#x1F310; Login met Microsoft';
+  }
+}
 async function djSpLoginKlik(){
   var btn = document.getElementById('djSpHeaderLoginBtn');
   if (btn) { btn.innerHTML = '&#8987; Bezig met inloggen…'; }
@@ -3132,7 +3167,20 @@ function djWachtwoordAnetsOrt(){ return djWwGet('anets_ort'); }
 function djWachtwoordSalaris(){ return djWwGet('salaris'); }
 function djWachtwoordMaster(){ return djWwGet('master'); }
 function djWachtwoordOrtIntern(){ return djWwGet('ort_intern'); }
+var DJ_ADMIN_TOEGESTAAN = ['sebastian.vander.meer@stenaline.com'];
 async function djAdminOpenen(){
+  if (typeof spInit === 'function') { try { await spInit(); } catch(e) {} }
+  var actiefAccount = null;
+  if (typeof spIngelogd === 'function' && spIngelogd()) {
+    var accounts = _spMsalInstance.getAllAccounts();
+    var voorkeurUsername = localStorage.getItem('dj_sp_account_username');
+    var actief = (voorkeurUsername && accounts.find(function(a){ return a.username === voorkeurUsername; })) || accounts[0];
+    actiefAccount = actief ? actief.username : null;
+  }
+  if (!actiefAccount || DJ_ADMIN_TOEGESTAAN.indexOf(actiefAccount.toLowerCase()) === -1) {
+    alert('Het beheerpaneel is alleen toegankelijk voor specifieke accounts. Log in met Microsoft (rechtsboven) met een geautoriseerd account om verder te gaan.');
+    return;
+  }
   var code = prompt('Beheercode:');
   if (code === null) return;
   if (code !== djWwGet('beheercode')) { alert('Onjuiste code.'); return; }
@@ -5570,6 +5618,7 @@ window.addEventListener('resize', () => {
   if (typeof spInit === 'function') {
     spInit().then(function(){
       if (typeof djSpHeaderRefresh === 'function') djSpHeaderRefresh();
+      if (spIngelogd() && typeof djMsGateVerberg === 'function') djMsGateVerberg();
       if (typeof djWwCloudPull === 'function' && spIngelogd()) djWwCloudPull();
     }).catch(function(){});
   }
