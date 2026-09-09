@@ -2924,19 +2924,26 @@ var _spMsalInstance = null;
 var _spSiteId = null;
 var _spInitPromise = null;
 
+var SP_MSAL_CDNS = [
+  'https://cdnjs.cloudflare.com/ajax/libs/msal-browser/3.7.1/msal-browser.min.js',
+  'https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.7.1/lib/msal-browser.min.js',
+  'https://alcdn.msauth.net/browser/3.7.1/js/msal-browser.min.js'
+];
+function _spLaadScriptMetFallback(idx){
+  return new Promise(function(resolve, reject){
+    if (idx >= SP_MSAL_CDNS.length) { reject(new Error('Kon de inlogbibliotheek (MSAL) van geen enkele bron laden — check internetverbinding/netwerkfilter.')); return; }
+    var script = document.createElement('script');
+    script.src = SP_MSAL_CDNS[idx];
+    script.onload = function(){ resolve(); };
+    script.onerror = function(){ _spLaadScriptMetFallback(idx + 1).then(resolve).catch(reject); };
+    document.head.appendChild(script);
+  });
+}
 function spInit(){
   if (_spInitPromise) return _spInitPromise;
-  _spInitPromise = new Promise(function(resolve, reject){
-    if (typeof msal === 'undefined') {
-      var script = document.createElement('script');
-      script.src = 'https://alcdn.msauth.net/browser/3.7.1/js/msal-browser.min.js';
-      script.onload = function(){ try { resolve(_spMaakInstance()); } catch(e){ reject(e); } };
-      script.onerror = reject;
-      document.head.appendChild(script);
-    } else {
-      try { resolve(_spMaakInstance()); } catch(e){ reject(e); }
-    }
-  });
+  _spInitPromise = (typeof msal !== 'undefined' ? Promise.resolve() : _spLaadScriptMetFallback(0))
+    .then(function(){ return _spMaakInstance(); })
+    .catch(function(e){ _spInitPromise = null; throw e; }); // bij mislukking opnieuw proberen toestaan
   return _spInitPromise;
 }
 function _spMaakInstance(){
