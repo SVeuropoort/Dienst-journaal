@@ -2771,15 +2771,6 @@ document.addEventListener('contextmenu', function(e) {
 </head>
 <body>
 <div id="google_translate_element"></div>
-<div id="dj-ms-gate" style="position:fixed;inset:0;background:#0a1628;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200000;gap:24px;">
-  <div style="text-align:center;">
-    <div style="font-size:48px;">&#x1F6A2;</div>
-    <div style="color:#fff;font-size:26px;font-weight:800;letter-spacing:2px;margin-top:8px;">DIENST JOURNAAL</div>
-    <div style="color:rgba(255,255,255,0.5);font-size:13px;margin-top:10px;max-width:320px;">Log in met je Stena-account om verder te gaan.</div>
-  </div>
-  <button id="djMsGateBtn" onclick="djMsGateLoginKlik()" style="padding:14px 28px;background:#0f6cbd;border:none;border-radius:10px;color:#fff;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:10px;">&#x1F310; Login met Microsoft</button>
-  <div id="djMsGateStatus" style="color:rgba(255,255,255,0.55);font-size:12px;min-height:16px;max-width:340px;text-align:center;"></div>
-</div>
 <div id="dj-login">
   <button id="dj-admin-gear" onclick="djAdminOpenen()" title="Beheer" style="position:fixed;top:16px;left:16px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.55);border-radius:8px;width:38px;height:38px;font-size:16px;cursor:pointer;">&#x2699;&#xFE0F;</button>
   <div style="text-align:center;">
@@ -2795,14 +2786,21 @@ document.addEventListener('contextmenu', function(e) {
         <option value="IMM">IMMINGHAM</option>
       </select>
     </div>
-    <div id="dj-ww-label" style="color:rgba(255,255,255,0.7);font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">Wachtwoord</div>
-    <input type="password" id="dj-ww" placeholder="Wachtwoord..." style="width:100%;padding:12px;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:rgba(255,255,255,0.1);color:#fff;font-size:15px;outline:none;box-sizing:border-box;margin-bottom:10px;">
-    <div id="dj-err" style="color:#ff6b6b;font-size:12px;margin-bottom:8px;display:none;">Onjuist wachtwoord.</div>
-    <button id="dj-btn" style="width:100%;padding:12px;background:#e8a020;border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;">INLOGGEN</button>
+    <button id="djMsGateBtn" onclick="djMsGateLoginKlik()" style="width:100%;padding:12px;background:#0f6cbd;border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">&#x1F310; Login met Microsoft</button>
+    <div id="djMsGateStatus" style="color:rgba(255,255,255,0.55);font-size:12px;margin-top:10px;min-height:14px;text-align:center;"></div>
+    <div id="dj-ww-backup" style="display:none;margin-top:18px;padding-top:18px;border-top:1px solid rgba(255,255,255,0.15);">
+      <div id="dj-ww-label" style="color:rgba(255,255,255,0.7);font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">Wachtwoord</div>
+      <input type="password" id="dj-ww" placeholder="Wachtwoord..." style="width:100%;padding:12px;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:rgba(255,255,255,0.1);color:#fff;font-size:15px;outline:none;box-sizing:border-box;margin-bottom:10px;">
+      <div id="dj-err" style="color:#ff6b6b;font-size:12px;margin-bottom:8px;display:none;">Onjuist wachtwoord.</div>
+      <button id="dj-btn" style="width:100%;padding:12px;background:#e8a020;border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;">INLOGGEN</button>
+    </div>
   </div>
   <div style="display:flex;gap:18px;margin-top:18px;">
     <a href="https://sveuropoort.github.io/Dienst-journaal/kpi-mt.html" id="dj-link-kpi" style="color:rgba(255,255,255,0.55);font-size:12px;text-decoration:none;display:flex;align-items:center;gap:5px;">&#x1F4CA; KPI Dashboard (MT)</a>
     <a href="https://sveuropoort.github.io/Dienst-journaal/materieel-garage.html" id="dj-link-mat" style="color:rgba(255,255,255,0.55);font-size:12px;text-decoration:none;display:flex;align-items:center;gap:5px;">&#x1F697; Materieel-garage</a>
+  </div>
+  <div style="margin-top:14px;">
+    <a href="#" id="dj-ww-backup-link" onclick="djToonWwBackup(); return false;" style="color:rgba(255,255,255,0.35);font-size:11px;text-decoration:underline;cursor:pointer;">Andere manier van inloggen</a>
   </div>
 </div>
 <!-- Beheerpaneel wachtwoorden: alleen bereikbaar via het tandwiel + code, vanaf de inlogpagina -->
@@ -3082,14 +3080,17 @@ function djSpHeaderRefresh(){
   }
 }
 // ══════════════════════════════════════════════════════════════════
-// Verplichte Microsoft-login vóór de rest van de app. Draait naast het bestaande
-// terminal-wachtwoordscherm (dat blijft ongewijzigd bestaan) totdat dat systeem
-// overbodig wordt. Zonder geldige Microsoft-login is er helemaal niets anders
-// te zien — dit scherm ligt met een hogere z-index over alles heen.
+// Microsoft-login is de primaire inlogmethode, rechtstreeks op het bestaande
+// terminal-keuzescherm. Het oude wachtwoordsysteem blijft als backup bestaan
+// (achter de link "Andere manier van inloggen"), totdat dat overbodig wordt.
 // ══════════════════════════════════════════════════════════════════
-function djMsGateVerberg(){
-  var gate = document.getElementById('dj-ms-gate');
-  if (gate) gate.style.display = 'none';
+function djToonWwBackup(){
+  var backup = document.getElementById('dj-ww-backup');
+  var link = document.getElementById('dj-ww-backup-link');
+  if (backup) backup.style.display = 'block';
+  if (link) link.style.display = 'none';
+  var ww = document.getElementById('dj-ww');
+  if (ww) ww.focus();
 }
 async function djMsGateLoginKlik(){
   var btn = document.getElementById('djMsGateBtn');
@@ -3111,7 +3112,10 @@ async function djMsGateLoginKlik(){
     }
     djSpHeaderRefresh();
     sessionStorage.setItem('dj_sp_verified', '1');
-    djMsGateVerberg();
+    sessionStorage.setItem('dj_auth', '1');
+    // Herlaad pagina zodat alle terminal-sleutels opnieuw berekend worden, net als bij de
+    // gewone wachtwoord-login.
+    location.reload();
   } catch (e) {
     console.error('Microsoft-login mislukt:', e);
     var detail = (e && (e.errorMessage || e.message)) || 'onbekende fout';
@@ -5647,10 +5651,16 @@ window.addEventListener('resize', () => {
         try {
           await spGetSiteId(); // bevestigt dat dit account nog steeds echt bij de site kan
           sessionStorage.setItem('dj_sp_verified', '1');
-          if (typeof djMsGateVerberg === 'function') djMsGateVerberg();
+          if (sessionStorage.getItem('dj_auth') !== '1') {
+            // Al eerder ingelogd bij Microsoft/SharePoint (deze sessie of een gecachete van
+            // eerder) — meteen doorgaan naar de app, zonder dat er nog geklikt hoeft te worden.
+            sessionStorage.setItem('dj_auth', '1');
+            location.reload();
+            return;
+          }
           if (typeof djWwCloudPull === 'function') djWwCloudPull();
         } catch(e) {
-          // Toegang niet (meer) geldig — sessie wissen, gate blijft zichtbaar
+          // Toegang niet (meer) geldig — sessie wissen
           sessionStorage.removeItem('dj_sp_verified');
           if (typeof djSpVerwijderSessie === 'function') djSpVerwijderSessie();
           if (typeof djSpHeaderRefresh === 'function') djSpHeaderRefresh();
