@@ -5651,13 +5651,6 @@ window.addEventListener('resize', () => {
         try {
           await spGetSiteId(); // bevestigt dat dit account nog steeds echt bij de site kan
           sessionStorage.setItem('dj_sp_verified', '1');
-          if (sessionStorage.getItem('dj_auth') !== '1') {
-            // Al eerder ingelogd bij Microsoft/SharePoint (deze sessie of een gecachete van
-            // eerder) — meteen doorgaan naar de app, zonder dat er nog geklikt hoeft te worden.
-            sessionStorage.setItem('dj_auth', '1');
-            location.reload();
-            return;
-          }
           if (typeof djWwCloudPull === 'function') djWwCloudPull();
         } catch(e) {
           // Toegang niet (meer) geldig — sessie wissen
