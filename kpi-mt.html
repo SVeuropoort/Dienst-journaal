@@ -237,23 +237,114 @@ function mtWwSet(w){ localStorage.setItem('dj_ww_kpi_mt', mtObf(w)); mtWwCloudPu
 // Zelfde gedeelde, terminal-onafhankelijke wachtwoorden-cloudrij als in de hoofdapp
 // (index.html), zodat een wachtwoordwijziging hier of daar altijd overal doorwerkt.
 var DJ_WW_CLOUD_ROW = 'dj_wachtwoorden_global';
+
+// ══════════════════════════════════════════════════════════════════
+// SharePoint/Entra ID fundament (vervangt Supabase) — zelfde opzet als index.html
+// ══════════════════════════════════════════════════════════════════
+var SP_CLIENT_ID = '620757bf-f871-4a8b-a267-8442506f5314';
+var SP_TENANT_ID = '5d0501ba-8bc1-464e-b3ad-9e2c8779c55c';
+var SP_REDIRECT_URI = 'https://sveuropoort.github.io/Dienst-journaal/';
+var SP_SITE_HOSTNAME = 'stena.sharepoint.com';
+var SP_SITE_PATH = '/sites/DienstJournaal';
+var SP_SCOPES = ['Sites.ReadWrite.All'];
+var SP_MSAL_CDNS = [
+  'https://cdnjs.cloudflare.com/ajax/libs/msal-browser/3.7.1/msal-browser.min.js',
+  'https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.7.1/lib/msal-browser.min.js',
+  'https://alcdn.msauth.net/browser/3.7.1/js/msal-browser.min.js'
+];
+var _spMsalInstance = null;
+var _spSiteId = null;
+var _spInitPromise = null;
+function _spLaadScriptMetFallback(idx){
+  return new Promise(function(resolve, reject){
+    if (idx >= SP_MSAL_CDNS.length) { reject(new Error('Kon de inlogbibliotheek (MSAL) van geen enkele bron laden.')); return; }
+    var script = document.createElement('script');
+    script.src = SP_MSAL_CDNS[idx];
+    script.onload = function(){ resolve(); };
+    script.onerror = function(){ _spLaadScriptMetFallback(idx + 1).then(resolve).catch(reject); };
+    document.head.appendChild(script);
+  });
+}
+async function _spMaakInstance(){
+  _spMsalInstance = new msal.PublicClientApplication({
+    auth: { clientId: SP_CLIENT_ID, authority: 'https://login.microsoftonline.com/' + SP_TENANT_ID, redirectUri: SP_REDIRECT_URI },
+    cache: { cacheLocation: 'localStorage' }
+  });
+  await _spMsalInstance.initialize();
+  return _spMsalInstance;
+}
+function spInit(){
+  if (_spInitPromise) return _spInitPromise;
+  _spInitPromise = (typeof msal !== 'undefined' ? Promise.resolve() : _spLaadScriptMetFallback(0))
+    .then(function(){ return _spMaakInstance(); })
+    .catch(function(e){ _spInitPromise = null; throw e; });
+  return _spInitPromise;
+}
+async function spLogin(){
+  await spInit();
+  var result = await _spMsalInstance.loginPopup({ scopes: SP_SCOPES });
+  return result.account;
+}
+async function spGetToken(){
+  await spInit();
+  var accounts = _spMsalInstance.getAllAccounts();
+  if (!accounts.length) { var account = await spLogin(); accounts = [account]; }
+  try {
+    var result = await _spMsalInstance.acquireTokenSilent({ scopes: SP_SCOPES, account: accounts[0] });
+    return result.accessToken;
+  } catch (e) {
+    var result2 = await _spMsalInstance.acquireTokenPopup({ scopes: SP_SCOPES });
+    return result2.accessToken;
+  }
+}
+function spIngelogd(){
+  if (!_spMsalInstance) return false;
+  return _spMsalInstance.getAllAccounts().length > 0;
+}
+async function spIngelogdAsync(){
+  try { await spInit(); } catch(e) { return false; }
+  return spIngelogd();
+}
+async function spGetSiteId(){
+  if (_spSiteId) return _spSiteId;
+  var token = await spGetToken();
+  var resp = await fetch('https://graph.microsoft.com/v1.0/sites/' + SP_SITE_HOSTNAME + ':' + SP_SITE_PATH, { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!resp.ok) throw new Error('Kon SharePoint site niet vinden (status ' + resp.status + ')');
+  var data = await resp.json();
+  _spSiteId = data.id;
+  return _spSiteId;
+}
+async function spOpslaanBestand(bestandsnaam, dataObj){
+  var token = await spGetToken();
+  var siteId = await spGetSiteId();
+  var url = 'https://graph.microsoft.com/v1.0/sites/' + siteId + '/drive/root:/Data/' + encodeURIComponent(bestandsnaam) + ':/content';
+  var resp = await fetch(url, { method: 'PUT', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify(dataObj) });
+  if (!resp.ok) throw new Error('Opslaan naar SharePoint mislukt (status ' + resp.status + ')');
+  return true;
+}
+async function spOphalenBestand(bestandsnaam){
+  var token = await spGetToken();
+  var siteId = await spGetSiteId();
+  var url = 'https://graph.microsoft.com/v1.0/sites/' + siteId + '/drive/root:/Data/' + encodeURIComponent(bestandsnaam) + ':/content';
+  var resp = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
+  if (resp.status === 404) return null;
+  if (!resp.ok) throw new Error('Ophalen van SharePoint mislukt (status ' + resp.status + ')');
+  return await resp.json();
+}
+// ══════════════════════════════════════════════════════════════════
+
 function mtWwCloudPush(){
   var payload = {};
   Object.keys(localStorage).forEach(function(k){ if (k.indexOf('dj_ww_') === 0) payload[k] = localStorage.getItem(k); });
-  fetch(SB_URL + '/rest/v1/' + SB_TABLE, {
-    method: 'POST',
-    headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' },
-    body: JSON.stringify({ id: DJ_WW_CLOUD_ROW, data: payload, updated_at: new Date().toISOString() })
-  }).catch(function(){});
+  spOpslaanBestand('wachtwoorden.json', { data: payload, updated_at: new Date().toISOString() }).catch(function(e){ console.error('SharePoint opslaan wachtwoorden mislukt:', e); });
 }
 async function mtWwCloudPull(){
   try {
-    var resp = await fetch(SB_URL + '/rest/v1/' + SB_TABLE + '?id=eq.' + DJ_WW_CLOUD_ROW + '&select=data', { headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY } });
-    var rows = await resp.json();
-    if (rows && rows[0] && rows[0].data) {
-      Object.keys(rows[0].data).forEach(function(k){ if (k.indexOf('dj_ww_') === 0) localStorage.setItem(k, rows[0].data[k]); });
+    var result = await spOphalenBestand('wachtwoorden.json');
+    if (result && result.data) {
+      Object.keys(result.data).forEach(function(k){ if (k.indexOf('dj_ww_') === 0) localStorage.setItem(k, result.data[k]); });
     }
-  } catch(e) {}
+  } catch(e) { console.error('SharePoint ophalen wachtwoorden mislukt:', e); }
 }
 
 function mtLogin(){
@@ -286,7 +377,12 @@ function mtWachtwoordWijzigen(){
 var SB_URL   = 'https://xgqtiseknvjwaqapwjdt.supabase.co';
 var SB_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhncXRpc2VrbnZqd2FxYXB3amR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODYxNzIsImV4cCI6MjA5NjE2MjE3Mn0.DdBJ6OzEVC-l_9qbJE-bVlv1WdxFkB1C2tjEHXqh5SE';
 var SB_TABLE = 'sync_data';
-mtWwCloudPull(); // meteen bij laden de nieuwste wachtwoorden ophalen, vóór het inloggen
+// meteen bij laden de nieuwste wachtwoorden ophalen — maar alleen als er al een SharePoint-sessie is
+if (typeof spInit === 'function') {
+  spInit().then(function(){
+    if (spIngelogd()) mtWwCloudPull();
+  }).catch(function(){});
+}
 
 var mtTerminal = sessionStorage.getItem('kpi_mt_terminal') || 'EP';
 // Gesimuleerd "localStorage" gevuld vanuit de cloud-data van de gekozen terminal. De
@@ -315,14 +411,16 @@ async function mtLaadTerminalData(terminal){
   content.style.opacity = '0.45';
   document.getElementById('mt-laatst-bijgewerkt').textContent = 'Laden\u2026';
   try {
+    if (!(await spIngelogdAsync())) {
+      document.getElementById('mt-laatst-bijgewerkt').textContent = 'Niet ingelogd bij SharePoint';
+      content.innerHTML = '<div id="kpi-placeholder">Log eerst in met Microsoft om de KPI-data te kunnen laden.<br><button onclick="spLogin().then(function(){ mtLaadTerminalData(mtTerminal); }).catch(function(e){ alert(\'Inloggen mislukt: \' + e.message); })" style="margin-top:12px;padding:10px 20px;background:#0f6cbd;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;">🌐 Login met Microsoft</button></div>';
+      content.style.opacity = '1';
+      return;
+    }
     var rowId = terminal + '_main';
-    var resp = await fetch(SB_URL + '/rest/v1/' + SB_TABLE + '?id=eq.' + rowId + '&select=data,updated_at', {
-      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
-    });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    var rows = await resp.json();
-    CLOUD_DATA = (rows && rows[0] && rows[0].data) ? rows[0].data : {};
-    var bijgewerkt = (rows && rows[0] && rows[0].updated_at) ? new Date(rows[0].updated_at) : null;
+    var result = await spOphalenBestand(rowId + '.json');
+    CLOUD_DATA = (result && result.data) ? result.data : {};
+    var bijgewerkt = (result && result.updated_at) ? new Date(result.updated_at) : null;
     document.getElementById('mt-laatst-bijgewerkt').textContent = bijgewerkt
       ? ('Bijgewerkt: ' + bijgewerkt.toLocaleDateString('nl-NL') + ' ' + bijgewerkt.toLocaleTimeString('nl-NL', {hour:'2-digit', minute:'2-digit'}))
       : 'Geen data gevonden';

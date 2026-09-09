@@ -2988,6 +2988,13 @@ function spIngelogd(){
   if (!_spMsalInstance) return false;
   return _spMsalInstance.getAllAccounts().length > 0;
 }
+// Zelfde check, maar laadt MSAL eerst in als dat nog niet is gebeurd — nodig op momenten dat
+// deze check heel vroeg (of automatisch, zonder gebruikersklik) wordt aangeroepen, zodat een
+// eerder ingelogde sessie altijd correct wordt herkend in plaats van foutief als "niet ingelogd".
+async function spIngelogdAsync(){
+  try { await spInit(); } catch(e) { return false; }
+  return spIngelogd();
+}
 
 // Haalt (en cachet) het SharePoint Site ID op — dit is iets anders dan de site-URL en is nodig
 // voor alle Graph API-aanroepen naar deze site.
@@ -5658,6 +5665,11 @@ window.addEventListener('resize', () => {
   async function cloudOpslaan(toonFouten) {
     if (_syncBezig) return;
     _syncBezig = true;
+    if (!(await spIngelogdAsync())) {
+      if (toonFouten) showSyncStatus('⚠ Niet ingelogd bij SharePoint — log in via het beheerpaneel (tandwiel)', 'err');
+      _syncBezig = false;
+      return;
+    }
     if (toonFouten) showSyncStatus('☁️ Opslaan...', 'info');
     try {
       var rowId = getSBRowId();
@@ -5674,21 +5686,7 @@ window.addEventListener('resize', () => {
           }
         } catch(e) {}
       }
-      // Gebruik upsert — werkt altijd of de rij bestaat of niet
-      var resp = await fetch(SB_URL + '/rest/v1/' + SB_TABLE, {
-        method: 'POST',
-        headers: {
-          'apikey': SB_KEY,
-          'Authorization': 'Bearer ' + SB_KEY,
-          'Content-Type': 'application/json',
-          'Prefer': 'resolution=merge-duplicates,return=minimal'
-        },
-        body: JSON.stringify({ id: rowId, data: data, updated_at: new Date().toISOString() })
-      });
-      if (!resp.ok && resp.status !== 204) {
-        var err = await resp.text();
-        throw new Error('HTTP ' + resp.status + ': ' + err.substring(0, 100));
-      }
+      await spOpslaanBestand(rowId + '.json', { data: data, updated_at: new Date().toISOString() });
       var dagCount = Object.keys(data).filter(function(k){return k.indexOf('dagplan')>-1;}).length;
       if (toonFouten) showSyncStatus('✓ Opgeslagen in ' + rowId + ' (' + dagCount + ' dagplan)', 'ok');
     } catch(e) {
@@ -5705,62 +5703,27 @@ window.addEventListener('resize', () => {
     // Eerst een eventuele nog niet verzonden wijziging wegschrijven, anders kan
     // het ophalen hieronder die wijziging alsnog overschrijven.
     if (window._flushPendingCloudOpslaan) await window._flushPendingCloudOpslaan();
+    if (!(await spIngelogdAsync())) {
+      showSyncStatus('⚠ Niet ingelogd bij SharePoint — log in via het beheerpaneel (tandwiel)', 'err');
+      _syncBezig = false;
+      return;
+    }
     showSyncStatus('☁️ Ophalen...', 'info');
     try {
       var rowId = getSBRowId();
-      var resp = await fetch(SB_URL + '/rest/v1/' + SB_TABLE + '?id=eq.' + rowId + '&select=data', {
-        headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
-      });
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      var rows = await resp.json();
-
-      // ── Eenmalige Supabase migratie: kopieer 'main' → 'EP_main' ──────────
-      if ((!rows || rows.length === 0) && rowId === 'EP_main') {
-        var respOld = await fetch(SB_URL + '/rest/v1/' + SB_TABLE + '?id=eq.main&select=data', {
-          headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
-        });
-        if (respOld.ok) {
-          var oldRows = await respOld.json();
-          if (oldRows && oldRows.length > 0) {
-            var oldData = oldRows[0].data || {};
-            var newData = {};
-            Object.keys(oldData).forEach(function(k) {
-              var isTK = TERMINAL_KEYS_SPLIT.indexOf(k) >= 0 || k.startsWith('dagplan_');
-              newData[isTK ? 'EP_' + k : k] = oldData[k];
-            });
-            await fetch(SB_URL + '/rest/v1/' + SB_TABLE, {
-              method: 'POST',
-              headers: {
-                'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY,
-                'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates'
-              },
-              body: JSON.stringify({ id: 'EP_main', data: newData })
-            });
-            rows = [{ data: newData }];
-            showSyncStatus('☁️ Europoort data gemigreerd naar EP_main...', 'info');
-          }
-        }
-      }
-
-      if (!rows || rows.length === 0) {
+      var result = await spOphalenBestand(rowId + '.json');
+      if (!result) {
         var t = sessionStorage.getItem('dj_terminal') || 'EP';
         showSyncStatus('✓ ' + (t === 'HVH' ? 'Hoek van Holland' : 'Europoort') + ' – lege start', 'ok');
-        // Maak meteen een lege rij aan in Supabase voor deze terminal
+        // Maak meteen een leeg bestand aan in SharePoint voor deze terminal
         try {
-          await fetch(SB_URL + '/rest/v1/' + SB_TABLE, {
-            method: 'POST',
-            headers: {
-              'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY,
-              'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates'
-            },
-            body: JSON.stringify({ id: getSBRowId(), data: {} })
-          });
-        } catch(e2) { console.warn('Kon lege rij niet aanmaken:', e2); }
+          await spOpslaanBestand(rowId + '.json', { data: {} });
+        } catch(e2) { console.warn('Kon leeg bestand niet aanmaken:', e2); }
         setTimeout(function(){ location.reload(); }, 1000);
         _syncBezig = false;
         return;
       }
-      var data = rows[0].data;
+      var data = result.data;
       setSyncData(data);
       showSyncStatus('✓ Data geladen – pagina wordt herladen...', 'ok');
       setTimeout(function(){ location.reload(); }, 1500);
@@ -24317,24 +24280,16 @@ function pdZoek(query){
   async function bhvCloudOpslaan(toonFouten) {
     if (_bhvSyncBezig) return;
     _bhvSyncBezig = true;
+    if (!(await spIngelogdAsync())) {
+      if (toonFouten) bhvShowStatus('⚠ Niet ingelogd bij SharePoint — log in via het beheerpaneel (tandwiel)');
+      _bhvSyncBezig = false;
+      return;
+    }
     if (toonFouten) bhvShowStatus('☁️ Opslaan...');
     try {
       var state = bhvGetSharedState();
       if (!state) { _bhvSyncBezig = false; return; }
-      var resp = await fetch(SB_URL + '/rest/v1/' + SB_TABLE, {
-        method: 'POST',
-        headers: {
-          'apikey': SB_KEY,
-          'Authorization': 'Bearer ' + SB_KEY,
-          'Content-Type': 'application/json',
-          'Prefer': 'resolution=merge-duplicates,return=minimal'
-        },
-        body: JSON.stringify({ id: BHV_SB_ROW_ID, data: state, updated_at: new Date().toISOString() })
-      });
-      if (!resp.ok && resp.status !== 204) {
-        var err = await resp.text();
-        throw new Error('HTTP ' + resp.status + ': ' + err.substring(0,100));
-      }
+      await spOpslaanBestand(BHV_SB_ROW_ID + '.json', { data: state, updated_at: new Date().toISOString() });
       if (toonFouten) bhvShowStatus('✓ Opgeslagen (gedeeld EP/HVH)');
     } catch(e) {
       if (toonFouten) bhvShowStatus('✗ ' + e.message);
@@ -24347,15 +24302,16 @@ function pdZoek(query){
   async function bhvCloudLaden(toonFouten) {
     if (_bhvSyncBezig) return;
     _bhvSyncBezig = true;
+    if (!(await spIngelogdAsync())) {
+      if (toonFouten) bhvShowStatus('⚠ Niet ingelogd bij SharePoint — log in via het beheerpaneel (tandwiel)');
+      _bhvSyncBezig = false;
+      return;
+    }
     if (toonFouten) bhvShowStatus('☁️ Ophalen...');
     try {
-      var resp = await fetch(SB_URL + '/rest/v1/' + SB_TABLE + '?id=eq.' + BHV_SB_ROW_ID + '&select=data', {
-        headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
-      });
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      var rows = await resp.json();
-      if (rows && rows.length && rows[0].data) {
-        bhvSaveLocalState(rows[0].data);
+      var result = await spOphalenBestand(BHV_SB_ROW_ID + '.json');
+      if (result && result.data) {
+        bhvSaveLocalState(result.data);
         // Dashboard opnieuw opbouwen met de nieuw opgehaalde gedeelde data
         _bhvMounted = false;
         bhvMount();
