@@ -3098,6 +3098,17 @@ async function djMsGateLoginKlik(){
   if (status) { status.textContent = ''; status.style.color = 'rgba(255,255,255,0.55)'; }
   try {
     await spLogin();
+    if (status) status.textContent = 'Toegang tot SharePoint controleren…';
+    // Niet genoeg dat het een geldig Stena-account is — het account moet ook
+    // daadwerkelijk toegang hebben tot de SharePoint-site zelf.
+    try {
+      await spGetSiteId();
+    } catch (siteErr) {
+      djSpVerwijderSessie();
+      if (status) { status.textContent = 'Dit account heeft geen toegang tot de SharePoint-site. Vraag toegang aan of log in met een ander account.'; status.style.color = '#ff8080'; }
+      if (btn) btn.innerHTML = '&#x1F310; Login met Microsoft';
+      return;
+    }
     djSpHeaderRefresh();
     djMsGateVerberg();
   } catch (e) {
@@ -3106,6 +3117,18 @@ async function djMsGateLoginKlik(){
     if (status) { status.textContent = 'Inloggen mislukt: ' + detail; status.style.color = '#ff8080'; }
     if (btn) btn.innerHTML = '&#x1F310; Login met Microsoft';
   }
+}
+// Wist de huidige MSAL-sessie volledig, zodat een afgewezen account (geen SharePoint-toegang)
+// niet via een gecachete sessie bij een volgend bezoek alsnog wordt doorgelaten.
+function djSpVerwijderSessie(){
+  try {
+    Object.keys(localStorage).filter(function(k){ return k.indexOf('msal.') === 0 || k.indexOf('msal-') === 0; }).forEach(function(k){ localStorage.removeItem(k); });
+    localStorage.removeItem('dj_sp_account_username');
+    _spMsalInstance = null;
+    _spInitPromise = null;
+    _spSiteId = null;
+    _spLastToken = null;
+  } catch(e) { console.warn('Kon sessie niet volledig wissen:', e); }
 }
 async function djSpLoginKlik(){
   var btn = document.getElementById('djSpHeaderLoginBtn');
@@ -5616,10 +5639,19 @@ window.addEventListener('resize', () => {
   // muisklik om, wat de browser blokkeert. spInit() laadt eerst MSAL zelf in (nodig om een
   // eventuele eerder ingelogde sessie uit de cache te herkennen), en pas daarna wordt gecheckt.
   if (typeof spInit === 'function') {
-    spInit().then(function(){
+    spInit().then(async function(){
       if (typeof djSpHeaderRefresh === 'function') djSpHeaderRefresh();
-      if (spIngelogd() && typeof djMsGateVerberg === 'function') djMsGateVerberg();
-      if (typeof djWwCloudPull === 'function' && spIngelogd()) djWwCloudPull();
+      if (spIngelogd()) {
+        try {
+          await spGetSiteId(); // bevestigt dat dit account nog steeds echt bij de site kan
+          if (typeof djMsGateVerberg === 'function') djMsGateVerberg();
+          if (typeof djWwCloudPull === 'function') djWwCloudPull();
+        } catch(e) {
+          // Toegang niet (meer) geldig — sessie wissen, gate blijft zichtbaar
+          if (typeof djSpVerwijderSessie === 'function') djSpVerwijderSessie();
+          if (typeof djSpHeaderRefresh === 'function') djSpHeaderRefresh();
+        }
+      }
     }).catch(function(){});
   }
   var _syncBezig = false;
