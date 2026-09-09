@@ -3257,20 +3257,28 @@ function djAdminAccountVerwijderen(idx){
   djAdminAccountsRender();
 }
 async function djAdminOpenen(){
-  if (typeof spInit === 'function') { try { await spInit(); } catch(e) {} }
+  if (typeof spInit === 'function') { try { await spInit(); } catch(e) { alert('Kon niet verbinden met Microsoft. Probeer het opnieuw.'); return; } }
+  // Bewuste, actieve herbevestiging: altijd een interactieve Microsoft-login-pop-up tonen om te
+  // openen, ook als er al een sessie is voor de rest van de app. Dit is expliciet gewenst voor
+  // het beheerpaneel, in tegenstelling tot de rest van de app die een bestaande sessie wel stil
+  // hergebruikt.
   var actiefAccount = null;
-  if (typeof spIngelogd === 'function' && spIngelogd()) {
-    var accounts = _spMsalInstance.getAllAccounts();
-    var voorkeurUsername = localStorage.getItem('dj_sp_account_username');
-    var actief = (voorkeurUsername && accounts.find(function(a){ return a.username === voorkeurUsername; })) || accounts[0];
-    actiefAccount = actief ? actief.username : null;
-    try { await djAdminAccountsCloudPull(); } catch(e) {} // meest actuele lijst ophalen vóór de check
-  }
-  var toegestaan = djAdminAccountsGet();
-  if (!actiefAccount || toegestaan.map(function(a){return a.toLowerCase();}).indexOf(actiefAccount.toLowerCase()) === -1) {
-    alert('Het beheerpaneel is alleen toegankelijk voor specifieke accounts. Log in met Microsoft (rechtsboven) met een geautoriseerd account om verder te gaan.');
+  try {
+    var result = await _spMsalInstance.loginPopup({ scopes: SP_SCOPES });
+    localStorage.setItem('dj_sp_account_username', result.account.username);
+    actiefAccount = result.account.username;
+  } catch (e) {
+    console.error('Bevestigen via Microsoft mislukt:', e);
+    alert('Inloggen om het beheerpaneel te openen is niet gelukt of geannuleerd.');
     return;
   }
+  try { await djAdminAccountsCloudPull(); } catch(e) {} // meest actuele lijst ophalen vóór de check
+  var toegestaan = djAdminAccountsGet();
+  if (!actiefAccount || toegestaan.map(function(a){return a.toLowerCase();}).indexOf(actiefAccount.toLowerCase()) === -1) {
+    alert('Het beheerpaneel is alleen toegankelijk voor specifieke accounts. Dit account (' + actiefAccount + ') is niet geautoriseerd.');
+    return;
+  }
+  djSpHeaderRefresh();
   try { await djWwCloudPull(); } catch(e) { console.error('SharePoint ophalen bij openen paneel mislukt:', e); } // haal de nieuwste waarden op, mocht een ander apparaat net iets gewijzigd hebben
   if (typeof spIngelogd === 'function' && spIngelogd()) djSpStatusTonen('Ingelogd bij SharePoint.', '#3fb950');
   djAdminAccountsRender();
