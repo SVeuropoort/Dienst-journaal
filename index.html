@@ -3110,6 +3110,7 @@ async function djMsGateLoginKlik(){
       return;
     }
     djSpHeaderRefresh();
+    sessionStorage.setItem('dj_sp_verified', '1');
     djMsGateVerberg();
   } catch (e) {
     console.error('Microsoft-login mislukt:', e);
@@ -3124,6 +3125,7 @@ function djSpVerwijderSessie(){
   try {
     Object.keys(localStorage).filter(function(k){ return k.indexOf('msal.') === 0 || k.indexOf('msal-') === 0; }).forEach(function(k){ localStorage.removeItem(k); });
     localStorage.removeItem('dj_sp_account_username');
+    sessionStorage.removeItem('dj_sp_verified');
     _spMsalInstance = null;
     _spInitPromise = null;
     _spSiteId = null;
@@ -5644,10 +5646,12 @@ window.addEventListener('resize', () => {
       if (spIngelogd()) {
         try {
           await spGetSiteId(); // bevestigt dat dit account nog steeds echt bij de site kan
+          sessionStorage.setItem('dj_sp_verified', '1');
           if (typeof djMsGateVerberg === 'function') djMsGateVerberg();
           if (typeof djWwCloudPull === 'function') djWwCloudPull();
         } catch(e) {
           // Toegang niet (meer) geldig — sessie wissen, gate blijft zichtbaar
+          sessionStorage.removeItem('dj_sp_verified');
           if (typeof djSpVerwijderSessie === 'function') djSpVerwijderSessie();
           if (typeof djSpHeaderRefresh === 'function') djSpHeaderRefresh();
         }
