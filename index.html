@@ -3034,10 +3034,19 @@ async function djSpLoginKlik(){
     // Meteen een rondje opslaan + ophalen als test dat de koppeling écht werkt.
     djWwCloudPush();
     await djWwCloudPull();
-    djSpStatusTonen('&#10003; Ingelogd en verbinding werkt.'.replace('&#10003;','✓'), '#3fb950');
+    djSpStatusTonen('✓ Ingelogd en verbinding werkt.', '#3fb950');
   } catch (e) {
     console.error('SharePoint login/test mislukt:', e);
-    djSpStatusTonen('Mislukt: ' + (e && e.message ? e.message : 'onbekende fout') + ' (zie console voor details)', '#e5484d');
+    var detail = 'onbekende fout';
+    try {
+      if (e) {
+        if (e.errorCode) detail = e.errorCode + (e.errorMessage ? ': ' + e.errorMessage : '');
+        else if (e.message) detail = e.message;
+        else if (typeof e === 'string') detail = e;
+        else detail = JSON.stringify(e);
+      }
+    } catch(e2) { detail = 'onbekende fout (kon foutdetails niet uitlezen)'; }
+    djSpStatusTonen('Mislukt: ' + detail, '#e5484d');
   }
 }
 
