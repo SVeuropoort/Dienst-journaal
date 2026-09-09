@@ -46,14 +46,21 @@
     <div style="color:rgba(255,255,255,0.5);font-size:12px;letter-spacing:2px;margin-top:2px;">MT &mdash; STENA LINE</div>
   </div>
   <div class="box">
-    <div class="lbl">Wachtwoord</div>
-    <input type="password" id="mt-ww" placeholder="Wachtwoord..." onkeydown="if(event.key==='Enter')mtLogin()">
-    <div id="mt-err">Onjuist wachtwoord.</div>
-    <button onclick="mtLogin()">INLOGGEN</button>
+    <button id="mtMsBtn" onclick="mtMsLoginKlik()" style="width:100%;padding:12px;background:#0f6cbd;border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">&#x1F310; Login met Microsoft</button>
+    <div id="mtMsStatus" style="color:rgba(255,255,255,0.55);font-size:12px;margin-top:10px;min-height:14px;text-align:center;"></div>
+    <div id="mt-ww-backup" style="display:none;margin-top:18px;padding-top:18px;border-top:1px solid rgba(255,255,255,0.15);">
+      <div class="lbl">Wachtwoord</div>
+      <input type="password" id="mt-ww" placeholder="Wachtwoord..." onkeydown="if(event.key==='Enter')mtLogin()">
+      <div id="mt-err">Onjuist wachtwoord.</div>
+      <button onclick="mtLogin()">INLOGGEN</button>
+    </div>
   </div>
   <div style="display:flex;gap:18px;margin-top:18px;">
     <a href="https://sveuropoort.github.io/Dienst-journaal/index.html" style="color:rgba(255,255,255,0.55);font-size:12px;text-decoration:none;display:flex;align-items:center;gap:5px;">&#x1F6A2; Dienst Journaal</a>
     <a href="https://sveuropoort.github.io/Dienst-journaal/materieel-garage.html" style="color:rgba(255,255,255,0.55);font-size:12px;text-decoration:none;display:flex;align-items:center;gap:5px;">&#x1F697; Materieel-garage</a>
+  </div>
+  <div style="margin-top:14px;">
+    <a href="#" id="mt-ww-backup-link" onclick="mtToonWwBackup(); return false;" style="color:rgba(255,255,255,0.35);font-size:11px;text-decoration:underline;cursor:pointer;">Andere manier van inloggen</a>
   </div>
 </div>
 
@@ -356,6 +363,74 @@ async function mtWwCloudPull(){
   } catch(e) { console.error('SharePoint ophalen wachtwoorden mislukt:', e); }
 }
 
+// ── Toegangsbeheer (zelfde lijst als de hoofdapp, via toegang_accounts.json) ──
+var DJ_TOEGANG_STANDAARD = [
+  { email: 'sebastian.vander.meer@stenaline.com', permissies: { beheer: true, EP: true, HVH: true, IMM: true, kpi: true } }
+];
+function djToegangGet(){
+  try {
+    var lijst = JSON.parse(localStorage.getItem('dj_toegang_accounts') || 'null');
+    return (Array.isArray(lijst) && lijst.length) ? lijst : DJ_TOEGANG_STANDAARD.slice();
+  } catch(e) { return DJ_TOEGANG_STANDAARD.slice(); }
+}
+async function djToegangCloudPull(){
+  try {
+    var result = await spOphalenBestand('toegang_accounts.json');
+    if (result && Array.isArray(result.data) && result.data.length) {
+      localStorage.setItem('dj_toegang_accounts', JSON.stringify(result.data));
+    }
+  } catch(e) { console.error('SharePoint ophalen toegang-accounts mislukt:', e); }
+}
+function djToegangHeeft(email, omgevingKey){
+  if (!email) return false;
+  var lijst = djToegangGet();
+  var entry = lijst.find(function(a){ return a.email.toLowerCase() === email.toLowerCase(); });
+  return !!(entry && entry.permissies && entry.permissies[omgevingKey]);
+}
+function mtToonWwBackup(){
+  var backup = document.getElementById('mt-ww-backup');
+  var link = document.getElementById('mt-ww-backup-link');
+  if (backup) backup.style.display = 'block';
+  if (link) link.style.display = 'none';
+  var ww = document.getElementById('mt-ww');
+  if (ww) ww.focus();
+}
+async function mtMsLoginKlik(){
+  var btn = document.getElementById('mtMsBtn');
+  var status = document.getElementById('mtMsStatus');
+  if (btn) btn.innerHTML = '&#8987; Bezig met inloggen…';
+  if (status) { status.textContent = ''; status.style.color = 'rgba(255,255,255,0.55)'; }
+  try {
+    await spLogin();
+    if (status) status.textContent = 'Toegang controleren…';
+    try {
+      await spVerifieerToegang();
+    } catch (siteErr) {
+      if (status) { status.textContent = 'Dit account heeft geen toegang tot de SharePoint-site.'; status.style.color = '#ff8080'; }
+      if (btn) btn.innerHTML = '&#x1F310; Login met Microsoft';
+      return;
+    }
+    try { await djToegangCloudPull(); } catch(e) {}
+    var accounts = _spMsalInstance.getAllAccounts();
+    var voorkeurUsername = localStorage.getItem('dj_sp_account_username');
+    var actief = (voorkeurUsername && accounts.find(function(a){ return a.username === voorkeurUsername; })) || accounts[0];
+    var huidigEmail = actief ? actief.username : null;
+    if (!huidigEmail || !djToegangHeeft(huidigEmail, 'kpi')) {
+      if (status) { status.textContent = 'Dit account heeft geen toestemming voor het KPI Dashboard.'; status.style.color = '#ff8080'; }
+      if (btn) btn.innerHTML = '&#x1F310; Login met Microsoft';
+      return;
+    }
+    sessionStorage.setItem('kpi_mt_auth', '1');
+    document.getElementById('mt-login').style.display = 'none';
+    document.getElementById('mt-app').style.display = 'block';
+    mtInit();
+  } catch (e) {
+    console.error('Microsoft-login mislukt:', e);
+    var detail = (e && (e.errorMessage || e.message)) || 'onbekende fout';
+    if (status) { status.textContent = 'Inloggen mislukt: ' + detail; status.style.color = '#ff8080'; }
+    if (btn) btn.innerHTML = '&#x1F310; Login met Microsoft';
+  }
+}
 function mtLogin(){
   var ingevoerd = document.getElementById('mt-ww').value;
   if (ingevoerd === mtWwGet()) {

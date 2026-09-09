@@ -2814,12 +2814,12 @@ document.addEventListener('contextmenu', function(e) {
       <button onclick="djSpLoginKlik()" style="width:100%;padding:10px;background:#0f6cbd;border:none;border-radius:8px;color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;">&#x1F310; Login met Microsoft (SharePoint)</button>
     </div>
     <div style="border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:12px;margin-bottom:16px;">
-      <div style="color:#e8a020;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Toegang beheerpaneel</div>
-      <div style="color:rgba(255,255,255,0.5);font-size:11px;margin-bottom:10px;">Alleen deze Microsoft-accounts mogen dit paneel openen.</div>
-      <div id="dj-admin-accounts-lijst" style="margin-bottom:10px;"></div>
+      <div style="color:#e8a020;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Toegangsbeheer</div>
+      <div style="color:rgba(255,255,255,0.5);font-size:11px;margin-bottom:10px;">Per account welke omgevingen toegestaan zijn. Houd dit gelijk aan wie er in SharePoint zelf toegang heeft.</div>
+      <div id="dj-toegang-lijst" style="margin-bottom:10px;overflow-x:auto;"></div>
       <div style="display:flex;gap:6px;">
-        <input type="text" id="dj-admin-account-nieuw" placeholder="naam@stenaline.com" style="flex:1;padding:8px;border:1px solid rgba(255,255,255,0.2);border-radius:6px;background:rgba(255,255,255,0.1);color:#fff;font-size:12.5px;box-sizing:border-box;">
-        <button onclick="djAdminAccountToevoegen()" style="padding:8px 14px;background:#1e7d34;border:none;border-radius:6px;color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;">+</button>
+        <input type="text" id="dj-toegang-nieuw" placeholder="naam@stenaline.com" style="flex:1;padding:8px;border:1px solid rgba(255,255,255,0.2);border-radius:6px;background:rgba(255,255,255,0.1);color:#fff;font-size:12.5px;box-sizing:border-box;">
+        <button onclick="djToegangToevoegen()" style="padding:8px 14px;background:#1e7d34;border:none;border-radius:6px;color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;">+</button>
       </div>
     </div>
     <div id="dj-admin-velden"></div>
@@ -3133,6 +3133,21 @@ async function djMsGateLoginKlik(){
       if (btn) btn.innerHTML = '&#x1F310; Login met Microsoft';
       return;
     }
+    // Naast SharePoint-toegang in het algemeen: heeft dit account ook specifiek toestemming
+    // voor de terminal die hierboven gekozen is?
+    try { await djToegangCloudPull(); } catch(e) {}
+    var gekozenTerminal = sessionStorage.getItem('dj_terminal') || 'EP';
+    var accounts = _spMsalInstance.getAllAccounts();
+    var voorkeurUsername = localStorage.getItem('dj_sp_account_username');
+    var actief = (voorkeurUsername && accounts.find(function(a){ return a.username === voorkeurUsername; })) || accounts[0];
+    var huidigEmail = actief ? actief.username : null;
+    if (!huidigEmail || !djToegangHeeft(huidigEmail, gekozenTerminal)) {
+      djSpVerwijderSessie();
+      var terminalNaam = { EP: 'Europoort', HVH: 'Hoek van Holland', IMM: 'Immingham' }[gekozenTerminal] || gekozenTerminal;
+      if (status) { status.textContent = 'Dit account heeft geen toestemming voor ' + terminalNaam + '. Kies een andere terminal of vraag toegang aan.'; status.style.color = '#ff8080'; }
+      if (btn) btn.innerHTML = '&#x1F310; Login met Microsoft';
+      return;
+    }
     djSpHeaderRefresh();
     sessionStorage.setItem('dj_sp_verified', '1');
     sessionStorage.setItem('dj_auth', '1');
@@ -3219,56 +3234,89 @@ function djWachtwoordAnetsOrt(){ return djWwGet('anets_ort'); }
 function djWachtwoordSalaris(){ return djWwGet('salaris'); }
 function djWachtwoordMaster(){ return djWwGet('master'); }
 function djWachtwoordOrtIntern(){ return djWwGet('ort_intern'); }
-// ── Beheer-toegestane accounts: beheerbaar vanuit het paneel zelf, opgeslagen in
-// SharePoint (admin_accounts.json), zodat de lijst overal blijft gelden. ──
-var DJ_ADMIN_STANDAARD = ['sebastian.vander.meer@stenaline.com'];
-function djAdminAccountsGet(){
+// ── Toegangsbeheer: per e-mailadres welke omgevingen toegestaan zijn. Handmatig
+// beheerd (Sebastiaan houdt dit gelijk aan wie er in SharePoint zelf toegang heeft),
+// opgeslagen in SharePoint (toegang_accounts.json), zodat de lijst overal geldt. ──
+var DJ_TOEGANG_OMGEVINGEN = [
+  { key: 'beheer', label: 'Beheer' },
+  { key: 'EP', label: 'Europoort' },
+  { key: 'HVH', label: 'Hoek van Holland' },
+  { key: 'IMM', label: 'Immingham' },
+  { key: 'kpi', label: 'KPI Dashboard' }
+];
+var DJ_TOEGANG_STANDAARD = [
+  { email: 'sebastian.vander.meer@stenaline.com', permissies: { beheer: true, EP: true, HVH: true, IMM: true, kpi: true } }
+];
+function djToegangGet(){
   try {
-    var lijst = JSON.parse(localStorage.getItem('dj_admin_accounts') || 'null');
-    return (Array.isArray(lijst) && lijst.length) ? lijst : DJ_ADMIN_STANDAARD.slice();
-  } catch(e) { return DJ_ADMIN_STANDAARD.slice(); }
+    var lijst = JSON.parse(localStorage.getItem('dj_toegang_accounts') || 'null');
+    return (Array.isArray(lijst) && lijst.length) ? lijst : DJ_TOEGANG_STANDAARD.slice();
+  } catch(e) { return DJ_TOEGANG_STANDAARD.slice(); }
 }
-function djAdminAccountsSet(lijst){
-  localStorage.setItem('dj_admin_accounts', JSON.stringify(lijst));
-  spOpslaanBestand('admin_accounts.json', { data: lijst, updated_at: new Date().toISOString() }).catch(function(e){ console.error('SharePoint opslaan admin-accounts mislukt:', e); });
+function djToegangSet(lijst){
+  localStorage.setItem('dj_toegang_accounts', JSON.stringify(lijst));
+  spOpslaanBestand('toegang_accounts.json', { data: lijst, updated_at: new Date().toISOString() }).catch(function(e){ console.error('SharePoint opslaan toegang-accounts mislukt:', e); });
 }
-async function djAdminAccountsCloudPull(){
+async function djToegangCloudPull(){
   try {
-    var result = await spOphalenBestand('admin_accounts.json');
+    var result = await spOphalenBestand('toegang_accounts.json');
     if (result && Array.isArray(result.data) && result.data.length) {
-      localStorage.setItem('dj_admin_accounts', JSON.stringify(result.data));
+      localStorage.setItem('dj_toegang_accounts', JSON.stringify(result.data));
     }
-  } catch(e) { console.error('SharePoint ophalen admin-accounts mislukt:', e); }
+  } catch(e) { console.error('SharePoint ophalen toegang-accounts mislukt:', e); }
 }
-function djAdminAccountsRender(){
-  var container = document.getElementById('dj-admin-accounts-lijst');
+// Geeft true terug als het opgegeven e-mailadres toestemming heeft voor de opgegeven omgeving
+// (bijv. djToegangHeeft('naam@stenaline.com', 'EP')). Hoofdletterongevoelig op het e-mailadres.
+function djToegangHeeft(email, omgevingKey){
+  if (!email) return false;
+  var lijst = djToegangGet();
+  var entry = lijst.find(function(a){ return a.email.toLowerCase() === email.toLowerCase(); });
+  return !!(entry && entry.permissies && entry.permissies[omgevingKey]);
+}
+function djToegangRender(){
+  var container = document.getElementById('dj-toegang-lijst');
   if (!container) return;
-  var lijst = djAdminAccountsGet();
-  container.innerHTML = lijst.map(function(email, idx){
-    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.08);">' +
-      '<span style="color:#fff;font-size:12.5px;">' + email.replace(/[<>]/g, '') + '</span>' +
-      (lijst.length > 1 ? '<button onclick="djAdminAccountVerwijderen(' + idx + ')" style="background:none;border:none;color:#ff8080;font-size:14px;cursor:pointer;padding:2px 6px;">&#10005;</button>' : '') +
+  var lijst = djToegangGet();
+  var header = '<div style="display:grid;grid-template-columns:1.6fr repeat(' + DJ_TOEGANG_OMGEVINGEN.length + ',0.6fr) 24px;gap:4px;align-items:center;margin-bottom:4px;">' +
+    '<span></span>' + DJ_TOEGANG_OMGEVINGEN.map(function(o){ return '<span style="color:rgba(255,255,255,0.5);font-size:9px;text-align:center;writing-mode:vertical-rl;transform:rotate(180deg);height:44px;">' + o.label + '</span>'; }).join('') + '<span></span></div>';
+  var rijen = lijst.map(function(entry, idx){
+    var vakjes = DJ_TOEGANG_OMGEVINGEN.map(function(o){
+      var aan = entry.permissies && entry.permissies[o.key];
+      return '<input type="checkbox" ' + (aan ? 'checked' : '') + ' onchange="djToegangVakjeWijzig(' + idx + ',\'' + o.key + '\',this.checked)" style="width:16px;height:16px;cursor:pointer;justify-self:center;">';
+    }).join('');
+    return '<div style="display:grid;grid-template-columns:1.6fr repeat(' + DJ_TOEGANG_OMGEVINGEN.length + ',0.6fr) 24px;gap:4px;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.08);">' +
+      '<span style="color:#fff;font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + entry.email.replace(/[<>"]/g, '') + '">' + entry.email.replace(/[<>]/g, '') + '</span>' +
+      vakjes +
+      (lijst.length > 1 ? '<button onclick="djToegangVerwijderen(' + idx + ')" style="background:none;border:none;color:#ff8080;font-size:13px;cursor:pointer;padding:2px;">&#10005;</button>' : '<span></span>') +
       '</div>';
   }).join('');
+  container.innerHTML = header + rijen;
 }
-function djAdminAccountToevoegen(){
-  var input = document.getElementById('dj-admin-account-nieuw');
+function djToegangVakjeWijzig(idx, omgevingKey, aan){
+  var lijst = djToegangGet();
+  if (!lijst[idx]) return;
+  if (!lijst[idx].permissies) lijst[idx].permissies = {};
+  lijst[idx].permissies[omgevingKey] = aan;
+  djToegangSet(lijst);
+}
+function djToegangToevoegen(){
+  var input = document.getElementById('dj-toegang-nieuw');
   var email = input ? input.value.trim().toLowerCase() : '';
   if (!email || email.indexOf('@') === -1) { alert('Vul een geldig e-mailadres in.'); return; }
-  var lijst = djAdminAccountsGet();
-  if (lijst.map(function(a){return a.toLowerCase();}).indexOf(email) !== -1) { alert('Dit account staat er al in.'); return; }
-  lijst.push(email);
-  djAdminAccountsSet(lijst);
+  var lijst = djToegangGet();
+  if (lijst.map(function(a){return a.email.toLowerCase();}).indexOf(email) !== -1) { alert('Dit account staat er al in.'); return; }
+  lijst.push({ email: email, permissies: { beheer: false, EP: false, HVH: false, IMM: false, kpi: false } });
+  djToegangSet(lijst);
   if (input) input.value = '';
-  djAdminAccountsRender();
+  djToegangRender();
 }
-function djAdminAccountVerwijderen(idx){
-  var lijst = djAdminAccountsGet();
+function djToegangVerwijderen(idx){
+  var lijst = djToegangGet();
   if (lijst.length <= 1) { alert('Er moet minstens één account overblijven.'); return; }
-  if (!confirm('Toegang voor "' + lijst[idx] + '" intrekken?')) return;
+  if (!confirm('Toegang voor "' + lijst[idx].email + '" volledig verwijderen?')) return;
   lijst.splice(idx, 1);
-  djAdminAccountsSet(lijst);
-  djAdminAccountsRender();
+  djToegangSet(lijst);
+  djToegangRender();
 }
 async function djAdminOpenen(){
   if (typeof spInit === 'function') { try { await spInit(); } catch(e) { alert('Kon niet verbinden met Microsoft. Probeer het opnieuw.'); return; } }
@@ -3286,16 +3334,15 @@ async function djAdminOpenen(){
     alert('Inloggen om het beheerpaneel te openen is niet gelukt of geannuleerd.');
     return;
   }
-  try { await djAdminAccountsCloudPull(); } catch(e) {} // meest actuele lijst ophalen vóór de check
-  var toegestaan = djAdminAccountsGet();
-  if (!actiefAccount || toegestaan.map(function(a){return a.toLowerCase();}).indexOf(actiefAccount.toLowerCase()) === -1) {
-    alert('Het beheerpaneel is alleen toegankelijk voor specifieke accounts. Dit account (' + actiefAccount + ') is niet geautoriseerd.');
+  try { await djToegangCloudPull(); } catch(e) {} // meest actuele lijst ophalen vóór de check
+  if (!actiefAccount || !djToegangHeeft(actiefAccount, 'beheer')) {
+    alert('Het beheerpaneel is alleen toegankelijk voor accounts met "Beheer"-toestemming. Dit account (' + actiefAccount + ') heeft die niet.');
     return;
   }
   djSpHeaderRefresh();
   try { await djWwCloudPull(); } catch(e) { console.error('SharePoint ophalen bij openen paneel mislukt:', e); } // haal de nieuwste waarden op, mocht een ander apparaat net iets gewijzigd hebben
   if (typeof spIngelogd === 'function' && spIngelogd()) djSpStatusTonen('Ingelogd bij SharePoint.', '#3fb950');
-  djAdminAccountsRender();
+  djToegangRender();
   var container = document.getElementById('dj-admin-velden');
   if (container) {
     container.innerHTML = DJ_WW_DEFS.map(function(def){
