@@ -2969,6 +2969,7 @@ async function spLogin(){
 
 // Geeft een geldig access token terug — logt automatisch in via popup als dat nog niet is gebeurd,
 // en ververst het token stil op de achtergrond als dat wél kan (zonder opnieuw in te loggen).
+var _spLastToken = null; // laatst opgehaalde token, voor het synchrone "vlak voor sluiten"-vangnet
 async function spGetToken(){
   await spInit();
   var accounts = _spMsalInstance.getAllAccounts();
@@ -2984,10 +2985,12 @@ async function spGetToken(){
   localStorage.setItem('dj_sp_account_username', account.username);
   try {
     var result = await _spMsalInstance.acquireTokenSilent({ scopes: SP_SCOPES, account: account });
+    _spLastToken = result.accessToken;
     return result.accessToken;
   } catch (e) {
     var result2 = await _spMsalInstance.acquireTokenPopup({ scopes: SP_SCOPES });
     localStorage.setItem('dj_sp_account_username', result2.account.username);
+    _spLastToken = result2.accessToken;
     return result2.accessToken;
   }
 }
@@ -3049,10 +3052,31 @@ function djSpStatusTonen(tekst, kleur){
   var el = document.getElementById('dj-sp-status');
   if (el) { el.textContent = tekst; el.style.color = kleur || 'rgba(255,255,255,0.6)'; }
 }
+// Werkt de knop in de hoofdbalk bij: wisselt tussen "Login met Microsoft" en het ingelogde
+// account. Dit is de knop die IEDEREEN (niet alleen beheerders) ziet en moet gebruiken —
+// dit moet uiteindelijk het hele wachtwoordsysteem gaan vervangen.
+function djSpHeaderRefresh(){
+  var btn = document.getElementById('djSpHeaderLoginBtn');
+  if (!btn) return;
+  if (typeof spIngelogd === 'function' && spIngelogd()) {
+    var accounts = _spMsalInstance.getAllAccounts();
+    var naam = accounts.length ? (accounts[0].username || accounts[0].name || 'Ingelogd') : 'Ingelogd';
+    btn.innerHTML = '&#9989; ' + naam;
+    btn.style.background = '#1e7d34';
+    btn.title = 'Klik om met een ander account in te loggen';
+  } else {
+    btn.innerHTML = '&#x1F310; Login met Microsoft';
+    btn.style.background = '#0f6cbd';
+    btn.title = 'Inloggen met je Stena-account (nodig om data te synchroniseren)';
+  }
+}
 async function djSpLoginKlik(){
+  var btn = document.getElementById('djSpHeaderLoginBtn');
+  if (btn) { btn.innerHTML = '&#8987; Bezig met inloggen…'; }
   djSpStatusTonen('Bezig met inloggen…', '#e8a020');
   try {
     await spLogin();
+    djSpHeaderRefresh();
     djSpStatusTonen('Ingelogd. Verbinding met SharePoint testen…', '#e8a020');
     // Meteen een rondje opslaan + ophalen als test dat de koppeling écht werkt.
     djWwCloudPush();
@@ -3070,6 +3094,7 @@ async function djSpLoginKlik(){
       }
     } catch(e2) { detail = 'onbekende fout (kon foutdetails niet uitlezen)'; }
     djSpStatusTonen('Mislukt: ' + detail, '#e5484d');
+    djSpHeaderRefresh();
   }
 }
 
@@ -3338,6 +3363,9 @@ function djHerstelVaarschema(){
         onblur="setTimeout(function(){ var el=document.getElementById('djZoekResultaten'); if(el) el.style.display='none'; }, 180)"
         style="width:220px;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.15);color:#fff;font-size:13px;font-family:inherit;">
       <div id="djZoekResultaten" style="display:none;position:absolute;top:calc(100% + 4px);left:0;width:280px;max-height:340px;overflow-y:auto;background:#0a2448;border:1px solid rgba(255,255,255,0.2);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.5);z-index:99999;"></div>
+    </div>
+    <div id="djSpHeaderLogin" style="position:relative;margin-left:10px;">
+      <button id="djSpHeaderLoginBtn" onclick="djSpLoginKlik()" style="background:#0f6cbd;border:none;color:#fff;font-size:12px;font-weight:700;padding:8px 14px;border-radius:8px;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px;">&#x1F310; Login met Microsoft</button>
     </div>
     <div id="djBhvWarningIcon" class="hidden" style="position:relative;margin-left:10px;cursor:default;">
       <style>#djBhvWarningIcon.hidden, #djBhvWarningPanel.hidden { display:none !important; }</style>
@@ -5539,6 +5567,7 @@ window.addEventListener('resize', () => {
   // eventuele eerder ingelogde sessie uit de cache te herkennen), en pas daarna wordt gecheckt.
   if (typeof spInit === 'function') {
     spInit().then(function(){
+      if (typeof djSpHeaderRefresh === 'function') djSpHeaderRefresh();
       if (typeof djWwCloudPull === 'function' && spIngelogd()) djWwCloudPull();
     }).catch(function(){});
   }
@@ -5778,6 +5807,7 @@ window.addEventListener('resize', () => {
   // afgemaakt; een synchrone XMLHttpRequest werkt hier wel betrouwbaar voor.
   function _cloudOpslaanSync() {
     if (!_autoSaveTimer) return; // niets te doen, alles staat al in de cloud
+    if (!_spLastToken || !_spSiteId) return; // nog nooit succesvol ingelogd/opgeslagen deze sessie — niets te versturen zonder geldig token
     clearTimeout(_autoSaveTimer);
     _autoSaveTimer = null;
     try {
@@ -5792,13 +5822,15 @@ window.addEventListener('resize', () => {
           if (_se && ((_se.ochEmps && _se.ochEmps.length > 0) || (_se.avondEmps && _se.avondEmps.length > 0))) data[_sk] = _se;
         } catch(e2) {}
       }
-      var xhr = new XMLHttpRequest();
-      xhr.open('POST', SB_URL + '/rest/v1/' + SB_TABLE, false); // false = synchroon, bewust
-      xhr.setRequestHeader('apikey', SB_KEY);
-      xhr.setRequestHeader('Authorization', 'Bearer ' + SB_KEY);
-      xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.setRequestHeader('Prefer', 'resolution=merge-duplicates,return=minimal');
-      xhr.send(JSON.stringify({ id: rowId, data: data, updated_at: new Date().toISOString() }));
+      var url = 'https://graph.microsoft.com/v1.0/sites/' + _spSiteId + '/drive/root:/Data/' + encodeURIComponent(rowId + '.json') + ':/content';
+      // keepalive: fetch die tijdens het sluiten/verlaten van de pagina toch wordt afgemaakt
+      // door de browser (in tegenstelling tot een gewone fetch, die dan wordt afgebroken).
+      fetch(url, {
+        method: 'PUT',
+        keepalive: true,
+        headers: { 'Authorization': 'Bearer ' + _spLastToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: data, updated_at: new Date().toISOString() })
+      }).catch(function(){});
     } catch(e) { /* best effort — als dit faalt is er niets meer aan te doen op dit moment */ }
   }
   window.addEventListener('pagehide', _cloudOpslaanSync);
@@ -5815,61 +5847,36 @@ window.addEventListener('resize', () => {
         // Zelfde beveiliging als bij de handmatige Ophalen-knop: eerst een
         // eventuele nog niet verzonden wijziging wegschrijven.
         if (window._flushPendingCloudOpslaan) await window._flushPendingCloudOpslaan();
+        // Eerst MSAL stil laten initialiseren, zodat een eerder ingelogde sessie (dit apparaat
+        // heeft al eens ingelogd) herkend wordt zonder een pop-up te forceren. Is er nog geen
+        // sessie (bijv. een collega die de app voor het eerst opent), dan wachten we gewoon
+        // netjes tot diegene zelf inlogt via het beheerpaneel — in plaats van blind door te gaan
+        // met (mogelijk lege) lokale data, wat precies het oude Supabase-probleem was.
+        if (typeof spInit === 'function') { try { await spInit(); } catch(e) {} }
+        if (typeof spIngelogd !== 'function' || !spIngelogd()) {
+          showSyncStatus('⚠ Niet ingelogd bij SharePoint — log in via het beheerpaneel (tandwiel) om data op te halen', 'err');
+          return;
+        }
         showSyncStatus('☁️ Data ophalen...', 'info');
         try {
           var _rowId = getSBRowId();
-          var resp = await fetch(SB_URL + '/rest/v1/' + SB_TABLE + '?id=eq.'+_rowId+'&select=data', {
-            headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
-          });
-          if (!resp.ok) throw new Error('HTTP ' + resp.status);
-          var rows = await resp.json();
-          // ── Eenmalige migratie EP: kopieer 'main' → 'EP_main' ──
-          if ((!rows || rows.length === 0) && _rowId === 'EP_main') {
-            var _respOld = await fetch(SB_URL + '/rest/v1/' + SB_TABLE + '?id=eq.main&select=data', {
-              headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
-            });
-            if (_respOld.ok) {
-              var _oldRows = await _respOld.json();
-              if (_oldRows && _oldRows.length > 0) {
-                var _oldData = _oldRows[0].data || {};
-                var _newData = {};
-                Object.keys(_oldData).forEach(function(k) {
-                  var _isTK = (typeof TERMINAL_KEYS_SPLIT !== 'undefined' && TERMINAL_KEYS_SPLIT.indexOf(k) >= 0) || k.startsWith('dagplan_');
-                  _newData[_isTK ? 'EP_' + k : k] = _oldData[k];
-                });
-                await fetch(SB_URL + '/rest/v1/' + SB_TABLE, {
-                  method: 'POST',
-                  headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY,
-                    'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' },
-                  body: JSON.stringify({ id: 'EP_main', data: _newData })
-                });
-                rows = [{ data: _newData }];
-              }
-            }
-          }
-          if (!rows || !rows[0] || !rows[0].data) {
-            // Geen data in Supabase — maar er kan wel localStorage data zijn (bijv. HVH)
-            // Sla die direct op in Supabase
+          var _result = await spOphalenBestand(_rowId + '.json');
+          if (!_result || !_result.data) {
+            // Geen data op SharePoint — maar er kan wel localStorage data zijn (bijv. HVH)
+            // Sla die direct op in SharePoint
             if (typeof getSyncData === 'function') {
               var localData = getSyncData();
               var hasLocalData = Object.keys(localData).length > 0;
               try {
-                await fetch(SB_URL + '/rest/v1/' + SB_TABLE, {
-                  method: 'POST',
-                  headers: {
-                    'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY,
-                    'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates'
-                  },
-                  body: JSON.stringify({ id: _rowId, data: hasLocalData ? localData : {} })
-                });
+                await spOpslaanBestand(_rowId + '.json', { data: hasLocalData ? localData : {}, updated_at: new Date().toISOString() });
                 if (hasLocalData) showSyncStatus('✓ Lokale data opgeslagen in cloud', 'ok');
-              } catch(e2) { console.warn('Kon rij niet aanmaken:', e2); }
+              } catch(e2) { console.warn('Kon bestand niet aanmaken:', e2); }
             }
             sessionStorage.setItem('_cloudGeladen', '1');
             showSyncStatus('', 'ok');
             return;
           }
-          if (typeof setSyncData === 'function') setSyncData(rows[0].data);
+          if (typeof setSyncData === 'function') setSyncData(_result.data);
           // Markeer als geladen ALLEEN na succes
           sessionStorage.setItem('_cloudGeladen', '1');
           showSyncStatus('✓ Data geladen', 'ok');
@@ -17188,12 +17195,9 @@ function wisselPunctualityDatum(dateStr) {
     if (btn) { btn.innerHTML = '&#8635; Bezig...'; btn.disabled = true; }
     try {
       var pfx = getTerminalPrefix();
-      var resp = await fetch(SB_URL + '/rest/v1/' + SB_TABLE + '?id=eq.' + getSBRowId() + '&select=data', {
-        headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
-      });
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      var rows = await resp.json();
-      var data = (rows && rows[0] && rows[0].data) || {};
+      if (!(await spIngelogdAsync())) throw new Error('Niet ingelogd bij SharePoint');
+      var result = await spOphalenBestand(getSBRowId() + '.json');
+      var data = (result && result.data) || {};
 
       var cloudStatus = data[pfx + 'materieel_status_v1'];
       var cloudCustom  = data[pfx + 'mat_custom_list'];
@@ -22848,13 +22852,10 @@ async function laadMetCloud() {
   if (btn) { btn.textContent = '⏳ Laden...'; btn.disabled = true; }
 
   try {
-    var resp = await fetch(SB_URL + '/rest/v1/' + SB_TABLE + '?id=eq.'+getSBRowId()+'&select=data', {
-      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
-    });
-    if (resp.ok) {
-      var rows = await resp.json();
-      if (rows && rows.length > 0) {
-        if (typeof setSyncData === 'function') setSyncData(rows[0].data);
+    if (await spIngelogdAsync()) {
+      var result = await spOphalenBestand(getSBRowId() + '.json');
+      if (result && result.data) {
+        if (typeof setSyncData === 'function') setSyncData(result.data);
       }
     }
   } catch(e) { console.warn('Cloud laden mislukt:', e); }
@@ -23947,19 +23948,20 @@ function pdZoek(query){
     msg += 'HVH keys (' + hvhKeys.length + '): ' + hvhKeys.join(', ') + '\n\n';
     msg += 'Ongeprefixte keys: ' + (bareKeys.join(', ')||'(geen)') + '\n\n';
 
-    msg += '=== SUPABASE ===\n';
+    msg += '=== SHAREPOINT ===\n';
     try {
-      var resp = await fetch(SB_URL + '/rest/v1/' + SB_TABLE + '?select=id', {
-        headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
-      });
-      var rows = await resp.json();
-      msg += 'Rijen: ' + rows.map(function(r){return r.id;}).join(', ') + '\n';
-      for(var ri=0; ri<rows.length; ri++){
-        var r2 = await fetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.'+rows[ri].id+'&select=data',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
-        var rd = await r2.json();
-        var keys = (rd&&rd[0]&&rd[0].data)?Object.keys(rd[0].data):[];
+      if (!(await spIngelogdAsync())) throw new Error('Niet ingelogd bij SharePoint');
+      var siteId = await spGetSiteId();
+      var token = await spGetToken();
+      var listResp = await fetch('https://graph.microsoft.com/v1.0/sites/' + siteId + '/drive/root:/Data:/children?$select=name', { headers: { 'Authorization': 'Bearer ' + token } });
+      var listData = await listResp.json();
+      var bestanden = (listData.value || []).map(function(f){ return f.name; });
+      msg += 'Bestanden: ' + bestanden.join(', ') + '\n';
+      for (var ri = 0; ri < bestanden.length; ri++) {
+        var rd = await spOphalenBestand(bestanden[ri]);
+        var keys = (rd && rd.data) ? Object.keys(rd.data) : [];
         var dagKeys = keys.filter(function(k){return k.indexOf('dagplan')>-1;});
-        msg += '  ' + rows[ri].id + ': ' + keys.length + ' keys, dagplan: [' + dagKeys.join(', ') + ']\n';
+        msg += '  ' + bestanden[ri] + ': ' + keys.length + ' keys, dagplan: [' + dagKeys.join(', ') + ']\n';
       }
     } catch(e) { msg += 'Fout: ' + e.message; }
     alert(msg);
@@ -23996,33 +23998,14 @@ function pdZoek(query){
 
     var keyCount = Object.keys(data).length;
     var dagKeys = Object.keys(data).filter(function(k){return k.indexOf('dagplan')>-1;});
-    if (!confirm('Forceer opslaan naar Supabase (' + rowId + ')\n' + keyCount + ' keys waarvan ' + dagKeys.length + ' dagplan:\n' + dagKeys.join('\n') + '\n\nDoorgaan?')) return;
+    if (!confirm('Forceer opslaan naar SharePoint (' + rowId + '.json)\n' + keyCount + ' keys waarvan ' + dagKeys.length + ' dagplan:\n' + dagKeys.join('\n') + '\n\nDoorgaan?')) return;
 
     showSyncStatus('⚠️ Forceer opslaan...', 'info');
     try {
-      // Probeer eerst PATCH
-      var resp = await fetch(SB_URL + '/rest/v1/' + SB_TABLE + '?id=eq.' + rowId, {
-        method: 'PATCH',
-        headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY,
-          'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-        body: JSON.stringify({ data: data, updated_at: new Date().toISOString() })
-      });
-      // Als niet gevonden, POST
-      if (resp.status === 404 || resp.status === 0 || (await resp.clone().text()) === '') {
-        resp = await fetch(SB_URL + '/rest/v1/' + SB_TABLE, {
-          method: 'POST',
-          headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY,
-            'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' },
-          body: JSON.stringify({ id: rowId, data: data })
-        });
-      }
-      if (resp.ok || resp.status === 204) {
-        showSyncStatus('✓ ' + keyCount + ' keys opgeslagen in ' + rowId, 'ok');
-        alert('✓ Succesvol opgeslagen in Supabase ' + rowId + '\n' + keyCount + ' keys');
-      } else {
-        var err = await resp.text();
-        throw new Error('HTTP ' + resp.status + ': ' + err.substring(0,100));
-      }
+      if (!(await spIngelogdAsync())) throw new Error('Niet ingelogd bij SharePoint — log in via het beheerpaneel (tandwiel)');
+      await spOpslaanBestand(rowId + '.json', { data: data, updated_at: new Date().toISOString() });
+      showSyncStatus('✓ ' + keyCount + ' keys opgeslagen in ' + rowId, 'ok');
+      alert('✓ Succesvol opgeslagen op SharePoint ' + rowId + '.json\n' + keyCount + ' keys');
     } catch(e) {
       showSyncStatus('✗ ' + e.message, 'err');
       alert('Fout: ' + e.message);
