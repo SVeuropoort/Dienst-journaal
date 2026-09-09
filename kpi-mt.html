@@ -330,6 +330,13 @@ async function spGetSiteId(){
   _spSiteId = data.id;
   return _spSiteId;
 }
+async function spVerifieerToegang(){
+  var token = await spGetToken();
+  var siteId = await spGetSiteId();
+  var resp = await fetch('https://graph.microsoft.com/v1.0/sites/' + siteId + '/drive/root:/Data', { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!resp.ok) throw new Error('Geen toegang tot de map "Data" op SharePoint (status ' + resp.status + ')');
+  return true;
+}
 async function spOpslaanBestand(bestandsnaam, dataObj){
   var token = await spGetToken();
   var siteId = await spGetSiteId();
