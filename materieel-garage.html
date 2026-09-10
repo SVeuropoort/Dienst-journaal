@@ -349,7 +349,7 @@ async function spOphalenBestand(bestandsnaam){
   var token = await spGetToken();
   var siteId = await spGetSiteId();
   var url = 'https://graph.microsoft.com/v1.0/sites/' + siteId + '/drive/root:/Data/' + encodeURIComponent(bestandsnaam) + ':/content';
-  var resp = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
+  var resp = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token }, cache: 'no-store' });
   if (resp.status === 404) return null;
   if (!resp.ok) throw new Error('Ophalen van SharePoint mislukt (status ' + resp.status + ')');
   return await resp.json();

@@ -241,9 +241,8 @@ function mtWwGet(){
   return mtDeobf(MT_WW_STANDAARD);
 }
 function mtWwSet(w){ localStorage.setItem('dj_ww_kpi_mt', mtObf(w)); mtWwCloudPush(); }
-// Zelfde gedeelde, terminal-onafhankelijke wachtwoorden-cloudrij als in de hoofdapp
+// Wachtwoorden delen hetzelfde SharePoint-bestand ("wachtwoorden.json") als in de hoofdapp
 // (index.html), zodat een wachtwoordwijziging hier of daar altijd overal doorwerkt.
-var DJ_WW_CLOUD_ROW = 'dj_wachtwoorden_global';
 
 // ══════════════════════════════════════════════════════════════════
 // SharePoint/Entra ID fundament (vervangt Supabase) — zelfde opzet als index.html
@@ -349,7 +348,7 @@ async function spOphalenBestand(bestandsnaam){
   var token = await spGetToken();
   var siteId = await spGetSiteId();
   var url = 'https://graph.microsoft.com/v1.0/sites/' + siteId + '/drive/root:/Data/' + encodeURIComponent(bestandsnaam) + ':/content';
-  var resp = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
+  var resp = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token }, cache: 'no-store' });
   if (resp.status === 404) return null;
   if (!resp.ok) throw new Error('Ophalen van SharePoint mislukt (status ' + resp.status + ')');
   return await resp.json();
@@ -463,11 +462,8 @@ function mtWachtwoordWijzigen(){
 }
 
 // ══════════════════════════════════════════════════════════════════
-// Supabase (zelfde database als de hoofdapp, hier alleen-lezen gebruikt)
+// Databron: SharePoint (zelfde bestanden als de hoofdapp, hier alleen-lezen gebruikt)
 // ══════════════════════════════════════════════════════════════════
-var SB_URL   = 'https://xgqtiseknvjwaqapwjdt.supabase.co';
-var SB_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhncXRpc2VrbnZqd2FxYXB3amR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODYxNzIsImV4cCI6MjA5NjE2MjE3Mn0.DdBJ6OzEVC-l_9qbJE-bVlv1WdxFkB1C2tjEHXqh5SE';
-var SB_TABLE = 'sync_data';
 // meteen bij laden de nieuwste wachtwoorden ophalen — maar alleen als er al een SharePoint-sessie is
 if (typeof spInit === 'function') {
   spInit().then(function(){
