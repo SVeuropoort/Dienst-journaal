@@ -4979,6 +4979,7 @@ function slaBedrijvenOp() {
   var lijst=document.getElementById('bedrijf-inst-input').value.split('\n').map(function(s){return s.trim();}).filter(function(s){return s&&s!=='Overige'&&s!=='Other';});
   if(!lijst.length){document.getElementById('bedrijf-inst-msg').style.color='#c00';document.getElementById('bedrijf-inst-msg').textContent=_immSB?'Enter at least one company.':'Voer minimaal één bedrijf in.';return;}
   localStorage.setItem(_BEDRIJF_KEY,JSON.stringify(lijst)); vulBedrijfSelect();
+  if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
   document.getElementById('bedrijf-inst-msg').style.color='#1a8a50'; document.getElementById('bedrijf-inst-msg').textContent=_immSB?'\u2713 Saved!':'\u2713 Opgeslagen!';
   setTimeout(closeBedrijfInst, 800);
 }
@@ -5014,6 +5015,7 @@ function slaPrijzenOp() {
   });
   localStorage.setItem(_PRIJZEN_KEY,JSON.stringify(saved));
   _svcArray=_loadSvcArray();
+  if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
   document.getElementById('prijs-inst-msg').textContent=_immSP?'\u2713 Prices saved!':'\u2713 Prijzen opgeslagen!';
   setTimeout(function(){closePrijsInst();buildServiceTable();},800);
 }
@@ -6018,6 +6020,30 @@ window.addEventListener('resize', () => {
     'werkorder_bedrijven_v1',
     'werkorder_prijzen_v1'
   ];
+
+  // ══════════════════════════════════════════════════════════════════
+  // Vangnet: garandeert dat NIETS uit SYNC_KEYS (of de dynamische dagplan_/
+  // kpi_snapshot_/ls_/dagPlanning_arch(Idx)-sleutels) ooit alleen lokaal
+  // blijft staan doordat een los stukje code vergat zelf autoCloudOpslaan()
+  // aan te roepen (zoals bij de Werkorder-bedrijven/-prijzen bleek te
+  // gebeuren). Elke localStorage.setItem() op zo'n sleutel triggert vanaf nu
+  // altijd zelf de bestaande, gedebouncede cloud-opslag — ongeacht welke
+  // functie de wijziging deed.
+  (function(){
+    var _origSetItem = localStorage.setItem.bind(localStorage);
+    var _dynamischeVoorvoegsels = ['dagplan_', 'kpi_snapshot_', 'ls_', 'dagPlanning_arch_'];
+    localStorage.setItem = function(key, value){
+      _origSetItem(key, value);
+      try {
+        if (typeof window.autoCloudOpslaan !== 'function' || !key) return;
+        var kaal = key.replace(/^(EP|HVH|IMM)_/, '');
+        var relevant = SYNC_KEYS.indexOf(kaal) !== -1
+          || key === 'dagPlanning_archIdx'
+          || _dynamischeVoorvoegsels.some(function(p){ return kaal.indexOf(p) === 0; });
+        if (relevant) window.autoCloudOpslaan();
+      } catch(e) {}
+    };
+  })();
 
   function getSyncData() {
     var data = {};
@@ -13307,6 +13333,7 @@ function oplOverzichtVoegUitgeslotenToe(naam){
   if (lijst.indexOf(naam) === -1) {
     lijst.push(naam);
     localStorage.setItem(oplOverzichtUitgeslotenKey(), JSON.stringify(lijst));
+    if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
   }
 }
 function oplOverzichtVerwijderUitUitgesloten(naam){
@@ -13315,6 +13342,7 @@ function oplOverzichtVerwijderUitUitgesloten(naam){
   if (idx !== -1) {
     lijst.splice(idx, 1);
     localStorage.setItem(oplOverzichtUitgeslotenKey(), JSON.stringify(lijst));
+    if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
   }
 }
 // Neemt nieuwe medewerkersnamen over vanuit de Maandafsluiting (alleen toevoegen, nooit verwijderen
