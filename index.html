@@ -5982,13 +5982,17 @@ window.addEventListener('resize', () => {
 
 
   // Alle localStorage keys die gesynchroniseerd worden
+  // Let op: materieel_status_v1 / mat_standalone_v2 / mat_custom_list zitten HIER BEWUST NIET
+  // in — die worden ook door Materieel-garage (los bestand) bijgewerkt. cloudOpslaan() hieronder
+  // doet een simpele "blinde" push van alles wat er lokaal in staat, zonder eerst de laatste
+  // cloud-versie op te halen; voor materieel zou dat een verse wijziging van Materieel-garage
+  // zomaar kunnen overschrijven met een verouderde lokale kopie. Materieel heeft daarom zijn
+  // eigen, voorzichtige ophalen-samenvoegen-opslaan in autoSaveMat() (zie verderop), net als
+  // Materieel-garage dat al deed.
   var SYNC_KEYS = [
     'dienstjournaal_stena_v1',
     'vaarschema_backup_v1',
     'vs_data_v1',
-    'materieel_status_v1',
-    'mat_standalone_v2',
-    'mat_custom_list',
     'plan_v3',
     'dagPlanning_v2_state',
     'dagPlanning_v2_lastDate',
@@ -17897,6 +17901,7 @@ function wisselPunctualityDatum(dateStr) {
     });
   }
 
+  var _matSaCloudPushTimer = null;
   function autoSaveMat() {
     // Save matSaData
     saveMatSaData(matSaData);
@@ -17926,6 +17931,28 @@ function wisselPunctualityDatum(dateStr) {
     const ts  = document.getElementById('mat-last-saved');
     if (lbl) { lbl.style.opacity='1'; setTimeout(()=>lbl.style.opacity='0',2000); }
     if (ts)  { ts.textContent = 'Opgeslagen: ' + new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}); }
+
+    // Voorzichtig naar SharePoint pushen: eerst de laatste cloud-versie ophalen en daar alleen
+    // de materieel-sleutels in overschrijven — in plaats van blind alles lokaal bekende data terug
+    // te schrijven (zoals de gewone cloudOpslaan() doet). Zo kan een net binnengekomen wijziging
+    // van Materieel-garage niet per ongeluk worden teruggedraaid door een verouderde lokale kopie.
+    clearTimeout(_matSaCloudPushTimer);
+    _matSaCloudPushTimer = setTimeout(function(){ pushMaterieelNaarCloud(matStore); }, 900);
+  }
+
+  async function pushMaterieelNaarCloud(matStore) {
+    try {
+      if (!(await spIngelogdAsync())) return;
+      var rowId = getSBRowId();
+      var result = await spOphalenBestand(rowId + '.json');
+      var data = (result && result.data) || {};
+      data[MAT_SA_KEY] = matSaData;
+      data[tk('mat_standalone_v2')] = matStore || getMatStore();
+      data[tk('mat_custom_list')] = matSaData.map(function(m){ return {type:m.type, naam:m.naam}; });
+      await spOpslaanBestand(rowId + '.json', { data: data, updated_at: new Date().toISOString() });
+    } catch(e) {
+      console.warn('Materieel niet naar SharePoint gepusht:', e);
+    }
   }
 
   function slaPortoOp() {
@@ -17941,8 +17968,9 @@ function wisselPunctualityDatum(dateStr) {
     // Toon bevestiging
     var lbl = document.getElementById('porto-saved-lbl');
     if(lbl) { lbl.style.opacity='1'; setTimeout(function(){lbl.style.opacity='0';}, 2000); }
-    // Cloud sync
-    if(typeof cloudOpslaan === 'function') setTimeout(function(){ cloudOpslaan(); }, 300);
+    // Cloud sync — via dezelfde voorzichtige ophalen-samenvoegen-opslaan als autoSaveMat(),
+    // niet de gewone (blinde) cloudOpslaan()
+    if (typeof pushMaterieelNaarCloud === 'function') setTimeout(function(){ pushMaterieelNaarCloud(mat); }, 300);
   }
 
   function laadPorto() {
@@ -19798,6 +19826,7 @@ function wisselPunctualityDatum(dateStr) {
       });
       localStorage.setItem(tk('mat_standalone_v2'), JSON.stringify(d));
       saveMatSaData(matSaData);
+      if (typeof pushMaterieelNaarCloud === 'function') pushMaterieelNaarCloud(d);
       buildMatSa(matSaData);
       if (typeof updateMatSaSummary === 'function') updateMatSaSummary();
       if (typeof updateMatBadges === 'function') updateMatBadges();
@@ -24561,7 +24590,7 @@ function pdZoek(query){
       d[dag][field]=parseInt(inp.value)||0;
     });
     localStorage.setItem(tk(STD_BEZ_KEY),JSON.stringify(d));
-    try{ var mat=JSON.parse(localStorage.getItem(tk('mat_standalone_v2'))||'{}'); mat['std_bezetting']=d; localStorage.setItem(tk('mat_standalone_v2'),JSON.stringify(mat)); if(typeof cloudOpslaan==='function') setTimeout(function(){ cloudOpslaan(); },300); }catch(e){}
+    try{ var mat=JSON.parse(localStorage.getItem(tk('mat_standalone_v2'))||'{}'); mat['std_bezetting']=d; localStorage.setItem(tk('mat_standalone_v2'),JSON.stringify(mat)); if(typeof pushMaterieelNaarCloud==='function') setTimeout(function(){ pushMaterieelNaarCloud(mat); },300); }catch(e){}
     closeStdBezetting();
     if(typeof renderKPI==='function') renderKPI();
   }
