@@ -5978,6 +5978,10 @@ window.addEventListener('resize', () => {
     }).catch(function(){});
   }
   var _syncBezig = false;
+  // Meest recent bekende volledige cloud-inhoud (bijgewerkt door cloudOpslaan()/cloudLaden()).
+  // Wordt gebruikt door de "sla op vlak voor sluiten"-vangnet hieronder, omdat die geen tijd meer
+  // heeft voor een eigen verse ophaal-actie vlak voor de pagina echt dichtgaat.
+  var _laatsteBekendeCloudData = {};
   
 
 
@@ -6149,7 +6153,7 @@ window.addEventListener('resize', () => {
     if (toonFouten) showSyncStatus('☁️ Opslaan...', 'info');
     try {
       var rowId = getSBRowId();
-      var data = getSyncData();
+      var lokaal = getSyncData();
       var pfx = getTerminalPrefix();
       // Voeg terminal-specifieke dagplan_ entries toe met medewerkers
       for (var _i = 0; _i < localStorage.length; _i++) {
@@ -6158,10 +6162,18 @@ window.addEventListener('resize', () => {
         try {
           var _e = JSON.parse(localStorage.getItem(_k));
           if (_e && ((_e.ochEmps && _e.ochEmps.length > 0) || (_e.avondEmps && _e.avondEmps.length > 0))) {
-            data[_k] = _e;
+            lokaal[_k] = _e;
           }
         } catch(e) {}
       }
+      // Eerst de meest recente cloud-versie ophalen en de lokale wijzigingen daar bovenop leggen,
+      // in plaats van het hele bestand blind te vervangen door alleen wat dit apparaat kent. Zonder
+      // dit zou elke opslagactie hier sleutels die alleen door andere apps worden bijgewerkt (zoals
+      // Materieel-garage) stilletjes wissen, ook als deze actie daar helemaal niets mee te maken had.
+      var result = await spOphalenBestand(rowId + '.json');
+      var cloudData = (result && result.data) || {};
+      var data = Object.assign({}, cloudData, lokaal);
+      _laatsteBekendeCloudData = data;
       await spOpslaanBestand(rowId + '.json', { data: data, updated_at: new Date().toISOString() });
       var dagCount = Object.keys(data).filter(function(k){return k.indexOf('dagplan')>-1;}).length;
       if (toonFouten) showSyncStatus('✓ Opgeslagen in ' + rowId + ' (' + dagCount + ' dagplan)', 'ok');
@@ -6251,16 +6263,21 @@ window.addEventListener('resize', () => {
     _autoSaveTimer = null;
     try {
       var rowId = getSBRowId();
-      var data = getSyncData();
+      var lokaal = getSyncData();
       var pfx = getTerminalPrefix();
       for (var _si = 0; _si < localStorage.length; _si++) {
         var _sk = localStorage.key(_si);
         if (!_sk || !_sk.startsWith(pfx + 'dagplan_')) continue;
         try {
           var _se = JSON.parse(localStorage.getItem(_sk));
-          if (_se && ((_se.ochEmps && _se.ochEmps.length > 0) || (_se.avondEmps && _se.avondEmps.length > 0))) data[_sk] = _se;
+          if (_se && ((_se.ochEmps && _se.ochEmps.length > 0) || (_se.avondEmps && _se.avondEmps.length > 0))) lokaal[_sk] = _se;
         } catch(e2) {}
       }
+      // Geen tijd meer voor een eigen verse ophaal-actie vlak voor de pagina dichtgaat — gebruik
+      // daarom de laatst bekende cloud-inhoud (bijgehouden door cloudOpslaan()) als basis, zodat
+      // sleutels die alleen door andere apps worden bijgewerkt (zoals Materieel-garage) niet
+      // alsnog verdwijnen door deze laatste-redmiddel-opslag.
+      var data = Object.assign({}, _laatsteBekendeCloudData, lokaal);
       var url = 'https://graph.microsoft.com/v1.0/sites/' + _spSiteId + '/drive/root:/Data/' + encodeURIComponent(rowId + '.json') + ':/content';
       // keepalive: fetch die tijdens het sluiten/verlaten van de pagina toch wordt afgemaakt
       // door de browser (in tegenstelling tot een gewone fetch, die dan wordt afgebroken).
