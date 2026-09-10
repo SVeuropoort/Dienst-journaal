@@ -2911,13 +2911,12 @@ function djWwSet(sleutel, waarde){
 // ══════════════════════════════════════════════════════════════════
 // Wachtwoorden zijn bewust NIET terminal-gebonden (hetzelfde meesterwachtwoord
 // hoort overal te werken), maar de normale cloud-sync IS terminal-gebonden
-// (elke terminal heeft zijn eigen rij in Supabase). Daarom krijgen wachtwoorden
-// hier hun EIGEN, aparte rij ("dj_wachtwoorden_global") die los van de
-// gekozen terminal wordt bijgewerkt en opgehaald — zo werkt een wijziging op
-// één apparaat altijd door naar alle andere apparaten, ongeacht welke
-// terminal daar toevallig actief is.
+// (elke terminal heeft zijn eigen bestand op SharePoint, bijv. EP_main.json).
+// Daarom krijgen wachtwoorden hun EIGEN, aparte bestand ("wachtwoorden.json")
+// dat los van de gekozen terminal wordt bijgewerkt en opgehaald — zo werkt een
+// wijziging op één apparaat altijd door naar alle andere apparaten, ongeacht
+// welke terminal daar toevallig actief is.
 // ══════════════════════════════════════════════════════════════════
-var DJ_WW_CLOUD_ROW = 'dj_wachtwoorden_global';
 
 // ══════════════════════════════════════════════════════════════════
 // FASE 1 — SharePoint/Entra ID fundament (vervangt Supabase stap voor stap)
@@ -3067,6 +3066,47 @@ async function spOphalenBestand(bestandsnaam){
   if (resp.status === 404) return null;
   if (!resp.ok) throw new Error('Ophalen van SharePoint mislukt (status ' + resp.status + ')');
   return await resp.json();
+}
+// ── Bijlagen: echte bestanden (certificaten, PDF's) in de map "Bijlagen" op SharePoint —
+// in tegenstelling tot /Data hierboven (kleine JSON-instellingen) gaat het hier om de
+// daadwerkelijke bestandsinhoud, zodat een collega op een ander apparaat 'm ook kan
+// terugvinden. Gebruikt een upload-sessie (in plaats van een simpele PUT) zodat ook
+// bestanden tot de toegestane 10 MB in één keer betrouwbaar geüpload worden.
+function spBijlagePad(pad){ return pad.split('/').map(encodeURIComponent).join('/'); }
+async function spUploadBijlage(pad, file){
+  var token = await spGetToken();
+  var siteId = await spGetSiteId();
+  var sessResp = await fetch('https://graph.microsoft.com/v1.0/sites/' + siteId + '/drive/root:/Bijlagen/' + spBijlagePad(pad) + ':/createUploadSession', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ item: { '@microsoft.graph.conflictBehavior': 'replace' } })
+  });
+  if (!sessResp.ok) throw new Error('Kon upload-sessie niet starten (status ' + sessResp.status + ')');
+  var sessie = await sessResp.json();
+  var putResp = await fetch(sessie.uploadUrl, {
+    method: 'PUT',
+    headers: { 'Content-Length': String(file.size), 'Content-Range': 'bytes 0-' + (file.size - 1) + '/' + file.size },
+    body: file
+  });
+  if (!putResp.ok) throw new Error('Uploaden naar SharePoint mislukt (status ' + putResp.status + ')');
+  return await putResp.json();
+}
+async function spDownloadBijlage(pad){
+  var token = await spGetToken();
+  var siteId = await spGetSiteId();
+  var url = 'https://graph.microsoft.com/v1.0/sites/' + siteId + '/drive/root:/Bijlagen/' + spBijlagePad(pad) + ':/content';
+  var resp = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
+  if (resp.status === 404) return null;
+  if (!resp.ok) throw new Error('Ophalen van bijlage mislukt (status ' + resp.status + ')');
+  return await resp.blob();
+}
+async function spVerwijderBijlage(pad){
+  var token = await spGetToken();
+  var siteId = await spGetSiteId();
+  var url = 'https://graph.microsoft.com/v1.0/sites/' + siteId + '/drive/root:/Bijlagen/' + spBijlagePad(pad);
+  var resp = await fetch(url, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } });
+  if (!resp.ok && resp.status !== 404) throw new Error('Verwijderen van bijlage mislukt (status ' + resp.status + ')');
+  return true;
 }
 // ══════════════════════════════════════════════════════════════════
 // EINDE FASE 1-fundament. Vanaf hier: wachtwoorden als eerste testcase op SharePoint.
@@ -5825,9 +5865,6 @@ window.addEventListener('resize', () => {
   // Init terminal bij laden
   (function(){ setTimeout(function(){ window.setTerminal(sessionStorage.getItem('dj_terminal')||'EP'); }, 0); })();
 
-  var SB_URL  = 'https://xgqtiseknvjwaqapwjdt.supabase.co';
-  var SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhncXRpc2VrbnZqd2FxYXB3amR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODYxNzIsImV4cCI6MjA5NjE2MjE3Mn0.DdBJ6OzEVC-l_9qbJE-bVlv1WdxFkB1C2tjEHXqh5SE';
-  var SB_TABLE = 'sync_data';
   // Direct bij het laden van de pagina de laatste wachtwoorden ophalen — maar alleen als er
   // al een SharePoint-sessie is; anders zou dit een pop-up proberen te openen buiten een
   // muisklik om, wat de browser blokkeert. spInit() laadt eerst MSAL zelf in (nodig om een
@@ -13290,6 +13327,24 @@ function certDbVerwijder(sleutel){
 // Zet een base64-dataURL om naar een blob: URL en toont die in een nieuw tabblad.
 // blob:-URL's werken vrijwel overal, ook in afgeschermde bedrijfsbrowsers waar
 // data:-URL's soms geblokkeerd worden.
+function certVeiligNaam(s){
+  return String(s || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60) || 'onbekend';
+}
+function certBestandsExtensie(naam, type){
+  var uitNaam = (naam || '').split('.').pop();
+  if (uitNaam && uitNaam.length <= 5 && uitNaam !== naam) return uitNaam.toLowerCase();
+  if (type === 'application/pdf') return 'pdf';
+  if (type && type.indexOf('image/') === 0) return type.split('/')[1] || 'jpg';
+  return 'bin';
+}
+function certToonBlobInNieuwTab(blob, type, naam, w){
+  var blobUrl = URL.createObjectURL(blob);
+  if (type && type.indexOf('image/') === 0) {
+    w.document.write('<title>' + oplEsc(naam) + '</title><body style="margin:0;background:#222;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="' + blobUrl + '" style="max-width:100%;max-height:100vh;"></body>');
+  } else {
+    w.location.href = blobUrl;
+  }
+}
 function certToonInNieuwTab(dataUrl, type, naam, w){
   try {
     var komma = dataUrl.indexOf(',');
@@ -13417,57 +13472,51 @@ function oplOverzichtKiesBestand(idx, veld){
       alert('Dit bestand is groter dan 10 MB. Kies een kleiner bestand (bijv. een foto i.p.v. een hoge-resolutie scan, of comprimeer de PDF).');
       return;
     }
-    var reader = new FileReader();
-    reader.onerror = function(){
-      oplToonMelding('✗ Kon het bestand niet inlezen in de browser.', '#7f1d1d');
-    };
-    reader.onload = function(e){
-      try {
-        var lijst = oplOverzichtGetData();
-        if (!lijst[idx]) { oplToonMelding('✗ Medewerker niet meer gevonden (lijst is ondertussen gewijzigd). Ververs de pagina en probeer opnieuw.', '#7f1d1d', 8000); return; }
-        var werknemerNaam = lijst[idx].naam;
-        var sleutel = certDbSleutel(werknemerNaam, veld);
-        oplToonMelding('⏳ Bestand opslaan…', '#075985', 4000);
-        certDbZet(sleutel, { naam: file.name, type: file.type, data: e.target.result, opgeslagenOp: new Date().toISOString() }).then(function(){
-          var lijst2 = oplOverzichtGetData();
-          if (!lijst2[idx]) return;
-          var vorigDatum = lijst2[idx][veld];
-          lijst2[idx][veld + 'Bestand'] = { naam: file.name, type: file.type, idb: true };
-          try {
-            oplOverzichtSaveData(lijst2);
-          } catch(saveErr) {
-            delete lijst2[idx][veld + 'Bestand'];
-            oplToonMelding('✗ Bestand is wel opgeslagen, maar de koppeling ernaar kon niet bewaard worden: ' + (saveErr && saveErr.message ? saveErr.message : saveErr), '#7f1d1d', 10000);
-            return;
-          }
-          oplToonMelding('✓ Bestand "' + file.name + '" gekoppeld.', '#166534', 3000);
-          if (oplHuidigeTab === 'overzicht') {
-            var content = document.getElementById('opl-content');
-            if (content) content.innerHTML = oplOverzichtHtml();
-          }
-          // Probeer automatisch de behaalde datum uit het certificaat te lezen (alleen bij PDF's,
-          // en alleen als het datumveld nog leeg is, om een handmatig ingevulde datum niet te overschrijven).
-          if (file.type === 'application/pdf' && !vorigDatum) {
-            oplProbeerDatumUitPdf(file, function(isoDatum){
-              if (!isoDatum) return;
-              var lijst3 = oplOverzichtGetData();
-              if (!lijst3[idx] || lijst3[idx][veld]) return; // ondertussen al iets anders ingevuld
-              lijst3[idx][veld] = isoDatum;
-              try { oplOverzichtSaveData(lijst3); } catch(e2) { return; }
-              if (oplHuidigeTab === 'overzicht') {
-                var content2 = document.getElementById('opl-content');
-                if (content2) content2.innerHTML = oplOverzichtHtml();
-              }
-            });
-          }
-        }).catch(function(idbErr){
-          oplToonMelding('✗ Kon bestand niet opslaan: ' + (idbErr && idbErr.message ? idbErr.message : idbErr), '#7f1d1d', 10000);
-        });
-      } catch(algemeneFout) {
-        oplToonMelding('✗ Onverwachte fout bij verwerken van het bestand: ' + (algemeneFout && algemeneFout.message ? algemeneFout.message : algemeneFout), '#7f1d1d', 10000);
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      var lijst = oplOverzichtGetData();
+      if (!lijst[idx]) { oplToonMelding('✗ Medewerker niet meer gevonden (lijst is ondertussen gewijzigd). Ververs de pagina en probeer opnieuw.', '#7f1d1d', 8000); return; }
+      var werknemerNaam = lijst[idx].naam;
+      var terminal = sessionStorage.getItem('dj_terminal') || 'EP';
+      var pad = 'Certificeringen/' + terminal + '/' + certVeiligNaam(werknemerNaam) + '__' + certVeiligNaam(veld) + '.' + certBestandsExtensie(file.name, file.type);
+      oplToonMelding('⏳ Bestand uploaden naar SharePoint…', '#075985', 6000);
+      spUploadBijlage(pad, file).then(function(){
+        var lijst2 = oplOverzichtGetData();
+        if (!lijst2[idx]) return;
+        var vorigDatum = lijst2[idx][veld];
+        lijst2[idx][veld + 'Bestand'] = { naam: file.name, type: file.type, sp: true, pad: pad };
+        try {
+          oplOverzichtSaveData(lijst2);
+        } catch(saveErr) {
+          delete lijst2[idx][veld + 'Bestand'];
+          oplToonMelding('✗ Bestand is wel geüpload, maar de koppeling ernaar kon niet bewaard worden: ' + (saveErr && saveErr.message ? saveErr.message : saveErr), '#7f1d1d', 10000);
+          return;
+        }
+        oplToonMelding('✓ Bestand "' + file.name + '" geüpload naar SharePoint — ook zichtbaar voor collega\'s.', '#166534', 4000);
+        if (oplHuidigeTab === 'overzicht') {
+          var content = document.getElementById('opl-content');
+          if (content) content.innerHTML = oplOverzichtHtml();
+        }
+        // Probeer automatisch de behaalde datum uit het certificaat te lezen (alleen bij PDF's,
+        // en alleen als het datumveld nog leeg is, om een handmatig ingevulde datum niet te overschrijven).
+        if (file.type === 'application/pdf' && !vorigDatum) {
+          oplProbeerDatumUitPdf(file, function(isoDatum){
+            if (!isoDatum) return;
+            var lijst3 = oplOverzichtGetData();
+            if (!lijst3[idx] || lijst3[idx][veld]) return; // ondertussen al iets anders ingevuld
+            lijst3[idx][veld] = isoDatum;
+            try { oplOverzichtSaveData(lijst3); } catch(e2) { return; }
+            if (oplHuidigeTab === 'overzicht') {
+              var content2 = document.getElementById('opl-content');
+              if (content2) content2.innerHTML = oplOverzichtHtml();
+            }
+          });
+        }
+      }).catch(function(spErr){
+        oplToonMelding('✗ Kon bestand niet uploaden naar SharePoint: ' + (spErr && spErr.message ? spErr.message : spErr), '#7f1d1d', 10000);
+      });
+    } catch(algemeneFout) {
+      oplToonMelding('✗ Onverwachte fout bij verwerken van het bestand: ' + (algemeneFout && algemeneFout.message ? algemeneFout.message : algemeneFout), '#7f1d1d', 10000);
+    }
   }, { once: true });
   document.body.appendChild(input);
   input.click();
@@ -13483,6 +13532,22 @@ function oplOverzichtBekijkBestand(idx, veld){
   var lijst = oplOverzichtGetData();
   var item = lijst[idx] && lijst[idx][veld + 'Bestand'];
   if (!item) return;
+  if (item.sp && item.pad) {
+    var w0 = window.open('', '_blank');
+    if (!w0) { alert('Pop-up geblokkeerd. Sta pop-ups toe om het certificaat te bekijken.'); return; }
+    spDownloadBijlage(item.pad).then(function(blob){
+      if (!blob) {
+        w0.close();
+        alert('Kon "' + oplEsc(item.naam) + '" niet vinden op SharePoint. Mogelijk is het bestand verwijderd of verplaatst.');
+        return;
+      }
+      certToonBlobInNieuwTab(blob, item.type, item.naam, w0);
+    }).catch(function(err){
+      w0.close();
+      alert('Fout bij ophalen van het bestand van SharePoint: ' + (err && err.message ? err.message : err));
+    });
+    return;
+  }
   if (item.idb) {
     var werknemerNaam = lijst[idx].naam;
     var sleutel = certDbSleutel(werknemerNaam, veld);
@@ -13491,7 +13556,7 @@ function oplOverzichtBekijkBestand(idx, veld){
     certDbHaal(sleutel).then(function(record){
       if (!record || !record.data) {
         w.close();
-        alert('Kon "' + oplEsc(item.naam) + '" niet vinden in de lokale opslag van dit apparaat. Certificaatbestanden worden per apparaat bewaard (niet gesynchroniseerd) — is het op een ander apparaat/browser gekoppeld?');
+        alert('Kon "' + oplEsc(item.naam) + '" niet vinden in de lokale opslag van dit apparaat. Dit bestand is gekoppeld vóórdat certificaten naar SharePoint gingen — vraag degene die het toevoegde om het opnieuw te uploaden (📎), dan wordt het ook voor jou en collega\'s vindbaar.');
         return;
       }
       certToonInNieuwTab(record.data, record.type, item.naam, w);
@@ -13501,7 +13566,7 @@ function oplOverzichtBekijkBestand(idx, veld){
     });
     return;
   }
-  // Oude bestanden (vóór deze update) staan nog direct als data-URL in de lijst zelf.
+  // Oude bestanden (vóór de IndexedDB-update) staan nog direct als data-URL in de lijst zelf.
   if (!item.data) return;
   var w2 = window.open('', '_blank');
   if (!w2) { alert('Pop-up geblokkeerd. Sta pop-ups toe om het certificaat te bekijken.'); return; }
@@ -13512,12 +13577,19 @@ function oplOverzichtVerwijderBestand(idx, veld){
   if (!lijst[idx]) return;
   if (!confirm('Gekoppeld certificaatbestand verwijderen?')) return;
   var werknemerNaam = lijst[idx].naam;
-  var wasIdb = lijst[idx][veld + 'Bestand'] && lijst[idx][veld + 'Bestand'].idb;
+  var bestandInfo = lijst[idx][veld + 'Bestand'];
+  var wasIdb = bestandInfo && bestandInfo.idb;
+  var spPad = bestandInfo && bestandInfo.sp ? bestandInfo.pad : null;
   delete lijst[idx][veld + 'Bestand'];
   oplOverzichtSaveData(lijst);
   if (oplHuidigeTab === 'overzicht') {
     var content = document.getElementById('opl-content');
     if (content) content.innerHTML = oplOverzichtHtml();
+  }
+  if (spPad) {
+    spVerwijderBijlage(spPad).catch(function(err){
+      console.warn('Kon bestand niet verwijderen van SharePoint:', err);
+    });
   }
   if (wasIdb) {
     certDbVerwijder(certDbSleutel(werknemerNaam, veld)).catch(function(err){
