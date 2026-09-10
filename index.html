@@ -18327,29 +18327,6 @@ function wisselPunctualityDatum(dateStr) {
   switchTab = function(t, btn) {
     _origSwitchTab(t, btn);
     if (t==='archief') { renderKPI(); }
-    if (t==='maandafsluiting') {
-      var lock = document.getElementById('ma-lock');
-      if (lock && lock.style.display !== 'none' && !lock.dataset.djChecked) {
-        lock.dataset.djChecked = '1';
-        djAutoUnlockModule('maandafsluiting', 'ma-lock', 'ma-iframe');
-      } else if (!lock || lock.style.display === 'none') {
-        setTimeout(function(){
-          var f=document.getElementById('ma-iframe');
-          if(f){f.style.width='99%';setTimeout(function(){f.style.width='100%';},50);}
-        }, 150);      }
-    }
-    if (t==='ort') {
-      var ortLock = document.getElementById('ort-lock');
-      if (ortLock && ortLock.style.display !== 'none' && !ortLock.dataset.djChecked) {
-        ortLock.dataset.djChecked = '1';
-        djAutoUnlockModule('ort', 'ort-lock', 'ort-iframe');
-      } else if (!ortLock || ortLock.style.display === 'none') {
-        setTimeout(function(){
-          var f=document.getElementById('ort-iframe');
-          if(f){f.style.width='99%';setTimeout(function(){f.style.width='100%';},50);}
-        }, 150);
-      }
-    }
   };
 
   document.addEventListener('DOMContentLoaded', function(){
@@ -22448,6 +22425,20 @@ function navTo(view, label, btn){
   }
   if(view === 'punctuality' && typeof renderTolynxKade === 'function') renderTolynxKade('punct');
   if(view === 'aowdash' && typeof aowVulMedewerkersDropdowns === 'function') aowVulMedewerkersDropdowns();
+  if(view === 'maandafsluiting' && typeof djAutoUnlockModule === 'function') {
+    var maLock = document.getElementById('ma-lock');
+    if (maLock && maLock.style.display !== 'none' && !maLock.dataset.djChecked) {
+      maLock.dataset.djChecked = '1';
+      djAutoUnlockModule('maandafsluiting', 'ma-lock', 'ma-iframe');
+    }
+  }
+  if(view === 'ort' && typeof djAutoUnlockModule === 'function') {
+    var ortLock = document.getElementById('ort-lock');
+    if (ortLock && ortLock.style.display !== 'none' && !ortLock.dataset.djChecked) {
+      ortLock.dataset.djChecked = '1';
+      djAutoUnlockModule('ort', 'ort-lock', 'ort-iframe');
+    }
+  }
   if(view === 'nieuw') {
     var _fd = document.getElementById('f-datum');
     if(_fd) {
