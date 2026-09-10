@@ -268,6 +268,7 @@ var SP_MSAL_CDNS = [
 var _spMsalInstance = null;
 var _spSiteId = null;
 var _spInitPromise = null;
+var _spLastToken = null; // laatst opgehaalde token, voor het synchrone "vlak voor sluiten"-vangnet
 function _spLaadScriptMetFallback(idx){
   return new Promise(function(resolve, reject){
     if (idx >= SP_MSAL_CDNS.length) { reject(new Error('Kon de inlogbibliotheek (MSAL) van geen enkele bron laden.')); return; }
@@ -312,10 +313,12 @@ async function spGetToken(){
   localStorage.setItem('dj_sp_account_username', account.username);
   try {
     var result = await _spMsalInstance.acquireTokenSilent({ scopes: SP_SCOPES, account: account });
+    _spLastToken = result.accessToken;
     return result.accessToken;
   } catch (e) {
     var result2 = await _spMsalInstance.acquireTokenPopup({ scopes: SP_SCOPES });
     localStorage.setItem('dj_sp_account_username', result2.account.username);
+    _spLastToken = result2.accessToken;
     return result2.accessToken;
   }
 }
@@ -347,6 +350,18 @@ async function spOphalenBestand(bestandsnaam){
   if (resp.status === 404) return null;
   if (!resp.ok) throw new Error('Ophalen van SharePoint mislukt (status ' + resp.status + ')');
   return await resp.json();
+}
+async function spOpslaanBestand(bestandsnaam, dataObj){
+  var token = await spGetToken();
+  var siteId = await spGetSiteId();
+  var url = 'https://graph.microsoft.com/v1.0/sites/' + siteId + '/drive/root:/Data/' + encodeURIComponent(bestandsnaam) + ':/content';
+  var resp = await fetch(url, {
+    method: 'PUT',
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify(dataObj)
+  });
+  if (!resp.ok) throw new Error('Opslaan naar SharePoint mislukt (status ' + resp.status + ')');
+  return true;
 }
 
 // ── Toegangsbeheer (zelfde lijst als de hoofdapp, via toegang_accounts.json) ──
@@ -430,10 +445,7 @@ function mgLogin(){
   }
 }
 
-// ===== Supabase config (zelfde database als Dienst Journaal) =====
-var SB_URL   = 'https://xgqtiseknvjwaqapwjdt.supabase.co';
-var SB_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhncXRpc2VrbnZqd2FxYXB3amR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODYxNzIsImV4cCI6MjA5NjE2MjE3Mn0.DdBJ6OzEVC-l_9qbJE-bVlv1WdxFkB1C2tjEHXqh5SE';
-var SB_TABLE = 'sync_data';
+// ===== Data-opslag: SharePoint (zelfde bestand als de hoofdapp: EP_main.json / HVH_main.json) =====
 
 var MATERIEEL_DEF = [
   {type:'Truck',naam:'E1',status:'OK',opmerking:''},{type:'Truck',naam:'E2',status:'OK',opmerking:''},
@@ -461,6 +473,8 @@ var saveTimer = null;
 var pollTimer = null;
 var isSaving = false;
 var sectieOpen = {trucks:true, overig:true};
+var _mgWijzigingPending = false; // staat op true zolang er een niet-opgeslagen wijziging is
+var _mgLaatsteServerData = {}; // meest recent bekende volledige inhoud van het SharePoint-bestand
 
 function prefix(){ return terminal + '_'; }
 function rowId(){ return terminal + '_main'; }
@@ -483,12 +497,9 @@ function wisselTerminal(t){
 async function ladenVanServer(){
   setStatus('Laden...', 'busy');
   try{
-    var resp = await fetch(SB_URL + '/rest/v1/' + SB_TABLE + '?id=eq.' + rowId() + '&select=data', {
-      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
-    });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    var rows = await resp.json();
-    var data = (rows && rows[0] && rows[0].data) || {};
+    var result = await spOphalenBestand(rowId() + '.json');
+    var data = (result && result.data) || {};
+    _mgLaatsteServerData = data;
 
     var customList = data[prefix() + 'mat_custom_list'];
     var basis = customList && customList.length
@@ -616,6 +627,7 @@ function opmerkingGewijzigd(i, val){
 
 function plannenOpslaan(){
   setStatus('Wijzigingen wachten...', 'busy');
+  _mgWijzigingPending = true;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(opslaanNaarServer, 900);
 }
@@ -625,12 +637,10 @@ async function opslaanNaarServer(){
   isSaving = true;
   setStatus('Opslaan...', 'busy');
   try{
-    // Haal de meest recente volledige rij op, zodat we alleen onze eigen sleutels overschrijven
-    var resp = await fetch(SB_URL + '/rest/v1/' + SB_TABLE + '?id=eq.' + rowId() + '&select=data', {
-      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
-    });
-    var rows = resp.ok ? await resp.json() : [];
-    var data = (rows && rows[0] && rows[0].data) || {};
+    // Haal de meest recente volledige inhoud op, zodat we alleen onze eigen sleutels overschrijven
+    // (dit bestand wordt ook door Dienst Journaal zelf gebruikt voor de dagplanning-data)
+    var result = await spOphalenBestand(rowId() + '.json');
+    var data = (result && result.data) || {};
 
     data[prefix() + 'materieel_status_v1'] = matData;
 
@@ -644,15 +654,9 @@ async function opslaanNaarServer(){
     // Zorg dat de materieellijst (namen/types) ook up-to-date staat
     data[prefix() + 'mat_custom_list'] = matData.map(function(m){ return {type:m.type, naam:m.naam}; });
 
-    var putResp = await fetch(SB_URL + '/rest/v1/' + SB_TABLE, {
-      method: 'POST',
-      headers: {
-        'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY,
-        'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal'
-      },
-      body: JSON.stringify({ id: rowId(), data: data, updated_at: new Date().toISOString() })
-    });
-    if (!putResp.ok && putResp.status !== 204) throw new Error('HTTP ' + putResp.status);
+    await spOpslaanBestand(rowId() + '.json', { data: data, updated_at: new Date().toISOString() });
+    _mgLaatsteServerData = data;
+    _mgWijzigingPending = false;
     setStatus('Opgeslagen ' + new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}), 'ok');
   }catch(e){
     setStatus('Opslaan mislukt: ' + e.message, 'err');
@@ -767,6 +771,36 @@ function mgInit(){
   ladenVanServer();
   starPolling();
 }
+
+// Extra vangnet: sla een wachtende wijziging ook direct op zodra de pagina verdwijnt
+// (kruisje/tab sluiten, app wisselen op mobiel), in plaats van te wachten op de gewone
+// 900ms-debounce. keepalive zorgt dat de browser dit verzoek alsnog afmaakt, ook al is
+// de pagina zelf al aan het sluiten.
+function _mgOpslaanSync(){
+  if (!_mgWijzigingPending) return;
+  if (!_spLastToken || !_spSiteId) return; // nog geen geldig token opgehaald deze sessie
+  clearTimeout(saveTimer);
+  try {
+    var data = JSON.parse(JSON.stringify(_mgLaatsteServerData || {}));
+    data[prefix() + 'materieel_status_v1'] = matData;
+    var matStore = data[prefix() + 'mat_standalone_v2'] || {};
+    matData.forEach(function(m){
+      if (m.type === 'Truck'){ matStore['t-' + m.naam] = { s: m.status, o: m.opmerking || '' }; }
+    });
+    data[prefix() + 'mat_standalone_v2'] = matStore;
+    data[prefix() + 'mat_custom_list'] = matData.map(function(m){ return {type:m.type, naam:m.naam}; });
+    var url = 'https://graph.microsoft.com/v1.0/sites/' + _spSiteId + '/drive/root:/Data/' + encodeURIComponent(rowId() + '.json') + ':/content';
+    fetch(url, {
+      method: 'PUT',
+      keepalive: true,
+      headers: { 'Authorization': 'Bearer ' + _spLastToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: data, updated_at: new Date().toISOString() })
+    }).catch(function(){});
+    _mgWijzigingPending = false;
+  } catch(e) { /* best effort */ }
+}
+window.addEventListener('pagehide', _mgOpslaanSync);
+document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'hidden') _mgOpslaanSync(); });
 
 // Direct doorgaan als deze sessie al eerder is ontgrendeld.
 (function(){
