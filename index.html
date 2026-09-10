@@ -2894,15 +2894,7 @@ var DJ_WW_DEFS = [
   { sleutel: 'login_EP', label: 'Inlogwachtwoord \u2014 Europoort', standaard: djObf('SVeuropoort2026') },
   { sleutel: 'login_HVH', label: 'Inlogwachtwoord \u2014 Hoek van Holland', standaard: djObf('SVhvh2026') },
   { sleutel: 'login_IMM', label: 'Inlogwachtwoord \u2014 Immingham', standaard: djObf('SVimmingham2026') },
-  { sleutel: 'werkoverdracht_EP', label: 'Werkoverdracht \u2014 Europoort', standaard: djObf('SVeuropoort') },
-  { sleutel: 'werkoverdracht_HVH', label: 'Werkoverdracht \u2014 Hoek van Holland', standaard: djObf('svhvh') },
-  { sleutel: 'werkoverdracht_IMM', label: 'Werkoverdracht \u2014 Immingham', standaard: djObf('svimmingham') },
-  { sleutel: 'master', label: 'Meesterwachtwoord (werkt overal, naast inlogwachtwoord)', standaard: djObf('stena') },
-  { sleutel: 'anets_certificeringen', label: 'Certificeringen ontgrendelen', standaard: djObf('anets') },
-  { sleutel: 'anets_maandafsluiting', label: 'Maandafsluiting ontgrendelen', standaard: djObf('anets') },
-  { sleutel: 'anets_ort', label: 'ORT/Basisrooster ontgrendelen', standaard: djObf('anets') },
-  { sleutel: 'salaris', label: 'Maandafsluiting \u2192 Instellingen (loongroepen)', standaard: djObf('Salaris') },
-  { sleutel: 'ort_intern', label: 'ORT Rekentool (intern tabblad)', standaard: djObf('SVeuropoort') },
+  { sleutel: 'master', label: 'Meesterwachtwoord (werkt overal, alleen nog voor de reserve-wachtwoordlogin hierboven)', standaard: djObf('stena') },
   { sleutel: 'kpi_mt', label: 'KPI Dashboard (MT) \u2014 los bestand kpi-mt.html', standaard: djObf('MTeuropoort2026') }
 ];
 function djWwGet(sleutel){
@@ -3242,10 +3234,15 @@ var DJ_TOEGANG_OMGEVINGEN = [
   { key: 'EP', label: 'Europoort' },
   { key: 'HVH', label: 'Hoek van Holland' },
   { key: 'IMM', label: 'Immingham' },
-  { key: 'kpi', label: 'KPI Dashboard' }
+  { key: 'kpi', label: 'KPI Dashboard' },
+  { key: 'certificeringen', label: 'Certificeringen' },
+  { key: 'maandafsluiting', label: 'Maandafsluiting' },
+  { key: 'salaris', label: 'Salaris' },
+  { key: 'ort', label: 'ORT' },
+  { key: 'werkoverdracht', label: 'Werkoverdracht' }
 ];
 var DJ_TOEGANG_STANDAARD = [
-  { email: 'sebastian.vander.meer@stenaline.com', permissies: { beheer: true, EP: true, HVH: true, IMM: true, kpi: true } }
+  { email: 'sebastian.vander.meer@stenaline.com', permissies: { beheer: true, EP: true, HVH: true, IMM: true, kpi: true, certificeringen: true, maandafsluiting: true, salaris: true, ort: true, werkoverdracht: true } }
 ];
 function djToegangGet(){
   try {
@@ -3272,6 +3269,41 @@ function djToegangHeeft(email, omgevingKey){
   var lijst = djToegangGet();
   var entry = lijst.find(function(a){ return a.email.toLowerCase() === email.toLowerCase(); });
   return !!(entry && entry.permissies && entry.permissies[omgevingKey]);
+}
+// Geeft het e-mailadres van het account terug waarmee nu (stil, zonder pop-up) is ingelogd bij
+// Microsoft — of null als er geen sessie is. Wordt gebruikt om module-toegang te checken zonder
+// dat de gebruiker opnieuw hoeft in te loggen.
+async function djHuidigEmail(){
+  try {
+    if (typeof spInit === 'function') await spInit();
+    if (!_spMsalInstance) return null;
+    var accounts = _spMsalInstance.getAllAccounts();
+    if (!accounts.length) return null;
+    var voorkeurUsername = localStorage.getItem('dj_sp_account_username');
+    var actief = (voorkeurUsername && accounts.find(function(a){ return a.username === voorkeurUsername; })) || accounts[0];
+    return actief ? actief.username : null;
+  } catch(e) { return null; }
+}
+// Vervangt de losse wachtwoorden per module: controleert of het huidige account toestemming
+// heeft voor de opgegeven omgeving (bijv. 'certificeringen', 'maandafsluiting', 'salaris',
+// 'ort', 'werkoverdracht'). Toont zelf een duidelijke pop-up als er geen sessie is of geen
+// toestemming — de aanroepende code hoeft daar niets voor te doen. Geeft true/false terug.
+async function djToegangCheckOfPopup(moduleKey){
+  var isEngels = (sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM';
+  var email = await djHuidigEmail();
+  if (!email) {
+    alert(isEngels ? 'You are not logged in with your Microsoft account. Please log in again from the main screen.' : 'Je bent niet ingelogd met je Microsoft-account. Log opnieuw in via het hoofdscherm.');
+    return false;
+  }
+  if (!djToegangHeeft(email, moduleKey)) {
+    var labelDef = DJ_TOEGANG_OMGEVINGEN.filter(function(o){ return o.key === moduleKey; })[0];
+    var moduleLabel = labelDef ? labelDef.label : moduleKey;
+    alert(isEngels
+      ? 'You don\'t have access to "' + moduleLabel + '". Ask Sebastiaan to enable it in Access management.'
+      : 'Je hebt geen toegang tot "' + moduleLabel + '". Vraag Sebastiaan om dit aan te zetten in Toegangsbeheer.');
+    return false;
+  }
+  return true;
 }
 function djToegangRender(){
   var container = document.getElementById('dj-toegang-lijst');
@@ -3305,7 +3337,7 @@ function djToegangToevoegen(){
   if (!email || email.indexOf('@') === -1) { alert('Vul een geldig e-mailadres in.'); return; }
   var lijst = djToegangGet();
   if (lijst.map(function(a){return a.email.toLowerCase();}).indexOf(email) !== -1) { alert('Dit account staat er al in.'); return; }
-  lijst.push({ email: email, permissies: { beheer: false, EP: false, HVH: false, IMM: false, kpi: false } });
+  lijst.push({ email: email, permissies: { beheer: false, EP: false, HVH: false, IMM: false, kpi: false, certificeringen: false, maandafsluiting: false, salaris: false, ort: false, werkoverdracht: false } });
   djToegangSet(lijst);
   if (input) input.value = '';
   djToegangRender();
@@ -5780,6 +5812,7 @@ window.addEventListener('resize', () => {
           await spVerifieerToegang(); // bevestigt dat dit account nog steeds echt bij de site kan
           sessionStorage.setItem('dj_sp_verified', '1');
           if (typeof djWwCloudPull === 'function') djWwCloudPull();
+          if (typeof djToegangCloudPull === 'function') djToegangCloudPull();
         } catch(e) {
           // Toegang niet (meer) geldig — sessie wissen
           sessionStorage.removeItem('dj_sp_verified');
@@ -12578,14 +12611,12 @@ function initOpleidingen(){
 var _oplCertificeringenOntgrendeld = false; // blijft ontgrendeld voor de rest van deze sessie
 function oplToonTab(id){
   if (id === 'overzicht' && !_oplCertificeringenOntgrendeld) {
-    var isEngelsOpl = (sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM';
-    var ww = prompt(isEngelsOpl ? 'Certifications contain personal data.\nEnter the password:' : 'Certificeringen bevat persoonlijke gegevens.\nVoer het wachtwoord in:');
-    if (ww === null) return; // geannuleerd: blijf op de huidige tab
-    if (!djWwCheck(ww, 'anets_certificeringen')) {
-      alert(isEngelsOpl ? 'Incorrect password.' : 'Onjuist wachtwoord.');
-      return;
-    }
-    _oplCertificeringenOntgrendeld = true;
+    djToegangCheckOfPopup('certificeringen').then(function(ok){
+      if (!ok) return;
+      _oplCertificeringenOntgrendeld = true;
+      oplToonTab(id);
+    });
+    return;
   }
   oplHuidigeTab = id;
   OPLEIDINGEN_FORMS.forEach(function(f){
@@ -14512,6 +14543,10 @@ function exportExcel() {
 
 // ── Settings paneel ───────────────────────────────────────────────────────────
 function checkWachtwoord() {
+  if (window.parent &amp;&amp; window.parent.djToegangCheckOfPopup) {
+    window.parent.djToegangCheckOfPopup('salaris').then(function(ok){ if (ok) openSettings(); });
+    return;
+  }
   document.getElementById(&quot;pw-modal&quot;).style.display = &quot;flex&quot;;
   setTimeout(function(){ document.getElementById(&quot;pw-modal-input&quot;).focus(); }, 50);
 }
@@ -16337,18 +16372,16 @@ renderAll();
     }
   }
 
-  var _ww = false; // werkoverdracht unlocked this session
+  var _ww = false; // ORT rekentool ontgrendeld voor de rest van deze sessie
 
   function checkWachtwoord() {
     if (_ww) return true;
-    var pw = prompt('Voer het wachtwoord in voor Werkoverdracht:');
-    if (pw === null) return false; // cancelled
-    if (djWwCheck(pw, 'ort_intern')) {
-      _ww = true;
-      return true;
+    if (typeof djToegangCheckOfPopup === 'function') {
+      djToegangCheckOfPopup('ort').then(function(ok){
+        if (ok) { _ww = true; switchTab('nieuw'); }
+      });
     }
-    alert('Onjuist wachtwoord.');
-    return false;
+    return false; // synchrone aanroeper krijgt hier altijd false; bij toegang volgt de tab-wissel async hierboven
   }
 
   function statusClass(s) {
@@ -18295,12 +18328,11 @@ function wisselPunctualityDatum(dateStr) {
     _origSwitchTab(t, btn);
     if (t==='archief') { renderKPI(); }
     if (t==='maandafsluiting') {
-      // Reset lock if not yet unlocked
       var lock = document.getElementById('ma-lock');
-      var iframe = document.getElementById('ma-iframe');
-      if (lock && lock.style.display !== 'none') {
-        // Show lock, keep iframe hidden
-      } else {
+      if (lock && lock.style.display !== 'none' && !lock.dataset.djChecked) {
+        lock.dataset.djChecked = '1';
+        djAutoUnlockModule('maandafsluiting', 'ma-lock', 'ma-iframe');
+      } else if (!lock || lock.style.display === 'none') {
         setTimeout(function(){
           var f=document.getElementById('ma-iframe');
           if(f){f.style.width='99%';setTimeout(function(){f.style.width='100%';},50);}
@@ -18308,10 +18340,10 @@ function wisselPunctualityDatum(dateStr) {
     }
     if (t==='ort') {
       var ortLock = document.getElementById('ort-lock');
-      var ortIframe = document.getElementById('ort-iframe');
-      if (ortLock && ortLock.style.display !== 'none') {
-        // Show lock, keep iframe hidden
-      } else {
+      if (ortLock && ortLock.style.display !== 'none' && !ortLock.dataset.djChecked) {
+        ortLock.dataset.djChecked = '1';
+        djAutoUnlockModule('ort', 'ort-lock', 'ort-iframe');
+      } else if (!ortLock || ortLock.style.display === 'none') {
         setTimeout(function(){
           var f=document.getElementById('ort-iframe');
           if(f){f.style.width='99%';setTimeout(function(){f.style.width='100%';},50);}
@@ -19269,40 +19301,23 @@ function wisselPunctualityDatum(dateStr) {
   // Teken truck diagram voor huidige maand
   if(typeof renderTruckChart === 'function') setTimeout(function(){ renderTruckChart(_kpiM, _kpiY); }, 500);
 
-  function checkMaPw() {
-    var inp = document.getElementById('ma-pw-input');
-    var err = document.getElementById('ma-pw-err');
-    var lock = document.getElementById('ma-lock');
-    var iframe = document.getElementById('ma-iframe');
-    if (!inp) return;
-    if (djWwCheck(inp.value, 'anets_maandafsluiting')) {
-      lock.style.display = 'none';
-      iframe.style.display = 'block';
-      iframe.style.width = '99%';
-      setTimeout(function(){ iframe.style.width = '100%'; }, 100);
-    } else {
-      if (err) err.textContent = 'Onjuist wachtwoord';
-      inp.value = '';
-      inp.focus();
-    }
-  }
-
-  function checkOrtPw() {
-    var inp = document.getElementById('ort-pw-input');
-    var err = document.getElementById('ort-pw-err');
-    var lock = document.getElementById('ort-lock');
-    var iframe = document.getElementById('ort-iframe');
-    if (!inp) return;
-    if (djWwCheck(inp.value, 'anets_ort')) {
-      lock.style.display = 'none';
-      iframe.style.display = 'block';
-      iframe.style.width = '99%';
-      setTimeout(function(){ iframe.style.width = '100%'; }, 100);
-    } else {
-      if (err) err.textContent = 'Onjuist wachtwoord';
-      inp.value = '';
-      inp.focus();
-    }
+  // Vervangt de losse wachtwoorden: controleert direct (zonder invoerveld) of het huidige
+  // account toestemming heeft, en toont zelf een duidelijk "geen toegang"-bericht als dat niet
+  // zo is (met een pop-up erbij, via djToegangCheckOfPopup).
+  function djAutoUnlockModule(moduleKey, lockId, iframeId){
+    var lock = document.getElementById(lockId);
+    if (!lock) return;
+    lock.innerHTML = '<div style="font-size:40px;">&#x23F3;</div><div style="font-size:13px;color:#666;">Toegang controleren\u2026</div>';
+    if (typeof djToegangCheckOfPopup !== 'function') { lock.innerHTML = '<div style="font-size:13px;color:#c0392b;">Toegangscontrole niet beschikbaar.</div>'; return; }
+    djToegangCheckOfPopup(moduleKey).then(function(ok){
+      if (ok) {
+        lock.style.display = 'none';
+        var iframe = document.getElementById(iframeId);
+        if (iframe) { iframe.style.display = 'block'; iframe.style.width = '99%'; setTimeout(function(){ iframe.style.width = '100%'; }, 100); }
+      } else {
+        lock.innerHTML = '<div style="font-size:40px;">&#x1F512;</div><div style="font-size:15px;font-weight:700;color:#003366;">Geen toegang</div><div style="font-size:13px;color:#666;text-align:center;max-width:260px;">Je account heeft geen toestemming voor deze module. Vraag Sebastiaan om toegang.</div>';
+      }
+    });
   }
 
   // Fullscreen wordt nu alleen nog handmatig geactiveerd via het knopje rechtsboven in de
@@ -23219,12 +23234,16 @@ function renderTruckChart(maand, jaar) {
   // Autosave verwijderd - alleen opslaan via de knop "Journaal Opslaan"
 })();
 
+var _werkoverdrachtOntgrendeld = false; // blijft ontgrendeld voor de rest van deze sessie
 function navWerkoverdracht(label, btn, subtab, callback) {
-  var terminal = sessionStorage.getItem('dj_terminal') || 'EP';
-  var isEngels = terminal === 'IMM';
-  var ww = prompt(isEngels ? 'Password required for Shift Handover:' : 'Wachtwoord vereist voor Werkoverdracht:');
-  if (ww === null) return;
-  if (!djWwCheck(ww, 'werkoverdracht_' + terminal)) { alert(isEngels ? 'Incorrect password.' : 'Onjuist wachtwoord.'); return; }
+  if (!_werkoverdrachtOntgrendeld) {
+    djToegangCheckOfPopup('werkoverdracht').then(function(ok){
+      if (!ok) return;
+      _werkoverdrachtOntgrendeld = true;
+      navWerkoverdracht(label, btn, subtab, callback);
+    });
+    return;
+  }
   navTo('nieuw', label, btn);
   if (subtab) setTimeout(function(){
     if (typeof nieuwToonTab === 'function') nieuwToonTab(subtab);
