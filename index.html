@@ -17768,12 +17768,17 @@ function wisselPunctualityDatum(dateStr) {
   // de standalone Materieel-garage-pagina), maar nooit terwijl iemand net een vakje aan het
   // invullen is — en dankzij matSaUpdateInPlace() hierboven zonder dat het scherm daarbij springt.
   var _matAutoRefreshTimer = null;
+  var _matPushInVlucht = false; // staat op true zolang een lokale wijziging nog opgehaald/samengevoegd/weggeschreven wordt
   function matAutoRefreshStart() {
     if (_matAutoRefreshTimer) return;
     _matAutoRefreshTimer = setInterval(function(){
       var actief = document.activeElement;
       var bezig = actief && (actief.tagName === 'INPUT' || actief.tagName === 'SELECT');
-      if (!bezig) verversMaterieelVanCloud(true);
+      // Sla deze beurt ook over als er nog een lokale wijziging staat te wachten om weggeschreven
+      // te worden (_matSaCloudPushTimer) of al onderweg is (_matPushInVlucht) — anders kan de
+      // ververs-actie halverwege matSaData overschrijven met een oudere cloud-stand, vlak voordat
+      // de eigen wijziging alsnog verstuurd wordt, en zo de eigen wijziging ongedaan maken.
+      if (!bezig && !_matSaCloudPushTimer && !_matPushInVlucht) verversMaterieelVanCloud(true);
     }, 25000);
   }
   matAutoRefreshStart();
@@ -17937,22 +17942,32 @@ function wisselPunctualityDatum(dateStr) {
     // te schrijven (zoals de gewone cloudOpslaan() doet). Zo kan een net binnengekomen wijziging
     // van Materieel-garage niet per ongeluk worden teruggedraaid door een verouderde lokale kopie.
     clearTimeout(_matSaCloudPushTimer);
-    _matSaCloudPushTimer = setTimeout(function(){ pushMaterieelNaarCloud(matStore); }, 900);
+    _matSaCloudPushTimer = setTimeout(function(){
+      _matSaCloudPushTimer = null;
+      pushMaterieelNaarCloud(matStore);
+    }, 900);
   }
 
   async function pushMaterieelNaarCloud(matStore) {
+    // Bevries matSaData op het moment van aanroepen: als de automatische ververs-actie (elke 25
+    // sec.) halverwege deze push zou draaien, mag die matSaData niet meer overschrijven zolang dit
+    // bezig is — anders kan een net gemaakte wijziging alsnog verloren gaan vlak vóór het versturen.
+    var teVerzendenStatus = matSaData;
+    var teVerzendenCustomList = matSaData.map(function(m){ return {type:m.type, naam:m.naam}; });
+    _matPushInVlucht = true;
     try {
       if (!(await spIngelogdAsync())) return;
       var rowId = getSBRowId();
       var result = await spOphalenBestand(rowId + '.json');
       var data = (result && result.data) || {};
-      data[MAT_SA_KEY] = matSaData;
+      data[MAT_SA_KEY] = teVerzendenStatus;
       data[tk('mat_standalone_v2')] = matStore || getMatStore();
-      data[tk('mat_custom_list')] = matSaData.map(function(m){ return {type:m.type, naam:m.naam}; });
+      data[tk('mat_custom_list')] = teVerzendenCustomList;
       await spOpslaanBestand(rowId + '.json', { data: data, updated_at: new Date().toISOString() });
     } catch(e) {
       console.warn('Materieel niet naar SharePoint gepusht:', e);
     }
+    _matPushInVlucht = false;
   }
 
   function slaPortoOp() {
