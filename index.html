@@ -17658,13 +17658,65 @@ function wisselPunctualityDatum(dateStr) {
     localStorage.setItem(MAT_SA_KEY, JSON.stringify(d));
   }
 
-  // Haalt de laatste materieelstatus rechtstreeks van Supabase op (bv. wijzigingen
+  // Werkt bestaande rijen bij zonder ze te verwijderen/opnieuw op te bouwen — voorkomt dat het
+  // scherm "springt" (scrollpositie of invoerveld-focus kwijtraakt) bij het verversen. Valt terug
+  // op de normale volledige opbouw (buildMatSa) als het aantal rijen niet meer overeenkomt,
+  // bijvoorbeeld omdat er een truck is toegevoegd of verwijderd.
+  function matSaUpdateInPlace(data) {
+    var truckBody = document.getElementById('mat-trucks-sa');
+    var overigBody = document.getElementById('mat-overig-sa');
+    if (!truckBody || !overigBody) return false;
+
+    var trucks = data.filter(function(m){ return m.type === 'Truck'; });
+    var overig = data.filter(function(m){ return m.type !== 'Truck'; });
+    var actief = document.activeElement;
+
+    function updateSectie(body, lijst, isTrucks) {
+      var rijen = body.querySelectorAll('tr');
+      if (rijen.length !== lijst.length) return false;
+      for (var idx = 0; idx < lijst.length; idx++) {
+        var m = lijst[idx];
+        var i = data.indexOf(m);
+        var tr = rijen[idx];
+        if (isTrucks && tr.getAttribute('data-idx') !== null && Number(tr.getAttribute('data-idx')) !== i) return false;
+        var sel = tr.querySelector('select');
+        var inp = tr.querySelector('input');
+        if (!sel) return false;
+        if (sel !== actief && sel.value !== m.status) {
+          sel.value = m.status;
+          updateStatusStyle(sel);
+        }
+        if (inp && inp !== actief) {
+          var isOK = m.status === 'OK';
+          var nieuweWaarde = isOK ? '' : (m.opmerking || '');
+          if (inp.value !== nieuweWaarde) inp.value = nieuweWaarde;
+          if (isTrucks) {
+            inp.disabled = isOK;
+            inp.placeholder = isOK ? '—' : 'Omschrijf de situatie...';
+            inp.style.background = isOK ? 'transparent' : 'var(--bg)';
+            inp.style.color = isOK ? 'var(--muted)' : 'var(--text)';
+            inp.style.cursor = isOK ? 'default' : 'text';
+          }
+        }
+      }
+      return true;
+    }
+
+    var ok1 = updateSectie(truckBody, trucks, true);
+    var ok2 = updateSectie(overigBody, overig, false);
+    if (ok1 && ok2) { updateMatSaSummary(); return true; }
+    return false;
+  }
+
+  // Haalt de laatste materieelstatus rechtstreeks van SharePoint op (bv. wijzigingen
   // gemaakt door de garage via de standalone Materieel-pagina) en werkt de
   // huidige weergave direct bij, zonder de hele pagina te herladen.
-  async function verversMaterieelVanCloud() {
+  // "stil": true bij de automatische periodieke ververs-actie op de achtergrond — dan geen
+  // knoptekst-verandering en geen foutmelding-pop-up, puur een best-effort achtergrondactie.
+  async function verversMaterieelVanCloud(stil) {
     var btn = document.getElementById('mat-refresh-btn');
     var origHTML = btn ? btn.innerHTML : '';
-    if (btn) { btn.innerHTML = '&#8635; Bezig...'; btn.disabled = true; }
+    if (btn && !stil) { btn.innerHTML = '&#8635; Bezig...'; btn.disabled = true; }
     try {
       var pfx = getTerminalPrefix();
       if (!(await spIngelogdAsync())) throw new Error('Niet ingelogd bij SharePoint');
@@ -17693,7 +17745,7 @@ function wisselPunctualityDatum(dateStr) {
       }
       matSaData = basis;
       materieel = JSON.parse(JSON.stringify(matSaData));
-      buildMatSa(matSaData);
+      if (!matSaUpdateInPlace(matSaData)) buildMatSa(matSaData);
 
       var lbl = document.getElementById('mat-saved-label');
       var ts  = document.getElementById('mat-last-saved');
@@ -17701,11 +17753,26 @@ function wisselPunctualityDatum(dateStr) {
       if (lbl) { lbl.textContent = _immR ? '\u2713 Refreshed' : '\u2713 Vernieuwd'; lbl.style.opacity = '1'; setTimeout(function(){ lbl.style.opacity = '0'; setTimeout(function(){ lbl.textContent = _immR ? '\u2713 Saved' : '\u2713 Opgeslagen'; }, 400); }, 2000); }
       if (ts)  { ts.textContent = (_immR ? 'Refreshed: ' : 'Vernieuwd: ') + new Date().toLocaleTimeString(_immR ? 'en-GB' : 'nl-NL',{hour:'2-digit',minute:'2-digit'}); }
     } catch(e) {
-      alert(((sessionStorage.getItem('dj_terminal')||'EP')==='IMM' ? 'Refresh failed: ' : 'Vernieuwen mislukt: ') + e.message);
+      if (!stil) alert(((sessionStorage.getItem('dj_terminal')||'EP')==='IMM' ? 'Refresh failed: ' : 'Vernieuwen mislukt: ') + e.message);
+      else console.warn('Automatisch verversen van materieel mislukt:', e);
     }
-    if (btn) { btn.innerHTML = origHTML; btn.disabled = false; }
+    if (btn && !stil) { btn.innerHTML = origHTML; btn.disabled = false; }
   }
   window.verversMaterieelVanCloud = verversMaterieelVanCloud;
+
+  // Ververs de materieelstatus elke 25 seconden vanzelf op de achtergrond (zelfde interval als
+  // de standalone Materieel-garage-pagina), maar nooit terwijl iemand net een vakje aan het
+  // invullen is — en dankzij matSaUpdateInPlace() hierboven zonder dat het scherm daarbij springt.
+  var _matAutoRefreshTimer = null;
+  function matAutoRefreshStart() {
+    if (_matAutoRefreshTimer) return;
+    _matAutoRefreshTimer = setInterval(function(){
+      var actief = document.activeElement;
+      var bezig = actief && (actief.tagName === 'INPUT' || actief.tagName === 'SELECT');
+      if (!bezig) verversMaterieelVanCloud(true);
+    }, 25000);
+  }
+  matAutoRefreshStart();
 
   function buildMatSa(data) {
     const trucks = data.filter(m => m.type === 'Truck');
