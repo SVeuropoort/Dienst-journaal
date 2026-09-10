@@ -4967,6 +4967,7 @@ function vulBedrijfSelect() {
   var ov=document.createElement('option'); ov.textContent=_immBS?'Other':'Overige'; sel.appendChild(ov);
   if(huidig) sel.value=huidig;
 }
+vulBedrijfSelect(); // meteen vullen bij laden van de pagina — niet pas wachten tot iemand op Opslaan drukt
 function openBedrijfInst() {
   document.getElementById('bedrijf-inst-input').value=getBedrijven().join('\n');
   document.getElementById('bedrijf-inst-msg').textContent='';
