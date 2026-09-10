@@ -173,7 +173,10 @@
 
 <div class="status-bar">
   <span id="status-text"><span class="dot dot-ok"></span>Klaar</span>
-  <button id="refresh-btn" onclick="ververs()">&#8635; Vernieuwen</button>
+  <div style="display:flex; gap:8px;">
+    <button id="save-btn" onclick="opslaanNu()" style="background:#1e7d34;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;">&#128190; Opslaan</button>
+    <button id="refresh-btn" onclick="ververs()">&#8635; Vernieuwen</button>
+  </div>
 </div>
 
 <main>
@@ -630,6 +633,14 @@ function plannenOpslaan(){
   _mgWijzigingPending = true;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(opslaanNaarServer, 900);
+}
+
+// Voor de expliciete "Opslaan"-knop: sla meteen op, zonder op de gebruikelijke
+// 900ms-debounce te wachten. De automatische opslag (hierboven) blijft ook gewoon
+// als vangnet werken.
+function opslaanNu(){
+  clearTimeout(saveTimer);
+  opslaanNaarServer();
 }
 
 async function opslaanNaarServer(){
