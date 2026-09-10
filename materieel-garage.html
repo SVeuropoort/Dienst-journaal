@@ -122,9 +122,43 @@
   .btn-secondary{background:#fff; color:var(--accent); border:1px solid rgba(232,25,44,0.3); border-radius:6px; padding:9px 14px; font-weight:700; cursor:pointer; font-size:13px;}
   .btn-cancel{background:#fff; color:var(--navy); border:1px solid var(--border); border-radius:6px; padding:9px 14px; font-weight:700; cursor:pointer; font-size:13px;}
   .btn-save{background:var(--navy); color:#fff; border:none; border-radius:6px; padding:9px 18px; font-weight:700; cursor:pointer; font-size:13px;}
+  /* ── Login scherm ── */
+  #mg-login{position:fixed;inset:0;background:#001830;z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px;font-family:'Segoe UI',Arial,sans-serif;}
+  #mg-login .box{background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:32px 40px;width:300px;}
+  #mg-login input{width:100%;padding:12px;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:rgba(255,255,255,0.1);color:#fff;font-size:15px;outline:none;box-sizing:border-box;margin-bottom:10px;}
+  #mg-login button{width:100%;padding:12px;background:#e8a020;border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;}
+  #mg-login .lbl{color:rgba(255,255,255,0.7);font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;}
+  #mg-err{color:#ff6b6b;font-size:12px;margin-bottom:8px;display:none;}
 </style>
 </head>
 <body>
+
+<div id="mg-login">
+  <div style="text-align:center;">
+    <div style="font-size:44px;">&#x1F69B;</div>
+    <div style="color:#fff;font-size:24px;font-weight:800;letter-spacing:1px;margin-top:6px;">STATUS MATERIEEL</div>
+    <div style="color:rgba(255,255,255,0.5);font-size:12px;letter-spacing:2px;margin-top:2px;">GARAGE &mdash; STENA LINE</div>
+  </div>
+  <div class="box">
+    <button id="mgMsBtn" onclick="mgMsLoginKlik()" style="width:100%;padding:12px;background:#0f6cbd;border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">&#x1F310; Login met Microsoft</button>
+    <div id="mgMsStatus" style="color:rgba(255,255,255,0.55);font-size:12px;margin-top:10px;min-height:14px;text-align:center;"></div>
+    <div id="mg-ww-backup" style="display:none;margin-top:18px;padding-top:18px;border-top:1px solid rgba(255,255,255,0.15);">
+      <div class="lbl">Wachtwoord</div>
+      <input type="password" id="mg-ww" placeholder="Wachtwoord..." onkeydown="if(event.key==='Enter')mgLogin()">
+      <div id="mg-err">Onjuist wachtwoord.</div>
+      <button onclick="mgLogin()">INLOGGEN</button>
+    </div>
+  </div>
+  <div style="display:flex;gap:18px;margin-top:18px;">
+    <a href="https://sveuropoort.github.io/Dienst-journaal/index.html" style="color:rgba(255,255,255,0.55);font-size:12px;text-decoration:none;display:flex;align-items:center;gap:5px;">&#x1F6A2; Dienst Journaal</a>
+    <a href="https://sveuropoort.github.io/Dienst-journaal/kpi-mt.html" style="color:rgba(255,255,255,0.55);font-size:12px;text-decoration:none;display:flex;align-items:center;gap:5px;">&#x1F4CA; KPI Dashboard (MT)</a>
+  </div>
+  <div style="margin-top:14px;">
+    <a href="#" id="mg-ww-backup-link" onclick="mgToonWwBackup(); return false;" style="color:rgba(255,255,255,0.35);font-size:11px;text-decoration:underline;cursor:pointer;">Andere manier van inloggen</a>
+  </div>
+</div>
+
+<div id="mg-app" style="display:none;">
 
 <header>
   <div class="header-top">
@@ -204,7 +238,198 @@
   </div>
 </div>
 
+</div>
+
 <script>
+// ══════════════════════════════════════════════════════════════════
+// Login — zelfde opzet als kpi-mt.html en index.html: Microsoft-inloggen als
+// primaire methode (met controle op de 'materieel'-toestemming in Toegangsbeheer),
+// een verborgen reserve-wachtwoordlogin als noodgeval-vangnet.
+// ══════════════════════════════════════════════════════════════════
+function mgObf(t){ try { return btoa(unescape(encodeURIComponent(t))).split('').reverse().join(''); } catch(e){ return ''; } }
+function mgDeobf(v){ try { return decodeURIComponent(escape(atob(v.split('').reverse().join('')))); } catch(e){ return ''; } }
+var MG_WW_STANDAARD = mgObf('SVmaterieel2026'); // eerste keer inloggen; daarna wijzigen via het tandwiel in Dienst Journaal
+function mgWwGet(){
+  var opgeslagen = localStorage.getItem('dj_ww_materieel_garage');
+  return mgDeobf(opgeslagen || MG_WW_STANDAARD);
+}
+
+var SP_CLIENT_ID = '620757bf-f871-4a8b-a267-8442506f5314';
+var SP_TENANT_ID = '5d0501ba-8bc1-464e-b3ad-9e2c8779c55c';
+var SP_REDIRECT_URI = 'https://sveuropoort.github.io/Dienst-journaal/';
+var SP_SITE_HOSTNAME = 'stena.sharepoint.com';
+var SP_SITE_PATH = '/sites/DienstJournaal';
+var SP_SCOPES = ['Sites.ReadWrite.All'];
+var SP_MSAL_CDNS = [
+  'https://cdnjs.cloudflare.com/ajax/libs/msal-browser/3.7.1/msal-browser.min.js',
+  'https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.7.1/lib/msal-browser.min.js',
+  'https://alcdn.msauth.net/browser/3.7.1/js/msal-browser.min.js'
+];
+var _spMsalInstance = null;
+var _spSiteId = null;
+var _spInitPromise = null;
+function _spLaadScriptMetFallback(idx){
+  return new Promise(function(resolve, reject){
+    if (idx >= SP_MSAL_CDNS.length) { reject(new Error('Kon de inlogbibliotheek (MSAL) van geen enkele bron laden.')); return; }
+    var script = document.createElement('script');
+    script.src = SP_MSAL_CDNS[idx];
+    script.onload = function(){ resolve(); };
+    script.onerror = function(){ _spLaadScriptMetFallback(idx + 1).then(resolve).catch(reject); };
+    document.head.appendChild(script);
+  });
+}
+async function _spMaakInstance(){
+  _spMsalInstance = new msal.PublicClientApplication({
+    auth: { clientId: SP_CLIENT_ID, authority: 'https://login.microsoftonline.com/' + SP_TENANT_ID, redirectUri: SP_REDIRECT_URI },
+    cache: { cacheLocation: 'localStorage' }
+  });
+  await _spMsalInstance.initialize();
+  return _spMsalInstance;
+}
+function spInit(){
+  if (_spInitPromise) return _spInitPromise;
+  _spInitPromise = (typeof msal !== 'undefined' ? Promise.resolve() : _spLaadScriptMetFallback(0))
+    .then(function(){ return _spMaakInstance(); })
+    .catch(function(e){ _spInitPromise = null; throw e; });
+  return _spInitPromise;
+}
+async function spLogin(){
+  await spInit();
+  var result = await _spMsalInstance.loginPopup({ scopes: SP_SCOPES });
+  localStorage.setItem('dj_sp_account_username', result.account.username);
+  return result.account;
+}
+async function spGetToken(){
+  await spInit();
+  var accounts = _spMsalInstance.getAllAccounts();
+  var voorkeurUsername = localStorage.getItem('dj_sp_account_username');
+  var account = null;
+  if (accounts.length) {
+    account = voorkeurUsername ? accounts.find(function(a){ return a.username === voorkeurUsername; }) : null;
+    if (!account) account = accounts[0];
+  }
+  if (!account) { account = await spLogin(); }
+  localStorage.setItem('dj_sp_account_username', account.username);
+  try {
+    var result = await _spMsalInstance.acquireTokenSilent({ scopes: SP_SCOPES, account: account });
+    return result.accessToken;
+  } catch (e) {
+    var result2 = await _spMsalInstance.acquireTokenPopup({ scopes: SP_SCOPES });
+    localStorage.setItem('dj_sp_account_username', result2.account.username);
+    return result2.accessToken;
+  }
+}
+function spIngelogd(){
+  if (!_spMsalInstance) return false;
+  return _spMsalInstance.getAllAccounts().length > 0;
+}
+async function spGetSiteId(){
+  if (_spSiteId) return _spSiteId;
+  var token = await spGetToken();
+  var resp = await fetch('https://graph.microsoft.com/v1.0/sites/' + SP_SITE_HOSTNAME + ':' + SP_SITE_PATH, { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!resp.ok) throw new Error('Kon SharePoint site niet vinden (status ' + resp.status + ')');
+  var data = await resp.json();
+  _spSiteId = data.id;
+  return _spSiteId;
+}
+async function spVerifieerToegang(){
+  var token = await spGetToken();
+  var siteId = await spGetSiteId();
+  var resp = await fetch('https://graph.microsoft.com/v1.0/sites/' + siteId + '/drive/root:/Data', { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!resp.ok) throw new Error('Geen toegang tot de map "Data" op SharePoint (status ' + resp.status + ')');
+  return true;
+}
+async function spOphalenBestand(bestandsnaam){
+  var token = await spGetToken();
+  var siteId = await spGetSiteId();
+  var url = 'https://graph.microsoft.com/v1.0/sites/' + siteId + '/drive/root:/Data/' + encodeURIComponent(bestandsnaam) + ':/content';
+  var resp = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
+  if (resp.status === 404) return null;
+  if (!resp.ok) throw new Error('Ophalen van SharePoint mislukt (status ' + resp.status + ')');
+  return await resp.json();
+}
+
+// ── Toegangsbeheer (zelfde lijst als de hoofdapp, via toegang_accounts.json) ──
+var DJ_TOEGANG_STANDAARD = [
+  { email: 'sebastian.vander.meer@stenaline.com', permissies: { beheer: true, EP: true, HVH: true, IMM: true, kpi: true, materieel: true } }
+];
+function djToegangGet(){
+  try {
+    var lijst = JSON.parse(localStorage.getItem('dj_toegang_accounts') || 'null');
+    return (Array.isArray(lijst) && lijst.length) ? lijst : DJ_TOEGANG_STANDAARD.slice();
+  } catch(e) { return DJ_TOEGANG_STANDAARD.slice(); }
+}
+async function djToegangCloudPull(){
+  try {
+    var result = await spOphalenBestand('toegang_accounts.json');
+    if (result && Array.isArray(result.data) && result.data.length) {
+      localStorage.setItem('dj_toegang_accounts', JSON.stringify(result.data));
+    }
+  } catch(e) { console.error('SharePoint ophalen toegang-accounts mislukt:', e); }
+}
+function djToegangHeeft(email, omgevingKey){
+  if (!email) return false;
+  var lijst = djToegangGet();
+  var entry = lijst.find(function(a){ return a.email.toLowerCase() === email.toLowerCase(); });
+  return !!(entry && entry.permissies && entry.permissies[omgevingKey]);
+}
+function mgToonWwBackup(){
+  var backup = document.getElementById('mg-ww-backup');
+  var link = document.getElementById('mg-ww-backup-link');
+  if (backup) backup.style.display = 'block';
+  if (link) link.style.display = 'none';
+  var ww = document.getElementById('mg-ww');
+  if (ww) ww.focus();
+}
+async function mgMsLoginKlik(){
+  var btn = document.getElementById('mgMsBtn');
+  var status = document.getElementById('mgMsStatus');
+  if (btn) btn.innerHTML = '&#8987; Bezig met inloggen…';
+  if (status) { status.textContent = ''; status.style.color = 'rgba(255,255,255,0.55)'; }
+  try {
+    await spLogin();
+    if (status) status.textContent = 'Toegang controleren…';
+    try {
+      await spVerifieerToegang();
+    } catch (siteErr) {
+      if (status) { status.textContent = 'Dit account heeft geen toegang tot de SharePoint-site.'; status.style.color = '#ff8080'; }
+      if (btn) btn.innerHTML = '&#x1F310; Login met Microsoft';
+      return;
+    }
+    try { await djToegangCloudPull(); } catch(e) {}
+    var accounts = _spMsalInstance.getAllAccounts();
+    var voorkeurUsername = localStorage.getItem('dj_sp_account_username');
+    var actief = (voorkeurUsername && accounts.find(function(a){ return a.username === voorkeurUsername; })) || accounts[0];
+    var huidigEmail = actief ? actief.username : null;
+    if (!huidigEmail || !djToegangHeeft(huidigEmail, 'materieel')) {
+      if (status) { status.textContent = 'Dit account heeft geen toestemming voor Materieel-garage.'; status.style.color = '#ff8080'; }
+      if (btn) btn.innerHTML = '&#x1F310; Login met Microsoft';
+      return;
+    }
+    sessionStorage.setItem('mg_auth', '1');
+    document.getElementById('mg-login').style.display = 'none';
+    document.getElementById('mg-app').style.display = 'block';
+    mgInit();
+  } catch (e) {
+    console.error('Microsoft-login mislukt:', e);
+    var detail = (e && (e.errorMessage || e.message)) || 'onbekende fout';
+    if (status) { status.textContent = 'Inloggen mislukt: ' + detail; status.style.color = '#ff8080'; }
+    if (btn) btn.innerHTML = '&#x1F310; Login met Microsoft';
+  }
+}
+function mgLogin(){
+  var ingevoerd = document.getElementById('mg-ww').value;
+  if (ingevoerd === mgWwGet()) {
+    sessionStorage.setItem('mg_auth', '1');
+    document.getElementById('mg-login').style.display = 'none';
+    document.getElementById('mg-app').style.display = 'block';
+    mgInit();
+  } else {
+    document.getElementById('mg-err').style.display = 'block';
+    document.getElementById('mg-ww').value = '';
+  }
+}
+
 // ===== Supabase config (zelfde database als Dienst Journaal) =====
 var SB_URL   = 'https://xgqtiseknvjwaqapwjdt.supabase.co';
 var SB_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhncXRpc2VrbnZqd2FxYXB3amR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODYxNzIsImV4cCI6MjA5NjE2MjE3Mn0.DdBJ6OzEVC-l_9qbJE-bVlv1WdxFkB1C2tjEHXqh5SE';
@@ -537,8 +762,22 @@ function starPolling(){
 
 document.getElementById('tab-' + terminal).classList.add('active');
 if (terminal !== 'EP') document.getElementById('tab-EP').classList.remove('active');
-ladenVanServer();
-starPolling();
+
+function mgInit(){
+  ladenVanServer();
+  starPolling();
+}
+
+// Direct doorgaan als deze sessie al eerder is ontgrendeld.
+(function(){
+  if (sessionStorage.getItem('mg_auth') === '1') {
+    document.getElementById('mg-login').style.display = 'none';
+    document.getElementById('mg-app').style.display = 'block';
+    mgInit();
+  } else {
+    setTimeout(function(){ document.getElementById('mg-ww').focus(); }, 100);
+  }
+})();
 </script>
 </body>
 </html>

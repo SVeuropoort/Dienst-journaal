@@ -2895,7 +2895,8 @@ var DJ_WW_DEFS = [
   { sleutel: 'login_HVH', label: 'Inlogwachtwoord \u2014 Hoek van Holland', standaard: djObf('SVhvh2026') },
   { sleutel: 'login_IMM', label: 'Inlogwachtwoord \u2014 Immingham', standaard: djObf('SVimmingham2026') },
   { sleutel: 'master', label: 'Meesterwachtwoord (werkt overal, alleen nog voor de reserve-wachtwoordlogin hierboven)', standaard: djObf('stena') },
-  { sleutel: 'kpi_mt', label: 'KPI Dashboard (MT) \u2014 los bestand kpi-mt.html', standaard: djObf('MTeuropoort2026') }
+  { sleutel: 'kpi_mt', label: 'KPI Dashboard (MT) \u2014 los bestand kpi-mt.html', standaard: djObf('MTeuropoort2026') },
+  { sleutel: 'materieel_garage', label: 'Materieel-garage \u2014 los bestand materieel-garage.html', standaard: djObf('SVmaterieel2026') }
 ];
 function djWwGet(sleutel){
   var def = DJ_WW_DEFS.filter(function(d){ return d.sleutel === sleutel; })[0];
@@ -3235,6 +3236,7 @@ var DJ_TOEGANG_OMGEVINGEN = [
   { key: 'HVH', label: 'Hoek van Holland' },
   { key: 'IMM', label: 'Immingham' },
   { key: 'kpi', label: 'KPI Dashboard' },
+  { key: 'materieel', label: 'Materieel-garage' },
   { key: 'certificeringen', label: 'Certificeringen' },
   { key: 'maandafsluiting', label: 'Maandafsluiting' },
   { key: 'salaris', label: 'Salaris' },
@@ -3242,7 +3244,7 @@ var DJ_TOEGANG_OMGEVINGEN = [
   { key: 'werkoverdracht', label: 'Werkoverdracht' }
 ];
 var DJ_TOEGANG_STANDAARD = [
-  { email: 'sebastian.vander.meer@stenaline.com', permissies: { beheer: true, EP: true, HVH: true, IMM: true, kpi: true, certificeringen: true, maandafsluiting: true, salaris: true, ort: true, werkoverdracht: true } }
+  { email: 'sebastian.vander.meer@stenaline.com', permissies: { beheer: true, EP: true, HVH: true, IMM: true, kpi: true, materieel: true, certificeringen: true, maandafsluiting: true, salaris: true, ort: true, werkoverdracht: true } }
 ];
 function djToegangGet(){
   try {
@@ -3337,7 +3339,7 @@ function djToegangToevoegen(){
   if (!email || email.indexOf('@') === -1) { alert('Vul een geldig e-mailadres in.'); return; }
   var lijst = djToegangGet();
   if (lijst.map(function(a){return a.email.toLowerCase();}).indexOf(email) !== -1) { alert('Dit account staat er al in.'); return; }
-  lijst.push({ email: email, permissies: { beheer: false, EP: false, HVH: false, IMM: false, kpi: false, certificeringen: false, maandafsluiting: false, salaris: false, ort: false, werkoverdracht: false } });
+  lijst.push({ email: email, permissies: { beheer: false, EP: false, HVH: false, IMM: false, kpi: false, materieel: false, certificeringen: false, maandafsluiting: false, salaris: false, ort: false, werkoverdracht: false } });
   djToegangSet(lijst);
   if (input) input.value = '';
   djToegangRender();
