@@ -3347,6 +3347,81 @@ async function djToegangCheckOfPopup(moduleKey){
   }
   return true;
 }
+
+// ══════════════════════════════════════════════════════════════════
+// Aanwezigheid: wie is er nu (ongeveer) actief in de app, over alle terminals heen.
+// Elke ingelogde sessie stuurt elke minuut een "hartslag" (e-mail + terminal + tijdstip)
+// naar een gedeeld SharePoint-bestand; iedereen die het laatste anderhalve minuut niets
+// van zich heeft laten horen, wordt als "weg" beschouwd. Werkt alleen met Microsoft-login
+// (de reserve-wachtwoordlogin heeft geen bekend account om te tonen).
+// ══════════════════════════════════════════════════════════════════
+var DJ_AANWEZIG_INTERVAL_MS = 60000;  // hartslag elke 60 sec.
+var DJ_AANWEZIG_TIMEOUT_MS = 150000;  // langer dan 2,5 min stil = "weg"
+var _djAanwezigTimer = null;
+function djAanwezigTerminalLabel(t){
+  return { EP: 'Europoort', HVH: 'Hoek van Holland', IMM: 'Immingham' }[t] || t;
+}
+async function djAanwezigHeartbeat(){
+  try {
+    var email = await djHuidigEmail();
+    if (!email) { djAanwezigVerbergIcon(); return; }
+    var naam = email;
+    try {
+      if (_spMsalInstance) {
+        var accounts = _spMsalInstance.getAllAccounts();
+        var voorkeurUsername = localStorage.getItem('dj_sp_account_username');
+        var actief = (voorkeurUsername && accounts.find(function(a){ return a.username === voorkeurUsername; })) || accounts[0];
+        if (actief && actief.name) naam = actief.name;
+      }
+    } catch(e) {}
+    var result = await spOphalenBestand('aanwezigheid.json');
+    var data = (result && result.data) || {};
+    data[email] = { naam: naam, terminal: sessionStorage.getItem('dj_terminal') || 'EP', laatstGezien: new Date().toISOString() };
+    await spOpslaanBestand('aanwezigheid.json', { data: data, updated_at: new Date().toISOString() });
+    djAanwezigRender(data, email);
+  } catch(e) {
+    console.warn('Aanwezigheid bijwerken mislukt:', e);
+  }
+}
+function djAanwezigVerbergIcon(){
+  var icon = document.getElementById('djAanwezigIcon');
+  if (icon) icon.style.display = 'none';
+}
+function djAanwezigRender(data, eigenEmail){
+  var nu = Date.now();
+  var anderen = Object.keys(data).filter(function(email){
+    if (email === eigenEmail) return false;
+    var t = Date.parse(data[email].laatstGezien);
+    return !isNaN(t) && (nu - t) < DJ_AANWEZIG_TIMEOUT_MS;
+  }).map(function(email){ return data[email]; }).sort(function(a, b){ return a.naam.localeCompare(b.naam); });
+  var icon = document.getElementById('djAanwezigIcon');
+  var aantal = document.getElementById('djAanwezigAantal');
+  var lijst = document.getElementById('djAanwezigLijst');
+  if (!icon || !lijst) return;
+  icon.style.display = 'inline-flex';
+  if (aantal) {
+    if (anderen.length) { aantal.style.display = 'inline-block'; aantal.textContent = String(anderen.length); }
+    else { aantal.style.display = 'none'; }
+  }
+  lijst.innerHTML = anderen.length
+    ? anderen.map(function(p){
+        return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.08);">' +
+          '<div style="font-weight:700;color:#fff;">' + oplEsc(p.naam) + '</div>' +
+          '<div style="color:rgba(255,255,255,0.5);font-size:11px;">' + djAanwezigTerminalLabel(p.terminal) + '</div>' +
+          '</div>';
+      }).join('')
+    : '<div style="color:rgba(255,255,255,0.5);">Niemand anders op dit moment online.</div>';
+}
+function djAanwezigTogglePanel(){
+  var panel = document.getElementById('djAanwezigPanel');
+  if (!panel) return;
+  panel.style.display = (panel.style.display === 'block') ? 'none' : 'block';
+}
+function djAanwezigStart(){
+  if (_djAanwezigTimer) return;
+  djAanwezigHeartbeat();
+  _djAanwezigTimer = setInterval(djAanwezigHeartbeat, DJ_AANWEZIG_INTERVAL_MS);
+}
 // Permissies gegroepeerd per categorie, zodat het overzicht per account leesbaar blijft
 // (volledige labels, geen priegelige verticale tekst meer).
 var DJ_TOEGANG_GROEPEN = [
@@ -3673,6 +3748,15 @@ function djHerstelVaarschema(){
     </div>
     <div id="djSpHeaderLogin" style="position:relative;margin-left:10px;">
       <button id="djSpHeaderLoginBtn" onclick="djSpLoginKlik()" style="background:#0f6cbd;border:none;color:#fff;font-size:12px;font-weight:700;padding:8px 14px;border-radius:8px;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px;">&#x1F310; Login met Microsoft</button>
+    </div>
+    </div>
+    <div id="djAanwezigIcon" style="display:none;position:relative;margin-left:10px;cursor:pointer;align-items:center;" onclick="djAanwezigTogglePanel()" title="Wie is er online?">
+      <span style="font-size:19px;">&#x1F465;</span>
+      <span id="djAanwezigAantal" style="display:none;position:absolute;top:-6px;right:-8px;background:#1e7d34;color:#fff;font-size:10px;font-weight:800;padding:1px 5px;border-radius:10px;min-width:14px;text-align:center;"></span>
+      <div id="djAanwezigPanel" style="display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:99999;background:#0d1f38;border:1px solid rgba(255,255,255,0.2);border-radius:10px;padding:10px 12px;min-width:220px;max-width:300px;box-shadow:0 8px 20px rgba(0,0,0,.35);font-size:12.5px;">
+        <div style="color:rgba(255,255,255,0.5);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Nu online</div>
+        <div id="djAanwezigLijst"></div>
+      </div>
     </div>
     <div id="djBhvWarningIcon" class="hidden" style="position:relative;margin-left:10px;cursor:default;">
       <style>#djBhvWarningIcon.hidden, #djBhvWarningPanel.hidden { display:none !important; }</style>
@@ -5878,6 +5962,7 @@ window.addEventListener('resize', () => {
           sessionStorage.setItem('dj_sp_verified', '1');
           if (typeof djWwCloudPull === 'function') djWwCloudPull();
           if (typeof djToegangCloudPull === 'function') djToegangCloudPull();
+          if (typeof djAanwezigStart === 'function') djAanwezigStart();
         } catch(e) {
           // Toegang niet (meer) geldig — sessie wissen
           sessionStorage.removeItem('dj_sp_verified');
@@ -23356,8 +23441,9 @@ function nieuwToonTab(tab){
 
 // ===== TOOLBOX (Werkoverdracht) =====
 // Toolbox-documenten (PDF) per terminal. Metadata (naam/datum) staat in localStorage
-// en wordt gesynchroniseerd; het bestand zelf staat lokaal in IndexedDB (zie CERT_DB),
-// net als bij certificaatbestanden bij Opleidingen.
+// en wordt gesynchroniseerd; het bestand zelf staat op SharePoint (map "Bijlagen/Toolbox"),
+// net als bij certificaatbestanden bij Opleidingen — zo is het ook voor collega's op
+// andere apparaten vindbaar.
 function toolboxKey(){ return tk('werkoverdracht_toolbox_v1'); }
 function toolboxGetData(){
   try {
@@ -23371,6 +23457,10 @@ function toolboxSaveData(lijst){
 }
 function toolboxSleutel(id){
   return 'toolbox::' + getTerminalPrefix() + '::' + id;
+}
+function toolboxPad(id, file, afgetekend){
+  var terminal = sessionStorage.getItem('dj_terminal') || 'EP';
+  return 'Toolbox/' + terminal + '/' + (afgetekend ? 'signed_' : '') + id + '.' + certBestandsExtensie(file.name, file.type);
 }
 function toolboxEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function toolboxKiesBestand(){
@@ -23390,24 +23480,18 @@ function toolboxKiesBestand(){
       alert('Dit bestand is groter dan 10 MB. Comprimeer de PDF en probeer opnieuw.');
       return;
     }
-    var reader = new FileReader();
-    reader.onerror = function(){
-      oplToonMelding('✗ Kon het bestand niet inlezen in de browser.', '#7f1d1d');
-    };
-    reader.onload = function(e){
-      var id = Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-      oplToonMelding('⏳ Toolbox opslaan…', '#075985', 4000);
-      certDbZet(toolboxSleutel(id), { naam: file.name, type: file.type || 'application/pdf', data: e.target.result, opgeslagenOp: new Date().toISOString() }).then(function(){
-        var lijst = toolboxGetData();
-        lijst.unshift({ id: id, naam: file.name, opgeslagenOp: new Date().toISOString() });
-        toolboxSaveData(lijst);
-        oplToonMelding('✓ Toolbox "' + file.name + '" toegevoegd.', '#166534', 3000);
-        toolboxRender();
-      }).catch(function(idbErr){
-        oplToonMelding('✗ Kon bestand niet opslaan: ' + (idbErr && idbErr.message ? idbErr.message : idbErr), '#7f1d1d', 10000);
-      });
-    };
-    reader.readAsDataURL(file);
+    var id = Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    var pad = toolboxPad(id, file, false);
+    oplToonMelding('⏳ Toolbox uploaden naar SharePoint…', '#075985', 6000);
+    spUploadBijlage(pad, file).then(function(){
+      var lijst = toolboxGetData();
+      lijst.unshift({ id: id, naam: file.name, opgeslagenOp: new Date().toISOString(), type: file.type || 'application/pdf', sp: true, pad: pad });
+      toolboxSaveData(lijst);
+      oplToonMelding('✓ Toolbox "' + file.name + '" geüpload naar SharePoint.', '#166534', 4000);
+      toolboxRender();
+    }).catch(function(spErr){
+      oplToonMelding('✗ Kon bestand niet uploaden: ' + (spErr && spErr.message ? spErr.message : spErr), '#7f1d1d', 10000);
+    });
   }, { once: true });
   document.body.appendChild(input);
   input.click();
@@ -23442,24 +23526,18 @@ function toolboxAfgetekendKiesBestand(){
       alert('Dit bestand is groter dan 10 MB. Comprimeer het bestand en probeer opnieuw.');
       return;
     }
-    var reader = new FileReader();
-    reader.onerror = function(){
-      oplToonMelding('✗ Kon het bestand niet inlezen in de browser.', '#7f1d1d');
-    };
-    reader.onload = function(e){
-      var id = Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-      oplToonMelding('⏳ Afgetekende lijst opslaan…', '#075985', 4000);
-      certDbZet(toolboxSleutel(id), { naam: file.name, type: file.type || (isPdf ? 'application/pdf' : 'image/jpeg'), data: e.target.result, opgeslagenOp: new Date().toISOString() }).then(function(){
-        var lijst = toolboxGetData();
-        lijst.unshift({ id: id, naam: file.name, opgeslagenOp: new Date().toISOString(), afgetekend: true });
-        toolboxSaveData(lijst);
-        oplToonMelding('✓ Afgetekende lijst "' + file.name + '" gearchiveerd.', '#166534', 3000);
-        toolboxRender();
-      }).catch(function(idbErr){
-        oplToonMelding('✗ Kon bestand niet opslaan: ' + (idbErr && idbErr.message ? idbErr.message : idbErr), '#7f1d1d', 10000);
-      });
-    };
-    reader.readAsDataURL(file);
+    var id = Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    var pad = toolboxPad(id, file, true);
+    oplToonMelding('⏳ Afgetekende lijst uploaden naar SharePoint…', '#075985', 6000);
+    spUploadBijlage(pad, file).then(function(){
+      var lijst = toolboxGetData();
+      lijst.unshift({ id: id, naam: file.name, opgeslagenOp: new Date().toISOString(), type: file.type || (isPdf ? 'application/pdf' : 'image/jpeg'), afgetekend: true, sp: true, pad: pad });
+      toolboxSaveData(lijst);
+      oplToonMelding('✓ Afgetekende lijst "' + file.name + '" gearchiveerd op SharePoint.', '#166534', 4000);
+      toolboxRender();
+    }).catch(function(spErr){
+      oplToonMelding('✗ Kon bestand niet uploaden: ' + (spErr && spErr.message ? spErr.message : spErr), '#7f1d1d', 10000);
+    });
   }, { once: true });
   document.body.appendChild(input);
   input.click();
@@ -23475,8 +23553,19 @@ function toolboxBekijk(id){
   var item = lijst.find(function(x){ return x.id === id; });
   if (!item) return;
   var w = window.open('', '_blank');
+  if (item.sp && item.pad) {
+    spDownloadBijlage(item.pad).then(function(blob){
+      if (!blob) { if (w) w.close(); oplToonMelding('✗ Bestand niet gevonden op SharePoint. Mogelijk verwijderd of verplaatst.', '#7f1d1d', 8000); return; }
+      certToonBlobInNieuwTab(blob, item.type, item.naam, w);
+    }).catch(function(err){
+      if (w) w.close();
+      oplToonMelding('✗ Kon bestand niet openen van SharePoint: ' + (err && err.message ? err.message : err), '#7f1d1d', 8000);
+    });
+    return;
+  }
+  // Oude items (vóór de SharePoint-update) staan nog lokaal in IndexedDB.
   certDbHaal(toolboxSleutel(id)).then(function(rec){
-    if (!rec) { if (w) w.close(); oplToonMelding('✗ Bestand niet gevonden op dit apparaat (bestanden syncen niet tussen apparaten).', '#7f1d1d', 8000); return; }
+    if (!rec) { if (w) w.close(); oplToonMelding('✗ Dit bestand is toegevoegd vóórdat Toolbox naar SharePoint ging en staat alleen op het apparaat waar het is geüpload. Vraag degene die het toevoegde om het opnieuw te uploaden.', '#7f1d1d', 10000); return; }
     certToonInNieuwTab(rec.data, rec.type, item.naam, w);
   }).catch(function(err){
     if (w) w.close();
@@ -23488,7 +23577,8 @@ function toolboxVerwijder(id){
   var item = lijst.find(function(x){ return x.id === id; });
   if (!item) return;
   if (!confirm('"' + item.naam + '" verwijderen uit de Toolbox?')) return;
-  certDbVerwijder(toolboxSleutel(id)).catch(function(){}).then(function(){
+  var opgeruimd = (item.sp && item.pad) ? spVerwijderBijlage(item.pad) : certDbVerwijder(toolboxSleutel(id));
+  Promise.resolve(opgeruimd).catch(function(){}).then(function(){
     var lijst2 = toolboxGetData().filter(function(x){ return x.id !== id; });
     toolboxSaveData(lijst2);
     toolboxRender();
