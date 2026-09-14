@@ -168,6 +168,7 @@
   <div class="terminal-tabs">
     <div class="terminal-tab active" id="tab-EP" onclick="wisselTerminal('EP')">Europoort</div>
     <div class="terminal-tab" id="tab-HVH" onclick="wisselTerminal('HVH')">Hoek van Holland</div>
+    <div class="terminal-tab" id="tab-IMM" onclick="wisselTerminal('IMM')">Immingham</div>
   </div>
 </header>
 
@@ -492,8 +493,9 @@ function wisselTerminal(t){
   if (t === terminal) return;
   terminal = t;
   localStorage.setItem('garage_mat_terminal', t);
-  document.getElementById('tab-EP').classList.toggle('active', t === 'EP');
-  document.getElementById('tab-HVH').classList.toggle('active', t === 'HVH');
+  ['EP','HVH','IMM'].forEach(function(term){
+    document.getElementById('tab-' + term).classList.toggle('active', term === t);
+  });
   ladenVanServer();
 }
 
@@ -688,11 +690,14 @@ function toggleSectie(naam){
 }
 
 // ===== Materieel beheren (tandwiel) =====
+function terminalNaam(t){
+  return t === 'HVH' ? 'Hoek van Holland' : (t === 'IMM' ? 'Immingham' : 'Europoort');
+}
 var instData = [];
 
 function openInstellingen(){
   instData = JSON.parse(JSON.stringify(matData));
-  document.getElementById('inst-terminal-naam').textContent = terminal === 'HVH' ? 'Hoek van Holland' : 'Europoort';
+  document.getElementById('inst-terminal-naam').textContent = terminalNaam(terminal);
   bouwInstellingenLijst();
   document.getElementById('inst-modal').style.display = 'flex';
 }
@@ -748,7 +753,7 @@ function instAddOverig(){
   bouwInstellingenLijst();
 }
 function instReset(){
-  if (!confirm('Terugkeren naar standaard materiaallijst voor ' + (terminal==='HVH'?'Hoek van Holland':'Europoort') + '?')) return;
+  if (!confirm('Terugkeren naar standaard materiaallijst voor ' + terminalNaam(terminal) + '?')) return;
   instData = JSON.parse(JSON.stringify(MATERIEEL_DEF));
   bouwInstellingenLijst();
 }
@@ -775,8 +780,7 @@ function starPolling(){
   }, 25000);
 }
 
-document.getElementById('tab-' + terminal).classList.add('active');
-if (terminal !== 'EP') document.getElementById('tab-EP').classList.remove('active');
+['EP','HVH','IMM'].forEach(function(t){ document.getElementById('tab-' + t).classList.toggle('active', t === terminal); });
 
 function mgInit(){
   ladenVanServer();
