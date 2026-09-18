@@ -12799,10 +12799,20 @@ function oplEsc(s){
   return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// Een medewerker zonder "Certificeringen"-toestemming in Toegangsbeheer krijgt dit tabblad
+// niet eens te zien tussen de andere Opleidingen-tabbladen (in plaats van het pas te blokkeren
+// zodra erop geklikt wordt).
+function oplMagOverzichtZien(){
+  var email = localStorage.getItem('dj_sp_account_username');
+  return email ? djToegangHeeft(email, 'certificeringen') : false;
+}
 function initOpleidingen(){
   var tabsEl = document.getElementById('opl-tabs');
   if (tabsEl && !tabsEl.dataset.built) {
-    tabsEl.innerHTML = OPLEIDINGEN_FORMS.map(function(f, i){
+    var magOverzicht = oplMagOverzichtZien();
+    tabsEl.innerHTML = OPLEIDINGEN_FORMS.filter(function(f){
+      return f.id !== 'overzicht' || magOverzicht;
+    }).map(function(f, i){
       return '<button id="opl-tab-' + f.id + '" onclick="oplToonTab(\'' + f.id + '\')" ' +
         'style="padding:9px 16px;border:none;border-radius:6px 6px 0 0;background:' + (i===0?'#003366':'#e8eef5') + ';color:' + (i===0?'#fff':'#003366') + ';' +
         'font-family:\'Barlow Condensed\',sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">' +
@@ -12810,6 +12820,7 @@ function initOpleidingen(){
     }).join('');
     tabsEl.dataset.built = '1';
   }
+  if (oplHuidigeTab === 'overzicht' && !oplMagOverzichtZien()) oplHuidigeTab = OPLEIDINGEN_FORMS[0].id;
   oplToonTab(oplHuidigeTab);
 }
 
@@ -15010,11 +15021,22 @@ function applySettings() {
   setTimeout(() => f.classList.remove(&quot;show&quot;), 2500);
 }
 
+// Verbergt het instellingen-tandwiel voor accounts zonder "Salaris"-toestemming in
+// Toegangsbeheer, in plaats van het pas te blokkeren zodra erop geklikt wordt.
+function _saMagInstellingen(){
+  try {
+    if (window.parent &amp;&amp; window.parent.djToegangHeeft) {
+      var email = window.parent.localStorage.getItem(&quot;dj_sp_account_username&quot;);
+      return email ? window.parent.djToegangHeeft(email, &quot;salaris&quot;) : false;
+    }
+  } catch(e) {}
+  return true;
+}
 // ── Hoofd render ──────────────────────────────────────────────────────────────
 function render() {
   const {step, resultaten, maand, jaar, filter, zoek, payroll, fileName} = state;
   document.getElementById(&quot;header-btns&quot;).innerHTML = `<div style=&quot;display:flex;align-items:center;gap:6px&quot;>
-    <button class=&quot;btn-gear&quot; onclick=&quot;checkWachtwoord()&quot; title=&quot;Instellingen&quot;>⚙️</button>
+    ${_saMagInstellingen() ? `<button class=&quot;btn-gear&quot; onclick=&quot;checkWachtwoord()&quot; title=&quot;Instellingen&quot;>⚙️</button>` : &quot;&quot;}
     ${step===&quot;result&quot; ? `<button class=&quot;btn-ghost&quot; onclick=&quot;reset()&quot;>↩ Nieuwe import</button><button class=&quot;btn-green&quot; onclick=&quot;exportExcel()&quot;>⬇ Download Excel</button>` : &quot;&quot;}
   </div>`;
 
@@ -21669,11 +21691,11 @@ if(_sfrEd) _sfrEd.addEventListener('keypress', function(e){if(e.key==='Enter')ca
   <button onclick="navTo('home','HOME',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x1F3E0; Home</button>
   <button onclick="navTo('dagplanning','DAGPLANNING',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x1F4C5; Dagplanning</button>
   <button onclick="navTo('punctuality','PUNCTUALITY',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x23F1; Punctuality</button>
-  <button onclick="navTo('materieel','MATERIEEL',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x1F69B; Materieel</button>
-  <button onclick="navWerkoverdracht('WERKOVERDRACHT &#x1F512;',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x21C4; Werkoverdracht &#x1F512;</button>
+  <button id="nav-btn-materieel" onclick="navTo('materieel','MATERIEEL',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x1F69B; Materieel</button>
+  <button id="nav-btn-werkoverdracht" onclick="navWerkoverdracht('WERKOVERDRACHT &#x1F512;',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x21C4; Werkoverdracht &#x1F512;</button>
   <button onclick="navTo('werkorder','WERKORDER',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x1F527; Werkorder</button>
   <button onclick="navTo('planning','TO DO LIST',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x2705; To Do List</button>
-  <button onclick="navTo('archief','KPI DASHBOARD',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x1F4CA; KPI Dashboard</button>
+  <button id="nav-btn-kpi" onclick="navTo('archief','KPI DASHBOARD',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x1F4CA; KPI Dashboard</button>
   <button id="nav-btn-maandafsluiting" onclick="navTo('maandafsluiting','MAANDAFSLUITING',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x1F4C8; Maandafsluiting &#x1F512;</button>
   <button id="nav-btn-ort" onclick="navTo('ort','ORT / BASISROOSTER',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x1F4D0; ORT / Basisrooster &#x1F512;</button>
   <button id="nav-btn-aowdash" onclick="navTo('aowdash','AOW & SFR',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x1F4B0; AOW &amp; SFR</button>
@@ -21694,6 +21716,28 @@ function djVerbergTabsVoorTerminal(){
     bhvTab.style.display = (t === 'IMM') ? 'none' : 'inline-block';
     if (t === 'IMM' && typeof matShowSubTab === 'function') matShowSubTab('status');
   }
+  djVerbergNavItemsZonderToegang();
+}
+// Verbergt navigatie-items voor modules waar dit account in Toegangsbeheer geen toestemming
+// voor heeft, zodat een medewerker een module niet eens ziet staan als hij er niet bij mag.
+// Gebruikt het laatst ingelogde account (synchroon uit localStorage) zodat het menu niet
+// hoeft te wachten op een netwerk-aanroep. Items die hier niet in staan (Home, Dagplanning,
+// Punctuality, Werkorder, To Do List, Schade Formulier, Opleidingen) zijn voor iedereen zichtbaar.
+var DJ_NAV_TOEGANG_KOPPELING = {
+  'nav-btn-kpi': 'kpi',
+  'nav-btn-materieel': 'materieel',
+  'nav-btn-maandafsluiting': 'maandafsluiting',
+  'nav-btn-ort': 'ort',
+  'nav-btn-werkoverdracht': 'werkoverdracht'
+};
+function djVerbergNavItemsZonderToegang(){
+  var email = localStorage.getItem('dj_sp_account_username');
+  Object.keys(DJ_NAV_TOEGANG_KOPPELING).forEach(function(id){
+    var navBtn = document.getElementById(id);
+    if (!navBtn || navBtn.style.display === 'none') return; // al verborgen door terminal-regel hierboven
+    var heeftToegang = email ? djToegangHeeft(email, DJ_NAV_TOEGANG_KOPPELING[id]) : false;
+    if (!heeftToegang) navBtn.style.display = 'none';
+  });
 }
 function toggleNavMenu(){
   djVerbergTabsVoorTerminal();
@@ -22358,9 +22402,9 @@ var DJ_VERTAAL_WOORDENBOEK = {
   "16T heftruck": "16T forklift",
   "Checkers auto": "Checkers car",
   "Ploegleider bus": "Team leader van",
-  "Portofoon & Accutollen": "Radios & Battery Tokens",
+  "Portofoon & Accutollen": "Radios & Cordless Impact Wrenches",
   "Portofoon": "Radio",
-  "Accutollen": "Battery Tokens",
+  "Accutollen": "Cordless Impact Wrenches",
   "💾 Porto Opslaan": "💾 Save",
   "✓ Opgeslagen in cloud": "✓ Saved to cloud",
   "Opmerking (wat is er kapot?)": "Remark (what is broken?)",
