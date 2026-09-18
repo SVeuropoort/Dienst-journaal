@@ -21717,6 +21717,34 @@ function djVerbergTabsVoorTerminal(){
     if (t === 'IMM' && typeof matShowSubTab === 'function') matShowSubTab('status');
   }
   djVerbergNavItemsZonderToegang();
+  djVerbergTerminalsZonderToegang();
+}
+// Verbergt op het inlogscherm de terminals in de keuzelijst waarvoor het laatst gebruikte
+// account (herkend via het lokaal onthouden e-mailadres) geen toestemming heeft, zodat
+// iemand niet eens een terminal kan kiezen waar hij na inloggen toch tegen een blokkade
+// aanloopt. Bij een nog onbekend account (eerste bezoek op dit apparaat) blijven alle
+// terminals zichtbaar — pas na een geslaagde login is het account bekend.
+function djVerbergTerminalsZonderToegang(){
+  var select = document.getElementById('terminal-select');
+  if (!select) return;
+  var email = localStorage.getItem('dj_sp_account_username');
+  if (!email) return;
+  var toegestaan = [];
+  Array.prototype.forEach.call(select.options, function(opt){
+    var heeftToegang = djToegangHeeft(email, opt.value);
+    opt.style.display = heeftToegang ? '' : 'none';
+    opt.disabled = !heeftToegang;
+    if (heeftToegang) toegestaan.push(opt.value);
+  });
+  if (!toegestaan.length) {
+    // Zou niet moeten voorkomen (account zonder enige terminal-toestemming) — dan toch
+    // alles tonen in plaats van een onbruikbaar inlogscherm te tonen.
+    Array.prototype.forEach.call(select.options, function(opt){ opt.style.display = ''; opt.disabled = false; });
+    return;
+  }
+  if (toegestaan.indexOf(select.value) === -1 && typeof window.setTerminal === 'function') {
+    window.setTerminal(toegestaan[0]);
+  }
 }
 // Verbergt navigatie-items voor modules waar dit account in Toegangsbeheer geen toestemming
 // voor heeft, zodat een medewerker een module niet eens ziet staan als hij er niet bij mag.
