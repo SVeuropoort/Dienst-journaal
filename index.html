@@ -6151,6 +6151,20 @@ window.addEventListener('resize', () => {
     return data;
   }
 
+  // Voorkomt dat een automatische pagina-herlaad (na een stille cloud-sync) de browser een
+  // storende "Reload app? Changes you made may not be saved" pop-up laat tonen terwijl iemand
+  // net ergens middenin aan het typen is. In dat geval slaan we de herlaad simpelweg over — de
+  // zojuist opgehaalde data staat via setSyncData al veilig in localStorage en wordt bij de
+  // eerstvolgende gewone herlaad/navigatie alsnog overal zichtbaar.
+  function djKanVeiligHerladen(){
+    var el = document.activeElement;
+    if (!el) return true;
+    var tag = (el.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea') return !el.value;
+    if (el.isContentEditable) return !(el.textContent || '').trim();
+    return true;
+  }
+
   function setSyncData(data) {
     if (!data) return;
     // Restore all keys from cloud (static + dynamic dagplanning keys)
@@ -6268,14 +6282,14 @@ window.addEventListener('resize', () => {
         try {
           await spOpslaanBestand(rowId + '.json', { data: {} });
         } catch(e2) { console.warn('Kon leeg bestand niet aanmaken:', e2); }
-        setTimeout(function(){ location.reload(); }, 1000);
+        if (djKanVeiligHerladen()) setTimeout(function(){ location.reload(); }, 1000);
         _syncBezig = false;
         return;
       }
       var data = result.data;
       setSyncData(data);
       showSyncStatus('✓ Data geladen – pagina wordt herladen...', 'ok');
-      setTimeout(function(){ location.reload(); }, 1500);
+      if (djKanVeiligHerladen()) setTimeout(function(){ location.reload(); }, 1500);
     } catch(e) {
       showSyncStatus('✗ Laden mislukt: ' + e.message, 'err');
     }
@@ -6398,7 +6412,7 @@ window.addEventListener('resize', () => {
           sessionStorage.setItem('_cloudGeladen', '1');
           showSyncStatus('✓ Data geladen', 'ok');
           // Herlaad de pagina zodat alle views de nieuwe data tonen
-          setTimeout(function(){ location.reload(); }, 800);
+          if (djKanVeiligHerladen()) setTimeout(function(){ location.reload(); }, 800);
         } catch(e) {
           console.warn('Auto cloud laden mislukt:', e);
           showSyncStatus('⚠️ Auto-laden mislukt – klik Ophalen', 'err');
