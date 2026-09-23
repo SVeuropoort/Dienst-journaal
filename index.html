@@ -23148,9 +23148,12 @@ var TOLYNX_RIJ_SVG = [
 ];
 var TOLYNX_RIJ_LABELS = ['Totaal', 'Trekker', 'Chauffeur', 'Trailer/Reachstacker', 'Tugmaster', 'Heftruck'];
 
-// De "Totaal"-rij (rij 0) wordt bewust NIET vertrouwd op OCR-herkenning (die rij bleek
-// onbetrouwbaar te herkennen), maar altijd automatisch berekend als de som van de overige
-// rijen (Trekker, Chauffeur, Trailer/Reachstacker, Tugmaster, Heftruck), per kolom.
+// Berekent de "Totaal"-rij (rij 0) als de som van de overige rijen (Trekker, Chauffeur,
+// Trailer/Reachstacker, Tugmaster, Heftruck), per kolom. Wordt alleen nog gebruikt bij het
+// handmatig bewerken van een veld (zie tolynxHerberekenLive hieronder) — bij het verwerken
+// van een screenshot wordt de Totaal-rij NIET meer op deze manier overschreven, omdat dat
+// de optelling ongemerkt te hoog liet uitvallen als er een rij extra werd meegeteld die niet
+// op de screenshot stond. Daar blijft nu gewoon staan wat is gelezen (of 0).
 function tolynxHerbereken(rijen){
   if (!rijen || rijen.length < 2) return rijen;
   var kolommen = rijen[1].length;
@@ -23689,8 +23692,11 @@ function tolynxOcrVerwerkResultaat(result){
   } else {
     tolynxOcrStatus('&#9989; Cijfers automatisch ingevuld. Controleer ze even voordat je op Opslaan klikt.', '#1e7d34');
   }
-  tolynxHerbereken(nieuw.import);
-  tolynxHerbereken(nieuw.export);
+  // De Totaal-rij wordt hier bewust NIET meer overschreven met een berekende som — die
+  // stond soms te hoog doordat de niet-bestaande 6e rij (zie hierboven) er ongemerkt in
+  // meetelde. In plaats daarvan blijft gewoon staan wat er voor die rij is gelezen, en dat
+  // is 0 als de rij niet apart op de screenshot voorkwam — duidelijk zichtbaar om te
+  // controleren, in plaats van een stille, mogelijk te hoge optelling.
   _tolynxWerkData.import = nieuw.import;
   _tolynxWerkData.export = nieuw.export;
   renderTolynxKadeModalInputs();
