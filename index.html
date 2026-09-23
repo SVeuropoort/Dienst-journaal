@@ -3072,6 +3072,21 @@ async function spOphalenBestand(bestandsnaam){
   if (!resp.ok) throw new Error('Ophalen van SharePoint mislukt (status ' + resp.status + ')');
   return await resp.json();
 }
+// Lichte check of een bestand op SharePoint gewijzigd is sinds de vorige keer — vraagt alleen
+// de metadata op (wanneer voor het laatst gewijzigd), niet de volledige inhoud. Wordt gebruikt
+// om regelmatig te controleren of een collega op een ander apparaat iets heeft opgeslagen,
+// zonder daarvoor telkens het hele (mogelijk grote) bestand te moeten downloaden. Geeft null
+// terug als het bestand nog niet bestaat.
+async function spLaatstGewijzigd(bestandsnaam){
+  var token = await spGetToken();
+  var siteId = await spGetSiteId();
+  var url = 'https://graph.microsoft.com/v1.0/sites/' + siteId + '/drive/root:/Data/' + encodeURIComponent(bestandsnaam) + '?$select=lastModifiedDateTime';
+  var resp = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token }, cache: 'no-store' });
+  if (resp.status === 404) return null;
+  if (!resp.ok) throw new Error('Controleren op wijzigingen mislukt (status ' + resp.status + ')');
+  var data = await resp.json();
+  return data.lastModifiedDateTime || null;
+}
 // ── Bijlagen: echte bestanden (certificaten, PDF's) in de map "Bijlagen" op SharePoint —
 // in tegenstelling tot /Data hierboven (kleine JSON-instellingen) gaat het hier om de
 // daadwerkelijke bestandsinhoud, zodat een collega op een ander apparaat 'm ook kan
@@ -6029,6 +6044,7 @@ window.addEventListener('resize', () => {
             });
           }
           if (typeof djAanwezigStart === 'function') djAanwezigStart();
+          if (typeof djLivePollStart === 'function') djLivePollStart();
         } catch(e) {
           // Toegang niet (meer) geldig — sessie wissen
           sessionStorage.removeItem('dj_sp_verified');
@@ -6163,6 +6179,53 @@ window.addEventListener('resize', () => {
     if (tag === 'input' || tag === 'textarea') return !el.value;
     if (el.isContentEditable) return !(el.textContent || '').trim();
     return true;
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // Live-verversing van de Dagelijkse Planning: controleert periodiek — licht, alleen de
+  // "laatst gewijzigd"-tijd, niet de hele inhoud — of een collega op een ander apparaat iets
+  // heeft opgeslagen, en werkt het scherm dan in-place bij, zonder de pagina te herladen. Dus
+  // geen geflikker en geen storende "Reload app?"-pop-up. Draait alleen terwijl de Dagplanning
+  // daadwerkelijk open staat, en slaat een ronde over als iemand net middenin een veld aan het
+  // typen is, zodat niemand zijn eigen typwerk kwijtraakt aan een binnenkomende update — die
+  // ronde wordt dan simpelweg de volgende keer opnieuw geprobeerd.
+  // ══════════════════════════════════════════════════════════════════
+  var DJ_LIVE_POLL_INTERVAL_MS = 15000;
+  var _djLivePollTimer = null;
+  var _djLivePollLaatsteWijziging = null;
+  var _djLivePollRowId = null;
+  async function djLivePollTick(){
+    try {
+      var dpView = document.getElementById('view-dagplanning');
+      if (!dpView || !dpView.classList.contains('active')) return; // alleen relevant als open
+      if (_syncBezig) return; // niet tegelijk met een handmatige opslaan/ophalen
+      if (typeof spIngelogd !== 'function' || !spIngelogd()) return;
+      var rowId = getSBRowId();
+      if (rowId !== _djLivePollRowId) {
+        // Terminal gewisseld sinds de vorige ronde — begin opnieuw met een schone nulmeting.
+        _djLivePollRowId = rowId;
+        _djLivePollLaatsteWijziging = null;
+      }
+      var gewijzigd = await spLaatstGewijzigd(rowId + '.json');
+      if (gewijzigd === _djLivePollLaatsteWijziging) return; // niets veranderd
+      var vorige = _djLivePollLaatsteWijziging;
+      _djLivePollLaatsteWijziging = gewijzigd;
+      if (vorige === null) return; // eerste meting: alleen nulmeting vastleggen, niet meteen laden
+      if (!djKanVeiligHerladen()) return; // iemand is net aan het typen — volgende ronde opnieuw
+      var result = await spOphalenBestand(rowId + '.json');
+      if (!result || !result.data) return;
+      setSyncData(result.data);
+      if (typeof buildPanels === 'function') buildPanels();
+      if (typeof buildStats === 'function') buildStats();
+      if (typeof refreshAllCertCells === 'function') refreshAllCertCells();
+      if (typeof showSyncStatus === 'function') showSyncStatus('✓ Bijgewerkt door collega', 'ok');
+    } catch(e) {
+      console.warn('Live-verversing Dagplanning mislukt:', e);
+    }
+  }
+  function djLivePollStart(){
+    if (_djLivePollTimer) return;
+    _djLivePollTimer = setInterval(djLivePollTick, DJ_LIVE_POLL_INTERVAL_MS);
   }
 
   function setSyncData(data) {
