@@ -23638,8 +23638,10 @@ function tolynxOcrVerwerkResultaat(result){
       // gevonden — meestal doordat er buiten beeld gescrold was) en "een los getal binnen
       // een wél zichtbare rij is niet goed gelezen", want dat vraagt een heel ander vervolg
       // van de gebruiker (opnieuw, ruimer screenshotten versus alleen even controleren).
-      if (lijst.length === 0) ontbrekendeRijen.push(label);
-      else if (kolomBezet.indexOf(false) >= 0) onvolledig = true;
+      // Rij 0 ("Totaal") wordt hierbuiten gehouden: die wordt toch altijd hieronder herberekend
+      // als som van de andere rijen, dus 0 herkende getallen daar is normaal, geen fout.
+      if (rIdx !== 0 && lijst.length === 0) ontbrekendeRijen.push(label);
+      else if (rIdx !== 0 && kolomBezet.indexOf(false) >= 0) onvolledig = true;
       nieuw.import.push(kolomWaarden.slice(0, 5));
       nieuw.export.push(kolomWaarden.slice(5, 10));
       return;
@@ -23673,7 +23675,7 @@ function tolynxOcrVerwerkResultaat(result){
         onvolledig = true;
         return;
       }
-      if (lijst.length === 0) ontbrekendeRijen.push(label); else onvolledig = true;
+      if (rIdx !== 0 && lijst.length === 0) ontbrekendeRijen.push(label); else if (rIdx !== 0) onvolledig = true;
       nieuw.import.push([0,0,0,0,0]); nieuw.export.push([0,0,0,0,0]); return;
     }
     nieuw.import.push(lijst.slice(0, 5).map(function(w){ return w.n; }));
