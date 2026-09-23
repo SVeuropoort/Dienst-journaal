@@ -23600,9 +23600,11 @@ function tolynxOcrVerwerkResultaat(result){
     }
   }
 
-  kandidaten.forEach(function(rij){
+  var ontbrekendeRijen = [];
+  kandidaten.forEach(function(rij, rIdx){
     rij.woorden.sort(function(a, b){ return a.xc - b.xc; });
     var lijst = rij.woorden;
+    var label = TOLYNX_RIJ_LABELS[rIdx] || ('rij ' + (rIdx + 1));
 
     if (kolomAnchors) {
       // Elk getal aan de dichtstbijzijnde vaste kolompositie toewijzen, in plaats van
@@ -23632,7 +23634,12 @@ function tolynxOcrVerwerkResultaat(result){
         }
         if (idx >= 0) { kolomWaarden[idx] = p.w.n; kolomBezet[idx] = true; }
       });
-      if (kolomBezet.indexOf(false) >= 0) onvolledig = true;
+      // Onderscheid maken tussen "deze rij stond niet eens op de screenshot" (0 getallen
+      // gevonden — meestal doordat er buiten beeld gescrold was) en "een los getal binnen
+      // een wél zichtbare rij is niet goed gelezen", want dat vraagt een heel ander vervolg
+      // van de gebruiker (opnieuw, ruimer screenshotten versus alleen even controleren).
+      if (lijst.length === 0) ontbrekendeRijen.push(label);
+      else if (kolomBezet.indexOf(false) >= 0) onvolledig = true;
       nieuw.import.push(kolomWaarden.slice(0, 5));
       nieuw.export.push(kolomWaarden.slice(5, 10));
       return;
@@ -23666,13 +23673,16 @@ function tolynxOcrVerwerkResultaat(result){
         onvolledig = true;
         return;
       }
-      onvolledig = true; nieuw.import.push([0,0,0,0,0]); nieuw.export.push([0,0,0,0,0]); return;
+      if (lijst.length === 0) ontbrekendeRijen.push(label); else onvolledig = true;
+      nieuw.import.push([0,0,0,0,0]); nieuw.export.push([0,0,0,0,0]); return;
     }
     nieuw.import.push(lijst.slice(0, 5).map(function(w){ return w.n; }));
     nieuw.export.push(lijst.slice(5, 10).map(function(w){ return w.n; }));
   });
 
-  if (onvolledig) {
+  if (ontbrekendeRijen.length) {
+    tolynxOcrStatus('&#9888; De rij(en) "' + ontbrekendeRijen.join(', ') + '" stonden niet op de screenshot (waarschijnlijk buiten beeld gescrold). Scroll zodat alle rijen zichtbaar zijn en plak de screenshot opnieuw, of vul deze rij(en) hieronder met de hand aan.', '#c0392b');
+  } else if (onvolledig) {
     tolynxOcrStatus('&#9888; Niet elke rij kon volledig worden herkend. Controleer alle velden goed voordat je opslaat (screenshot staat hierboven).', '#c0392b');
   } else {
     tolynxOcrStatus('&#9989; Cijfers automatisch ingevuld. Controleer ze even voordat je op Opslaan klikt.', '#1e7d34');
