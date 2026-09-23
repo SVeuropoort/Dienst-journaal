@@ -19137,6 +19137,23 @@ function wisselPunctualityDatum(dateStr) {
         }
       }
 
+      // Ruwe, uurlijkse zeeniveaudata van het weermodel bevat kleine golf-/windruis, waardoor
+      // hierboven soms meerdere valse hoog/laag-momenten vlak na elkaar worden gezien, terwijl
+      // een echt getij hier steeds zo'n 6 uur en 12 minuten duurt. Een kandidaat die minder dan
+      // 4 uur na het vorige, al geaccepteerde moment valt, is dus bijna zeker ruis: binnen zo'n
+      // venster van 4 uur wordt alleen het meest uitgesproken punt (verst van 0) bewaard.
+      var MIN_MS_TUSSEN_GETIJEN = 4 * 3600000;
+      var gefilterdeEvents = [];
+      events.forEach(function(ev){
+        var vorige = gefilterdeEvents[gefilterdeEvents.length - 1];
+        if (!vorige || (ev.time - vorige.time) >= MIN_MS_TUSSEN_GETIJEN) {
+          gefilterdeEvents.push(ev);
+        } else if (Math.abs(ev.level) > Math.abs(vorige.level)) {
+          gefilterdeEvents[gefilterdeEvents.length - 1] = ev;
+        }
+      });
+      events = gefilterdeEvents;
+
       if (events.length === 0) {
         // Fallback: show hourly for next 12h
         for (var j = 0; j < times.length && events.length < 8; j++) {
