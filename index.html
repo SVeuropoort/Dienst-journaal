@@ -23140,13 +23140,17 @@ var TOLYNX_RIJ_IMG = {
 var TOLYNX_RIJ_KLEUR = '#5a6b82';
 var TOLYNX_RIJ_SVG = [
   tolynxSvg('<path d="M6 12c0-2.2 1.6-4 3.6-4 1.6 0 2.6 1.2 2.4 1.6-.4.9-1 2.4-2 2.4-1.6 0-2-2-2-2M12 12c0 2.2 1.6 4 3.6 4 2 0 3.6-1.8 3.6-4s-1.6-4-3.6-4c-1.6 0-2.6 1.2-2.4 1.6.4.9 1 2.4 2 2.4"/>', TOLYNX_RIJ_KLEUR, 18),
-  '<img src="' + TOLYNX_RIJ_IMG.trekker + '" style="height:18px;width:auto;display:block;">',
   '<img src="' + TOLYNX_RIJ_IMG.chauffeur + '" style="height:18px;width:auto;display:block;">',
   '<img src="' + TOLYNX_RIJ_IMG.trailer_reachstacker + '" style="height:18px;width:auto;display:block;">',
   '<img src="' + TOLYNX_RIJ_IMG.tugmaster + '" style="height:18px;width:auto;display:block;">',
   '<img src="' + TOLYNX_RIJ_IMG.heftruck + '" style="height:18px;width:auto;display:block;">'
 ];
-var TOLYNX_RIJ_LABELS = ['Totaal', 'Trekker', 'Chauffeur', 'Trailer/Reachstacker', 'Tugmaster', 'Heftruck'];
+// "Trekker" is bewust géén aparte rij meer: die categorie bestaat niet meer los in rePort
+// (vermoedelijk samengevoegd met Tugmaster, hetzelfde type voertuig). De tabel heeft dus
+// écht maar 5 rijen — Totaal + 4 categorieën — niet 6. Met N=6 verzon de OCR-koppeling
+// hierboven steeds een niet-bestaande extra rij, waardoor alle rijen erna een label
+// opschoven en de Totaal-rij's eigen cijfers per ongeluk als "Trekker" werden bestempeld.
+var TOLYNX_RIJ_LABELS = ['Totaal', 'Chauffeur', 'Trailer/Reachstacker', 'Tugmaster', 'Heftruck'];
 
 // Berekent het werkelijke totaal-aantal-op-de-kade als som van de échte categorierijen
 // (Trekker, Chauffeur, Trailer/Reachstacker, Tugmaster, Heftruck) — bewust NIET door de
@@ -23189,7 +23193,7 @@ function tolynxHerberekenLive(kant){
 }
 
 function tolynxKadeKey(){ return tk('kpi_tolynx_kade_v1'); }
-function tolynxKadeLeeg(){ return [[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]]; }
+function tolynxKadeLeeg(){ return [[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]]; }
 function getTolynxKadeHistorie(){
   try {
     var d = JSON.parse(localStorage.getItem(tolynxKadeKey()) || 'null');
