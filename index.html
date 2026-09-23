@@ -3479,6 +3479,9 @@ function djToegangVakjeWijzig(idx, omgevingKey, aan){
   if (!lijst[idx].permissies) lijst[idx].permissies = {};
   lijst[idx].permissies[omgevingKey] = aan;
   djToegangSet(lijst);
+  // Zorgt dat een net ingetrokken (of toegevoegde) toestemming meteen zichtbaar wordt in het
+  // eigen scherm, zonder dat de pagina herladen hoeft te worden.
+  if (typeof djVerbergTabsVoorTerminal === 'function') djVerbergTabsVoorTerminal();
 }
 function djToegangToevoegen(){
   var input = document.getElementById('dj-toegang-nieuw');
@@ -6014,7 +6017,15 @@ window.addEventListener('resize', () => {
           await spVerifieerToegang(); // bevestigt dat dit account nog steeds echt bij de site kan
           sessionStorage.setItem('dj_sp_verified', '1');
           if (typeof djWwCloudPull === 'function') djWwCloudPull();
-          if (typeof djToegangCloudPull === 'function') djToegangCloudPull();
+          if (typeof djToegangCloudPull === 'function') {
+            // Wacht de verse toegangslijst af en pas de zichtbaarheid van tegels/nav-items
+            // er meteen opnieuw op toe — anders draait die check al vóór deze data binnen is
+            // en blijft een net ingetrokken tegel (zoals BlueVi) alsnog zichtbaar tot de
+            // volgende paginalaad.
+            djToegangCloudPull().then(function(){
+              if (typeof djVerbergTabsVoorTerminal === 'function') djVerbergTabsVoorTerminal();
+            });
+          }
           if (typeof djAanwezigStart === 'function') djAanwezigStart();
         } catch(e) {
           // Toegang niet (meer) geldig — sessie wissen
