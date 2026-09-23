@@ -23148,6 +23148,18 @@ var TOLYNX_RIJ_SVG = [
 ];
 var TOLYNX_RIJ_LABELS = ['Totaal', 'Trekker', 'Chauffeur', 'Trailer/Reachstacker', 'Tugmaster', 'Heftruck'];
 
+// Berekent het werkelijke totaal-aantal-op-de-kade als som van de échte categorierijen
+// (Trekker, Chauffeur, Trailer/Reachstacker, Tugmaster, Heftruck) — bewust NIET door de
+// eigen "Totaal"-rij (rij 0) uit te lezen, want die mag sinds kort gewoon 0 zijn als hij niet
+// apart van de screenshot is afgelezen (zie tolynxOcrVerwerkResultaat). Voor de boven-maximum-
+// waarschuwing hieronder, en voor de maand-donut in het KPI-dashboard, mag het getal nooit
+// stilletjes te laag uitvallen doordat de Totaal-rij zelf niet gelezen kon worden.
+function tolynxWerkelijkTotaal(rijen){
+  if (!rijen || rijen.length < 2) return 0;
+  var som = 0;
+  for (var r = 1; r < rijen.length; r++) som += (rijen[r] && rijen[r][0]) || 0;
+  return som;
+}
 // Berekent de "Totaal"-rij (rij 0) als de som van de overige rijen (Trekker, Chauffeur,
 // Trailer/Reachstacker, Tugmaster, Heftruck), per kolom. Wordt alleen nog gebruikt bij het
 // handmatig bewerken van een veld (zie tolynxHerberekenLive hieronder) — bij het verwerken
@@ -23236,7 +23248,7 @@ function tolynxMaandDonutKaartHtml(){
   var tot = maandEntries.length;
   var binnen = 0, boven = 0;
   maandEntries.forEach(function(e){
-    var totaalKade = (e.import[0][0] || 0) + (e.export[0][0] || 0);
+    var totaalKade = tolynxWerkelijkTotaal(e.import) + tolynxWerkelijkTotaal(e.export);
     if (max !== null && totaalKade > max) boven++; else binnen++;
   });
 
@@ -23286,7 +23298,7 @@ function tolynxMaandDonutKaartHtml(){
   return html;
 }
 function tolynxTotaalOpKadeHtml(snapshot){
-  var totaal = (snapshot.import[0][0] || 0) + (snapshot.export[0][0] || 0);
+  var totaal = tolynxWerkelijkTotaal(snapshot.import) + tolynxWerkelijkTotaal(snapshot.export);
   var max = getTolynxMax();
   var overschreden = max !== null && totaal > max;
   var kleurBg = overschreden ? '#c0392b' : '#eef3fa';
