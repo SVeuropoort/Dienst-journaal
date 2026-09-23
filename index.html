@@ -6199,6 +6199,7 @@ window.addEventListener('resize', () => {
       var dpView = document.getElementById('view-dagplanning');
       if (!dpView || !dpView.classList.contains('active')) return; // alleen relevant als open
       if (_syncBezig) return; // niet tegelijk met een handmatige opslaan/ophalen
+      if (_autoSaveTimer) return; // eigen wijziging staat nog in de 2-sec.-wachtrij om weg te schrijven
       if (typeof spIngelogd !== 'function' || !spIngelogd()) return;
       var rowId = getSBRowId();
       if (rowId !== _djLivePollRowId) {
@@ -6208,13 +6209,22 @@ window.addEventListener('resize', () => {
       }
       var gewijzigd = await spLaatstGewijzigd(rowId + '.json');
       if (gewijzigd === _djLivePollLaatsteWijziging) return; // niets veranderd
-      var vorige = _djLivePollLaatsteWijziging;
-      _djLivePollLaatsteWijziging = gewijzigd;
-      if (vorige === null) return; // eerste meting: alleen nulmeting vastleggen, niet meteen laden
+      if (_djLivePollLaatsteWijziging === null) {
+        // Eerste meting: alleen de nulmeting vastleggen, niet meteen laden.
+        _djLivePollLaatsteWijziging = gewijzigd;
+        return;
+      }
       if (!djKanVeiligHerladen()) return; // iemand is net aan het typen — volgende ronde opnieuw
+      // Vlak vóór het (mogelijk trage) ophalen nogmaals checken: een eigen wijziging kan er in de
+      // tussentijd bij zijn gekomen. Bewust _djLivePollLaatsteWijziging nog NIET bijwerken hier —
+      // zo ziet de volgende ronde deze update alsnog als "nieuw" en probeert hij opnieuw zodra de
+      // eigen wijziging is weggeschreven, in plaats van 'm stilzwijgend te missen.
+      if (_syncBezig || _autoSaveTimer) return;
       var result = await spOphalenBestand(rowId + '.json');
-      if (!result || !result.data) return;
+      if (_syncBezig || _autoSaveTimer) return; // en nogmaals vlak vóór het toepassen
+      if (!result || !result.data) { _djLivePollLaatsteWijziging = gewijzigd; return; }
       setSyncData(result.data);
+      _djLivePollLaatsteWijziging = gewijzigd;
       if (typeof window.djDagplanningHerlaadInPlace === 'function') {
         window.djDagplanningHerlaadInPlace();
       } else {
