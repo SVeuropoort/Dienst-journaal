@@ -6190,7 +6190,7 @@ window.addEventListener('resize', () => {
   // typen is, zodat niemand zijn eigen typwerk kwijtraakt aan een binnenkomende update — die
   // ronde wordt dan simpelweg de volgende keer opnieuw geprobeerd.
   // ══════════════════════════════════════════════════════════════════
-  var DJ_LIVE_POLL_INTERVAL_MS = 15000;
+  var DJ_LIVE_POLL_INTERVAL_MS = 8000;
   var _djLivePollTimer = null;
   var _djLivePollLaatsteWijziging = null;
   var _djLivePollRowId = null;
@@ -6215,9 +6215,14 @@ window.addEventListener('resize', () => {
       var result = await spOphalenBestand(rowId + '.json');
       if (!result || !result.data) return;
       setSyncData(result.data);
-      if (typeof buildPanels === 'function') buildPanels();
-      if (typeof buildStats === 'function') buildStats();
-      if (typeof refreshAllCertCells === 'function') refreshAllCertCells();
+      if (typeof window.djDagplanningHerlaadInPlace === 'function') {
+        window.djDagplanningHerlaadInPlace();
+      } else {
+        // Vangnet, mocht de Dagplanning-module (nog) niet geladen zijn.
+        if (typeof buildPanels === 'function') buildPanels();
+        if (typeof buildStats === 'function') buildStats();
+        if (typeof refreshAllCertCells === 'function') refreshAllCertCells();
+      }
       if (typeof showSyncStatus === 'function') showSyncStatus('✓ Bijgewerkt door collega', 'ok');
     } catch(e) {
       console.warn('Live-verversing Dagplanning mislukt:', e);
@@ -9085,6 +9090,29 @@ function loadFullState(){
     return true;
   } catch(e){ return false; }
 }
+
+// Wordt aangeroepen door de live-poll (elders in de app) zodra blijkt dat een collega op een
+// ander apparaat iets heeft opgeslagen: haalt de zojuist door setSyncData() ververste data
+// opnieuw uit localStorage in dit scherm — exact dezelfde stappen als bij het eerste laden van
+// de pagina (loadFullState() + de per-datum aanvulling), zodat de tabel écht de nieuwe namen/
+// posities toont in plaats van alleen de oude in-memory staat opnieuw te tekenen.
+window.djDagplanningHerlaadInPlace = function(){
+  loadFullState();
+  try {
+    var _snap = JSON.parse(localStorage.getItem(tk('dagplan_' + planDate)));
+    if (_snap && ((_snap.ochEmps && _snap.ochEmps.length) || (_snap.avondEmps && _snap.avondEmps.length))) {
+      allEmps   = _snap.allEmps   || allEmps;
+      ochEmps   = _snap.ochEmps   || ochEmps;
+      avondEmps = _snap.avondEmps || avondEmps;
+      if (_snap.pos)   pos   = _snap.pos;
+      if (_snap.texts) texts = _snap.texts;
+    }
+  } catch(e) {}
+  buildPanels(); buildStats();
+  var _bOch = document.getElementById('bOch'); if (_bOch) _bOch.textContent = ochEmps.length;
+  var _bAvond = document.getElementById('bAvond'); if (_bAvond) _bAvond.textContent = avondEmps.length;
+  if (typeof refreshAllCertCells === 'function') refreshAllCertCells();
+};
 
 function loadLastDate(){
   return localStorage.getItem(LAST_DATE_KEY) || '';
