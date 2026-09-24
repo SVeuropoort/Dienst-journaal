@@ -16869,6 +16869,14 @@ renderAll();
 
     // Trucks tbody
     const truckBody = document.getElementById('materieel-trucks');
+    if (!truckBody) {
+      // Verouderde weergave: het materieeloverzicht wordt tegenwoordig elders opgebouwd
+      // (mat-trucks-sa/mat-overig-sa) en dit element bestaat niet meer. Zonder deze check
+      // crashte deze functie hier stilletjes, waardoor alles ná deze aanroep in dezelfde
+      // opstartroutine (o.a. loadMatStandalone/laadPorto/vulBedrijfSelect) nooit uitgevoerd
+      // werd — dat bleek de oorzaak van een leeg/grijs scherm elders in de app.
+      return;
+    }
     truckBody.innerHTML = '';
     trucks.forEach(m => {
       const i = data.indexOf(m);
@@ -16886,6 +16894,7 @@ renderAll();
 
     // Overig tbody
     const overigBody = document.getElementById('materieel-overig');
+    if (!overigBody) return;
     overigBody.innerHTML = '';
     overig.forEach(m => {
       const i = data.indexOf(m);
