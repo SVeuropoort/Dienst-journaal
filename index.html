@@ -15412,7 +15412,22 @@ function doBereken() { state.resultaten = bereken(state.payroll); state.step = &
 function reset() { state={step:&quot;upload&quot;,payroll:null,resultaten:null,maand:new Date().getMonth()+1,jaar:new Date().getFullYear(),filter:&quot;actief&quot;,zoek:&quot;&quot;,fileName:&quot;&quot;,rawWorkbook:null}; render(); }
 function setFilter(f) { state.filter = f; render(); }
 
-render();
+try {
+  render();
+} catch(e) {
+  console.error('Maandafsluiting render mislukt:', e);
+  var _fc = document.getElementById('content');
+  if (_fc) {
+    var _fmsg = ((e && e.message) || String(e)).split('&').join('&amp;').split('<').join('&lt;').split('>').join('&gt;');
+    var _fstack = ((e && e.stack) || '').split('&').join('&amp;').split('<').join('&lt;').split('>').join('&gt;');
+    _fc.innerHTML = '<div style=\'max-width:600px;margin:60px auto;text-align:center;\'>' +
+      '<div style=\'font-size:40px;margin-bottom:16px;\'>\u26A0\uFE0F</div>' +
+      '<h2 style=\'color:#c0392b;margin-bottom:12px;\'>Er ging iets mis bij het laden van dit scherm</h2>' +
+      '<p style=\'color:#666;font-size:13px;margin-bottom:8px;\'>De opgeslagen gegevens konden niet worden weergegeven. Geef deze technische melding door zodat het gericht opgelost kan worden:</p>' +
+      '<code style=\'display:block;background:#f5f5f5;color:#c0392b;padding:10px 14px;border-radius:6px;font-size:12px;text-align:left;white-space:pre-wrap;\'>' + _fmsg + (_fstack ? String.fromCharCode(10,10) + _fstack : '') + '</code>' +
+      '</div>';
+  }
+}
 </script>
 
 
