@@ -18299,6 +18299,16 @@ function wisselPunctualityDatum(dateStr) {
       data[tk('mat_standalone_v2')] = matStore || getMatStore();
       data[tk('mat_custom_list')] = teVerzendenCustomList;
       await spOpslaanBestand(rowId + '.json', { data: data, updated_at: new Date().toISOString() });
+      // Apart, klein "markeerbestand" dat UITSLUITEND wijzigt wanneer materieel-data wijzigt —
+      // los van EP_main.json/HVH_main.json (die ook bij elke andere wijziging in de app verandert).
+      // Hierop kan een Power Automate-flow triggeren voor een melding die écht alleen over
+      // materieel gaat, in plaats van bij elke wijziging in de hele app af te gaan.
+      try {
+        var terminalPrefix = sessionStorage.getItem('dj_terminal') || 'EP';
+        await spOpslaanBestand(terminalPrefix + '_materieel_wijziging.json', { gewijzigd_op: new Date().toISOString() });
+      } catch(eMarker) {
+        console.warn('Materieel-wijziging-markeerbestand niet opgeslagen:', eMarker);
+      }
     } catch(e) {
       console.warn('Materieel niet naar SharePoint gepusht:', e);
     }
