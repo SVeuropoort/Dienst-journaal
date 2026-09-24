@@ -9009,9 +9009,11 @@ function manualSave(){
 
     // Visual feedback
     const btn = document.getElementById('saveBtn');
-    btn.innerHTML = '✅ Opgeslagen!';
-    btn.style.background = '#1e8449';
-    setTimeout(()=>{ btn.innerHTML='💾 Opslaan'; btn.style.background='#27ae60'; }, 2500);
+    if (btn) {
+      btn.innerHTML = '✅ Opgeslagen!';
+      btn.style.background = '#1e8449';
+      setTimeout(()=>{ btn.innerHTML='💾 Opslaan'; btn.style.background='#27ae60'; }, 2500);
+    }
 
   } catch(err){
     alert('Opslaan mislukt: ' + err.message);
@@ -17450,6 +17452,7 @@ function laadDagData() {
     doCopy(pad);
     if (!silent) {
       const bev = document.getElementById('kopie-bevestiging');
+      if (!bev) return;
       bev.style.opacity = '1';
       setTimeout(() => bev.style.opacity = '0', 2500);
     }
