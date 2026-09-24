@@ -7739,10 +7739,24 @@ function getCertDates() {
 }
 // Datums worden niet meer los opgeslagen (ze staan alleen nog in Opleidingen).
 function saveCertDates(data) {}
+// Zet een opgeslagen datum (jjjj-mm-dd óf, bij een oude/foutieve invoer, dd-mm-jjjj) om naar
+// een betrouwbaar Date-object. new Date(...) alleen is te streng: die herkent dd-mm-jjjj vaak
+// niet (of leest 'm verkeerd om), waardoor de vervaldatum stil leeg bleef terwijl de datum zelf
+// via isoNaarNL (die wél beide formaten herkent) prima werd getoond.
+function certParseDatum(behaald) {
+  if (!behaald) return null;
+  var s = String(behaald).trim();
+  var m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  var m2 = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (m2) return new Date(Number(m2[3]), Number(m2[2]) - 1, Number(m2[1]));
+  var d = new Date(s);
+  return isNaN(d) ? null : d;
+}
 function getCertVervalDatum(behaald, cat) {
   if (!behaald) return null;
-  var d = new Date(behaald);
-  if (isNaN(d)) return null;
+  var d = certParseDatum(behaald);
+  if (!d || isNaN(d)) return null;
   var maanden = getCertGeldigheidMaanden()[cat] || 12;
   d.setMonth(d.getMonth() + maanden);
   return d;
