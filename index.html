@@ -6089,6 +6089,7 @@ window.addEventListener('resize', () => {
     'dagpl_cert_dates_v1',
     'kade_vakken_v1',
     'ortRekentoolState_v1',
+    'cert_geldigheid_maanden_v1',
     'opleiding_shunten_v1','opleiding_lossen_v1','opleiding_laden_v1','opleiding_heftruck_v1','opleiding_reachstacker_v1',
     'opleiding_overzicht_v1',
     'opleiding_aftek_config_v1',
@@ -7628,8 +7629,23 @@ function doubleShiftNames(){
 // alleen daar — dit scherm (Dagelijkse Planning) is uitsluitend ter controle.
 // Categorie-sleutel hier (bhv/adm/ehbo/gevst) → veldnaam in Opleidingen-overzicht.
 var CERT_NAAR_OPL_VELD = { bhv: 'bhv', adm: 'al', ehbo: 'ehbo', gevst: 'gs' };
-// Geldigheid in jaren per categorie
-var CERT_GELDIGHEID = { bhv: 1, adm: 1, ehbo: 1, gevst: 5 };
+// Geldigheid per categorie, in maanden. Instelbaar via het tandwiel-knopje bij
+// "Geldigheid & Vervaldata" in het Certificeringen-scherm (was voorheen een vaste
+// tabel in jaren: BHV/EHBO/Ademlucht = 1 jaar, Gevaarlijke stoffen = 5 jaar — die
+// waarden zijn nu de standaardwaarden, maar wel aanpasbaar).
+var CERT_GELDIGHEID_STANDAARD_MAANDEN = { bhv: 12, adm: 12, ehbo: 12, gevst: 60 };
+function getCertGeldigheidMaanden() {
+  try {
+    var opgeslagen = JSON.parse(localStorage.getItem('cert_geldigheid_maanden_v1'));
+    if (opgeslagen && typeof opgeslagen === 'object') {
+      return Object.assign({}, CERT_GELDIGHEID_STANDAARD_MAANDEN, opgeslagen);
+    }
+  } catch(e) {}
+  return Object.assign({}, CERT_GELDIGHEID_STANDAARD_MAANDEN);
+}
+function setCertGeldigheidMaanden(obj) {
+  localStorage.setItem('cert_geldigheid_maanden_v1', JSON.stringify(obj));
+}
 
 // Oude vaste lijst — niet meer leidend voor logo's, maar gebruikt als controlelijst:
 // mensen die hier ooit in stonden maar nog geen datum in Opleidingen hebben,
@@ -7727,8 +7743,8 @@ function getCertVervalDatum(behaald, cat) {
   if (!behaald) return null;
   var d = new Date(behaald);
   if (isNaN(d)) return null;
-  var jaren = CERT_GELDIGHEID[cat] || 1;
-  d.setFullYear(d.getFullYear() + jaren);
+  var maanden = getCertGeldigheidMaanden()[cat] || 12;
+  d.setMonth(d.getMonth() + maanden);
   return d;
 }
 function djDatumPad2(n) { n = String(n); return n.length === 1 ? '0' + n : n; }
@@ -9299,6 +9315,44 @@ function renderCertGeldigheid() {
     html += '</tbody></table></div>';
   });
   document.getElementById('cert-geldig-body').innerHTML = html;
+  var uitlegEl = document.getElementById('cert-geldig-uitleg');
+  if (uitlegEl) {
+    var g = getCertGeldigheidMaanden();
+    uitlegEl.innerHTML = 'Alleen-lezen overzicht van behaal- en vervaldatums (BHV/EHBO/Ademlucht = ' + certMaandenLabel(g.bhv) +
+      ' geldig, Gevaarlijke stoffen = ' + certMaandenLabel(g.gevst) + '). Datums wijzig je in <strong>Opleidingen → Certificeringen</strong>, de geldigheidsduur via het tandwiel hiernaast.';
+  }
+}
+// Formatteert een aantal maanden leesbaar: "12" wordt "1 jaar", "18" wordt "18 maanden".
+function certMaandenLabel(maanden) {
+  maanden = Number(maanden) || 0;
+  if (maanden > 0 && maanden % 12 === 0) {
+    var jaren = maanden / 12;
+    return jaren + ' jaar';
+  }
+  return maanden + ' maand' + (maanden === 1 ? '' : 'en');
+}
+function certGeldigheidToonForm() {
+  var g = getCertGeldigheidMaanden();
+  document.getElementById('cert-geldig-in-bhv').value = g.bhv;
+  document.getElementById('cert-geldig-in-ehbo').value = g.ehbo;
+  document.getElementById('cert-geldig-in-adm').value = g.adm;
+  document.getElementById('cert-geldig-in-gevst').value = g.gevst;
+  document.getElementById('cert-geldig-form').style.display = 'block';
+}
+function certGeldigheidVerbergForm() {
+  document.getElementById('cert-geldig-form').style.display = 'none';
+}
+function certGeldigheidOpslaan() {
+  var nieuw = {
+    bhv:   Math.max(1, parseInt(document.getElementById('cert-geldig-in-bhv').value, 10)   || 12),
+    ehbo:  Math.max(1, parseInt(document.getElementById('cert-geldig-in-ehbo').value, 10)  || 12),
+    adm:   Math.max(1, parseInt(document.getElementById('cert-geldig-in-adm').value, 10)   || 12),
+    gevst: Math.max(1, parseInt(document.getElementById('cert-geldig-in-gevst').value, 10) || 60)
+  };
+  setCertGeldigheidMaanden(nieuw);
+  certGeldigheidVerbergForm();
+  renderCertGeldigheid();
+  if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
 }
 function certSaveDatum(input) {
   var cat = input.dataset.cat;
@@ -16728,7 +16782,24 @@ renderAll();
 
       <!-- Tab: Geldigheid -->
       <div id="cert-tab-geldig" style="display:none;">
-        <p style="font-size:12px;color:#718096;margin-bottom:12px;">Alleen-lezen overzicht van behaal- en vervaldatums (BHV/EHBO/Ademlucht = 1 jaar geldig, Gevaarlijke stoffen = 5 jaar). Datums wijzig je in <strong>Opleidingen → Certificeringen</strong>.</p>
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px;">
+          <p id="cert-geldig-uitleg" style="font-size:12px;color:#718096;margin:0;flex:1;"></p>
+          <button onclick="certGeldigheidToonForm()" title="Geldigheidsduur per categorie aanpassen"
+            style="flex-shrink:0;background:#f7fafc;border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:13px;">&#x2699;&#xFE0F;</button>
+        </div>
+        <div id="cert-geldig-form" style="display:none;background:#f7fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:16px;">
+          <div style="font-size:12px;font-weight:700;color:#2d3748;margin-bottom:10px;">Geldigheidsduur per categorie (in maanden)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div><label style="font-size:11px;color:#718096;">BHV</label><input type="number" min="1" id="cert-geldig-in-bhv" style="width:100%;padding:7px 9px;border:1px solid #cbd5e0;border-radius:5px;font-size:13px;box-sizing:border-box;"></div>
+            <div><label style="font-size:11px;color:#718096;">EHBO</label><input type="number" min="1" id="cert-geldig-in-ehbo" style="width:100%;padding:7px 9px;border:1px solid #cbd5e0;border-radius:5px;font-size:13px;box-sizing:border-box;"></div>
+            <div><label style="font-size:11px;color:#718096;">Ademlucht</label><input type="number" min="1" id="cert-geldig-in-adm" style="width:100%;padding:7px 9px;border:1px solid #cbd5e0;border-radius:5px;font-size:13px;box-sizing:border-box;"></div>
+            <div><label style="font-size:11px;color:#718096;">Gevaarlijke stoffen</label><input type="number" min="1" id="cert-geldig-in-gevst" style="width:100%;padding:7px 9px;border:1px solid #cbd5e0;border-radius:5px;font-size:13px;box-sizing:border-box;"></div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px;">
+            <button onclick="certGeldigheidOpslaan()" style="padding:7px 16px;border:none;border-radius:6px;background:#003366;color:#fff;cursor:pointer;font-size:12px;font-weight:700;">Opslaan</button>
+            <button onclick="certGeldigheidVerbergForm()" style="padding:7px 16px;border:1px solid #cbd5e0;border-radius:6px;background:#fff;color:#4a5568;cursor:pointer;font-size:12px;">Annuleren</button>
+          </div>
+        </div>
         <div id="cert-geldig-body"></div>
       </div>
 
