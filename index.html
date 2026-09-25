@@ -17442,7 +17442,14 @@ function laadDagData() {
       `&windspeed_unit=ms&timezone=Europe%2FAmsterdam`;
 
     try {
-      const res = await fetch(url);
+      // Open-Meteo geeft af en toe een tijdelijke 502 ("Could not relay message upstream") —
+      // dan één keer opnieuw proberen na 3 seconden voordat we een foutmelding tonen.
+      let res;
+      try { res = await fetch(url); } catch(_e1) { res = null; }
+      if (!res || !res.ok) {
+        await new Promise(function(r){ setTimeout(r, 3000); });
+        res = await fetch(url);
+      }
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const json = await res.json();
       const c = json.current;
@@ -19234,28 +19241,66 @@ function wisselPunctualityDatum(dateStr) {
         if (!rwsResultaat) {
           throw new Error('Nog geen getijdenbestand gevonden op SharePoint (Power Automate-flow al eerder gedraaid?)');
         }
-        var rwsJson = rwsResultaat.series ? rwsResultaat : (rwsResultaat.data || rwsResultaat);
-        var reeksen = rwsJson.series || [];
-        var astro = reeksen.find(function(s){
-          return s && s.meta && /astronomisch/i.test(s.meta.parameterName || '');
-        });
-        if (!astro || !astro.data || !astro.data.length) {
-          throw new Error('Geen astronomisch-getij-reeks gevonden in RWS-data');
+        // Power Automate kan de RWS-respons soms als tekst (string) of ingepakt in "body"/"$content"
+        // wegschrijven — pak 'm in alle gevallen uit tot het echte RWS-object.
+        if (typeof rwsResultaat === 'string') { try { rwsResultaat = JSON.parse(rwsResultaat); } catch(_e){} }
+        if (rwsResultaat && rwsResultaat.body) rwsResultaat = rwsResultaat.body;
+        if (rwsResultaat && rwsResultaat['$content']) {
+          try { rwsResultaat = JSON.parse(atob(rwsResultaat['$content'])); } catch(_e){}
         }
-        var punten = astro.data
-          .filter(function(p){ return p && p.value !== null && p.value !== undefined; })
-          .map(function(p){ return { time: new Date(p.dateTime), level: p.value / 100 }; }); // cm -> m
-
-        for (var i = 1; i < punten.length - 1; i++) {
-          var t = punten[i].time;
-          if (t < new Date(now.getTime() - 2*3600000)) continue;
-          if (t > new Date(now.getTime() + 24*3600000)) break;
-          var prev = punten[i-1].level, curr = punten[i].level, next = punten[i+1].level;
-          if (curr > prev && curr > next) {
-            events.push({ type: 'hoog', time: t, level: curr });
-          } else if (curr < prev && curr < next) {
-            events.push({ type: 'laag', time: t, level: curr });
+        if (typeof rwsResultaat === 'string') { try { rwsResultaat = JSON.parse(rwsResultaat); } catch(_e){} }
+        var punten = [];
+        if (rwsResultaat && rwsResultaat.WaarnemingenLijst) {
+          // Officiele RWS WaterWebservices (ddapi20, OphalenWaarnemingen met ProcesType "astronomisch").
+          // Er kunnen meerdere reeksen terugkomen (bijv. t.o.v. NAP en t.o.v. MSL) — kies NAP.
+          var lijsten = rwsResultaat.WaarnemingenLijst.filter(function(w){ return w && w.MetingenLijst && w.MetingenLijst.length; });
+          if (!lijsten.length) throw new Error('Geen astronomisch-getij-reeks gevonden in RWS-data');
+          var reeks = lijsten.find(function(w){
+            var h = w.AquoMetadata && w.AquoMetadata.Hoedanigheid && w.AquoMetadata.Hoedanigheid.Code;
+            return h && /NAP/i.test(h);
+          }) || lijsten[0];
+          punten = reeks.MetingenLijst
+            .map(function(m){
+              var v = m && m.Meetwaarde ? m.Meetwaarde.Waarde_Numeriek : null;
+              return { time: new Date(m.Tijdstip), level: (typeof v === 'number') ? v : null };
+            })
+            .filter(function(p){ return p.level !== null && Math.abs(p.level) < 10000 && !isNaN(p.time); }) // 999999999 = hiaat
+            .map(function(p){ return { time: p.time, level: p.level / 100 }; }) // cm -> m
+            .sort(function(a,b){ return a.time - b.time; });
+        } else {
+          // Oud waterinfo-formaat (series/meta) — blijft ondersteund als vangnet.
+          var rwsJson = rwsResultaat.series ? rwsResultaat : (rwsResultaat.data || rwsResultaat);
+          var reeksen = rwsJson.series || [];
+          var astro = reeksen.find(function(s){
+            return s && s.meta && /astronomisch/i.test(s.meta.parameterName || '');
+          });
+          if (!astro || !astro.data || !astro.data.length) {
+            throw new Error('Geen astronomisch-getij-reeks gevonden in RWS-data');
           }
+          punten = astro.data
+            .filter(function(p){ return p && p.value !== null && p.value !== undefined; })
+            .map(function(p){ return { time: new Date(p.dateTime), level: p.value / 100 }; });
+        }
+        if (punten.length < 3) throw new Error('Te weinig getijdata in bestand (flow-periode te kort?)');
+
+        // Hoog/laagwater bepalen. Bij 10-minutenwaarden in hele cm liggen er aan de top vaak twee
+        // gelijke waarden naast elkaar — daarom op richtingswissel zoeken (vlakke stukken overslaan)
+        // en het midden van zo'n vlak stuk als tijdstip nemen.
+        var vanaf = new Date(now.getTime() - 2*3600000), tot = new Date(now.getTime() + 24*3600000);
+        var richting = 0, vlakStart = 0;
+        for (var i = 1; i < punten.length; i++) {
+          var d = punten[i].level - punten[i-1].level;
+          if (d === 0) continue;
+          var nieuw = d > 0 ? 1 : -1;
+          if (richting !== 0 && nieuw !== richting) {
+            // extreem ligt tussen vlakStart en i-1
+            var t = new Date((punten[vlakStart].time.getTime() + punten[i-1].time.getTime()) / 2);
+            if (t >= vanaf && t <= tot) {
+              events.push({ type: richting > 0 ? 'hoog' : 'laag', time: t, level: punten[i-1].level });
+            }
+          }
+          richting = nieuw;
+          vlakStart = i;
         }
         // De astronomische curve is al glad (geen model-ruis zoals bij Open-Meteo), maar als
         // extra vangnet blijft dezelfde minimale-tussenafstand-check staan.
@@ -19369,9 +19414,13 @@ function wisselPunctualityDatum(dateStr) {
       if (errEl) {
         errEl.style.display = 'block';
         var _immGF = (sessionStorage.getItem('dj_terminal')||'EP')==='IMM';
+        var _tijErrInfo = (typeof getTerminalWeerGetijdenInfo === 'function') ? getTerminalWeerGetijdenInfo() : {};
+        var _tijErrUrl = _tijErrInfo.tijUrl || 'https://nl.tideschart.com/Netherlands/South-Holland/Gemeente-Rotterdam/Europoort/';
+        var _tijErrMsg = String((e && e.message) || e || '').replace(/[<>&"]/g, function(c){ return {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]; });
         errEl.innerHTML = (_immGF ? 'Tide data could not be loaded. ' : 'Getijdendata kon niet worden geladen. ') +
-          '<a href="https://nl.tideschart.com/Netherlands/South-Holland/Gemeente-Rotterdam/Europoort/" ' +
-          'target="_blank" style="color:var(--navy);font-weight:600;">' + (_immGF ? 'View on tideschart.com' : 'Bekijk op tideschart.com') + ' &#x2197;</a>';
+          '<a href="' + _tijErrUrl + '" ' +
+          'target="_blank" style="color:var(--navy);font-weight:600;">' + (_immGF ? 'View on tideschart.com' : 'Bekijk op tideschart.com') + ' &#x2197;</a>' +
+          (_tijErrMsg ? '<div style="margin-top:6px;font-size:11px;opacity:.75;">' + _tijErrMsg + '</div>' : '');
       }
     }
   }
