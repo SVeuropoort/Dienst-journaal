@@ -19287,38 +19287,43 @@ function wisselPunctualityDatum(dateStr) {
         if (punten.length < 3) throw new Error('Te weinig getijdata in bestand (flow-periode te kort?)');
         _tijDataBereik = { van: punten[0].time, tot: punten[punten.length-1].time };
 
-        // Hoog/laagwater bepalen. Bij 10-minutenwaarden in hele cm liggen er aan de top vaak twee
-        // gelijke waarden naast elkaar — daarom op richtingswissel zoeken (vlakke stukken overslaan)
-        // en het midden van zo'n vlak stuk als tijdstip nemen.
+        // Hoog/laagwater bepalen. Stap 1: alle keerpunten zoeken. Bij 10-minutenwaarden in hele cm
+        // liggen er aan de top vaak gelijke waarden naast elkaar — daarom op richtingswissel zoeken
+        // (vlakke stukken overslaan) en het midden van zo'n vlak stuk als tijdstip nemen.
         var vanaf = tijVanaf05, tot = new Date(now.getTime() + 24*3600000);
+        var ruw = [];
         var richting = 0, vlakStart = 0;
         for (var i = 1; i < punten.length; i++) {
           var d = punten[i].level - punten[i-1].level;
           if (d === 0) continue;
           var nieuw = d > 0 ? 1 : -1;
           if (richting !== 0 && nieuw !== richting) {
-            // extreem ligt tussen vlakStart en i-1
             var t = new Date((punten[vlakStart].time.getTime() + punten[i-1].time.getTime()) / 2);
-            if (t >= vanaf && t <= tot) {
-              events.push({ type: richting > 0 ? 'hoog' : 'laag', time: t, level: punten[i-1].level });
-            }
+            ruw.push({ type: richting > 0 ? 'hoog' : 'laag', time: t, level: punten[i-1].level });
           }
           richting = nieuw;
           vlakStart = i;
         }
-        // De astronomische curve is al glad (geen model-ruis zoals bij Open-Meteo), maar als
-        // extra vangnet blijft dezelfde minimale-tussenafstand-check staan.
-        var MIN_MS_RWS = 4 * 3600000;
-        var gefilterdRws = [];
-        events.forEach(function(ev){
-          var vorige = gefilterdRws[gefilterdRws.length - 1];
-          if (!vorige || (ev.time - vorige.time) >= MIN_MS_RWS) {
-            gefilterdRws.push(ev);
-          } else if (Math.abs(ev.level) > Math.abs(vorige.level)) {
-            gefilterdRws[gefilterdRws.length - 1] = ev;
+        // Stap 2: dubbel laagwater (agger) bij Hoek van Holland wegfilteren. Daar zakt het water,
+        // stijgt het een paar cm en zakt het daarna nog eens. Een omkering van minder dan 10 cm is
+        // geen echt getij: die kleine "top" en het tweede dal vallen weg, het eerste laagwater
+        // (LW1) blijft staan — zoals Rijkswaterstaat en tideschart het laagwater ook tonen.
+        // (De vorige 4-uurs-regel liet hier per ongeluk het laagwater door het hoogwater vervangen.)
+        var MIN_OMKERING = 0.10; // m
+        var schoon = [], slaTerugkeerOver = false;
+        ruw.forEach(function(ev){
+          var vorige = schoon[schoon.length - 1];
+          if (slaTerugkeerOver) {
+            if (ev.type === vorige.type) { slaTerugkeerOver = false; return; }
           }
+          if (vorige && ev.type !== vorige.type && Math.abs(ev.level - vorige.level) < MIN_OMKERING) {
+            slaTerugkeerOver = true;
+            return;
+          }
+          slaTerugkeerOver = false;
+          schoon.push(ev);
         });
-        events = gefilterdRws;
+        events = schoon.filter(function(ev){ return ev.time >= vanaf && ev.time <= tot; });
       } else {
         // Immingham (UK): Rijkswaterstaat dekt alleen Nederlandse meetstations, dus hier blijft
         // de oude aanpak via het algemene weermodel (Open-Meteo Marine) in gebruik.
@@ -19417,7 +19422,7 @@ function wisselPunctualityDatum(dateStr) {
       // de flow genoeg data terug ophaalt en of de nieuwste app-versie geladen is.
       if (upd && _tijDataBereik) {
         var _fmtDT = function(d){ return pad(d.getDate()) + '-' + pad(d.getMonth()+1) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()); };
-        upd.textContent += ' \u00b7 data ' + _fmtDT(_tijDataBereik.van) + ' t/m ' + _fmtDT(_tijDataBereik.tot) + ' \u00b7 v36u';
+        upd.textContent += ' \u00b7 data ' + _fmtDT(_tijDataBereik.van) + ' t/m ' + _fmtDT(_tijDataBereik.tot) + ' \u00b7 v36u2';
       }
 
     } catch(e) {
