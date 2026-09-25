@@ -19224,6 +19224,10 @@ function wisselPunctualityDatum(dateStr) {
       var _tijInfo = (typeof getTerminalWeerGetijdenInfo === 'function') ? getTerminalWeerGetijdenInfo() : {tijLat:51.9479, tijLon:4.0478, rwsStation:'hoekvanholland'};
       var now = new Date();
       var events = [];
+      // Getijden tonen vanaf 05:00 's ochtends (begin dagdienst). Voor 05:00 's nachts nog de
+      // vorige dag vanaf 05:00, zodat de lopende dienst zichtbaar blijft.
+      var tijVanaf05 = new Date(now); tijVanaf05.setHours(5, 0, 0, 0);
+      if (now < tijVanaf05) tijVanaf05.setDate(tijVanaf05.getDate() - 1);
 
       if (_tijInfo.rwsStation) {
         // Rijkswaterstaat Waterinfo — het "astronomisch" getij is de pure, berekende getijcurve
@@ -19286,7 +19290,7 @@ function wisselPunctualityDatum(dateStr) {
         // Hoog/laagwater bepalen. Bij 10-minutenwaarden in hele cm liggen er aan de top vaak twee
         // gelijke waarden naast elkaar — daarom op richtingswissel zoeken (vlakke stukken overslaan)
         // en het midden van zo'n vlak stuk als tijdstip nemen.
-        var vanaf = new Date(now.getTime() - 2*3600000), tot = new Date(now.getTime() + 24*3600000);
+        var vanaf = tijVanaf05, tot = new Date(now.getTime() + 24*3600000);
         var richting = 0, vlakStart = 0;
         for (var i = 1; i < punten.length; i++) {
           var d = punten[i].level - punten[i-1].level;
@@ -19342,7 +19346,7 @@ function wisselPunctualityDatum(dateStr) {
         var levels = json.hourly.sea_level_height_msl;
         for (var k = 1; k < times.length - 1; k++) {
           var tk_ = new Date(times[k]);
-          if (tk_ < new Date(now.getTime() - 2*3600000)) continue;
+          if (tk_ < tijVanaf05) continue;
           if (tk_ > new Date(now.getTime() + 24*3600000)) break;
           var prevK = levels[k-1], currK = levels[k], nextK = levels[k+1];
           if (currK !== null && prevK !== null && nextK !== null) {
@@ -19396,7 +19400,7 @@ function wisselPunctualityDatum(dateStr) {
         var dagDiv = document.createElement('div');
         dagDiv.className = 'gb-hl';
         var isVandaag = ev.time.toDateString() === now.toDateString();
-        dagDiv.textContent = isVandaag ? 'vandaag' : 'morgen';
+        dagDiv.textContent = isVandaag ? 'vandaag' : (ev.time < now ? 'gisteren' : 'morgen');
 
         div.appendChild(typeDiv);
         div.appendChild(tijdDiv);
