@@ -19224,6 +19224,7 @@ function wisselPunctualityDatum(dateStr) {
       var _tijInfo = (typeof getTerminalWeerGetijdenInfo === 'function') ? getTerminalWeerGetijdenInfo() : {tijLat:51.9479, tijLon:4.0478, rwsStation:'hoekvanholland'};
       var now = new Date();
       var events = [];
+      var _tijDataBereik = null;
       // Getijden tonen over 36 uur: 12 uur terug t/m 24 uur vooruit.
       var tijVanaf05 = new Date(now.getTime() - 12*3600000);
 
@@ -19284,6 +19285,7 @@ function wisselPunctualityDatum(dateStr) {
             .map(function(p){ return { time: new Date(p.dateTime), level: p.value / 100 }; });
         }
         if (punten.length < 3) throw new Error('Te weinig getijdata in bestand (flow-periode te kort?)');
+        _tijDataBereik = { van: punten[0].time, tot: punten[punten.length-1].time };
 
         // Hoog/laagwater bepalen. Bij 10-minutenwaarden in hele cm liggen er aan de top vaak twee
         // gelijke waarden naast elkaar — daarom op richtingswissel zoeken (vlakke stukken overslaan)
@@ -19411,6 +19413,12 @@ function wisselPunctualityDatum(dateStr) {
       loading.style.display = 'none';
       if (dataEl) dataEl.style.display = 'block';
       if (upd) upd.textContent = ((sessionStorage.getItem('dj_terminal')||'EP')==='IMM' ? 'Updated: ' : 'Bijgewerkt: ') + pad(now.getHours()) + ':' + pad(now.getMinutes());
+      // Toont welk tijdsbereik er in het RWS-bestand zit (en de versie), zodat zichtbaar is of
+      // de flow genoeg data terug ophaalt en of de nieuwste app-versie geladen is.
+      if (upd && _tijDataBereik) {
+        var _fmtDT = function(d){ return pad(d.getDate()) + '-' + pad(d.getMonth()+1) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+        upd.textContent += ' \u00b7 data ' + _fmtDT(_tijDataBereik.van) + ' t/m ' + _fmtDT(_tijDataBereik.tot) + ' \u00b7 v36u';
+      }
 
     } catch(e) {
       loading.style.display = 'none';
