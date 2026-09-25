@@ -14134,6 +14134,133 @@ function oplOverzichtTabelHtml(titel, kleur, rijen, tbodyId, isGroep){
     '</table></div>') + '</div>';
 }
 
+// Certificeringen-overzicht als PDF (A4 liggend). Wordt direct gedownload via jsPDF,
+// zonder pop-up (window.open wordt geblokkeerd door de bedrijfsbrowser). Het PDF-bestand
+// kun je daarna gewoon openen en printen.
+function oplLaadJsPdf(cb){
+  if (window.jspdf && window.jspdf.jsPDF) { cb(); return; }
+  var s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+  s.onload = cb;
+  s.onerror = function(){ alert('Kon de PDF-bibliotheek niet laden. Controleer je internetverbinding.'); };
+  document.head.appendChild(s);
+}
+function oplOverzichtPdf(){
+  var btn = document.getElementById('opl-ovz-pdf-btn');
+  var btnTekst = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '&#x23F3; Bezig...'; }
+  oplLaadJsPdf(function(){
+    try { oplOverzichtPdfMaken(); }
+    catch(e){ alert('PDF maken mislukt: ' + (e && e.message ? e.message : e)); }
+    if (btn) { btn.disabled = false; btn.innerHTML = btnTekst; }
+  });
+}
+function oplOverzichtPdfMaken(){
+  var t = oplOverzichtHuidigTerminal();
+  var imm = t === 'IMM';
+  var terminalNaam = t === 'HVH' ? 'Hoek van Holland' : (imm ? 'Immingham' : 'Europoort');
+  var lijst = oplOverzichtGetData();
+
+  var hoofd = [], groepen = {}, groepVolg = [];
+  lijst.forEach(function(r){
+    if (r.groep) {
+      if (!groepen[r.groep]) { groepen[r.groep] = []; groepVolg.push(r.groep); }
+      groepen[r.groep].push(r);
+    } else hoofd.push(r);
+  });
+  groepVolg.sort(function(a, b){ return a.localeCompare(b); });
+
+  var kolommen = [
+    { k: 'tt',   t: 'Terminal Truck' },
+    { k: 'rs',   t: 'Reachstacker' },
+    { k: 'hf',   t: 'Heftruck' },
+    { k: 'bhv',  t: 'BHV' },
+    { k: 'ehbo', t: 'EHBO' },
+    { k: 'pl',   t: 'Ploegleider' },
+    { k: 'bb',   t: 'Beademings- ballon' },
+    { k: 'al',   t: 'Ademlucht' },
+    { k: 'gs',   t: 'Gevaarlijke stoffen' }
+  ];
+
+  var jsPDF = window.jspdf.jsPDF;
+  var doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  var PW = 297, PH = 210, M = 10, RIJ = 6.2;
+  var nu = new Date();
+  var pad2 = function(n){ return String(n).padStart(2, '0'); };
+  var datumTekst = pad2(nu.getDate()) + '-' + pad2(nu.getMonth()+1) + '-' + nu.getFullYear() + ' ' + pad2(nu.getHours()) + ':' + pad2(nu.getMinutes());
+  var y = M;
+
+  function paginaKop(){
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(0, 51, 102);
+    doc.text((imm ? 'Certifications \u2013 ' : 'Certificeringen \u2013 ') + terminalNaam, M, M + 5);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(100);
+    doc.text((imm ? 'Printed: ' : 'Afgedrukt: ') + datumTekst, M, M + 10);
+    try { doc.addImage(OPL_STENA_LOGO, 'PNG', PW - M - 30, M, 30, 11.5); } catch(e) {}
+    y = M + 16;
+  }
+  function kolomBreedtes(metTwb){
+    var cols = (metTwb ? [{ k: 'twb', t: 'Basis TW' }] : []).concat(kolommen);
+    var naamB = 52;
+    var rest = (PW - 2*M - naamB) / cols.length;
+    return { cols: cols, naamB: naamB, colB: rest };
+  }
+  function tabelKop(kb, kleur){
+    // Kopregel twee regels hoog, zodat lange kolomnamen (Gevaarlijke stoffen,
+    // Beademingsballon) netjes afbreken in plaats van over de rand te lopen.
+    var KOP = 8.5;
+    doc.setFillColor(17, 17, 17); doc.rect(M, y, PW - 2*M, KOP, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(255);
+    doc.text(imm ? 'Name' : 'Naam', M + 2, y + 5.3);
+    kb.cols.forEach(function(c, i){
+      var regels = doc.splitTextToSize(c.t, kb.colB - 2.5).slice(0, 2);
+      var ty = regels.length > 1 ? y + 3.6 : y + 5.3;
+      regels.forEach(function(r, n){ doc.text(r, M + kb.naamB + i*kb.colB + 1.5, ty + n*3.2); });
+    });
+    y += KOP;
+  }
+  function sectie(titel, rijen, metTwb, kleur){
+    var kb = kolomBreedtes(metTwb);
+    if (y + RIJ*3 > PH - M) { doc.addPage(); paginaKop(); }
+    doc.setFillColor(kleur[0], kleur[1], kleur[2]); doc.rect(M, y, PW - 2*M, 7, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(255);
+    doc.text(titel + ' (' + rijen.length + ')', M + 2, y + 4.9);
+    y += 7;
+    tabelKop(kb, kleur);
+    rijen.forEach(function(r, n){
+      if (y + RIJ > PH - M - 4) { doc.addPage(); paginaKop(); tabelKop(kb, kleur); }
+      if (n % 2 === 1) { doc.setFillColor(242, 245, 250); doc.rect(M, y, PW - 2*M, RIJ, 'F'); }
+      doc.setDrawColor(225); doc.line(M, y + RIJ, PW - M, y + RIJ);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(20);
+      var naam = String(r.naam || '');
+      if (doc.getTextWidth(naam) > kb.naamB - 3) {
+        while (naam.length > 1 && doc.getTextWidth(naam + '\u2026') > kb.naamB - 3) naam = naam.slice(0, -1);
+        naam += '\u2026';
+      }
+      doc.text(naam, M + 2, y + 4.2);
+      kb.cols.forEach(function(c, i){
+        var w = r[c.k] ? isoNaarNL(r[c.k]) : '';
+        if (w) doc.text(String(w), M + kb.naamB + i*kb.colB + 1.5, y + 4.2);
+      });
+      y += RIJ;
+    });
+    y += 6;
+  }
+
+  paginaKop();
+  var kleurTerm = t === 'HVH' ? [122, 31, 31] : (imm ? [31, 107, 58] : [0, 51, 102]);
+  sectie(terminalNaam, hoofd, false, kleurTerm);
+  groepVolg.forEach(function(g){ sectie(g, groepen[g], true, [138, 109, 26]); });
+
+  var totaal = doc.getNumberOfPages();
+  for (var p = 1; p <= totaal; p++) {
+    doc.setPage(p);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(130);
+    doc.text((imm ? 'Page ' : 'Pagina ') + p + ' / ' + totaal, PW - M, PH - 5, { align: 'right' });
+  }
+  var bestand = (imm ? 'Certifications_' : 'Certificeringen_') + terminalNaam.replace(/\s+/g, '_') + '_' + nu.getFullYear() + '-' + pad2(nu.getMonth()+1) + '-' + pad2(nu.getDate()) + '.pdf';
+  doc.save(bestand);
+}
+
 function oplOverzichtHtml(){
   var t = oplOverzichtHuidigTerminal();
   var titel = t === 'HVH' ? 'Hoek van Holland' : (t === 'IMM' ? 'Immingham' : 'Europoort');
@@ -14163,6 +14290,9 @@ function oplOverzichtHtml(){
     html += '<div style="font-size:11.5px;color:#667;margin-bottom:14px;">Datum van behaalde certificering per medewerker. Leeg = nog niet behaald. Klik op een datumveld om te bewerken (formaat dd/mm/jjjj).</div>';
     html += '<div style="font-size:12px;color:var(--muted);background:#f5f8fc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:14px;line-height:1.5;">Een nieuwe medewerker voeg je hier niet los toe: iedereen komt automatisch binnen vanuit de Maandafsluiting. Hoort iemand bij een groep (Stagiaires, Pro Intermediair, Schooljongens, TOS, e.d.), voeg hem dan toe bij Werkoverdracht &rarr; Personeelsdossier &rarr; Groepen &mdash; die verschijnt daarna vanzelf ook hier.</div>';
   }
+  html += '<div style="display:flex;justify-content:flex-end;margin-bottom:10px;">' +
+    '<button onclick="oplOverzichtPdf()" id="opl-ovz-pdf-btn" style="background:#003366;color:#fff;border:none;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:12px;font-weight:700;">&#x1F5A8;&#xFE0F; ' + (t === 'IMM' ? 'Print / PDF' : 'Printen / PDF') + '</button>' +
+    '</div>';
   html += oplOverzichtTabelHtml(titel, kleur, hoofdRijen, 'opl-ovz-tbody');
 
   groepVolgorde.forEach(function(groepNaam, gIdx){
@@ -19418,13 +19548,6 @@ function wisselPunctualityDatum(dateStr) {
       loading.style.display = 'none';
       if (dataEl) dataEl.style.display = 'block';
       if (upd) upd.textContent = ((sessionStorage.getItem('dj_terminal')||'EP')==='IMM' ? 'Updated: ' : 'Bijgewerkt: ') + pad(now.getHours()) + ':' + pad(now.getMinutes());
-      // Toont welk tijdsbereik er in het RWS-bestand zit (en de versie), zodat zichtbaar is of
-      // de flow genoeg data terug ophaalt en of de nieuwste app-versie geladen is.
-      if (upd && _tijDataBereik) {
-        var _fmtDT = function(d){ return pad(d.getDate()) + '-' + pad(d.getMonth()+1) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()); };
-        upd.textContent += ' \u00b7 data ' + _fmtDT(_tijDataBereik.van) + ' t/m ' + _fmtDT(_tijDataBereik.tot) + ' \u00b7 v36u2';
-      }
-
     } catch(e) {
       loading.style.display = 'none';
       if (errEl) {
@@ -20118,6 +20241,9 @@ function wisselPunctualityDatum(dateStr) {
   // volledige paginalaad — dus ook direct na het (opnieuw) inloggen. Zelfde vertraging
   // en zelfde redenen als bij laadWeer hierboven.
   document.addEventListener('DOMContentLoaded', function(){ setTimeout(laadGetijden, 2000); });
+  // Getijden elke 30 minuten automatisch verversen (alleen als de app zichtbaar is), zodat het
+  // venster van 12 uur terug / 24 uur vooruit meeschuift als de app de hele dienst openstaat.
+  setInterval(function(){ if (!document.hidden) laadGetijden(); }, 30 * 60 * 1000);
   // =====  ZOEKFUNCTIES =====
   // ===== SCHEEPZOEKER =====
   var SCHEPEN_DEFAULT = [
