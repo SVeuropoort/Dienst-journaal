@@ -19224,10 +19224,8 @@ function wisselPunctualityDatum(dateStr) {
       var _tijInfo = (typeof getTerminalWeerGetijdenInfo === 'function') ? getTerminalWeerGetijdenInfo() : {tijLat:51.9479, tijLon:4.0478, rwsStation:'hoekvanholland'};
       var now = new Date();
       var events = [];
-      // Getijden tonen vanaf 05:00 's ochtends (begin dagdienst). Voor 05:00 's nachts nog de
-      // vorige dag vanaf 05:00, zodat de lopende dienst zichtbaar blijft.
-      var tijVanaf05 = new Date(now); tijVanaf05.setHours(5, 0, 0, 0);
-      if (now < tijVanaf05) tijVanaf05.setDate(tijVanaf05.getDate() - 1);
+      // Getijden tonen over 36 uur: 12 uur terug t/m 24 uur vooruit.
+      var tijVanaf05 = new Date(now.getTime() - 12*3600000);
 
       if (_tijInfo.rwsStation) {
         // Rijkswaterstaat Waterinfo — het "astronomisch" getij is de pure, berekende getijcurve
@@ -19324,7 +19322,8 @@ function wisselPunctualityDatum(dateStr) {
         // de oude aanpak via het algemene weermodel (Open-Meteo Marine) in gebruik.
         var lat = _tijInfo.tijLat, lon = _tijInfo.tijLon;
         var today = new Date();
-        var tomorrow = new Date(today);
+        today.setDate(today.getDate() - 1); // vanaf gisteren, voor het venster van 12 uur terug
+        var tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         var fmt = function(d) {
           return d.getFullYear() + '-' +
@@ -19381,7 +19380,7 @@ function wisselPunctualityDatum(dateStr) {
       // Render
       var pad = function(n){ return String(n).padStart(2,'0'); };
       blokken.innerHTML = '';
-      events.slice(0, 8).forEach(function(ev) {
+      events.slice(0, 10).forEach(function(ev) {
         var div = document.createElement('div');
         div.className = 'getijden-blok ' + ev.type;
 
