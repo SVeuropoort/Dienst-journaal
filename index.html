@@ -17388,7 +17388,8 @@ function laadDagData() {
         weerLat: 51.9791, weerLon: 4.1291,
         tijLat: 51.9791, tijLon: 4.1291,
         tijUrl: 'https://nl.tideschart.com/Netherlands/South-Holland/Hoek-van-Holland/',
-        tijBronLabel: 'tideschart.com &ndash; Hoek van Holland'
+        tijBronLabel: 'Rijkswaterstaat Waterinfo &ndash; Hoek van Holland',
+        rwsStation: 'hoekvanholland'
       };
     }
     if (t === 'IMM') {
@@ -17397,7 +17398,8 @@ function laadDagData() {
         weerLat: 53.6144, weerLon: -0.2200,
         tijLat: 53.6144, tijLon: -0.2200,
         tijUrl: 'https://www.tideschart.com/United-Kingdom/England/North-East-Lincolnshire/Immingham/',
-        tijBronLabel: 'tideschart.com &ndash; Immingham'
+        tijBronLabel: 'tideschart.com &ndash; Immingham',
+        rwsStation: null
       };
     }
     return {
@@ -17405,7 +17407,8 @@ function laadDagData() {
       weerLat: 51.9479, weerLon: 4.0478,
       tijLat: 51.9479, tijLon: 4.0478,
       tijUrl: 'https://nl.tideschart.com/Netherlands/South-Holland/Gemeente-Rotterdam/Europoort/',
-      tijBronLabel: 'tideschart.com &ndash; Europoort'
+      tijBronLabel: 'Rijkswaterstaat Waterinfo &ndash; Hoek van Holland (dichtstbijzijnde meetstation)',
+      rwsStation: 'hoekvanholland'
     };
   }
   function verversWeerGetijdenTitels(){
@@ -19210,79 +19213,111 @@ function wisselPunctualityDatum(dateStr) {
     if (errEl)  errEl.style.display  = 'none';
 
     try {
-      // Open-Meteo Marine API - sea level height, coördinaten passen zich aan op basis van de ingelogde terminal
       if (typeof verversWeerGetijdenTitels === 'function') verversWeerGetijdenTitels();
-      var _tijInfo = (typeof getTerminalWeerGetijdenInfo === 'function') ? getTerminalWeerGetijdenInfo() : {tijLat:51.9479, tijLon:4.0478};
-      var lat = _tijInfo.tijLat, lon = _tijInfo.tijLon;
-      var today = new Date();
-      var tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      var fmt = function(d) {
-        return d.getFullYear() + '-' +
-          String(d.getMonth()+1).padStart(2,'0') + '-' +
-          String(d.getDate()).padStart(2,'0');
-      };
-
-      var url = 'https://marine-api.open-meteo.com/v1/marine?' +
-        'latitude=' + lat + '&longitude=' + lon +
-        '&hourly=sea_level_height_msl' +
-        '&start_date=' + fmt(today) +
-        '&end_date=' + fmt(tomorrow) +
-        '&timezone=Europe%2FAmsterdam';
-
-      var res  = await fetch(url);
-      var json = await res.json();
-
-      if (!json.hourly || !json.hourly.sea_level_height_msl) {
-        throw new Error('Geen getijdendata beschikbaar');
-      }
-
-      var times  = json.hourly.time;
-      var levels = json.hourly.sea_level_height_msl;
-
-      // Find local maxima (hoog water) and minima (laag water) for today
+      var _tijInfo = (typeof getTerminalWeerGetijdenInfo === 'function') ? getTerminalWeerGetijdenInfo() : {tijLat:51.9479, tijLon:4.0478, rwsStation:'hoekvanholland'};
       var now = new Date();
       var events = [];
 
-      for (var i = 1; i < times.length - 1; i++) {
-        var t = new Date(times[i]);
-        // Only show today and near future
-        if (t < new Date(now.getTime() - 2*3600000)) continue;
-        if (t > new Date(now.getTime() + 24*3600000)) break;
+      if (_tijInfo.rwsStation) {
+        // Rijkswaterstaat Waterinfo — het "astronomisch" getij is de pure, berekende getijcurve
+        // zonder wind-/weersinvloeden (dus zonder ruis), voor Nederlandse meetstations. Dit is
+        // dezelfde bron die waterinfo.rws.nl zelf gebruikt, en zou de tijden/hoogtes die je op
+        // tideschart.com ziet, moeten benaderen — betrouwbaarder dan het eerder gebruikte,
+        // algemene weermodel (Open-Meteo), dat af en toe valse hoog/laagwater-momenten liet zien.
+        var rwsUrl = 'https://waterinfo.rws.nl/api/chart/get?mapType=waterhoogte&locationCodes=' +
+          _tijInfo.rwsStation + '&values=-6,60';
+        var rwsRes  = await fetch(rwsUrl);
+        var rwsJson = await rwsRes.json();
+        var reeksen = rwsJson.series || [];
+        var astro = reeksen.find(function(s){
+          return s && s.meta && /astronomisch/i.test(s.meta.parameterName || '');
+        });
+        if (!astro || !astro.data || !astro.data.length) {
+          throw new Error('Geen astronomisch-getij-reeks gevonden in RWS-data');
+        }
+        var punten = astro.data
+          .filter(function(p){ return p && p.value !== null && p.value !== undefined; })
+          .map(function(p){ return { time: new Date(p.dateTime), level: p.value / 100 }; }); // cm -> m
 
-        var prev = levels[i-1], curr = levels[i], next = levels[i+1];
-        if (curr !== null && prev !== null && next !== null) {
+        for (var i = 1; i < punten.length - 1; i++) {
+          var t = punten[i].time;
+          if (t < new Date(now.getTime() - 2*3600000)) continue;
+          if (t > new Date(now.getTime() + 24*3600000)) break;
+          var prev = punten[i-1].level, curr = punten[i].level, next = punten[i+1].level;
           if (curr > prev && curr > next) {
             events.push({ type: 'hoog', time: t, level: curr });
           } else if (curr < prev && curr < next) {
             events.push({ type: 'laag', time: t, level: curr });
           }
         }
-      }
-
-      // Ruwe, uurlijkse zeeniveaudata van het weermodel bevat kleine golf-/windruis, waardoor
-      // hierboven soms meerdere valse hoog/laag-momenten vlak na elkaar worden gezien, terwijl
-      // een echt getij hier steeds zo'n 6 uur en 12 minuten duurt. Een kandidaat die minder dan
-      // 4 uur na het vorige, al geaccepteerde moment valt, is dus bijna zeker ruis: binnen zo'n
-      // venster van 4 uur wordt alleen het meest uitgesproken punt (verst van 0) bewaard.
-      var MIN_MS_TUSSEN_GETIJEN = 4 * 3600000;
-      var gefilterdeEvents = [];
-      events.forEach(function(ev){
-        var vorige = gefilterdeEvents[gefilterdeEvents.length - 1];
-        if (!vorige || (ev.time - vorige.time) >= MIN_MS_TUSSEN_GETIJEN) {
-          gefilterdeEvents.push(ev);
-        } else if (Math.abs(ev.level) > Math.abs(vorige.level)) {
-          gefilterdeEvents[gefilterdeEvents.length - 1] = ev;
+        // De astronomische curve is al glad (geen model-ruis zoals bij Open-Meteo), maar als
+        // extra vangnet blijft dezelfde minimale-tussenafstand-check staan.
+        var MIN_MS_RWS = 4 * 3600000;
+        var gefilterdRws = [];
+        events.forEach(function(ev){
+          var vorige = gefilterdRws[gefilterdRws.length - 1];
+          if (!vorige || (ev.time - vorige.time) >= MIN_MS_RWS) {
+            gefilterdRws.push(ev);
+          } else if (Math.abs(ev.level) > Math.abs(vorige.level)) {
+            gefilterdRws[gefilterdRws.length - 1] = ev;
+          }
+        });
+        events = gefilterdRws;
+      } else {
+        // Immingham (UK): Rijkswaterstaat dekt alleen Nederlandse meetstations, dus hier blijft
+        // de oude aanpak via het algemene weermodel (Open-Meteo Marine) in gebruik.
+        var lat = _tijInfo.tijLat, lon = _tijInfo.tijLon;
+        var today = new Date();
+        var tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        var fmt = function(d) {
+          return d.getFullYear() + '-' +
+            String(d.getMonth()+1).padStart(2,'0') + '-' +
+            String(d.getDate()).padStart(2,'0');
+        };
+        var url = 'https://marine-api.open-meteo.com/v1/marine?' +
+          'latitude=' + lat + '&longitude=' + lon +
+          '&hourly=sea_level_height_msl' +
+          '&start_date=' + fmt(today) +
+          '&end_date=' + fmt(tomorrow) +
+          '&timezone=Europe%2FAmsterdam';
+        var res  = await fetch(url);
+        var json = await res.json();
+        if (!json.hourly || !json.hourly.sea_level_height_msl) {
+          throw new Error('Geen getijdendata beschikbaar');
         }
-      });
-      events = gefilterdeEvents;
-
-      if (events.length === 0) {
-        // Fallback: show hourly for next 12h
-        for (var j = 0; j < times.length && events.length < 8; j++) {
-          var tj = new Date(times[j]);
-          if (tj >= now) {
-            events.push({ type: levels[j] > 0 ? 'hoog' : 'laag', time: tj, level: levels[j] });
+        var times  = json.hourly.time;
+        var levels = json.hourly.sea_level_height_msl;
+        for (var k = 1; k < times.length - 1; k++) {
+          var tk_ = new Date(times[k]);
+          if (tk_ < new Date(now.getTime() - 2*3600000)) continue;
+          if (tk_ > new Date(now.getTime() + 24*3600000)) break;
+          var prevK = levels[k-1], currK = levels[k], nextK = levels[k+1];
+          if (currK !== null && prevK !== null && nextK !== null) {
+            if (currK > prevK && currK > nextK) {
+              events.push({ type: 'hoog', time: tk_, level: currK });
+            } else if (currK < prevK && currK < nextK) {
+              events.push({ type: 'laag', time: tk_, level: currK });
+            }
+          }
+        }
+        var MIN_MS_OM = 4 * 3600000;
+        var gefilterdOm = [];
+        events.forEach(function(ev){
+          var vorige = gefilterdOm[gefilterdOm.length - 1];
+          if (!vorige || (ev.time - vorige.time) >= MIN_MS_OM) {
+            gefilterdOm.push(ev);
+          } else if (Math.abs(ev.level) > Math.abs(vorige.level)) {
+            gefilterdOm[gefilterdOm.length - 1] = ev;
+          }
+        });
+        events = gefilterdOm;
+        if (events.length === 0) {
+          for (var j = 0; j < times.length && events.length < 8; j++) {
+            var tj = new Date(times[j]);
+            if (tj >= now) {
+              events.push({ type: levels[j] > 0 ? 'hoog' : 'laag', time: tj, level: levels[j] });
+            }
           }
         }
       }
