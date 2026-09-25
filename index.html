@@ -19224,10 +19224,17 @@ function wisselPunctualityDatum(dateStr) {
         // dezelfde bron die waterinfo.rws.nl zelf gebruikt, en zou de tijden/hoogtes die je op
         // tideschart.com ziet, moeten benaderen — betrouwbaarder dan het eerder gebruikte,
         // algemene weermodel (Open-Meteo), dat af en toe valse hoog/laagwater-momenten liet zien.
-        var rwsUrl = 'https://waterinfo.rws.nl/api/chart/get?mapType=waterhoogte&locationCodes=' +
-          _tijInfo.rwsStation + '&values=-6,60';
-        var rwsRes  = await fetch(rwsUrl);
-        var rwsJson = await rwsRes.json();
+        //
+        // Rechtstreeks vanuit de browser ophalen bij waterinfo.rws.nl bleek geblokkeerd door CORS
+        // (Rijkswaterstaat staat dat niet toe vanaf een andere website). Daarom haalt een Power
+        // Automate-flow deze data periodiek zelf op (een server heeft geen last van CORS) en zet
+        // 'm klaar als bestand in de Data-map op SharePoint — hier wordt dat bestand gewoon
+        // gelezen, net als bij de rest van de app.
+        var rwsResultaat = await spOphalenBestand('getijden_hoekvanholland.json');
+        if (!rwsResultaat) {
+          throw new Error('Nog geen getijdenbestand gevonden op SharePoint (Power Automate-flow al eerder gedraaid?)');
+        }
+        var rwsJson = rwsResultaat.series ? rwsResultaat : (rwsResultaat.data || rwsResultaat);
         var reeksen = rwsJson.series || [];
         var astro = reeksen.find(function(s){
           return s && s.meta && /astronomisch/i.test(s.meta.parameterName || '');
