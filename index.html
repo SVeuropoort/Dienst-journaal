@@ -6204,6 +6204,8 @@ window.addEventListener('resize', () => {
       if (!dpView || !dpView.classList.contains('active')) return; // alleen relevant als open
       if (_syncBezig) return; // niet tegelijk met een handmatige opslaan/ophalen
       if (_autoSaveTimer) return; // eigen wijziging staat nog in de 2-sec.-wachtrij om weg te schrijven
+      if (!djStartOphalenKlaar()) return; // start-ophalen nog niet klaar
+      if (window.djHeeftOnopgeslagenWerk && window.djHeeftOnopgeslagenWerk()) return; // eigen werk eerst naar de cloud
       if (typeof spIngelogd !== 'function' || !spIngelogd()) return;
       var rowId = getSBRowId();
       if (rowId !== _djLivePollRowId) {
@@ -6226,6 +6228,7 @@ window.addEventListener('resize', () => {
       if (_syncBezig || _autoSaveTimer) return;
       var result = await spOphalenBestand(rowId + '.json');
       if (_syncBezig || _autoSaveTimer) return; // en nogmaals vlak vóór het toepassen
+      if (window.djHeeftOnopgeslagenWerk && window.djHeeftOnopgeslagenWerk()) return;
       if (!result || !result.data) { _djLivePollLaatsteWijziging = gewijzigd; return; }
       setSyncData(result.data);
       _djLivePollLaatsteWijziging = gewijzigd;
@@ -6250,12 +6253,17 @@ window.addEventListener('resize', () => {
   function setSyncData(data) {
     if (!data) return;
     // Restore all keys from cloud (static + dynamic dagplanning keys)
-    Object.keys(data).forEach(function(k) {
-      if (data[k] !== undefined) {
-        var val = typeof data[k] === 'string' ? data[k] : JSON.stringify(data[k]);
-        localStorage.setItem(k, val);
-      }
-    });
+    _djSyncDataToepassen = true;
+    try {
+      Object.keys(data).forEach(function(k) {
+        if (data[k] !== undefined) {
+          var val = typeof data[k] === 'string' ? data[k] : JSON.stringify(data[k]);
+          localStorage.setItem(k, val);
+        }
+      });
+    } finally {
+      _djSyncDataToepassen = false;
+    }
   }
 
   function showSyncStatus(msg, type) {
@@ -6300,7 +6308,13 @@ window.addEventListener('resize', () => {
   })();
 
   async function cloudOpslaan(toonFouten) {
-    if (_syncBezig) return;
+    if (_syncBezig) {
+      // Er loopt al een opslag. Vroeger werd deze aanvraag dan stil genegeerd — waardoor een
+      // wijziging die tijdens een (trage) opslag werd gemaakt nooit in de cloud kwam en de
+      // live-verversing 'm daarna weer wegveegde. Nu: onthouden en direct na afloop opnieuw.
+      _djOpslaanOpnieuw = true;
+      return;
+    }
     // EERST OPHALEN, DAN PAS OPSLAAN: zolang deze sessie de cloud-versie nog niet heeft
     // opgehaald, mag dit apparaat niets wegschrijven. Anders overschrijft een verouderde lokale
     // kopie (bijv. een lege of oude Dagplanning) de lijst die een collega net heeft opgeslagen.
@@ -6315,6 +6329,9 @@ window.addEventListener('resize', () => {
       return;
     }
     if (toonFouten) showSyncStatus('☁️ Opslaan...', 'info');
+    var _versieBijStart = _djWijzigVersie;
+    _djOpslaanOpnieuw = false;
+    var _gelukt = false;
     try {
       var rowId = getSBRowId();
       var lokaal = getSyncData();
@@ -6339,6 +6356,8 @@ window.addEventListener('resize', () => {
       var data = Object.assign({}, cloudData, lokaal);
       _laatsteBekendeCloudData = data;
       await spOpslaanBestand(rowId + '.json', { data: data, updated_at: new Date().toISOString() });
+      _gelukt = true;
+      _djOpgeslagenVersie = _versieBijStart;
       var dagCount = Object.keys(data).filter(function(k){return k.indexOf('dagplan')>-1;}).length;
       if (toonFouten) showSyncStatus('✓ Opgeslagen in ' + rowId + ' (' + dagCount + ' dagplan)', 'ok');
     } catch(e) {
@@ -6346,6 +6365,14 @@ window.addEventListener('resize', () => {
       else console.warn('cloudOpslaan:', e.message);
     }
     _syncBezig = false;
+    // Nieuwe wijzigingen tijdens deze opslag, of mislukt? Dan opnieuw proberen, zodat niets
+    // lokaal blijft hangen (en dus ook niet door de live-verversing kan worden overschreven).
+    if (_djOpslaanOpnieuw || _djWijzigVersie !== _djOpgeslagenVersie) {
+      _djOpslaanOpnieuw = false;
+      if (!_autoSaveTimer) {
+        _autoSaveTimer = setTimeout(function(){ _autoSaveTimer = null; cloudOpslaan(); }, _gelukt ? 500 : 10000);
+      }
+    }
   }
 
 
@@ -6403,8 +6430,16 @@ window.addEventListener('resize', () => {
   function djStartOphalenKlaar(){ return _djStartOphalenKlaarVlag; }
   function djMarkeerStartOphalenKlaar(){ _djStartOphalenKlaarVlag = true; sessionStorage.setItem('_cloudGeladen', '1'); }
   window.djSluitStartOphalen = function(){ _djStartOphalenKlaarVlag = false; if (_autoSaveTimer) { clearTimeout(_autoSaveTimer); _autoSaveTimer = null; } };
+  // Wijzig-teller: elke lokale wijziging verhoogt _djWijzigVersie; een geslaagde opslag zet
+  // _djOpgeslagenVersie gelijk. Zolang die verschillen heeft dit apparaat onopgeslagen werk en mag
+  // de live-verversing de cloud-versie NIET over de lokale data heen leggen.
+  var _djWijzigVersie = 0, _djOpgeslagenVersie = 0, _djOpslaanOpnieuw = false;
+  var _djSyncDataToepassen = false; // true tijdens setSyncData: dat is cloud-data, geen eigen wijziging
+  window.djHeeftOnopgeslagenWerk = function(){ return _djWijzigVersie !== _djOpgeslagenVersie || !!_autoSaveTimer || _syncBezig; };
   window._doCloudOpslaan = function() {
+    if (_djSyncDataToepassen) return; // cloud-data wordt net lokaal gezet: niet terug-opslaan
     if (!djStartOphalenKlaar()) return; // nog niet opgehaald: niets wegschrijven (zie hierboven)
+    _djWijzigVersie++;
     if (_autoSaveTimer) clearTimeout(_autoSaveTimer);
     _autoSaveTimer = setTimeout(function() {
       _autoSaveTimer = null;
@@ -6527,6 +6562,9 @@ window.addEventListener('resize', () => {
         } catch(e) {
           console.warn('Auto cloud laden mislukt:', e);
           showSyncStatus('⚠️ Auto-laden mislukt – klik Ophalen', 'err');
+          // Automatisch opnieuw proberen: zolang het ophalen niet gelukt is wordt er niets
+          // opgeslagen, dus hier niet blijven hangen.
+          setTimeout(function(){ if (!djStartOphalenKlaar()) djStartOphalen(); }, 15000);
           // Highlight de Ophalen knop
           var btn = document.querySelector('[onclick="cloudLaden()"]');
           if (btn) { btn.style.animation = 'pulse 1s infinite'; btn.style.boxShadow = '0 0 0 3px rgba(220,53,69,0.4)'; }
@@ -6621,11 +6659,9 @@ window.addEventListener('resize', () => {
     </button>
   </div>
 
-  <div class="act-bar">
-    <strong>💡</strong> Selecteer een medewerker uit de dropdown om hem/haar op positie te plaatsen.
-    Wijzigingen blijven bewaard tijdens de sessie.
-    <span style="flex:1"></span>
-    <button onclick="clearPos()">Posities wissen</button>
+  <div style="display:flex;justify-content:flex-end;padding:6px 0;">
+    <button onclick="clearPos()" title="Alle posities van deze planning leegmaken"
+      style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:12.5px;font-weight:700;">Opschonen</button>
   </div>
 
   <!-- Per-tab print button bar -->
@@ -22585,6 +22621,7 @@ var DJ_VERTAAL_WOORDENBOEK = {
   "🔍 Laden": "🔍 Load",
   "◀ Vorige": "◀ Previous",
   "Gisteren": "Yesterday",
+  "Opschonen": "Clean up",
   "Vandaag": "Today",
   "Morgen": "Tomorrow",
   "Volgende ▶": "Next ▶",
