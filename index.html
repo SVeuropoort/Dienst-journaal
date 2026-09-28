@@ -4456,16 +4456,15 @@ function djHerstelVaarschema(){
 
     <!-- Datum selector met automatische backup -->
     <div class="vaarschema-datum-bar">
-      <div class="field" style="max-width:260px;">
+      <div class="field" style="max-width:none;">
         <label>&#x1F4C5; Datum</label>
-        <div style="display:flex;gap:6px;align-items:center;">
-          <button onclick="vsDatumStap(-1)" style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:7px 11px;cursor:pointer;font-size:14px;">&#8592;</button>
-          <input type="date" id="vs-datum" style="flex:1;" onchange="wisselPunctualityDatum(this.value)" />
-          <button onclick="vsDatumStap(1)" style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:7px 11px;cursor:pointer;font-size:14px;">&#8594;</button>
-          <button onclick="wisselPunctualityDatum(document.getElementById('vs-datum').value)"
-            style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:13px;font-weight:700;white-space:nowrap;">
-            Laden
-          </button>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+          <button type="button" class="dp-dagknop" onclick="vsDatumStap(-1)" title="Een dag terug">&#9664; Vorige</button>
+          <button type="button" class="dp-dagknop" data-vs-offset="-1" onclick="vsDagKies(-1)">Gisteren</button>
+          <button type="button" class="dp-dagknop" data-vs-offset="0" onclick="vsDagKies(0)">Vandaag</button>
+          <button type="button" class="dp-dagknop" data-vs-offset="1" onclick="vsDagKies(1)">Morgen</button>
+          <button type="button" class="dp-dagknop" onclick="vsDatumStap(1)" title="Een dag vooruit">Volgende &#9654;</button>
+          <input type="date" id="vs-datum" style="flex:0 0 auto;min-width:150px;" onchange="wisselPunctualityDatum(this.value)" title="Kies een datum" />
         </div>
       </div>
       <div style="display:flex;gap:8px;align-items:flex-end;margin-left:auto;">
@@ -7513,7 +7512,7 @@ function dagKnoppenMarkeer() {
   });
 }
 // Gisteren (-1) / Vandaag (0) / Morgen (1), gerekend vanaf de echte datum van vandaag.
-document.addEventListener('DOMContentLoaded', function(){ setTimeout(dagKnoppenMarkeer, 1500); });
+document.addEventListener('DOMContentLoaded', function(){ setTimeout(function(){ dagKnoppenMarkeer(); if (typeof vsKnoppenMarkeer === 'function') vsKnoppenMarkeer(); }, 1500); });
 function dagKies(offset) {
   var inp = document.getElementById('dagPlanDatum');
   if (!inp) return;
@@ -18455,12 +18454,34 @@ Verzonden via Dienst Journaal Europoort`;
 
 
   window._punctBusy = false;
+  function vsDatumStr(d) {
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+// Accent op Gisteren/Vandaag/Morgen als de gekozen Punctuality-datum daarmee overeenkomt.
+function vsKnoppenMarkeer() {
+  var inp = document.getElementById('vs-datum');
+  var waarde = inp ? inp.value : '';
+  document.querySelectorAll('.dp-dagknop[data-vs-offset]').forEach(function(btn){
+    var d = new Date(); d.setHours(12,0,0,0);
+    d.setDate(d.getDate() + parseInt(btn.getAttribute('data-vs-offset'), 10));
+    btn.classList.toggle('actief', waarde === vsDatumStr(d));
+  });
+}
+window.vsKnoppenMarkeer = vsKnoppenMarkeer;
+// Gisteren (-1) / Vandaag (0) / Morgen (1), gerekend vanaf de echte datum van vandaag.
+function vsDagKies(offset) {
+  var d = new Date(); d.setHours(12,0,0,0);
+  d.setDate(d.getDate() + offset);
+  wisselPunctualityDatum(vsDatumStr(d));
+}
+window.vsDagKies = vsDagKies;
   function vsDatumStap(delta) {
   var inp = document.getElementById('vs-datum');
-  if (!inp || !inp.value) return;
-  var d = new Date(inp.value);
+  if (!inp) return;
+  if (!inp.value) { vsDagKies(delta); return; }
+  var d = new Date(inp.value + 'T12:00:00');
   d.setDate(d.getDate() + delta);
-  inp.value = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  inp.value = vsDatumStr(d);
   wisselPunctualityDatum(inp.value);
 }
 
@@ -18494,6 +18515,8 @@ function wisselPunctualityDatum(dateStr) {
     // Sync dagplanning date silently
     var dp = document.getElementById('dagPlanDatum');
     if (dp && dp.value !== dateStr) dp.value = dateStr;
+    if (typeof vsKnoppenMarkeer === 'function') vsKnoppenMarkeer();
+    if (typeof dagKnoppenMarkeer === 'function') dagKnoppenMarkeer();
   }
   window.wisselPunctualityDatum = wisselPunctualityDatum;
   function isVandaag(d){var t=new Date();return d===t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');}
