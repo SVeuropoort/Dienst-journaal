@@ -536,6 +536,15 @@ function mtWisselTerminal(t){
 }
 
 function mtVerversNu(){ mtLaadTerminalData(mtTerminal); }
+// Klik op een regel bij "Dagen buiten de normen": opent die dag in Punctuality van de hoofdapp
+// (zelfde tabblad). De hoofdapp toont daar een "Terug naar KPI-MT"-knop die hier weer terugkomt.
+function mtNaarPunctualiteit(datumSlash){
+  var d = String(datumSlash || '').split('/');
+  if (d.length !== 3) return;
+  var iso = d[2] + '-' + d[1] + '-' + d[0]; // dd/mm/yyyy -> yyyy-mm-dd
+  location.href = 'https://sveuropoort.github.io/Dienst-journaal/index.html?van=kpi-mt&punctuality=' +
+    encodeURIComponent(iso) + '&terminal=' + encodeURIComponent(mtTerminal);
+}
 
 function mtInit(){
   mtWisselTerminal(mtTerminal);
@@ -815,7 +824,7 @@ function mtRenderKpi(){
         var bg = r.isWE ? (i%2===0?'#fff3cd':'#ffeaa7') : (i%2===0?'#fff5f5':'#fde8e8');
         var aw = (r.afwijking>0?'+':'')+r.afwijking+' min';
         var weBadge = r.isWE ? '<span style="background:#e67e22;color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:5px;vertical-align:middle;">WE</span>' : '';
-        return '<tr style="background:'+bg+';"><td style="padding:7px 10px;border:1px solid #f5b7b1;font-weight:700;color:var(--navy);">'+r.datum+weBadge+'</td><td style="padding:7px 10px;border:1px solid #f5b7b1;">'+r.route+'</td><td style="padding:7px 10px;border:1px solid #f5b7b1;">'+r.kolom+'</td><td style="text-align:center;padding:7px 10px;border:1px solid #f5b7b1;font-weight:700;color:#c0392b;">'+r.werkelijk+'</td><td style="text-align:center;padding:7px 10px;border:1px solid #f5b7b1;color:#555;">'+r.norm+'&#177;'+r.marge+'m</td><td style="text-align:center;padding:7px 10px;border:1px solid #f5b7b1;font-weight:700;color:#c0392b;">'+aw+'</td><td style="padding:7px 10px;border:1px solid #f5b7b1;color:'+(r.opm?'var(--navy)':'#aaa')+';font-style:'+(r.opm?'normal':'italic')+';">'+(r.opm||'&#x2014;')+'</td></tr>';
+        return '<tr onclick="mtNaarPunctualiteit(\''+r.datum+'\')" title="'+(isImm?'Click to open this day in Punctuality':'Klik om deze dag in Punctuality te openen')+'" style="background:'+bg+';cursor:pointer;" onmouseover="this.style.filter=\'brightness(0.95)\'" onmouseout="this.style.filter=\'\'"><td style="padding:7px 10px;border:1px solid #f5b7b1;font-weight:700;color:var(--navy);">'+r.datum+weBadge+'</td><td style="padding:7px 10px;border:1px solid #f5b7b1;">'+r.route+'</td><td style="padding:7px 10px;border:1px solid #f5b7b1;">'+r.kolom+'</td><td style="text-align:center;padding:7px 10px;border:1px solid #f5b7b1;font-weight:700;color:#c0392b;">'+r.werkelijk+'</td><td style="text-align:center;padding:7px 10px;border:1px solid #f5b7b1;color:#555;">'+r.norm+'&#177;'+r.marge+'m</td><td style="text-align:center;padding:7px 10px;border:1px solid #f5b7b1;font-weight:700;color:#c0392b;">'+aw+'</td><td style="padding:7px 10px;border:1px solid #f5b7b1;color:'+(r.opm?'var(--navy)':'#aaa')+';font-style:'+(r.opm?'normal':'italic')+';">'+(r.opm||'&#x2014;')+'</td></tr>';
       }).join('');
     }
   }

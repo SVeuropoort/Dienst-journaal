@@ -2705,6 +2705,29 @@ window.tk = window.tk || function(key) {
 #dj-login{position:fixed;inset:0;background:#001830;z-index:99999;display:none;align-items:center;justify-content:center;flex-direction:column;gap:20px;font-family:Arial,sans-serif;}
 </style>
 <script>
+// Doorverwijzing vanuit het KPI-MT dashboard (klik op een regel bij "Dagen buiten de normen"):
+// index.html?van=kpi-mt&punctuality=yyyy-mm-dd&terminal=EP. Wordt in sessionStorage onthouden,
+// zodat het ook werkt als er eerst nog ingelogd moet worden (inloggen herlaadt de pagina).
+(function(){
+  try {
+    var q = new URLSearchParams(location.search);
+    var van = q.get('van'), dag = q.get('punctuality'), term = q.get('terminal');
+    if (van === 'kpi-mt' && /^\d{4}-\d{2}-\d{2}$/.test(dag || '')) {
+      sessionStorage.setItem('dj_diep_link', JSON.stringify({ van: van, punctuality: dag }));
+      sessionStorage.setItem('dj_terug_naar', 'kpi-mt');
+      if (term === 'EP' || term === 'HVH' || term === 'IMM') {
+        var huidig = sessionStorage.getItem('dj_terminal') || 'EP';
+        if (huidig !== term) {
+          // Andere terminal: opnieuw inloggen, zodat de toegangscontrole voor die terminal geldt.
+          sessionStorage.setItem('dj_terminal', term);
+          sessionStorage.removeItem('dj_auth');
+          sessionStorage.removeItem('_cloudGeladen');
+        }
+      }
+      history.replaceState(null, '', location.pathname);
+    }
+  } catch(e) {}
+})();
 (function(){
   var ok = sessionStorage.getItem('dj_auth')==='1';
   if(ok){ document.getElementById('dj-html').style.visibility='visible'; }
@@ -22754,6 +22777,51 @@ function toggleNavMenu(){
     m.style.display = 'block';
   }
 }
+
+// Uitvoeren van een doorverwijzing uit KPI-MT (zie begin van de pagina) + "Terug"-knop.
+// Wacht tot het automatische ophalen van de cloud-data klaar is: dat herlaadt bij de eerste keer
+// de pagina, en dan zou de sprong naar Punctuality meteen weer verloren gaan.
+(function(){
+  function terugKnop(){
+    if (sessionStorage.getItem('dj_terug_naar') !== 'kpi-mt') return;
+    if (document.getElementById('djTerugKpiMt')) return;
+    var en = (sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM';
+    var b = document.createElement('button');
+    b.id = 'djTerugKpiMt';
+    b.innerHTML = '&#8592; ' + (en ? 'Back to KPI-MT' : 'Terug naar KPI-MT');
+    b.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:100001;background:#c0392b;color:#fff;border:none;border-radius:24px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.3);';
+    b.onclick = function(){
+      sessionStorage.removeItem('dj_terug_naar');
+      location.href = 'https://sveuropoort.github.io/Dienst-journaal/kpi-mt.html';
+    };
+    document.body.appendChild(b);
+  }
+  function uitvoeren(){
+    var raw = sessionStorage.getItem('dj_diep_link');
+    if (!raw) return;
+    sessionStorage.removeItem('dj_diep_link');
+    try {
+      var link = JSON.parse(raw);
+      if (link.punctuality) kpiNormRegelNaarPunctualiteit(link.punctuality.split('-').reverse().join('/'));
+    } catch(e) {}
+  }
+  window.addEventListener('load', function(){
+    if (sessionStorage.getItem('dj_auth') !== '1') return; // eerst inloggen; daarna herlaadt de pagina
+    terugKnop();
+    if (!sessionStorage.getItem('dj_diep_link')) return;
+    var alGeladen = sessionStorage.getItem('_cloudGeladen') === '1';
+    if (alGeladen) { setTimeout(uitvoeren, 1500); return; }
+    // Nog niet opgehaald: wacht tot het ophalen klaar is. Herlaadt de pagina daarna, dan
+    // voert de volgende pagina het uit; zo niet (bijv. geen herlaad nodig), dan hier.
+    var start = Date.now(), klaarSinds = null;
+    var t = setInterval(function(){
+      if (sessionStorage.getItem('_cloudGeladen') === '1') { if (!klaarSinds) klaarSinds = Date.now(); }
+      if ((klaarSinds && Date.now() - klaarSinds > 2500) || Date.now() - start > 30000) {
+        clearInterval(t); uitvoeren();
+      }
+    }, 500);
+  });
+})();
 
 function kpiNormRegelNaarPunctualiteit(datumSlash){
   if (!datumSlash) return;
