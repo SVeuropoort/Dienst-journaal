@@ -9265,18 +9265,41 @@ function loadFullState(){
 // de pagina (loadFullState() + de per-datum aanvulling), zodat de tabel écht de nieuwe namen/
 // posities toont in plaats van alleen de oude in-memory staat opnieuw te tekenen.
 window.djDagplanningHerlaadInPlace = function(){
-  loadFullState();
+  // BELANGRIJK: blijf op de dag die de gebruiker NU open heeft staan. Vroeger werd hier
+  // loadFullState() gebruikt, maar die algemene "huidige staat" wordt via de cloud met alle
+  // apparaten gedeeld — had een collega (of deze pc eerder) een andere dag open, dan sprong het
+  // scherm na de live-verversing naar díe dag (vaak leeg), terwijl je bijv. morgen aan het
+  // invullen was. Nu wordt alleen de per-datum opslag van de gekozen dag opnieuw ingelezen.
+  var _inp = document.getElementById('dagPlanDatum');
+  var gekozen = (_inp && _inp.value) || planDate;
+  if (!gekozen) { loadFullState(); gekozen = planDate; }
+  var bron = null;
   try {
-    var _snap = JSON.parse(localStorage.getItem(tk('dagplan_' + planDate)));
-    if (_snap && ((_snap.ochEmps && _snap.ochEmps.length) || (_snap.avondEmps && _snap.avondEmps.length))) {
-      allEmps   = _snap.allEmps   || allEmps;
-      ochEmps   = _snap.ochEmps   || ochEmps;
-      avondEmps = _snap.avondEmps || avondEmps;
-      if (_snap.pos)   pos   = _snap.pos;
-      if (_snap.texts) texts = _snap.texts;
-    }
+    var _snap = JSON.parse(localStorage.getItem(tk('dagplan_' + gekozen)) || 'null');
+    if (_snap && ((_snap.ochEmps && _snap.ochEmps.length) || (_snap.avondEmps && _snap.avondEmps.length))) bron = _snap;
+  } catch(e) {}
+  if (!bron) {
+    try {
+      var _st = JSON.parse(localStorage.getItem(STATE_KEY) || 'null');
+      if (_st && _st.planDate === gekozen &&
+          ((_st.ochEmps && _st.ochEmps.length) || (_st.avondEmps && _st.avondEmps.length))) bron = _st;
+    } catch(e) {}
+  }
+  if (!bron) return; // niets bruikbaars voor deze dag in de cloud: huidig scherm laten staan
+  planDate  = gekozen;
+  allEmps   = bron.allEmps   || allEmps;
+  ochEmps   = bron.ochEmps   || ochEmps;
+  avondEmps = bron.avondEmps || avondEmps;
+  if (bron.pos)   pos   = bron.pos;
+  if (bron.texts) texts = bron.texts;
+  try {
+    // Alleen sessionStorage (wordt niet gesynchroniseerd): voorkomt dat het binnenhalen van
+    // collega-wijzigingen zelf weer een opslag naar de cloud veroorzaakt.
+    sessionStorage.setItem(posKey(),   JSON.stringify(pos));
+    sessionStorage.setItem(textsKey(), JSON.stringify(texts));
   } catch(e) {}
   buildPanels(); buildStats();
+  if (typeof updateDayLabel === 'function') updateDayLabel();
   var _bOch = document.getElementById('bOch'); if (_bOch) _bOch.textContent = ochEmps.length;
   var _bAvond = document.getElementById('bAvond'); if (_bAvond) _bAvond.textContent = avondEmps.length;
   if (typeof refreshAllCertCells === 'function') refreshAllCertCells();
