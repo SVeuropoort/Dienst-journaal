@@ -6016,6 +6016,8 @@ window.addEventListener('resize', () => {
     // opgerekt.
     if (prev !== t) {
       sessionStorage.removeItem('_cloudGeladen'); // reset zodat auto-sync herlaadt
+      // Andere terminal = ander cloud-bestand: niets opslaan tot die versie is opgehaald.
+      if (typeof window.djSluitStartOphalen === 'function') window.djSluitStartOphalen();
       if (typeof cloudLaden === 'function') cloudLaden();
     }
   };
@@ -6299,6 +6301,13 @@ window.addEventListener('resize', () => {
 
   async function cloudOpslaan(toonFouten) {
     if (_syncBezig) return;
+    // EERST OPHALEN, DAN PAS OPSLAAN: zolang deze sessie de cloud-versie nog niet heeft
+    // opgehaald, mag dit apparaat niets wegschrijven. Anders overschrijft een verouderde lokale
+    // kopie (bijv. een lege of oude Dagplanning) de lijst die een collega net heeft opgeslagen.
+    if (!djStartOphalenKlaar()) {
+      if (toonFouten) showSyncStatus('⚠ Eerst de nieuwste data ophalen — probeer het zo opnieuw', 'err');
+      return;
+    }
     _syncBezig = true;
     if (!(await spIngelogdAsync())) {
       if (toonFouten) showSyncStatus('⚠ Niet ingelogd bij SharePoint — log in via het beheerpaneel (tandwiel)', 'err');
@@ -6362,12 +6371,14 @@ window.addEventListener('resize', () => {
         try {
           await spOpslaanBestand(rowId + '.json', { data: {} });
         } catch(e2) { console.warn('Kon leeg bestand niet aanmaken:', e2); }
+        djMarkeerStartOphalenKlaar();
         if (djKanVeiligHerladen()) setTimeout(function(){ location.reload(); }, 1000);
         _syncBezig = false;
         return;
       }
       var data = result.data;
       setSyncData(data);
+      djMarkeerStartOphalenKlaar();
       showSyncStatus('✓ Data geladen – pagina wordt herladen...', 'ok');
       if (djKanVeiligHerladen()) setTimeout(function(){ location.reload(); }, 1500);
     } catch(e) {
@@ -6384,7 +6395,16 @@ window.addEventListener('resize', () => {
 
   // AUTO CLOUD SYNC - debounced
   var _autoSaveTimer = null;
+  // Staat pas op "klaar" zodra deze sessie de cloud-versie heeft opgehaald (of er bleek nog geen
+  // cloud-bestand te zijn). Tot dat moment worden automatische opslag-acties genegeerd: bij het
+  // opstarten schrijft de app zelf al allerlei sleutels (zoals de Dagplanning-status) naar
+  // localStorage, en die zouden anders als "wijziging" naar de cloud gaan vóór het ophalen.
+  var _djStartOphalenKlaarVlag = !!sessionStorage.getItem('_cloudGeladen');
+  function djStartOphalenKlaar(){ return _djStartOphalenKlaarVlag; }
+  function djMarkeerStartOphalenKlaar(){ _djStartOphalenKlaarVlag = true; sessionStorage.setItem('_cloudGeladen', '1'); }
+  window.djSluitStartOphalen = function(){ _djStartOphalenKlaarVlag = false; if (_autoSaveTimer) { clearTimeout(_autoSaveTimer); _autoSaveTimer = null; } };
   window._doCloudOpslaan = function() {
+    if (!djStartOphalenKlaar()) return; // nog niet opgehaald: niets wegschrijven (zie hierboven)
     if (_autoSaveTimer) clearTimeout(_autoSaveTimer);
     _autoSaveTimer = setTimeout(function() {
       _autoSaveTimer = null;
@@ -6452,12 +6472,14 @@ window.addEventListener('resize', () => {
   // Auto ophalen bij eerste keer openen (eenmalig per sessie)
   (function() {
     if (sessionStorage.getItem('_cloudGeladen')) return; // al geladen deze sessie
-    // Wacht tot pagina geladen is, haal dan cloud data op
+    // Wacht tot pagina geladen is, haal dan cloud data op.
+    // Let op: hier bewust GEEN "eerst wachtende wijziging wegschrijven" meer vóór het ophalen.
+    // Bij het opstarten is een wachtende wijziging vrijwel altijd de app zelf die zijn (verouderde)
+    // lokale stand naar localStorage schrijft — en die wegschrijven vóór het ophalen overschreef
+    // precies de Dagplanning die een collega net had opgeslagen. Eerst ophalen, dan pas opslaan.
+    var _djWachtOpLoginTimer = null;
     window.addEventListener('load', function() {
-      setTimeout(async function() {
-        // Zelfde beveiliging als bij de handmatige Ophalen-knop: eerst een
-        // eventuele nog niet verzonden wijziging wegschrijven.
-        if (window._flushPendingCloudOpslaan) await window._flushPendingCloudOpslaan();
+      setTimeout(async function djStartOphalen() {
         // Eerst MSAL stil laten initialiseren, zodat een eerder ingelogde sessie (dit apparaat
         // heeft al eens ingelogd) herkend wordt zonder een pop-up te forceren. Is er nog geen
         // sessie (bijv. een collega die de app voor het eerst opent), dan wachten we gewoon
@@ -6466,6 +6488,15 @@ window.addEventListener('resize', () => {
         if (typeof spInit === 'function') { try { await spInit(); } catch(e) {} }
         if (typeof spIngelogd !== 'function' || !spIngelogd()) {
           showSyncStatus('⚠ Niet ingelogd bij SharePoint — log in via het beheerpaneel (tandwiel) om data op te halen', 'err');
+          // Zodra er alsnog is ingelogd: automatisch ophalen, zodat opslaan daarna weer werkt.
+          if (!_djWachtOpLoginTimer) {
+            _djWachtOpLoginTimer = setInterval(function(){
+              if (typeof spIngelogd === 'function' && spIngelogd()) {
+                clearInterval(_djWachtOpLoginTimer); _djWachtOpLoginTimer = null;
+                djStartOphalen();
+              }
+            }, 3000);
+          }
           return;
         }
         showSyncStatus('☁️ Data ophalen...', 'info');
@@ -6483,13 +6514,13 @@ window.addEventListener('resize', () => {
                 if (hasLocalData) showSyncStatus('✓ Lokale data opgeslagen in cloud', 'ok');
               } catch(e2) { console.warn('Kon bestand niet aanmaken:', e2); }
             }
-            sessionStorage.setItem('_cloudGeladen', '1');
+            djMarkeerStartOphalenKlaar();
             showSyncStatus('', 'ok');
             return;
           }
           if (typeof setSyncData === 'function') setSyncData(_result.data);
-          // Markeer als geladen ALLEEN na succes
-          sessionStorage.setItem('_cloudGeladen', '1');
+          // Markeer als geladen ALLEEN na succes — pas vanaf nu mag dit apparaat opslaan.
+          djMarkeerStartOphalenKlaar();
           showSyncStatus('✓ Data geladen', 'ok');
           // Herlaad de pagina zodat alle views de nieuwe data tonen
           if (djKanVeiligHerladen()) setTimeout(function(){ location.reload(); }, 800);
@@ -6550,10 +6581,20 @@ window.addEventListener('resize', () => {
   <!-- DAY SELECTOR -->
   <div class="day-selector" id="daySelector" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
     <span style="font-size:11px;color:#555;font-weight:600;">Planning voor:</span>
-    <button onclick="dagStap(-1)" style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:14px;">&#8592;</button>
-    <input type="date" id="dagPlanDatum" onchange="if(typeof laadMetCloud==='function')laadMetCloud();" style="padding:6px 10px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer;">
-    <button onclick="laadMetCloud()" id="laadBtn" style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:5px;">&#x1F50D; Laden</button>
-    <button onclick="dagStap(1)" style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:14px;">&#8594;</button>
+    <style>
+      .dp-dagknop{background:#fff;color:var(--navy);border:1px solid #c8d7e8;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12.5px;font-weight:700;white-space:nowrap;}
+      .dp-dagknop:hover{background:#eef3fa;}
+      .dp-dagknop.actief{background:var(--navy);color:#fff;border-color:var(--navy);}
+    </style>
+    <span style="display:inline-flex;gap:6px;flex-wrap:wrap;align-items:center;">
+      <button type="button" class="dp-dagknop" onclick="dagStap(-1)" title="Een dag terug">&#9664; Vorige</button>
+      <button type="button" class="dp-dagknop" data-dp-offset="-1" onclick="dagKies(-1)">Gisteren</button>
+      <button type="button" class="dp-dagknop" data-dp-offset="0" onclick="dagKies(0)">Vandaag</button>
+      <button type="button" class="dp-dagknop" data-dp-offset="1" onclick="dagKies(1)">Morgen</button>
+      <button type="button" class="dp-dagknop" onclick="dagStap(1)" title="Een dag vooruit">Volgende &#9654;</button>
+      <input type="date" id="dagPlanDatum" onchange="dagKnoppenMarkeer();if(typeof laadMetCloud==='function')laadMetCloud();" title="Kies een datum" style="padding:6px 10px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer;">
+    </span>
+    <button onclick="laadMetCloud()" id="laadBtn" style="display:none;">&#x1F50D; Laden</button>
     <span id="dag-plan-label" style="font-size:11px;color:#888;margin-left:4px;"></span>
     <span style="flex:1"></span>
     <!-- Upload Excel voor geselecteerde dag -->
@@ -7133,12 +7174,39 @@ function switchDay(offset){
   laadDagPlanning();
 }
 
+function dagDatumStr(d) {
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+// Zet het "actief"-accent op Gisteren/Vandaag/Morgen als de gekozen datum daarmee overeenkomt.
+function dagKnoppenMarkeer() {
+  var inp = document.getElementById('dagPlanDatum');
+  var waarde = inp ? inp.value : '';
+  document.querySelectorAll('.dp-dagknop[data-dp-offset]').forEach(function(btn){
+    var d = new Date(); d.setHours(12,0,0,0);
+    d.setDate(d.getDate() + parseInt(btn.getAttribute('data-dp-offset'), 10));
+    btn.classList.toggle('actief', waarde === dagDatumStr(d));
+  });
+}
+// Gisteren (-1) / Vandaag (0) / Morgen (1), gerekend vanaf de echte datum van vandaag.
+document.addEventListener('DOMContentLoaded', function(){ setTimeout(dagKnoppenMarkeer, 1500); });
+function dagKies(offset) {
+  var inp = document.getElementById('dagPlanDatum');
+  if (!inp) return;
+  var d = new Date(); d.setHours(12,0,0,0);
+  d.setDate(d.getDate() + offset);
+  inp.value = dagDatumStr(d);
+  dagKnoppenMarkeer();
+  if (typeof laadMetCloud === 'function') laadMetCloud();
+}
+// Vorige / Volgende: een dag terug of vooruit vanaf de datum die nu gekozen is.
 function dagStap(delta) {
   var inp = document.getElementById('dagPlanDatum');
-  if (!inp || !inp.value) return;
-  var d = new Date(inp.value);
+  if (!inp) return;
+  if (!inp.value) { dagKies(delta); return; }
+  var d = new Date(inp.value + 'T12:00:00');
   d.setDate(d.getDate() + delta);
-  inp.value = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  inp.value = dagDatumStr(d);
+  dagKnoppenMarkeer();
   // Automatisch laden bij datumwissel
   if (typeof laadMetCloud === 'function') laadMetCloud();
 }
@@ -22494,6 +22562,11 @@ var DJ_VERTAAL_WOORDENBOEK = {
   "Sleep Excel hier naartoe of klik om te bladeren": "Drag Excel file here or click to browse",
   "Planning voor:": "Planning for:",
   "🔍 Laden": "🔍 Load",
+  "◀ Vorige": "◀ Previous",
+  "Gisteren": "Yesterday",
+  "Vandaag": "Today",
+  "Morgen": "Tomorrow",
+  "Volgende ▶": "Next ▶",
   "Excel laden": "Load Excel",
   "📂 Excel laden": "📂 Load Excel",
   "🌅 OCHTEND": "🌅 MORNING",
@@ -24104,6 +24177,7 @@ function toggleNormen() {
 async function laadMetCloud() {
   var inp = document.getElementById('dagPlanDatum');
   var dateStr = inp ? inp.value : '';
+  if (typeof dagKnoppenMarkeer === 'function') dagKnoppenMarkeer();
   if (!dateStr) return;
 
   var btn = document.getElementById('laadBtn');
