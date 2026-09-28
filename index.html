@@ -3415,7 +3415,7 @@ function djAanwezigRender(data, eigenEmail){
     if (email === eigenEmail) return false;
     var t = Date.parse(data[email].laatstGezien);
     return !isNaN(t) && (nu - t) < DJ_AANWEZIG_TIMEOUT_MS;
-  }).map(function(email){ return data[email]; }).sort(function(a, b){ return a.naam.localeCompare(b.naam); });
+  }).map(function(email){ var p = Object.assign({ email: email }, data[email]); if (typeof _djChatNamen !== 'undefined' && p.naam) _djChatNamen[email.toLowerCase()] = p.naam; return p; }).sort(function(a, b){ return a.naam.localeCompare(b.naam); });
   var icon = document.getElementById('djAanwezigIcon');
   var aantal = document.getElementById('djAanwezigAantal');
   var lijst = document.getElementById('djAanwezigLijst');
@@ -3425,11 +3425,17 @@ function djAanwezigRender(data, eigenEmail){
     if (anderen.length) { aantal.style.display = 'inline-block'; aantal.textContent = String(anderen.length); }
     else { aantal.style.display = 'none'; }
   }
+  if (typeof djAanwezigGesprekkenRender === 'function') setTimeout(djAanwezigGesprekkenRender, 0);
   lijst.innerHTML = anderen.length
     ? anderen.map(function(p){
-        return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.08);">' +
-          '<div style="font-weight:700;color:#fff;">' + oplEsc(p.naam) + '</div>' +
+        var _em = String(p.email || '').toLowerCase().replace(/'/g, '');
+        var _n = (typeof djChatOngelezen === 'function') ? djChatOngelezen(_em) : 0;
+        return '<div onclick="event.stopPropagation();djChatOpen(\'' + _em + '\')" title="Stuur een bericht" style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.08);cursor:pointer;">' +
+          '<div style="flex:1;min-width:0;">' +
+          '<div style="font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + oplEsc(p.naam) + '</div>' +
           '<div style="color:rgba(255,255,255,0.5);font-size:11px;">' + djAanwezigTerminalLabel(p.terminal) + '</div>' +
+          '</div>' +
+          (_n ? '<span style="background:#d93025;color:#fff;font-size:10px;font-weight:800;padding:1px 6px;border-radius:10px;">' + _n + '</span>' : '<span style="font-size:14px;">&#x1F4AC;</span>') +
           '</div>';
       }).join('')
     : '<div style="color:rgba(255,255,255,0.5);">Niemand anders op dit moment online.</div>';
@@ -3443,7 +3449,244 @@ function djAanwezigStart(){
   if (_djAanwezigTimer) return;
   djAanwezigHeartbeat();
   _djAanwezigTimer = setInterval(djAanwezigHeartbeat, DJ_AANWEZIG_INTERVAL_MS);
+  if (typeof djChatStart === 'function') djChatStart();
 }
+// ═════════════════════════════════════════════════════════════════
+// Chat: privéberichten van persoon naar persoon, tussen ingelogde gebruikers.
+// Alle berichten staan in één gedeeld SharePoint-bestand (chat.json); elke gebruiker ziet in de
+// app alleen de gesprekken waar hij/zij zelf in zit. Nieuwe berichten worden elke 5 sec.
+// opgehaald (eerst goedkoop checken óf het bestand veranderd is). Versturen gaat volgens
+// "eerst ophalen, dan opslaan" en wordt daarna gecontroleerd, zodat twee mensen die tegelijk
+// iets sturen elkaars bericht niet wegschrijven. Berichten ouder dan 7 dagen vervallen.
+// "Gelezen" wordt per apparaat bijgehouden (localStorage), niet in het gedeelde bestand.
+// ═════════════════════════════════════════════════════════════════
+var DJ_CHAT_BESTAND = 'chat.json';
+var DJ_CHAT_POLL_MS = 5000;
+var DJ_CHAT_BEWAAR_MS = 7 * 24 * 3600 * 1000;
+var DJ_CHAT_MAX = 1000;
+var _djChatBerichten = [];
+var _djChatLaatstGewijzigd = null;
+var _djChatTimer = null;
+var _djChatEigenEmail = null;
+var _djChatEigenNaam = null;
+var _djChatPartner = null;     // e-mail van het gesprek dat nu open staat
+var _djChatNamen = {};         // e-mail -> weergavenaam (uit berichten en aanwezigheid)
+var _djChatVersturen = false;
+
+function djChatEn(){ return (sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM'; }
+function djChatGelezenGet(){ try { return JSON.parse(localStorage.getItem('dj_chat_gelezen') || '{}'); } catch(e){ return {}; } }
+function djChatGelezenZet(partner, iso){
+  var g = djChatGelezenGet(); g[partner] = iso;
+  try { localStorage.setItem('dj_chat_gelezen', JSON.stringify(g)); } catch(e){}
+}
+function djChatNaam(email){ return _djChatNamen[email] || email; }
+function djChatSchoon(lijst){
+  var grens = Date.now() - DJ_CHAT_BEWAAR_MS;
+  var gezien = {};
+  return (lijst || []).filter(function(b){
+    if (!b || !b.id || gezien[b.id]) return false;
+    gezien[b.id] = true;
+    var t = Date.parse(b.tijd);
+    return !isNaN(t) && t >= grens;
+  }).sort(function(a, b){ return Date.parse(a.tijd) - Date.parse(b.tijd); }).slice(-DJ_CHAT_MAX);
+}
+function djChatVerwerk(lijst){
+  _djChatBerichten = djChatSchoon(lijst);
+  _djChatBerichten.forEach(function(b){
+    if (b.vanNaam) _djChatNamen[b.van] = b.vanNaam;
+    if (b.naarNaam) _djChatNamen[b.naar] = b.naarNaam;
+  });
+  djChatBadgeRender();
+  if (typeof djAanwezigGesprekkenRender === 'function') djAanwezigGesprekkenRender();
+  if (_djChatPartner) djChatVensterRender();
+}
+async function djChatOphalen(forceer){
+  var gewijzigd = await spLaatstGewijzigd(DJ_CHAT_BESTAND);
+  if (!forceer && gewijzigd && gewijzigd === _djChatLaatstGewijzigd) return false;
+  var res = await spOphalenBestand(DJ_CHAT_BESTAND);
+  _djChatLaatstGewijzigd = gewijzigd;
+  djChatVerwerk((res && res.data && res.data.berichten) || []);
+  return true;
+}
+async function djChatTick(){
+  try {
+    if (!_djChatEigenEmail) {
+      var em = await djHuidigEmail();
+      if (!em) return;
+      _djChatEigenEmail = em.toLowerCase();
+      _djChatEigenNaam = em;
+      try {
+        var acc = _spMsalInstance && _spMsalInstance.getAllAccounts();
+        var act = acc && (acc.find(function(a){ return a.username && a.username.toLowerCase() === _djChatEigenEmail; }) || acc[0]);
+        if (act && act.name) _djChatEigenNaam = act.name;
+      } catch(e){}
+      _djChatNamen[_djChatEigenEmail] = _djChatEigenNaam;
+    }
+    if (_djChatVersturen) return;
+    await djChatOphalen(false);
+  } catch(e) { console.warn('Chat ophalen mislukt:', e); }
+}
+function djChatStart(){
+  if (_djChatTimer) return;
+  djChatTick();
+  _djChatTimer = setInterval(function(){ if (!document.hidden) djChatTick(); }, DJ_CHAT_POLL_MS);
+}
+function djChatOngelezen(partner){
+  if (!_djChatEigenEmail) return 0;
+  var g = djChatGelezenGet();
+  return _djChatBerichten.filter(function(b){
+    return b.naar === _djChatEigenEmail && (!partner || b.van === partner) &&
+      (!g[b.van] || Date.parse(b.tijd) > Date.parse(g[b.van]));
+  }).length;
+}
+function djChatBadgeRender(){
+  var badge = document.getElementById('djChatOngelezen');
+  if (!badge) return;
+  var n = djChatOngelezen(null);
+  badge.style.display = n ? 'inline-block' : 'none';
+  badge.textContent = n > 99 ? '99+' : String(n);
+}
+// Gesprekspartners: iedereen met wie je deze week berichten hebt uitgewisseld, nieuwste eerst.
+function djChatPartners(){
+  var laatste = {};
+  _djChatBerichten.forEach(function(b){
+    var p = b.van === _djChatEigenEmail ? b.naar : (b.naar === _djChatEigenEmail ? b.van : null);
+    if (p) laatste[p] = b.tijd;
+  });
+  return Object.keys(laatste).sort(function(a, b){ return Date.parse(laatste[b]) - Date.parse(laatste[a]); });
+}
+function djChatOpen(email, naam){
+  if (!email) return;
+  email = email.toLowerCase();
+  if (naam) _djChatNamen[email] = naam;
+  _djChatPartner = email;
+  var panel = document.getElementById('djAanwezigPanel');
+  if (panel) panel.style.display = 'none';
+  var v = document.getElementById('djChatVenster');
+  if (!v) {
+    v = document.createElement('div');
+    v.id = 'djChatVenster';
+    v.style.cssText = 'position:fixed;right:16px;bottom:16px;width:320px;max-width:calc(100vw - 32px);height:420px;max-height:calc(100vh - 100px);z-index:100000;background:#fff;border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.35);display:flex;flex-direction:column;overflow:hidden;font-family:inherit;';
+    v.innerHTML =
+      '<div style="background:#0d1f38;color:#fff;padding:10px 12px;display:flex;align-items:center;gap:8px;">' +
+        '<span style="font-size:16px;">&#x1F4AC;</span>' +
+        '<span id="djChatTitel" style="flex:1;font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>' +
+        '<button onclick="djChatSluit()" title="Sluiten" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;line-height:1;">&#x2715;</button>' +
+      '</div>' +
+      '<div id="djChatLijst" style="flex:1;overflow-y:auto;padding:10px;background:#f2f5f9;display:flex;flex-direction:column;gap:6px;"></div>' +
+      '<div style="display:flex;gap:6px;padding:8px;border-top:1px solid #dde4ee;">' +
+        '<textarea id="djChatInvoer" rows="1" style="flex:1;resize:none;border:1px solid #c8d7e8;border-radius:8px;padding:7px 9px;font-size:13px;font-family:inherit;max-height:90px;" ' +
+          'onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();djChatVerstuur();}"></textarea>' +
+        '<button id="djChatStuurKnop" onclick="djChatVerstuur()" style="background:#0d1f38;color:#fff;border:none;border-radius:8px;padding:0 14px;font-weight:700;cursor:pointer;font-size:13px;"></button>' +
+      '</div>';
+    document.body.appendChild(v);
+  }
+  v.style.display = 'flex';
+  document.getElementById('djChatStuurKnop').textContent = djChatEn() ? 'Send' : 'Stuur';
+  document.getElementById('djChatInvoer').placeholder = djChatEn() ? 'Type a message…' : 'Typ een bericht…';
+  djChatVensterRender();
+  setTimeout(function(){ var i = document.getElementById('djChatInvoer'); if (i) i.focus(); }, 50);
+  djChatOphalen(true).catch(function(){});
+}
+function djChatSluit(){
+  _djChatPartner = null;
+  var v = document.getElementById('djChatVenster');
+  if (v) v.style.display = 'none';
+}
+function djChatVensterRender(){
+  var lijst = document.getElementById('djChatLijst');
+  var titel = document.getElementById('djChatTitel');
+  if (!lijst || !_djChatPartner) return;
+  if (titel) titel.textContent = djChatNaam(_djChatPartner);
+  var p = _djChatPartner, ik = _djChatEigenEmail;
+  var gesprek = _djChatBerichten.filter(function(b){
+    return (b.van === ik && b.naar === p) || (b.van === p && b.naar === ik);
+  });
+  var onderaan = lijst.scrollHeight - lijst.scrollTop - lijst.clientHeight < 40;
+  if (!gesprek.length) {
+    lijst.innerHTML = '<div style="color:#8795a8;font-size:12px;text-align:center;margin-top:20px;">' +
+      (djChatEn() ? 'No messages yet. Messages are kept for 7 days.' : 'Nog geen berichten. Berichten worden 7 dagen bewaard.') + '</div>';
+  } else {
+    var vorigeDag = '';
+    lijst.innerHTML = gesprek.map(function(b){
+      var d = new Date(b.tijd);
+      var dag = d.toLocaleDateString(djChatEn() ? 'en-GB' : 'nl-NL', { weekday:'short', day:'numeric', month:'short' });
+      var tijd = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+      var eigen = b.van === ik;
+      var kop = dag !== vorigeDag ? '<div style="text-align:center;color:#8795a8;font-size:10.5px;margin:4px 0;">' + dag + '</div>' : '';
+      vorigeDag = dag;
+      return kop + '<div style="align-self:' + (eigen ? 'flex-end' : 'flex-start') + ';max-width:80%;background:' + (eigen ? '#0d1f38' : '#fff') +
+        ';color:' + (eigen ? '#fff' : '#17232b') + ';border-radius:10px;padding:6px 9px;font-size:13px;box-shadow:0 1px 2px rgba(0,0,0,.08);white-space:pre-wrap;word-wrap:break-word;">' +
+        oplEsc(b.tekst) + '<div style="font-size:10px;opacity:.6;text-align:right;margin-top:2px;">' + tijd + (b.bezig ? ' &#x23F3;' : '') + '</div></div>';
+    }).join('');
+  }
+  if (onderaan || !lijst.dataset.gescrold) { lijst.scrollTop = lijst.scrollHeight; lijst.dataset.gescrold = '1'; }
+  // Wat hier te zien is, telt als gelezen.
+  var laatsteVanPartner = gesprek.filter(function(b){ return b.van === p; }).pop();
+  if (laatsteVanPartner) {
+    var g = djChatGelezenGet()[p];
+    if (!g || Date.parse(laatsteVanPartner.tijd) > Date.parse(g)) { djChatGelezenZet(p, laatsteVanPartner.tijd); djChatBadgeRender(); if (typeof djAanwezigGesprekkenRender === 'function') djAanwezigGesprekkenRender(); }
+  }
+}
+async function djChatVerstuur(){
+  var invoer = document.getElementById('djChatInvoer');
+  var tekst = invoer ? invoer.value.trim() : '';
+  if (!tekst || !_djChatPartner) return;
+  if (!_djChatEigenEmail) { await djChatTick(); if (!_djChatEigenEmail) { alert(djChatEn() ? 'Log in with Microsoft to use chat.' : 'Log in met Microsoft om te chatten.'); return; } }
+  var bericht = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+    van: _djChatEigenEmail, vanNaam: _djChatEigenNaam,
+    naar: _djChatPartner, naarNaam: djChatNaam(_djChatPartner),
+    tekst: tekst.slice(0, 2000), tijd: new Date().toISOString()
+  };
+  invoer.value = '';
+  // Direct tonen (met zandlopertje) terwijl het bericht wordt weggeschreven.
+  _djChatBerichten.push(Object.assign({ bezig: true }, bericht));
+  djChatVensterRender();
+  _djChatVersturen = true;
+  var gelukt = false;
+  try {
+    for (var poging = 0; poging < 3 && !gelukt; poging++) {
+      // Eerst de nieuwste versie ophalen, eigen bericht erbij, dan opslaan…
+      var res = await spOphalenBestand(DJ_CHAT_BESTAND);
+      var lijst = djChatSchoon(((res && res.data && res.data.berichten) || []).concat([bericht]));
+      await spOpslaanBestand(DJ_CHAT_BESTAND, { data: { berichten: lijst }, updated_at: new Date().toISOString() });
+      // …en controleren of het bericht er ook echt in staat (niet overschreven door iemand
+      // die precies tegelijk iets stuurde). Zo niet: opnieuw.
+      await new Promise(function(r){ setTimeout(r, 800 + Math.random() * 700); });
+      var check = await spOphalenBestand(DJ_CHAT_BESTAND);
+      var nu = (check && check.data && check.data.berichten) || [];
+      gelukt = nu.some(function(b){ return b.id === bericht.id; });
+      if (gelukt) { _djChatLaatstGewijzigd = null; djChatVerwerk(nu); }
+    }
+  } catch(e) {
+    console.warn('Chatbericht versturen mislukt:', e);
+  }
+  _djChatVersturen = false;
+  if (!gelukt) {
+    _djChatBerichten = _djChatBerichten.filter(function(b){ return b.id !== bericht.id; });
+    djChatVensterRender();
+    if (invoer && !invoer.value) invoer.value = tekst;
+    alert(djChatEn() ? 'Message could not be sent. Please try again.' : 'Bericht kon niet worden verstuurd. Probeer het opnieuw.');
+  }
+}
+// Lijst "Gesprekken" in het online-paneel: recente gesprekspartners, ook als ze offline zijn.
+function djAanwezigGesprekkenRender(){
+  var el = document.getElementById('djChatGesprekken');
+  if (!el) return;
+  var partners = djChatPartners();
+  if (!partners.length) { el.innerHTML = ''; return; }
+  el.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:10px 0 4px;">' +
+    (djChatEn() ? 'Conversations' : 'Gesprekken') + '</div>' +
+    partners.slice(0, 8).map(function(p){
+      var n = djChatOngelezen(p);
+      return '<div onclick="event.stopPropagation();djChatOpen(\'' + p.replace(/'/g, '') + '\')" style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.08);cursor:pointer;">' +
+        '<span style="flex:1;color:#fff;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + oplEsc(djChatNaam(p)) + '</span>' +
+        (n ? '<span style="background:#d93025;color:#fff;font-size:10px;font-weight:800;padding:1px 6px;border-radius:10px;">' + n + '</span>' : '<span style="font-size:13px;">&#x1F4AC;</span>') +
+        '</div>';
+    }).join('');
+}
+
 // Permissies gegroepeerd per categorie, zodat het overzicht per account leesbaar blijft
 // (volledige labels, geen priegelige verticale tekst meer).
 var DJ_TOEGANG_GROEPEN = [
@@ -3779,9 +4022,11 @@ function djHerstelVaarschema(){
     <div id="djAanwezigIcon" style="display:none;position:relative;margin-left:10px;cursor:pointer;align-items:center;" onclick="djAanwezigTogglePanel()" title="Wie is er online?">
       <span style="font-size:19px;">&#x1F465;</span>
       <span id="djAanwezigAantal" style="display:none;position:absolute;top:-6px;right:-8px;background:#1e7d34;color:#fff;font-size:10px;font-weight:800;padding:1px 5px;border-radius:10px;min-width:14px;text-align:center;"></span>
+      <span id="djChatOngelezen" title="Ongelezen berichten" style="display:none;position:absolute;bottom:-6px;right:-8px;background:#d93025;color:#fff;font-size:10px;font-weight:800;padding:1px 5px;border-radius:10px;min-width:14px;text-align:center;"></span>
       <div id="djAanwezigPanel" style="display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:99999;background:#0d1f38;border:1px solid rgba(255,255,255,0.2);border-radius:10px;padding:10px 12px;min-width:220px;max-width:300px;box-shadow:0 8px 20px rgba(0,0,0,.35);font-size:12.5px;">
         <div style="color:rgba(255,255,255,0.5);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Nu online</div>
         <div id="djAanwezigLijst"></div>
+        <div id="djChatGesprekken"></div>
       </div>
     </div>
     <div id="djBhvWarningIcon" class="hidden" style="position:relative;margin-left:10px;cursor:default;">
