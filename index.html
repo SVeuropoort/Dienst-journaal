@@ -7120,6 +7120,27 @@ function refreshDropdowns(pfx, pool){
   });
 }
 
+// Backspace (of Delete) op een geselecteerde naam-cel in de Dagplanning maakt die cel direct
+// leeg — ook als de keuzelijst openstaat. Via een gewoon 'change'-event, zodat precies dezelfde
+// verwerking draait als bij handmatig de lege optie kiezen (setP / setTruck: opslaan, dropdowns
+// en statistieken bijwerken).
+document.addEventListener('keydown', function(e){
+  if (e.key !== 'Backspace' && e.key !== 'Delete') return;
+  var sel = e.target;
+  if (!sel || sel.tagName !== 'SELECT' || !sel.classList.contains('psel')) return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (sel.value === '') return;
+  sel.value = '';
+  sel.blur(); // sluit een eventueel openstaande keuzelijst
+  sel.dispatchEvent(new Event('change', { bubbles: true }));
+  var k = sel.getAttribute('data-key');
+  setTimeout(function(){
+    // De cel kan na het bijwerken opnieuw zijn opgebouwd: focus de (nieuwe) cel weer.
+    var nieuw = k ? document.querySelector('select.psel[data-key="' + k + '"]') : null;
+    if (nieuw) nieuw.focus();
+  }, 0);
+}, true);
 function setP(k, v){
   pos[k]=v; savePos();
   const sel = document.querySelector('[data-key="'+k+'"]');
