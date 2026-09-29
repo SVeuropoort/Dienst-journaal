@@ -4526,7 +4526,8 @@ function djHerstelVaarschema(){
 
 
     <div class="action-row">
-      <span id="wo-autosave-status" style="color:#5a6b80;font-size:12.5px;font-weight:600;align-self:center;">&#x2601;&#xFE0F; Wijzigingen worden automatisch opgeslagen</span>
+      <button type="button" class="btn-primary" onclick="woPrinten()" title="Werkoverdracht printen (zonder agenda en ziekmeldingen)">&#x1F5A8;&#xFE0F; Printen</button>
+      <span id="wo-autosave-status" style="color:#5a6b80;font-size:12.5px;font-weight:600;align-self:center;margin-left:10px;">&#x2601;&#xFE0F; Wijzigingen worden automatisch opgeslagen</span>
 
     </div>
 
@@ -18354,6 +18355,53 @@ function djAgendaStart(){
 window.djAgendaLaden = djAgendaLaden;
 document.addEventListener('DOMContentLoaded', function(){ setTimeout(djAgendaStart, 2500); });
 
+
+// ── Werkoverdracht printen. Bewust ZONDER "Mijn agenda" (privé) en ZONDER "Ziekmeldingen"
+// (persoonsgegevens). Print via een verborgen frame in de pagina, dus zonder pop-upvenster.
+function woPrinten(){
+  var en = (sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM';
+  var terminalNaam = { EP: 'Europoort', HVH: 'Hoek van Holland', IMM: 'Immingham' }[sessionStorage.getItem('dj_terminal') || 'EP'] || '';
+  var val = function(id){ var el = document.getElementById(id); return el ? el.value : ''; };
+  var esc = function(t){ return String(t || '').replace(/[&<>]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }); };
+  var iso = val('f-datum');
+  var p = iso.split('-'); var datumNL = p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : iso;
+  var dag = '';
+  try { dag = new Date(iso + 'T12:00:00').toLocaleDateString(en ? 'en-GB' : 'nl-NL', { weekday: 'long' }); } catch(e){}
+  var blok = function(titel, tekst){
+    return '<h2>' + titel + '</h2><div class="vak">' + (String(tekst || '').trim() ? esc(tekst) : '<span class="leeg">\u2014</span>') + '</div>';
+  };
+  var nu = new Date();
+  var geprint = String(nu.getDate()).padStart(2,'0') + '/' + String(nu.getMonth()+1).padStart(2,'0') + '/' + nu.getFullYear() + ' ' + String(nu.getHours()).padStart(2,'0') + ':' + String(nu.getMinutes()).padStart(2,'0');
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + (en ? 'Shift handover ' : 'Werkoverdracht ') + datumNL + '</title><style>' +
+    '@page{size:A4;margin:14mm 14mm 16mm;}' +
+    'body{font-family:Arial,Helvetica,sans-serif;color:#17232b;font-size:11pt;margin:0;}' +
+    '.kop{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #0d1f38;padding-bottom:6px;margin-bottom:10px;}' +
+    '.kop h1{margin:0;font-size:18pt;color:#0d1f38;}.kop .sub{color:#5a6b80;font-size:10pt;}' +
+    'table.sv{width:100%;border-collapse:collapse;margin-bottom:6px;}table.sv td{border:1px solid #c8d7e8;padding:6px 8px;width:50%;}table.sv b{display:block;font-size:8.5pt;color:#5a6b80;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px;}' +
+    'h2{font-size:11pt;color:#0d1f38;margin:14px 0 0;padding:4px 8px;border:1px solid #c8d7e8;border-left:5px solid #0d1f38;background:#eef3fa;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+    '.vak{border:1px solid #c8d7e8;border-top:none;padding:8px;white-space:pre-wrap;min-height:40px;page-break-inside:avoid;}' +
+    '.leeg{color:#8795a8;}.voet{margin-top:14px;color:#8795a8;font-size:8.5pt;text-align:right;}' +
+    '</style></head><body>' +
+    '<div class="kop"><div><h1>' + (en ? 'Shift handover' : 'Werkoverdracht') + '</h1><div class="sub">Stena Line Stevedoring \u2014 ' + esc(terminalNaam) + '</div></div>' +
+    '<div style="text-align:right;"><div style="font-size:14pt;font-weight:bold;">' + esc(datumNL) + '</div><div class="sub">' + esc(dag) + '</div></div></div>' +
+    '<table class="sv"><tr><td><b>' + (en ? 'Supervisor morning' : 'Supervisor ochtend') + '</b>' + (esc(val('f-sup-oud')) || '\u2014') + '</td>' +
+    '<td><b>' + (en ? 'Supervisor afternoon' : 'Supervisor middag') + '</b>' + (esc(val('f-sup-nieuw')) || '\u2014') + '</td></tr></table>' +
+    blok(en ? 'Open tasks' : 'Openstaande taken', val('f-taken')) +
+    blok(en ? 'Special notes / incidents' : 'Bijzonderheden / incidenten', val('f-incident')) +
+    blok(en ? 'Notes for next shift (start-up)' : 'Opmerkingen voor volgende dienst (start-up)', val('f-startup')) +
+    '<div class="voet">' + (en ? 'Printed ' : 'Afgedrukt ') + geprint + '</div>' +
+    '</body></html>';
+  var oud = document.getElementById('wo-print-frame'); if (oud) oud.remove();
+  var f = document.createElement('iframe');
+  f.id = 'wo-print-frame';
+  f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
+  document.body.appendChild(f);
+  f.onload = function(){
+    try { f.contentWindow.focus(); f.contentWindow.print(); } catch(e) { alert(en ? 'Printing failed.' : 'Printen mislukt.'); }
+  };
+  f.srcdoc = html;
+}
+window.woPrinten = woPrinten;
 // ── Werkoverdracht automatisch opslaan, net als de Dagplanning: elke wijziging in de tekstvelden
 // wordt na 1,5 sec. voor de gekozen datum weggeschreven (lokaal + cloud). "Opslaan" blijft werken.
 window._woAutoTimer = null;
@@ -23737,6 +23785,7 @@ var DJ_VERTAAL_WOORDENBOEK = {
   "◀ Vorige": "◀ Previous",
   "Gisteren": "Yesterday",
   "Opschonen": "Clean up",
+  "🖨️ Printen": "🖨️ Print",
   "Vandaag": "Today",
   "Morgen": "Tomorrow",
   "Volgende ▶": "Next ▶",
