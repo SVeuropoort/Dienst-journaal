@@ -7566,6 +7566,105 @@ function refreshDropdowns(pfx, pool){
   });
 }
 
+// Typen in een naam-dropdown (Dagplanning, Ziekmeldingen): zoekt op ACHTERNAAM én voornaam.
+// De browser zoekt standaard alleen op de eerste letters van de optie (dus de voornaam). Nu:
+// - typ een paar letters ("soe") en de eerste passende persoon wordt gekozen, achternamen eerst;
+// - dezelfde letter nogmaals ("s", "s") springt naar de volgende persoon met die letter;
+// - een klein lijstje onder de cel laat zien wie er allemaal bij de ingetypte letters passen;
+// - de keuze wordt vastgezet zodra je even stopt met typen (of de cel verlaat), zodat de rest
+//   van de planning niet bij elke toetsaanslag opnieuw wordt opgebouwd.
+(function(){
+  var TUSSEN = { van:1, de:1, der:1, den:1, te:1, ten:1, ter:1, het:1, 'in':1, 't':1, la:1, le:1, du:1, da:1, di:1, del:1, von:1 };
+  var buf = '', bufTimer = null, commitTimer = null, actief = null, hint = null, cyclusIdx = -1, cyclusLetter = '';
+  function isNaamSelect(el){ return el && el.tagName === 'SELECT' && (el.classList.contains('psel') || el.id === 'ziekm-naam'); }
+  function tokens(naam){
+    return String(naam || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9\s\-']/g, ' ').split(/[\s\-]+/).filter(Boolean);
+  }
+  function score(naam, q){
+    var t = tokens(naam);
+    if (!t.length) return -1;
+    var achter = t.slice(1).filter(function(w){ return !TUSSEN[w]; });
+    var achterSamen = t.slice(1).join('').replace(/'/g, '');
+    if (achter.some(function(w){ return w.replace(/'/g, '').indexOf(q) === 0; }) || (achterSamen && achterSamen.indexOf(q) === 0)) return 0;
+    if (t[0].replace(/'/g, '').indexOf(q) === 0) return 1;
+    if (t.some(function(w){ return !TUSSEN[w] && w.indexOf(q) === 0; })) return 2;
+    return -1;
+  }
+  function kandidaten(sel, q){
+    var lijst = [];
+    Array.prototype.forEach.call(sel.options, function(o, i){
+      if (!o.value || o.disabled) return;
+      var sc = score(o.text, q);
+      if (sc >= 0) lijst.push({ i: i, sc: sc, tekst: o.text });
+    });
+    return lijst.sort(function(a, b){ return a.sc - b.sc || a.i - b.i; });
+  }
+  function toonHint(sel, lijst, gekozen){
+    if (!hint) {
+      hint = document.createElement('div');
+      hint.style.cssText = 'position:fixed;z-index:100003;background:#0d1f38;color:#fff;border-radius:8px;padding:5px 0;font-size:12px;box-shadow:0 6px 18px rgba(0,0,0,.3);max-width:280px;pointer-events:none;';
+      document.body.appendChild(hint);
+    }
+    var r = sel.getBoundingClientRect();
+    hint.style.left = Math.max(4, Math.min(r.left, window.innerWidth - 290)) + 'px';
+    hint.style.top = (r.bottom + 4 + 200 > window.innerHeight ? Math.max(4, r.top - 4 - Math.min(lijst.length, 8) * 22 - 26) : r.bottom + 4) + 'px';
+    var kop = '<div style="padding:2px 10px 4px;color:rgba(255,255,255,.55);font-size:10.5px;">\u201c' + buf.replace(/[<>&]/g, '') + '\u201d \u2014 ' + lijst.length + (lijst.length === 1 ? ' persoon' : ' personen') + '</div>';
+    hint.innerHTML = kop + (lijst.length ? lijst.slice(0, 8).map(function(k){
+      var aan = k.i === gekozen;
+      return '<div style="padding:3px 10px;' + (aan ? 'background:#0f6cbd;font-weight:700;' : '') + 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + k.tekst.replace(/[<>&]/g, '') + '</div>';
+    }).join('') + (lijst.length > 8 ? '<div style="padding:2px 10px;color:rgba(255,255,255,.5);">\u2026 nog ' + (lijst.length - 8) + '</div>' : '')
+      : '<div style="padding:3px 10px;color:#ff9b9b;">Geen naam gevonden</div>');
+    hint.style.display = 'block';
+  }
+  function verbergHint(){ if (hint) hint.style.display = 'none'; }
+  function vastzetten(){
+    if (commitTimer) { clearTimeout(commitTimer); commitTimer = null; }
+    verbergHint();
+    var sel = actief; actief = null; buf = ''; cyclusIdx = -1; cyclusLetter = '';
+    if (!sel || sel.dataset.typVorige === undefined) return;
+    var vorige = sel.dataset.typVorige; delete sel.dataset.typVorige;
+    if (sel.value === vorige) return;
+    var k = sel.getAttribute('data-key');
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    setTimeout(function(){
+      var nieuw = k ? document.querySelector('select.psel[data-key="' + k + '"]') : null;
+      if (nieuw && document.activeElement !== nieuw) nieuw.focus();
+    }, 0);
+  }
+  document.addEventListener('keydown', function(e){
+    var sel = e.target;
+    if (!isNaamSelect(sel) || e.ctrlKey || e.altKey || e.metaKey) return;
+    if (e.key === 'Enter' || e.key === 'Tab') { if (actief === sel) vastzetten(); return; }
+    if (e.key === 'Escape') { if (actief === sel) { if (sel.dataset.typVorige !== undefined) sel.value = sel.dataset.typVorige; delete sel.dataset.typVorige; actief = null; buf = ''; verbergHint(); } return; }
+    if (!e.key || e.key.length !== 1 || !/[a-zA-Z0-9\u00C0-\u017F']/.test(e.key)) return;
+    e.preventDefault(); e.stopPropagation();
+    if (actief && actief !== sel) vastzetten();
+    if (sel.dataset.typVorige === undefined) sel.dataset.typVorige = sel.value;
+    actief = sel;
+    var letter = e.key.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    var lijst;
+    if (buf.length <= 1 && (buf === '' || buf === letter) && cyclusLetter === letter) {
+      // Zelfde letter nog eens: door de personen met die letter heen bladeren.
+      buf = letter;
+      lijst = kandidaten(sel, buf);
+      cyclusIdx = lijst.length ? (cyclusIdx + 1) % lijst.length : -1;
+    } else {
+      buf = (buf + letter).slice(0, 30);
+      lijst = kandidaten(sel, buf);
+      cyclusIdx = 0;
+      cyclusLetter = buf.length === 1 ? letter : '';
+    }
+    var gekozen = (lijst.length && cyclusIdx >= 0) ? lijst[cyclusIdx].i : -1;
+    if (gekozen >= 0) sel.selectedIndex = gekozen;
+    toonHint(sel, lijst, gekozen);
+    if (bufTimer) clearTimeout(bufTimer);
+    bufTimer = setTimeout(function(){ buf = ''; }, 900);
+    if (commitTimer) clearTimeout(commitTimer);
+    commitTimer = setTimeout(vastzetten, 1300);
+  }, true);
+  document.addEventListener('focusout', function(e){ if (actief && e.target === actief) vastzetten(); }, true);
+})();
 // Backspace (of Delete) op een geselecteerde naam-cel in de Dagplanning maakt die cel direct
 // leeg — ook als de keuzelijst openstaat. Via een gewoon 'change'-event, zodat precies dezelfde
 // verwerking draait als bij handmatig de lege optie kiezen (setP / setTruck: opslaan, dropdowns
