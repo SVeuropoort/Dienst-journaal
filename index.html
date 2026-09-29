@@ -4354,7 +4354,16 @@ function djHerstelVaarschema(){
         <h2>Ziekmeldingen</h2>
       </div>
       <div class="field">
-        <label>Namen ziek gemelde medewerkers</label>
+        <label>Ziek gemelde medewerkers</label>
+        <div id="ziekm-lijst"></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;">
+          <select id="ziekm-naam" style="flex:1 1 220px;min-width:200px;padding:7px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></select>
+          <input type="date" id="ziekm-datum" title="Ziek gemeld op" style="padding:6px 8px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;">
+          <button type="button" onclick="ziekmMeldZiek()" style="background:#c0392b;color:#fff;border:none;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:13px;font-weight:700;white-space:nowrap;">&#x2795; Ziek melden</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Overige opmerkingen ziekmeldingen</label>
         <textarea id="f-ziek" placeholder="Schrijf hier uw bericht"></textarea>
       </div>
     </div>
@@ -6135,6 +6144,7 @@ window.addEventListener('resize', () => {
     'opleiding_overzicht_v1',
     'opleiding_overzicht_uitgesloten_v1',
     'werkoverdracht_toolbox_v1',
+    'werkoverdracht_ziekmeldingen_v1',
     'std_bezetting_v1',
     'pd_groepen_extra_v1'
   ];
@@ -6372,6 +6382,7 @@ window.addEventListener('resize', () => {
     'opleiding_overzicht_uitgesloten_v1',
     'dagPlanning_vasteCelteksten_v1',
     'werkoverdracht_toolbox_v1',
+    'werkoverdracht_ziekmeldingen_v1',
     'std_bezetting_v1',
     'pd_groepen_extra_v1',
     'werkorder_bedrijven_v1',
@@ -17658,6 +17669,160 @@ function getDagplanSV(datum){
   }catch(e){ return { och:'', mid:'' }; }
 }
 
+// ═════════════════════════════════════════════════════════════════
+// Ziekmeldingen (Werkoverdracht). Een ziekmelding geldt vanaf de meld-datum en blijft in alle
+// latere werkoverdrachten staan tot de medewerker beter is gemeld. Per persoon: bijzonderheden,
+// datum laatste contact en met wie dat contact was. Eén lijst per terminal, via de cloud gedeeld.
+// Bij het opslaan van een overdracht wordt een momentopname meegeschreven (e.ziekLijst), zodat de
+// geschiedenis laat zien wie er op die dag ziek was.
+// ═════════════════════════════════════════════════════════════════
+function ziekmEn(){ return (sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM'; }
+function ziekmKey(){ return tk('werkoverdracht_ziekmeldingen_v1'); }
+function ziekmGet(){ try { var l = JSON.parse(localStorage.getItem(ziekmKey()) || '[]'); return Array.isArray(l) ? l : []; } catch(e){ return []; } }
+function ziekmSave(lijst){
+  localStorage.setItem(ziekmKey(), JSON.stringify(lijst));
+  if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+}
+function ziekmVandaagIso(){ var d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function ziekmDatum(){ var el = document.getElementById('f-datum'); return (el && el.value) || ziekmVandaagIso(); }
+function ziekmNL(iso){ if (!iso) return ''; var p = iso.split('-'); return p.length === 3 ? p[2]+'-'+p[1]+'-'+p[0] : iso; }
+function ziekmEsc(t){ return String(t == null ? '' : t).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+// Ziek op deze datum: gemeld op of vóór de datum, en (nog) niet beter gemeld vóór of op de datum.
+function ziekmActief(datum){
+  return ziekmGet().filter(function(z){ return z.gemeldOp <= datum && (!z.beterOp || datum < z.beterOp); })
+    .sort(function(a, b){ return a.gemeldOp < b.gemeldOp ? -1 : a.gemeldOp > b.gemeldOp ? 1 : a.naam.localeCompare(b.naam); });
+}
+function ziekmBeterOpDatum(datum){ return ziekmGet().filter(function(z){ return z.beterOp === datum; }); }
+function ziekmSnapshot(datum){
+  if (!datum) return [];
+  var velden = function(z, beter){ return { naam: z.naam, gemeldOp: z.gemeldOp, laatsteContact: z.laatsteContact || '', contactMet: z.contactMet || '', bijzonderheden: z.bijzonderheden || '', beterGemeld: !!beter }; };
+  return ziekmActief(datum).map(function(z){ return velden(z, false); })
+    .concat(ziekmBeterOpDatum(datum).map(function(z){ return velden(z, true); }));
+}
+function ziekmTekstVoorEntry(e){
+  if (!e) return '';
+  var regels = (e.ziekLijst || []).map(function(z){
+    var d = ['\u2022 ' + z.naam + (z.beterGemeld ? ' \u2014 beter gemeld' : ' \u2014 ziek sinds ' + ziekmNL(z.gemeldOp))];
+    if (z.laatsteContact) d.push('laatste contact ' + ziekmNL(z.laatsteContact) + (z.contactMet ? ' (met ' + z.contactMet + ')' : ''));
+    else if (z.contactMet) d.push('contact met ' + z.contactMet);
+    if (z.bijzonderheden) d.push(z.bijzonderheden);
+    return d.join(' \u00b7 ');
+  });
+  var vrij = (e.ziek || '').trim();
+  if (vrij) regels.push(vrij);
+  return regels.join('\n');
+}
+function ziekmVulDropdown(actief){
+  var sel = document.getElementById('ziekm-naam');
+  if (!sel) return;
+  var bezet = {};
+  actief.forEach(function(z){ bezet[z.naam] = true; });
+  var secties = (typeof toolboxAlleMedewerkersGegroepeerd === 'function') ? toolboxAlleMedewerkersGegroepeerd() : [];
+  var html = '<option value="">' + (ziekmEn() ? '— Choose employee —' : '— Kies medewerker —') + '</option>';
+  secties.forEach(function(sec){
+    var namen = (sec.namen || []).filter(function(n){ return !bezet[n]; });
+    if (!namen.length) return;
+    html += '<optgroup label="' + ziekmEsc(sec.titel) + '">' + namen.map(function(n){ return '<option value="' + ziekmEsc(n) + '">' + ziekmEsc(n) + '</option>'; }).join('') + '</optgroup>';
+  });
+  var vorige = sel.value;
+  sel.innerHTML = html;
+  if (vorige && !bezet[vorige]) sel.value = vorige;
+}
+function ziekmRender(){
+  var box = document.getElementById('ziekm-lijst');
+  if (!box) return;
+  var en = ziekmEn();
+  var datum = ziekmDatum();
+  var dIn = document.getElementById('ziekm-datum');
+  if (dIn && (!dIn.value || dIn.dataset.volgt !== '0')) { dIn.value = datum; dIn.dataset.volgt = '1'; }
+  if (dIn && !dIn.dataset.gebonden) { dIn.dataset.gebonden = '1'; dIn.addEventListener('change', function(){ dIn.dataset.volgt = '0'; }); }
+  var actief = ziekmActief(datum);
+  var beter = ziekmBeterOpDatum(datum);
+  ziekmVulDropdown(actief);
+  if (!actief.length && !beter.length) {
+    box.innerHTML = '<div style="color:#8795a8;font-size:12.5px;font-style:italic;padding:4px 0;">' + (en ? 'Nobody reported sick on this date.' : 'Niemand ziek gemeld op deze datum.') + '</div>';
+    return;
+  }
+  var inp = 'padding:5px 7px;border:1px solid #c8d7e8;border-radius:5px;font-size:12.5px;width:100%;box-sizing:border-box;';
+  var th = 'text-align:left;padding:6px 8px;font-size:11px;color:#fff;background:var(--navy);white-space:nowrap;';
+  var td = 'padding:5px 6px;border-bottom:1px solid #e3e9f1;vertical-align:middle;';
+  var rij = function(z, isBeter){
+    var id = ziekmEsc(z.id);
+    var dagen = Math.max(0, Math.round((new Date(datum + 'T12:00:00') - new Date(z.gemeldOp + 'T12:00:00')) / 86400000));
+    return '<tr style="' + (isBeter ? 'opacity:.6;background:#eef8f0;' : '') + '">' +
+      '<td style="' + td + 'font-weight:700;color:var(--navy);white-space:nowrap;">' + ziekmEsc(z.naam) + '</td>' +
+      '<td style="' + td + 'white-space:nowrap;">' + ziekmNL(z.gemeldOp) + (isBeter ? '' : '<div style="font-size:10.5px;color:#8795a8;">' + (en ? 'day ' : 'dag ') + (dagen + 1) + '</div>') + '</td>' +
+      '<td style="' + td + '"><input type="date" style="' + inp + 'min-width:130px;" value="' + ziekmEsc(z.laatsteContact || '') + '" onchange="ziekmVeld(\'' + id + '\',\'laatsteContact\',this.value)"></td>' +
+      '<td style="' + td + '"><input type="text" style="' + inp + 'min-width:120px;" value="' + ziekmEsc(z.contactMet || '') + '" placeholder="' + (en ? 'Name' : 'Naam') + '" onchange="ziekmVeld(\'' + id + '\',\'contactMet\',this.value)"></td>' +
+      '<td style="' + td + 'width:40%;"><input type="text" style="' + inp + '" value="' + ziekmEsc(z.bijzonderheden || '') + '" placeholder="' + (en ? 'Notes (no medical details)' : 'Bijzonderheden (geen medische details)') + '" onchange="ziekmVeld(\'' + id + '\',\'bijzonderheden\',this.value)"></td>' +
+      '<td style="' + td + 'white-space:nowrap;text-align:right;">' +
+        (isBeter
+          ? '<span style="color:#1a7a40;font-weight:700;font-size:12px;">&#x2714; ' + (en ? 'Fit' : 'Beter') + '</span> <button type="button" onclick="ziekmBeterOngedaan(\'' + id + '\')" title="' + (en ? 'Undo' : 'Ongedaan maken') + '" style="background:none;border:1px solid #c8d7e8;border-radius:5px;padding:3px 7px;cursor:pointer;font-size:11px;">&#x21B6;</button>'
+          : '<button type="button" onclick="ziekmBeter(\'' + id + '\')" style="background:#1a7a40;color:#fff;border:none;border-radius:5px;padding:5px 10px;cursor:pointer;font-size:12px;font-weight:700;">' + (en ? 'Report fit' : 'Beter melden') + '</button>' +
+            ' <button type="button" onclick="ziekmVerwijder(\'' + id + '\')" title="' + (en ? 'Remove (entered by mistake)' : 'Verwijderen (per ongeluk ingevoerd)') + '" style="background:none;border:none;color:#c0392b;cursor:pointer;font-size:14px;">&#x2715;</button>') +
+      '</td></tr>';
+  };
+  box.innerHTML = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;">' +
+    '<tr><th style="' + th + 'border-radius:6px 0 0 0;">' + (en ? 'Employee' : 'Medewerker') + '</th><th style="' + th + '">' + (en ? 'Sick since' : 'Ziek sinds') + '</th>' +
+    '<th style="' + th + '">' + (en ? 'Last contact' : 'Laatste contact') + '</th><th style="' + th + '">' + (en ? 'Contact with' : 'Contact gehad met') + '</th>' +
+    '<th style="' + th + '">' + (en ? 'Notes' : 'Bijzonderheden') + '</th><th style="' + th + 'border-radius:0 6px 0 0;"></th></tr>' +
+    actief.map(function(z){ return rij(z, false); }).join('') + beter.map(function(z){ return rij(z, true); }).join('') +
+    '</table></div>';
+}
+function ziekmMeldZiek(){
+  var sel = document.getElementById('ziekm-naam');
+  var naam = sel ? sel.value : '';
+  if (!naam) { alert(ziekmEn() ? 'Choose an employee first.' : 'Kies eerst een medewerker.'); return; }
+  var dIn = document.getElementById('ziekm-datum');
+  var gemeldOp = (dIn && dIn.value) || ziekmDatum();
+  var lijst = ziekmGet();
+  var alZiek = lijst.some(function(z){ return z.naam === naam && !z.beterOp; });
+  if (alZiek) { alert((ziekmEn() ? naam + ' is already reported sick.' : naam + ' staat al ziek gemeld.')); return; }
+  lijst.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), naam: naam, gemeldOp: gemeldOp,
+    laatsteContact: '', contactMet: '', bijzonderheden: '', beterOp: null, aangemaakt: new Date().toISOString() });
+  ziekmSave(lijst);
+  if (dIn) dIn.dataset.volgt = '1';
+  ziekmRender();
+}
+function ziekmVeld(id, veld, waarde){
+  var lijst = ziekmGet();
+  var z = lijst.find(function(x){ return x.id === id; });
+  if (!z) return;
+  z[veld] = String(waarde || '').slice(0, 500);
+  ziekmSave(lijst);
+}
+function ziekmBeter(id){
+  var lijst = ziekmGet();
+  var z = lijst.find(function(x){ return x.id === id; });
+  if (!z) return;
+  var datum = ziekmDatum();
+  if (datum < z.gemeldOp) datum = z.gemeldOp;
+  if (!confirm((ziekmEn() ? 'Report ' + z.naam + ' fit as of ' : z.naam + ' beter melden per ') + ziekmNL(datum) + '?')) return;
+  z.beterOp = datum;
+  ziekmSave(lijst);
+  ziekmRender();
+}
+function ziekmBeterOngedaan(id){
+  var lijst = ziekmGet();
+  var z = lijst.find(function(x){ return x.id === id; });
+  if (!z) return;
+  z.beterOp = null;
+  ziekmSave(lijst);
+  ziekmRender();
+}
+function ziekmVerwijder(id){
+  var lijst = ziekmGet();
+  var z = lijst.find(function(x){ return x.id === id; });
+  if (!z) return;
+  if (!confirm(ziekmEn() ? 'Remove this sick report for ' + z.naam + '? (Use "Report fit" if the employee has recovered.)'
+                         : 'Ziekmelding van ' + z.naam + ' verwijderen? (Gebruik "Beter melden" als de medewerker hersteld is.)')) return;
+  ziekmSave(lijst.filter(function(x){ return x.id !== id; }));
+  ziekmRender();
+}
+document.addEventListener('DOMContentLoaded', function(){ setTimeout(ziekmRender, 1500); });
+['ziekmRender','ziekmMeldZiek','ziekmVeld','ziekmBeter','ziekmBeterOngedaan','ziekmVerwijder','ziekmSnapshot','ziekmTekstVoorEntry']
+  .forEach(function(n){ try { window[n] = eval(n); } catch(e){} });
+
 // Zet supervisor-velden in Werkoverdracht op basis van de SV-cel uit de Dagplanning
 function syncSupervisorVanDagplan(datum){
   var sv = getDagplanSV(datum);
@@ -17675,14 +17840,15 @@ function laadDagData() {
     var pd=document.getElementById('f-datum').dataset.prevDatum||datum, ps=document.getElementById('f-datum').dataset.prevDienst||dienst;
     if((so||sn||ta||zk||ic||st)&&(pd!==datum||ps!==dienst)){
       var data=getData(), best=data.filter(function(e){return e.datum===pd&&e.dienst===ps;});
-      if(best.length>0){var idx2=data.indexOf(best[best.length-1]);data[idx2]=Object.assign({},data[idx2],{supOud:so,supNieuw:sn,taken:ta,ziek:zk,incident:ic,startup:st});}
-      else data.push({id:Date.now(),datum:pd,dienst:ps,supOud:so,supNieuw:sn,taken:ta,ziek:zk,incident:ic,startup:st,materieel:[],tijden:[],units:[],sjorringen:[]});
+      var zl=(typeof ziekmSnapshot==='function')?ziekmSnapshot(pd):[];
+      if(best.length>0){var idx2=data.indexOf(best[best.length-1]);data[idx2]=Object.assign({},data[idx2],{supOud:so,supNieuw:sn,taken:ta,ziek:zk,ziekLijst:zl,incident:ic,startup:st});}
+      else data.push({id:Date.now(),datum:pd,dienst:ps,supOud:so,supNieuw:sn,taken:ta,ziek:zk,ziekLijst:zl,incident:ic,startup:st,materieel:[],tijden:[],units:[],sjorringen:[]});
       saveData(data);
     }
     document.getElementById('f-datum').dataset.prevDatum=datum;
     document.getElementById('f-datum').dataset.prevDienst=dienst;
     var allD=getData(), ents=allD.filter(function(e){return e.datum===datum&&e.dienst===dienst;});
-    if(!ents.length){document.getElementById('f-taken').value='';document.getElementById('f-ziek').value='';document.getElementById('f-incident').value='';document.getElementById('f-startup').value='';syncSupervisorVanDagplan(datum);return;}
+    if(!ents.length){document.getElementById('f-taken').value='';document.getElementById('f-ziek').value='';document.getElementById('f-incident').value='';document.getElementById('f-startup').value='';syncSupervisorVanDagplan(datum);if(typeof ziekmRender==='function')ziekmRender();return;}
     var e=ents[ents.length-1];
     document.getElementById('f-taken').value=e.taken||'';document.getElementById('f-ziek').value=e.ziek||'';
     document.getElementById('f-incident').value=e.incident||'';document.getElementById('f-startup').value=e.startup||'';
@@ -17690,6 +17856,7 @@ function laadDagData() {
     if(e.tijden){setTijden(e.tijden);}else{document.querySelectorAll('.tijden-input').forEach(function(i){i.value='';}); }
     if(e.sjorringen){setSjorringen(e.sjorringen);}else{document.querySelectorAll('.sjor-input').forEach(function(i){i.value='';}); }
     syncSupervisorVanDagplan(datum);
+    if (typeof ziekmRender === 'function') ziekmRender();
   }
 
   function slaJournaalOp() {
@@ -17704,6 +17871,7 @@ function laadDagData() {
       supNieuw:  document.getElementById('f-sup-nieuw').value,
       taken:     document.getElementById('f-taken').value,
       ziek:      document.getElementById('f-ziek').value,
+      ziekLijst: (typeof ziekmSnapshot === 'function') ? ziekmSnapshot(datum) : [],
       incident:  document.getElementById('f-incident').value,
       materieel: JSON.parse(JSON.stringify(materieel)),
       startup:   document.getElementById('f-startup').value,
@@ -17812,11 +17980,11 @@ function laadDagData() {
     const q = zoekterm.toLowerCase();
     const velden = {
       taken:    entry.taken    || '',
-      ziek:     entry.ziek     || '',
+      ziek:     ziekmTekstVoorEntry(entry),
       incident: entry.incident || '',
       startup:  entry.startup  || '',
       materieel: (entry.materieel||[]).map(m => m.naam+' '+m.status+' '+m.opmerking).join(' '),
-      alles:    [entry.taken, entry.ziek, entry.incident, entry.startup,
+      alles:    [entry.taken, ziekmTekstVoorEntry(entry), entry.incident, entry.startup,
                  entry.supOud, entry.supNieuw, entry.dienst,
                  (entry.materieel||[]).map(m => m.naam+' '+m.status+' '+m.opmerking).join(' ')
                 ].join(' ')
@@ -17856,7 +18024,7 @@ function laadDagData() {
       var maand = MAANDEN[d.getMonth()].toUpperCase() + ' ' + d.getFullYear();
 
       var heeftTaken    = e.taken    && e.taken.trim();
-      var heeftZiek     = e.ziek     && e.ziek.trim();
+      var heeftZiek     = ziekmTekstVoorEntry(e).trim();
       var heeftIncident = e.incident && e.incident.trim();
       var defects = (e.materieel||[]).filter(function(m){ return m.status==='DEFECT'; }).length;
       var nTaken  = heeftTaken ? e.taken.trim().split('\n').filter(Boolean).length : 0;
@@ -17882,7 +18050,7 @@ function laadDagData() {
         (overig.length ? '<tr><td colspan="4" style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--navy);padding:8px 10px 4px;background:var(--surface2);">Overig</td></tr>'+overigRows : '');
 
       var takenHl    = fi ? highlight(e.taken||'', fi)    : (e.taken||'');
-      var ziekHl     = fi ? highlight(e.ziek||'', fi)     : (e.ziek||'');
+      var ziekHl     = fi ? highlight(ziekmTekstVoorEntry(e), fi) : ziekmTekstVoorEntry(e);
       var incidentHl = fi ? highlight(e.incident||'', fi) : (e.incident||'');
       var startupHl  = fi ? highlight(e.startup||'', fi)  : (e.startup||'');
 
@@ -17901,7 +18069,7 @@ function laadDagData() {
         '<div class="entry-detail" style="display:none;">'+
           '<div class="detail-grid">'+
             (e.taken    ? '<div class="detail-item"><div class="dl">Openstaande Taken</div><div class="dv">'+takenHl+'</div></div>' : '')+
-            (e.ziek     ? '<div class="detail-item"><div class="dl">Ziekmeldingen</div><div class="dv">'+ziekHl+'</div></div>' : '')+
+            (heeftZiek  ? '<div class="detail-item"><div class="dl">Ziekmeldingen</div><div class="dv" style="white-space:pre-wrap;">'+ziekHl+'</div></div>' : '')+
             (e.incident ? '<div class="detail-item"><div class="dl">Bijzonderheden</div><div class="dv">'+incidentHl+'</div></div>' : '')+
             (e.startup  ? '<div class="detail-item"><div class="dl">Start-Up</div><div class="dv">'+startupHl+'</div></div>' : '')+
           '</div>'+
@@ -18277,7 +18445,7 @@ ${sjorTxt}
 ${e.taken||'—'}
 
 --- ZIEKMELDINGEN ---
-${e.ziek||'—'}
+${ziekmTekstVoorEntry(e)||'—'}
 
 --- BIJZONDERHEDEN / INCIDENTEN ---
 ${e.incident||'—'}
