@@ -7566,22 +7566,23 @@ function refreshDropdowns(pfx, pool){
   });
 }
 
-// Typen in een naam-dropdown (Dagplanning, Ziekmeldingen): zoekt op ACHTERNAAM én voornaam.
-// De browser zoekt standaard alleen op de eerste letters van de optie (dus de voornaam). Nu:
-// - typ een paar letters ("soe") en de eerste passende persoon wordt gekozen, achternamen eerst;
-// - dezelfde letter nogmaals ("s", "s") springt naar de volgende persoon met die letter;
-// - een klein lijstje onder de cel laat zien wie er allemaal bij de ingetypte letters passen;
-// - de keuze wordt vastgezet zodra je even stopt met typen (of de cel verlaat), zodat de rest
-//   van de planning niet bij elke toetsaanslag opnieuw wordt opgebouwd.
+// Zoekbare naam-keuzelijst (Dagplanning, Ziekmeldingen). De standaard keuzelijst van de browser
+// zoekt alleen op de eerste letters (= voornaam) en vangt, zodra hij openstaat, alle toetsen zelf
+// af. Daarom opent een klik op zo'n naamcel nu een eigen lijstje met zoekveld:
+// - typ een deel van de achternaam of voornaam ("soe", "geff", "van der m"): de lijst filtert direct,
+//   achternamen eerst; tussenvoegsels (van, de, der…) worden overgeslagen;
+// - pijltjes op/neer + Enter, of klikken, kiest de persoon; Esc of ernaast klikken sluit;
+// - staat een cel geselecteerd (zonder lijst), dan opent een letter het lijstje met die letter.
+// Op telefoons/tablets blijft de gewone keuzelijst van het apparaat werken.
 (function(){
   var TUSSEN = { van:1, de:1, der:1, den:1, te:1, ten:1, ter:1, het:1, 'in':1, 't':1, la:1, le:1, du:1, da:1, di:1, del:1, von:1 };
-  var buf = '', bufTimer = null, commitTimer = null, actief = null, hint = null, cyclusIdx = -1, cyclusLetter = '';
-  function isNaamSelect(el){ return el && el.tagName === 'SELECT' && (el.classList.contains('psel') || el.id === 'ziekm-naam'); }
-  function tokens(naam){
-    return String(naam || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9\s\-']/g, ' ').split(/[\s\-]+/).filter(Boolean);
-  }
+  var pop = null, doelSel = null, gefilterd = [], idx = 0, laatsteTouch = 0;
+  function isNaamSelect(el){ return el && el.tagName === 'SELECT' && (el.classList.contains('psel') || el.id === 'ziekm-naam') && !el.disabled; }
+  function norm(t){ return String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+  function tokens(naam){ return norm(naam).replace(/[^a-z0-9\s\-']/g, ' ').split(/[\s\-]+/).filter(Boolean); }
   function score(naam, q){
+    q = norm(q).replace(/\s+/g, '').replace(/'/g, '');
+    if (!q) return 3;
     var t = tokens(naam);
     if (!t.length) return -1;
     var achter = t.slice(1).filter(function(w){ return !TUSSEN[w]; });
@@ -7589,81 +7590,98 @@ function refreshDropdowns(pfx, pool){
     if (achter.some(function(w){ return w.replace(/'/g, '').indexOf(q) === 0; }) || (achterSamen && achterSamen.indexOf(q) === 0)) return 0;
     if (t[0].replace(/'/g, '').indexOf(q) === 0) return 1;
     if (t.some(function(w){ return !TUSSEN[w] && w.indexOf(q) === 0; })) return 2;
+    if (t.join('').indexOf(q) !== -1) return 2.5; // ergens in de naam
     return -1;
   }
-  function kandidaten(sel, q){
-    var lijst = [];
-    Array.prototype.forEach.call(sel.options, function(o, i){
-      if (!o.value || o.disabled) return;
+  function esc(t){ return String(t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function sluit(){ if (pop) pop.style.display = 'none'; doelSel = null; }
+  function kies(optIndex){
+    var sel = doelSel; sluit();
+    if (!sel) return;
+    if (sel.selectedIndex !== optIndex) {
+      sel.selectedIndex = optIndex;
+      var k = sel.getAttribute('data-key');
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+      setTimeout(function(){ var n = k ? document.querySelector('select.psel[data-key="' + k + '"]') : sel; if (n) n.focus(); }, 0);
+    } else sel.focus();
+  }
+  function tekenLijst(){
+    var q = pop.querySelector('input').value;
+    gefilterd = [];
+    Array.prototype.forEach.call(doelSel.options, function(o, i){
+      if (o.disabled) return;
+      if (!o.value) { if (!q) gefilterd.push({ i: i, sc: -1, tekst: '— leeg —', leeg: true }); return; }
       var sc = score(o.text, q);
-      if (sc >= 0) lijst.push({ i: i, sc: sc, tekst: o.text });
+      if (sc >= 0) gefilterd.push({ i: i, sc: sc, tekst: o.text });
     });
-    return lijst.sort(function(a, b){ return a.sc - b.sc || a.i - b.i; });
+    if (q) gefilterd.sort(function(a, b){ return a.sc - b.sc || a.i - b.i; });
+    if (idx >= gefilterd.length) idx = Math.max(0, gefilterd.length - 1);
+    var lijst = pop.querySelector('.djnp-lijst');
+    lijst.innerHTML = gefilterd.length ? gefilterd.map(function(k, n){
+      var huidig = k.i === doelSel.selectedIndex;
+      return '<div data-n="' + n + '" style="padding:5px 10px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;' +
+        (n === idx ? 'background:#0f6cbd;color:#fff;' : '') + (k.leeg ? 'color:' + (n === idx ? '#fff' : '#8795a8') + ';font-style:italic;' : '') + (huidig ? 'font-weight:800;' : '') + '">' + esc(k.tekst) + '</div>';
+    }).join('') : '<div style="padding:6px 10px;color:#c0392b;">Geen naam gevonden</div>';
+    var act = lijst.querySelector('[data-n="' + idx + '"]');
+    if (act) act.scrollIntoView({ block: 'nearest' });
   }
-  function toonHint(sel, lijst, gekozen){
-    if (!hint) {
-      hint = document.createElement('div');
-      hint.style.cssText = 'position:fixed;z-index:100003;background:#0d1f38;color:#fff;border-radius:8px;padding:5px 0;font-size:12px;box-shadow:0 6px 18px rgba(0,0,0,.3);max-width:280px;pointer-events:none;';
-      document.body.appendChild(hint);
+  function open(sel, beginTekst){
+    if (!pop) {
+      pop = document.createElement('div');
+      pop.style.cssText = 'position:fixed;z-index:100004;background:#fff;border:1px solid #9fb3cc;border-radius:8px;box-shadow:0 10px 26px rgba(0,0,0,.28);width:240px;font-size:13px;overflow:hidden;';
+      pop.innerHTML = '<input type="text" autocomplete="off" placeholder="Zoek op achternaam of voornaam…" style="width:100%;box-sizing:border-box;border:none;border-bottom:1px solid #dde4ee;padding:8px 10px;font-size:13px;outline:none;">' +
+        '<div class="djnp-lijst" style="max-height:260px;overflow-y:auto;"></div>';
+      document.body.appendChild(pop);
+      var inp = pop.querySelector('input');
+      inp.addEventListener('input', function(){ idx = 0; tekenLijst(); });
+      inp.addEventListener('keydown', function(e){
+        if (e.key === 'ArrowDown') { e.preventDefault(); idx = Math.min(idx + 1, gefilterd.length - 1); tekenLijst(); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); idx = Math.max(idx - 1, 0); tekenLijst(); }
+        else if (e.key === 'Enter') { e.preventDefault(); if (gefilterd[idx]) kies(gefilterd[idx].i); }
+        else if (e.key === 'Escape') { e.preventDefault(); var s0 = doelSel; sluit(); if (s0) s0.focus(); }
+        else if (e.key === 'Tab') { if (gefilterd[idx] && inp.value) { e.preventDefault(); kies(gefilterd[idx].i); } else sluit(); }
+      });
+      pop.addEventListener('mousedown', function(e){
+        var r = e.target.closest('[data-n]');
+        e.preventDefault(); // focus in het zoekveld houden
+        if (r) kies(gefilterd[+r.getAttribute('data-n')].i);
+      });
     }
+    doelSel = sel;
     var r = sel.getBoundingClientRect();
-    hint.style.left = Math.max(4, Math.min(r.left, window.innerWidth - 290)) + 'px';
-    hint.style.top = (r.bottom + 4 + 200 > window.innerHeight ? Math.max(4, r.top - 4 - Math.min(lijst.length, 8) * 22 - 26) : r.bottom + 4) + 'px';
-    var kop = '<div style="padding:2px 10px 4px;color:rgba(255,255,255,.55);font-size:10.5px;">\u201c' + buf.replace(/[<>&]/g, '') + '\u201d \u2014 ' + lijst.length + (lijst.length === 1 ? ' persoon' : ' personen') + '</div>';
-    hint.innerHTML = kop + (lijst.length ? lijst.slice(0, 8).map(function(k){
-      var aan = k.i === gekozen;
-      return '<div style="padding:3px 10px;' + (aan ? 'background:#0f6cbd;font-weight:700;' : '') + 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + k.tekst.replace(/[<>&]/g, '') + '</div>';
-    }).join('') + (lijst.length > 8 ? '<div style="padding:2px 10px;color:rgba(255,255,255,.5);">\u2026 nog ' + (lijst.length - 8) + '</div>' : '')
-      : '<div style="padding:3px 10px;color:#ff9b9b;">Geen naam gevonden</div>');
-    hint.style.display = 'block';
+    var breed = Math.max(220, Math.min(300, r.width + 60));
+    pop.style.width = breed + 'px';
+    pop.style.left = Math.max(4, Math.min(r.left, window.innerWidth - breed - 4)) + 'px';
+    var onder = window.innerHeight - r.bottom;
+    pop.style.top = (onder < 300 && r.top > onder ? Math.max(4, r.top - 300) : r.bottom + 2) + 'px';
+    pop.style.display = 'block';
+    var inp2 = pop.querySelector('input');
+    inp2.value = beginTekst || '';
+    // Begin op de huidige naam (of bovenaan als er gezocht wordt).
+    idx = 0;
+    tekenLijst();
+    if (!beginTekst) { var h = gefilterd.findIndex(function(k){ return k.i === sel.selectedIndex; }); if (h >= 0) { idx = h; tekenLijst(); } }
+    setTimeout(function(){ inp2.focus(); var v = inp2.value; inp2.setSelectionRange(v.length, v.length); }, 0);
   }
-  function verbergHint(){ if (hint) hint.style.display = 'none'; }
-  function vastzetten(){
-    if (commitTimer) { clearTimeout(commitTimer); commitTimer = null; }
-    verbergHint();
-    var sel = actief; actief = null; buf = ''; cyclusIdx = -1; cyclusLetter = '';
-    if (!sel || sel.dataset.typVorige === undefined) return;
-    var vorige = sel.dataset.typVorige; delete sel.dataset.typVorige;
-    if (sel.value === vorige) return;
-    var k = sel.getAttribute('data-key');
-    sel.dispatchEvent(new Event('change', { bubbles: true }));
-    setTimeout(function(){
-      var nieuw = k ? document.querySelector('select.psel[data-key="' + k + '"]') : null;
-      if (nieuw && document.activeElement !== nieuw) nieuw.focus();
-    }, 0);
-  }
+  document.addEventListener('touchstart', function(){ laatsteTouch = Date.now(); }, { passive: true, capture: true });
+  document.addEventListener('mousedown', function(e){
+    if (pop && pop.style.display === 'block' && !pop.contains(e.target)) sluit();
+    var sel = e.target;
+    if (!isNaamSelect(sel) || e.button !== 0 || Date.now() - laatsteTouch < 800) return;
+    e.preventDefault(); // eigen lijstje in plaats van de standaard keuzelijst
+    sel.focus();
+    open(sel, '');
+  }, true);
   document.addEventListener('keydown', function(e){
     var sel = e.target;
     if (!isNaamSelect(sel) || e.ctrlKey || e.altKey || e.metaKey) return;
-    if (e.key === 'Enter' || e.key === 'Tab') { if (actief === sel) vastzetten(); return; }
-    if (e.key === 'Escape') { if (actief === sel) { if (sel.dataset.typVorige !== undefined) sel.value = sel.dataset.typVorige; delete sel.dataset.typVorige; actief = null; buf = ''; verbergHint(); } return; }
+    if (e.key === 'Enter' || e.key === ' ' || (e.altKey && e.key === 'ArrowDown')) { e.preventDefault(); open(sel, ''); return; }
     if (!e.key || e.key.length !== 1 || !/[a-zA-Z0-9\u00C0-\u017F']/.test(e.key)) return;
     e.preventDefault(); e.stopPropagation();
-    if (actief && actief !== sel) vastzetten();
-    if (sel.dataset.typVorige === undefined) sel.dataset.typVorige = sel.value;
-    actief = sel;
-    var letter = e.key.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    var lijst;
-    if (buf.length <= 1 && (buf === '' || buf === letter) && cyclusLetter === letter) {
-      // Zelfde letter nog eens: door de personen met die letter heen bladeren.
-      buf = letter;
-      lijst = kandidaten(sel, buf);
-      cyclusIdx = lijst.length ? (cyclusIdx + 1) % lijst.length : -1;
-    } else {
-      buf = (buf + letter).slice(0, 30);
-      lijst = kandidaten(sel, buf);
-      cyclusIdx = 0;
-      cyclusLetter = buf.length === 1 ? letter : '';
-    }
-    var gekozen = (lijst.length && cyclusIdx >= 0) ? lijst[cyclusIdx].i : -1;
-    if (gekozen >= 0) sel.selectedIndex = gekozen;
-    toonHint(sel, lijst, gekozen);
-    if (bufTimer) clearTimeout(bufTimer);
-    bufTimer = setTimeout(function(){ buf = ''; }, 900);
-    if (commitTimer) clearTimeout(commitTimer);
-    commitTimer = setTimeout(vastzetten, 1300);
+    open(sel, e.key);
   }, true);
-  document.addEventListener('focusout', function(e){ if (actief && e.target === actief) vastzetten(); }, true);
+  window.addEventListener('resize', sluit);
+  document.addEventListener('scroll', function(e){ if (pop && pop.style.display === 'block' && !pop.contains(e.target)) sluit(); }, true);
 })();
 // Backspace (of Delete) op een geselecteerde naam-cel in de Dagplanning maakt die cel direct
 // leeg — ook als de keuzelijst openstaat. Via een gewoon 'change'-event, zodat precies dezelfde
