@@ -4317,10 +4317,13 @@ function djHerstelVaarschema(){
       <div class="form-grid col3">
         <div class="field">
           <label>Datum</label>
-          <div style="display:flex;gap:6px;align-items:center;">
-            <button onclick="fDatumStap(-1)" style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:7px 11px;cursor:pointer;font-size:14px;">&#8592;</button>
-            <input type="date" id="f-datum" style="flex:1;" onchange="laadDagData()" />
-            <button onclick="fDatumStap(1)" style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:7px 11px;cursor:pointer;font-size:14px;">&#8594;</button>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+            <button type="button" class="dp-dagknop" onclick="fDatumStap(-1)" title="Een dag terug">&#9664; Vorige</button>
+            <button type="button" class="dp-dagknop" data-wo-offset="-1" onclick="fDagKies(-1)">Gisteren</button>
+            <button type="button" class="dp-dagknop" data-wo-offset="0" onclick="fDagKies(0)">Vandaag</button>
+            <button type="button" class="dp-dagknop" data-wo-offset="1" onclick="fDagKies(1)">Morgen</button>
+            <button type="button" class="dp-dagknop" onclick="fDatumStap(1)" title="Een dag vooruit">Volgende &#9654;</button>
+            <input type="date" id="f-datum" style="flex:1 1 140px;min-width:140px;" onchange="fKnoppenMarkeer();laadDagData()" title="Kies een datum" />
           </div>
         </div>
         <input type="hidden" id="f-dienst" value="Dag">
@@ -4358,7 +4361,7 @@ function djHerstelVaarschema(){
         <div id="ziekm-lijst"></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;">
           <select id="ziekm-naam" style="flex:1 1 220px;min-width:200px;padding:7px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></select>
-          <input type="date" id="ziekm-datum" title="Ziek gemeld op" style="padding:6px 8px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;">
+          <input type="text" id="ziekm-datum" placeholder="dd/mm/jjjj" title="Ziek gemeld op (dd/mm/jjjj)" style="width:110px;padding:7px 8px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;">
           <button type="button" onclick="ziekmMeldZiek()" style="background:#c0392b;color:#fff;border:none;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:13px;font-weight:700;white-space:nowrap;">&#x2795; Ziek melden</button>
         </div>
       </div>
@@ -7523,7 +7526,7 @@ function dagKnoppenMarkeer() {
   });
 }
 // Gisteren (-1) / Vandaag (0) / Morgen (1), gerekend vanaf de echte datum van vandaag.
-document.addEventListener('DOMContentLoaded', function(){ setTimeout(function(){ dagKnoppenMarkeer(); if (typeof vsKnoppenMarkeer === 'function') vsKnoppenMarkeer(); }, 1500); });
+document.addEventListener('DOMContentLoaded', function(){ setTimeout(function(){ dagKnoppenMarkeer(); if (typeof vsKnoppenMarkeer === 'function') vsKnoppenMarkeer(); if (typeof fKnoppenMarkeer === 'function') fKnoppenMarkeer(); }, 1500); });
 function dagKies(offset) {
   var inp = document.getElementById('dagPlanDatum');
   if (!inp) return;
@@ -17642,12 +17645,39 @@ renderAll();
     // Trucks opmerking synced via onchange too — nothing extra needed
   }
 
+  function fDatumIso(d) {
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+// Accent op Gisteren/Vandaag/Morgen als de gekozen Werkoverdracht-datum daarmee overeenkomt.
+function fKnoppenMarkeer() {
+  var inp = document.getElementById('f-datum');
+  var waarde = inp ? inp.value : '';
+  document.querySelectorAll('.dp-dagknop[data-wo-offset]').forEach(function(btn){
+    var d = new Date(); d.setHours(12,0,0,0);
+    d.setDate(d.getDate() + parseInt(btn.getAttribute('data-wo-offset'), 10));
+    btn.classList.toggle('actief', waarde === fDatumIso(d));
+  });
+}
+window.fKnoppenMarkeer = fKnoppenMarkeer;
+// Gisteren (-1) / Vandaag (0) / Morgen (1), gerekend vanaf de echte datum van vandaag.
+function fDagKies(offset) {
+  var inp = document.getElementById('f-datum');
+  if (!inp) return;
+  var d = new Date(); d.setHours(12,0,0,0);
+  d.setDate(d.getDate() + offset);
+  inp.value = fDatumIso(d);
+  fKnoppenMarkeer();
+  laadDagData();
+}
+window.fDagKies = fDagKies;
   function fDatumStap(delta) {
   var inp = document.getElementById('f-datum');
-  if (!inp || !inp.value) return;
-  var d = new Date(inp.value);
+  if (!inp) return;
+  if (!inp.value) { fDagKies(delta); return; }
+  var d = new Date(inp.value + 'T12:00:00');
   d.setDate(d.getDate() + delta);
-  inp.value = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  inp.value = fDatumIso(d);
+  fKnoppenMarkeer();
   laadDagData();
 }
 
@@ -17685,7 +17715,22 @@ function ziekmSave(lijst){
 }
 function ziekmVandaagIso(){ var d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function ziekmDatum(){ var el = document.getElementById('f-datum'); return (el && el.value) || ziekmVandaagIso(); }
-function ziekmNL(iso){ if (!iso) return ''; var p = iso.split('-'); return p.length === 3 ? p[2]+'-'+p[1]+'-'+p[0] : iso; }
+function ziekmNL(iso){ if (!iso) return ''; var p = iso.split('-'); return p.length === 3 ? p[2]+'/'+p[1]+'/'+p[0] : iso; }
+// dd/mm/jjjj -> jjjj-mm-dd; '' bij leeg, null bij ongeldige invoer.
+function ziekmNaarIso(tekst){
+  var t = String(tekst || '').trim();
+  if (!t) return '';
+  var iso = nlNaarIso(t);
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return null;
+  var d = new Date(+m[1], +m[2] - 1, +m[3]);
+  return (d.getFullYear() === +m[1] && d.getMonth() === +m[2] - 1 && d.getDate() === +m[3]) ? iso : null;
+}
+function ziekmOngeldig(el){
+  if (!el) return;
+  el.style.borderColor = '#c0392b'; el.style.background = '#fdecea';
+  el.title = ziekmEn() ? 'Invalid date — use dd/mm/yyyy' : 'Ongeldige datum — gebruik dd/mm/jjjj';
+}
 function ziekmEsc(t){ return String(t == null ? '' : t).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 // Ziek op deze datum: gemeld op of vóór de datum, en (nog) niet beter gemeld vóór of op de datum.
 function ziekmActief(datum){
@@ -17734,7 +17779,7 @@ function ziekmRender(){
   var en = ziekmEn();
   var datum = ziekmDatum();
   var dIn = document.getElementById('ziekm-datum');
-  if (dIn && (!dIn.value || dIn.dataset.volgt !== '0')) { dIn.value = datum; dIn.dataset.volgt = '1'; }
+  if (dIn && (!dIn.value || dIn.dataset.volgt !== '0')) { dIn.value = ziekmNL(datum); dIn.dataset.volgt = '1'; }
   if (dIn && !dIn.dataset.gebonden) { dIn.dataset.gebonden = '1'; dIn.addEventListener('change', function(){ dIn.dataset.volgt = '0'; }); }
   var actief = ziekmActief(datum);
   var beter = ziekmBeterOpDatum(datum);
@@ -17752,7 +17797,7 @@ function ziekmRender(){
     return '<tr style="' + (isBeter ? 'opacity:.6;background:#eef8f0;' : '') + '">' +
       '<td style="' + td + 'font-weight:700;color:var(--navy);white-space:nowrap;">' + ziekmEsc(z.naam) + '</td>' +
       '<td style="' + td + 'white-space:nowrap;">' + ziekmNL(z.gemeldOp) + (isBeter ? '' : '<div style="font-size:10.5px;color:#8795a8;">' + (en ? 'day ' : 'dag ') + (dagen + 1) + '</div>') + '</td>' +
-      '<td style="' + td + '"><input type="date" style="' + inp + 'min-width:130px;" value="' + ziekmEsc(z.laatsteContact || '') + '" onchange="ziekmVeld(\'' + id + '\',\'laatsteContact\',this.value)"></td>' +
+      '<td style="' + td + '"><input type="text" placeholder="dd/mm/jjjj" style="' + inp + 'width:105px;" value="' + ziekmEsc(ziekmNL(z.laatsteContact || '')) + '" onchange="ziekmContactDatum(\'' + id + '\',this)"></td>' +
       '<td style="' + td + '"><input type="text" style="' + inp + 'min-width:120px;" value="' + ziekmEsc(z.contactMet || '') + '" placeholder="' + (en ? 'Name' : 'Naam') + '" onchange="ziekmVeld(\'' + id + '\',\'contactMet\',this.value)"></td>' +
       '<td style="' + td + 'width:40%;"><input type="text" style="' + inp + '" value="' + ziekmEsc(z.bijzonderheden || '') + '" placeholder="' + (en ? 'Notes (no medical details)' : 'Bijzonderheden (geen medische details)') + '" onchange="ziekmVeld(\'' + id + '\',\'bijzonderheden\',this.value)"></td>' +
       '<td style="' + td + 'white-space:nowrap;text-align:right;">' +
@@ -17774,7 +17819,9 @@ function ziekmMeldZiek(){
   var naam = sel ? sel.value : '';
   if (!naam) { alert(ziekmEn() ? 'Choose an employee first.' : 'Kies eerst een medewerker.'); return; }
   var dIn = document.getElementById('ziekm-datum');
-  var gemeldOp = (dIn && dIn.value) || ziekmDatum();
+  var gemeldOp = dIn ? ziekmNaarIso(dIn.value) : '';
+  if (gemeldOp === null) { ziekmOngeldig(dIn); alert(ziekmEn() ? 'Invalid date — use dd/mm/yyyy.' : 'Ongeldige datum — gebruik dd/mm/jjjj.'); return; }
+  if (!gemeldOp) gemeldOp = ziekmDatum();
   var lijst = ziekmGet();
   var alZiek = lijst.some(function(z){ return z.naam === naam && !z.beterOp; });
   if (alZiek) { alert((ziekmEn() ? naam + ' is already reported sick.' : naam + ' staat al ziek gemeld.')); return; }
@@ -17790,6 +17837,13 @@ function ziekmVeld(id, veld, waarde){
   if (!z) return;
   z[veld] = String(waarde || '').slice(0, 500);
   ziekmSave(lijst);
+}
+function ziekmContactDatum(id, el){
+  var iso = ziekmNaarIso(el.value);
+  if (iso === null) { ziekmOngeldig(el); return; }
+  el.style.borderColor = ''; el.style.background = ''; el.title = '';
+  el.value = ziekmNL(iso);
+  ziekmVeld(id, 'laatsteContact', iso);
 }
 function ziekmBeter(id){
   var lijst = ziekmGet();
@@ -17820,7 +17874,7 @@ function ziekmVerwijder(id){
   ziekmRender();
 }
 document.addEventListener('DOMContentLoaded', function(){ setTimeout(ziekmRender, 1500); });
-['ziekmRender','ziekmMeldZiek','ziekmVeld','ziekmBeter','ziekmBeterOngedaan','ziekmVerwijder','ziekmSnapshot','ziekmTekstVoorEntry']
+['ziekmRender','ziekmMeldZiek','ziekmVeld','ziekmContactDatum','ziekmBeter','ziekmBeterOngedaan','ziekmVerwijder','ziekmSnapshot','ziekmTekstVoorEntry']
   .forEach(function(n){ try { window[n] = eval(n); } catch(e){} });
 
 // Zet supervisor-velden in Werkoverdracht op basis van de SV-cel uit de Dagplanning
@@ -17848,7 +17902,7 @@ function laadDagData() {
     document.getElementById('f-datum').dataset.prevDatum=datum;
     document.getElementById('f-datum').dataset.prevDienst=dienst;
     var allD=getData(), ents=allD.filter(function(e){return e.datum===datum&&e.dienst===dienst;});
-    if(!ents.length){document.getElementById('f-taken').value='';document.getElementById('f-ziek').value='';document.getElementById('f-incident').value='';document.getElementById('f-startup').value='';syncSupervisorVanDagplan(datum);if(typeof ziekmRender==='function')ziekmRender();return;}
+    if(!ents.length){document.getElementById('f-taken').value='';document.getElementById('f-ziek').value='';document.getElementById('f-incident').value='';document.getElementById('f-startup').value='';syncSupervisorVanDagplan(datum);if(typeof ziekmRender==='function')ziekmRender();if(typeof fKnoppenMarkeer==='function')fKnoppenMarkeer();return;}
     var e=ents[ents.length-1];
     document.getElementById('f-taken').value=e.taken||'';document.getElementById('f-ziek').value=e.ziek||'';
     document.getElementById('f-incident').value=e.incident||'';document.getElementById('f-startup').value=e.startup||'';
@@ -17857,6 +17911,7 @@ function laadDagData() {
     if(e.sjorringen){setSjorringen(e.sjorringen);}else{document.querySelectorAll('.sjor-input').forEach(function(i){i.value='';}); }
     syncSupervisorVanDagplan(datum);
     if (typeof ziekmRender === 'function') ziekmRender();
+    if (typeof fKnoppenMarkeer === 'function') fKnoppenMarkeer();
   }
 
   function slaJournaalOp() {
