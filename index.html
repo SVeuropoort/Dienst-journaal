@@ -4527,8 +4527,8 @@ function djHerstelVaarschema(){
 
 
     <div class="action-row">
-      <button class="btn-primary" onclick="slaJournaalOp()">&#x1F4BE; Journaal Opslaan</button>
-      <button class="btn-secondary" onclick="resetForm()">Wissen</button>
+      <span id="wo-autosave-status" style="color:#5a6b80;font-size:12.5px;font-weight:600;align-self:center;">&#x2601;&#xFE0F; Wijzigingen worden automatisch opgeslagen</span>
+
     </div>
 
     </div>
@@ -18253,6 +18253,8 @@ function woAutoOpslaanNu(datum, dienst){
     ziekLijst: (typeof ziekmSnapshot === 'function') ? ziekmSnapshot(datum) : [],
     bijgewerktOp: new Date().toISOString()
   };
+  // Stand van het materieel meenemen, zoals de oude knop "Journaal Opslaan" dat deed.
+  try { if (typeof materieel !== 'undefined' && Array.isArray(materieel)) velden.materieel = JSON.parse(JSON.stringify(materieel)); } catch(e){}
   var data = getData();
   var best = data.filter(function(e){ return e.datum === datum && e.dienst === dienst; });
   if (best.length) { var ix = data.indexOf(best[best.length-1]); data[ix] = Object.assign({}, data[ix], velden); }
@@ -18263,9 +18265,13 @@ function woAutoOpslaanNu(datum, dienst){
   }
   saveData(data);
   if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+  var st = document.getElementById('wo-autosave-status');
+  if (st) { var n = new Date(); st.innerHTML = '&#x2714; ' + (((sessionStorage.getItem('dj_terminal')||'EP')==='IMM') ? 'Saved automatically at ' : 'Automatisch opgeslagen om ') + String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0'); st.style.color = '#1a7a40'; }
 }
 function woAutoOpslaanPlan(){
   if (window._woAutoTimer) clearTimeout(window._woAutoTimer);
+  var st = document.getElementById('wo-autosave-status');
+  if (st) { st.innerHTML = '&#x23F3; ' + (((sessionStorage.getItem('dj_terminal')||'EP')==='IMM') ? 'Saving…' : 'Opslaan…'); st.style.color = '#5a6b80'; }
   var datum = (document.getElementById('f-datum') || {}).value;
   var dienst = (document.getElementById('f-dienst') || {}).value || 'Dag';
   window._woAutoTimer = setTimeout(function(){ window._woAutoTimer = null; woAutoOpslaanNu(datum, dienst); }, 1500);
@@ -23563,6 +23569,8 @@ var DJ_VERTAAL_WOORDENBOEK = {
   " = te laat.": " = late.",
   "💾 Opslaan": "💾 Save",
   "Journaal Opslaan": "Save Log",
+  "Wijzigingen worden automatisch opgeslagen": "Changes are saved automatically",
+  "☁️ Wijzigingen worden automatisch opgeslagen": "☁️ Changes are saved automatically",
   "Wissen": "Clear",
   "Toevoegen": "Add",
   "+ Toevoegen": "+ Add",
@@ -25380,7 +25388,7 @@ function renderTruckChart(maand, jaar) {
 }
 // ═══ AUTO-SAVE WERKOVERDRACHT ═══
 (function(){
-  // Autosave verwijderd - alleen opslaan via de knop "Journaal Opslaan"
+  // Opslaan gebeurt automatisch (zie woAutoOpslaanNu bij laadDagData); de knop "Journaal Opslaan" is vervallen.
 })();
 
 var _werkoverdrachtOntgrendeld = false; // blijft ontgrendeld voor de rest van deze sessie
