@@ -2827,9 +2827,7 @@ document.addEventListener('contextmenu', function(e) {
     <a href="https://sveuropoort.github.io/Dienst-journaal/kpi-mt.html" id="dj-link-kpi" style="color:rgba(255,255,255,0.55);font-size:12px;text-decoration:none;display:flex;align-items:center;gap:5px;">&#x1F4CA; KPI Dashboard (MT)</a>
     <a href="https://sveuropoort.github.io/Dienst-journaal/materieel-garage.html" id="dj-link-mat" style="color:rgba(255,255,255,0.55);font-size:12px;text-decoration:none;display:flex;align-items:center;gap:5px;">&#x1F697; Materieel-garage</a>
   </div>
-  <div style="margin-top:14px;">
-    <a href="#" id="dj-ww-backup-link" onclick="djToonWwBackup(); return false;" style="color:rgba(255,255,255,0.35);font-size:11px;text-decoration:underline;cursor:pointer;">Andere manier van inloggen</a>
-  </div>
+  <!-- "Andere manier van inloggen" (wachtwoord) is verwijderd: alleen nog Stena Microsoft-login. -->
 </div>
 <!-- Beheerpaneel wachtwoorden: alleen bereikbaar via het tandwiel + code, vanaf de inlogpagina -->
 <div id="dj-admin-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:100000;align-items:center;justify-content:center;">
@@ -2891,6 +2889,12 @@ document.addEventListener('contextmenu', function(e) {
     setTimeout(function(){ document.getElementById('dj-ww').focus(); }, 100);
   }
   function djLogin(){
+    // Inloggen met een wachtwoord is uitgeschakeld: de app is alleen nog toegankelijk met een
+    // Stena Microsoft-account (plus toestemming in Toegangsbeheer). De wachtwoorden stonden
+    // bovendien leesbaar in de openbare broncode op GitHub.
+    var err = document.getElementById('dj-err');
+    if (err) { err.textContent = 'Inloggen kan alleen met je Stena Microsoft-account.'; err.style.display = 'block'; }
+    return;
     var terminal = sessionStorage.getItem('dj_terminal') || 'EP';
     var ingevoerd = document.getElementById('dj-ww').value;
     if(djWwCheck(ingevoerd, 'login_' + terminal)){
@@ -2923,13 +2927,7 @@ function djDeobf(verward){
 // Alle wachtwoorden in het systeem, op dezelfde manier behandeld. "standaard" staat hier al
 // verward (djObf) opgeslagen, precies zoals een aangepast wachtwoord dat ook zou zijn.
 var DJ_WW_DEFS = [
-  { sleutel: 'beheercode', label: 'Beheercode (voor dit paneel zelf)', standaard: djObf('13111982') },
-  { sleutel: 'login_EP', label: 'Inlogwachtwoord \u2014 Europoort', standaard: djObf('SVeuropoort2026') },
-  { sleutel: 'login_HVH', label: 'Inlogwachtwoord \u2014 Hoek van Holland', standaard: djObf('SVhvh2026') },
-  { sleutel: 'login_IMM', label: 'Inlogwachtwoord \u2014 Immingham', standaard: djObf('SVimmingham2026') },
   { sleutel: 'master', label: 'Meesterwachtwoord (werkt overal, alleen nog voor de reserve-wachtwoordlogin hierboven)', standaard: djObf('stena') },
-  { sleutel: 'kpi_mt', label: 'KPI Dashboard (MT) \u2014 los bestand kpi-mt.html', standaard: djObf('MTeuropoort2026') },
-  { sleutel: 'materieel_garage', label: 'Materieel-garage \u2014 los bestand materieel-garage.html', standaard: djObf('SVmaterieel2026') }
 ];
 function djWwGet(sleutel){
   var def = DJ_WW_DEFS.filter(function(d){ return d.sleutel === sleutel; })[0];
@@ -3189,6 +3187,7 @@ function djSpHeaderRefresh(){
 // (achter de link "Andere manier van inloggen"), totdat dat overbodig wordt.
 // ══════════════════════════════════════════════════════════════════
 function djToonWwBackup(){
+  return; // wachtwoord-login uitgeschakeld (alleen Microsoft-login)
   var backup = document.getElementById('dj-ww-backup');
   var link = document.getElementById('dj-ww-backup-link');
   if (backup) backup.style.display = 'block';

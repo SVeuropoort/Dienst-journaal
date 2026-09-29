@@ -59,9 +59,7 @@
     <a href="https://sveuropoort.github.io/Dienst-journaal/index.html" style="color:rgba(255,255,255,0.55);font-size:12px;text-decoration:none;display:flex;align-items:center;gap:5px;">&#x1F6A2; Dienst Journaal</a>
     <a href="https://sveuropoort.github.io/Dienst-journaal/materieel-garage.html" style="color:rgba(255,255,255,0.55);font-size:12px;text-decoration:none;display:flex;align-items:center;gap:5px;">&#x1F697; Materieel-garage</a>
   </div>
-  <div style="margin-top:14px;">
-    <a href="#" id="mt-ww-backup-link" onclick="mtToonWwBackup(); return false;" style="color:rgba(255,255,255,0.35);font-size:11px;text-decoration:underline;cursor:pointer;">Andere manier van inloggen</a>
-  </div>
+  <!-- "Andere manier van inloggen" (wachtwoord) is verwijderd: alleen nog Stena Microsoft-login. -->
 </div>
 
 <!-- ══════════════ APP ══════════════ -->
@@ -227,7 +225,7 @@
 // ══════════════════════════════════════════════════════════════════
 function mtObf(t){ try { return btoa(unescape(encodeURIComponent(t))).split('').reverse().join(''); } catch(e){ return ''; } }
 function mtDeobf(v){ try { return decodeURIComponent(escape(atob(v.split('').reverse().join('')))); } catch(e){ return ''; } }
-var MT_WW_STANDAARD = mtObf('MTeuropoort2026'); // eerste keer inloggen; daarna direct wijzigen via het tandwiel
+var MT_WW_STANDAARD = ''; // wachtwoord-login is uitgeschakeld (alleen Microsoft-login); geen standaardwachtwoord meer in de code
 // Gedeelde opslagsleutel met het Wachtwoordbeheer-paneel in de hoofdapp (index.html), zodat dit
 // wachtwoord daar ook beheerd kan worden. "kpi_mt_ww_v1" is de oude, aparte sleutel van vóór die
 // koppeling — als iemand het wachtwoord destijds al via het tandwiel hier had gewijzigd, wordt
@@ -438,6 +436,10 @@ async function mtMsLoginKlik(){
   }
 }
 function mtLogin(){
+  // Wachtwoord-login uitgeschakeld: alleen nog met een Stena Microsoft-account met KPI-toegang.
+  var err = document.getElementById('mt-err');
+  if (err) { err.textContent = 'Inloggen kan alleen met je Stena Microsoft-account.'; err.style.display = 'block'; }
+  return;
   var ingevoerd = document.getElementById('mt-ww').value;
   if (ingevoerd === mtWwGet()) {
     sessionStorage.setItem('kpi_mt_auth', '1');

@@ -153,9 +153,7 @@
     <a href="https://sveuropoort.github.io/Dienst-journaal/index.html" style="color:rgba(255,255,255,0.55);font-size:12px;text-decoration:none;display:flex;align-items:center;gap:5px;">&#x1F6A2; Dienst Journaal</a>
     <a href="https://sveuropoort.github.io/Dienst-journaal/kpi-mt.html" style="color:rgba(255,255,255,0.55);font-size:12px;text-decoration:none;display:flex;align-items:center;gap:5px;">&#x1F4CA; KPI Dashboard (MT)</a>
   </div>
-  <div style="margin-top:14px;">
-    <a href="#" id="mg-ww-backup-link" onclick="mgToonWwBackup(); return false;" style="color:rgba(255,255,255,0.35);font-size:11px;text-decoration:underline;cursor:pointer;">Andere manier van inloggen</a>
-  </div>
+  <!-- "Andere manier van inloggen" (wachtwoord) is verwijderd: alleen nog Stena Microsoft-login. -->
 </div>
 
 <div id="mg-app" style="display:none;">
@@ -252,7 +250,7 @@
 // ══════════════════════════════════════════════════════════════════
 function mgObf(t){ try { return btoa(unescape(encodeURIComponent(t))).split('').reverse().join(''); } catch(e){ return ''; } }
 function mgDeobf(v){ try { return decodeURIComponent(escape(atob(v.split('').reverse().join('')))); } catch(e){ return ''; } }
-var MG_WW_STANDAARD = mgObf('SVmaterieel2026'); // eerste keer inloggen; daarna wijzigen via het tandwiel in Dienst Journaal
+var MG_WW_STANDAARD = ''; // wachtwoord-login is uitgeschakeld (alleen Microsoft-login); geen standaardwachtwoord meer in de code
 function mgWwGet(){
   var opgeslagen = localStorage.getItem('dj_ww_materieel_garage');
   return mgDeobf(opgeslagen || MG_WW_STANDAARD);
@@ -437,6 +435,10 @@ async function mgMsLoginKlik(){
   }
 }
 function mgLogin(){
+  // Wachtwoord-login uitgeschakeld: alleen nog met een Stena Microsoft-account met Materieel-toegang.
+  var err = document.getElementById('mg-err');
+  if (err) { err.textContent = 'Inloggen kan alleen met je Stena Microsoft-account.'; err.style.display = 'block'; }
+  return;
   var ingevoerd = document.getElementById('mg-ww').value;
   if (ingevoerd === mgWwGet()) {
     sessionStorage.setItem('mg_auth', '1');
