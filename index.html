@@ -4453,6 +4453,19 @@ function djHerstelVaarschema(){
       </div>
     </div>
 
+    <!-- Mijn agenda (Outlook) -->
+    <div class="card">
+      <div class="card-header">
+        <div class="icon">&#x1F4C5;</div>
+        <h2>Mijn agenda</h2>
+        <span style="flex:1"></span>
+        <button type="button" onclick="djAgendaNieuw()" style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:5px 11px;cursor:pointer;font-size:12px;font-weight:700;margin-right:6px;">&#x2795; Nieuwe afspraak</button>
+        <button type="button" onclick="djAgendaLaden(false)" title="Vernieuwen" style="background:none;border:1px solid #c8d7e8;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;color:var(--navy);">&#x21BB;</button>
+      </div>
+      <div style="color:#8795a8;font-size:11px;margin:-4px 0 8px;">Je eigen Outlook-afspraken op de gekozen datum &mdash; alleen zichtbaar voor jou. Klik op een afspraak om hem te bewerken; wijzigingen staan direct in Outlook.</div>
+      <div id="dj-agenda-body"><div style="color:#8795a8;font-size:12.5px;">Agenda laden&hellip;</div></div>
+    </div>
+
     <!-- Openstaande Taken -->
     <div class="card">
       <div class="card-header">
@@ -6625,6 +6638,7 @@ window.addEventListener('resize', () => {
       var result = await spOphalenBestand(rowId + '.json');
       if (_syncBezig || _autoSaveTimer) return; // en nogmaals vlak vóór het toepassen
       if (window.djHeeftOnopgeslagenWerk && window.djHeeftOnopgeslagenWerk()) return;
+      if (window._woAutoTimer) return; // Werkoverdracht: getypte tekst staat nog te wachten
       if (!result || !result.data) { _djLivePollLaatsteWijziging = gewijzigd; return; }
       setSyncData(result.data);
       _djLivePollLaatsteWijziging = gewijzigd;
@@ -6636,6 +6650,7 @@ window.addEventListener('resize', () => {
         if (typeof buildStats === 'function') buildStats();
         if (typeof refreshAllCertCells === 'function') refreshAllCertCells();
       }
+      if (typeof window.djWerkoverdrachtHerlaadInPlace === 'function') window.djWerkoverdrachtHerlaadInPlace();
       if (typeof showSyncStatus === 'function') showSyncStatus('✓ Bijgewerkt door collega', 'ok');
     } catch(e) {
       console.warn('Live-verversing Dagplanning mislukt:', e);
@@ -17827,6 +17842,8 @@ function ziekmGet(){ try { var l = JSON.parse(localStorage.getItem(ziekmKey()) |
 function ziekmSave(lijst){
   localStorage.setItem(ziekmKey(), JSON.stringify(lijst));
   if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+  // Ook de momentopname in de overdracht van de gekozen dag bijwerken.
+  if (typeof woAutoOpslaanPlan === 'function') woAutoOpslaanPlan();
 }
 function ziekmVandaagIso(){ var d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function ziekmDatum(){ var el = document.getElementById('f-datum'); return (el && el.value) || ziekmVandaagIso(); }
@@ -18000,24 +18017,296 @@ function syncSupervisorVanDagplan(datum){
   if(elM){ elM.value = sv.mid; elM.readOnly = true; elM.title = 'Automatisch overgenomen uit Dagplanning (Avond, SV)'; elM.style.background = '#f0f2f5'; }
 }
 
+// ── Mijn agenda (Outlook) in de Werkoverdracht. Toont de afspraken uit de EIGEN Outlook-agenda
+// van wie nu met Microsoft is ingelogd, voor de gekozen overdrachtsdatum. Afspraken kunnen hier ook
+// worden aangemaakt, gewijzigd en verwijderd; dat gebeurt rechtstreeks in Outlook. Wordt rechtstreeks via
+// Microsoft Graph gelezen en nergens opgeslagen (niet lokaal, niet op SharePoint): collega's zien
+// jouw agenda dus niet, en jij de hunne niet. Vereist de Graph-machtiging Calendars.ReadWrite.
+var DJ_AGENDA_SCOPES = ['Calendars.ReadWrite']; // lezen én bewerken (wijzigingen gaan direct naar Outlook)
+var _djAgendaItems = [];
+var _djAgendaTimer = null;
+function djAgendaEn(){ return (sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM'; }
+function djAgendaEsc(t){ return String(t == null ? '' : t).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+async function djAgendaToken(interactief){
+  if (typeof spInit === 'function') await spInit();
+  var accounts = _spMsalInstance.getAllAccounts();
+  if (!accounts.length && !interactief) return null;
+  var voorkeur = localStorage.getItem('dj_sp_account_username');
+  var account = (voorkeur && accounts.find(function(a){ return a.username === voorkeur; })) || accounts[0];
+  try {
+    if (!account) throw new Error('geen account');
+    return (await _spMsalInstance.acquireTokenSilent({ scopes: DJ_AGENDA_SCOPES, account: account })).accessToken;
+  } catch(e) {
+    if (!interactief) return null;
+    return (await _spMsalInstance.acquireTokenPopup({ scopes: DJ_AGENDA_SCOPES })).accessToken;
+  }
+}
+function djAgendaStatus(html){ var b = document.getElementById('dj-agenda-body'); if (b) b.innerHTML = html; }
+function djAgendaKoppelKnop(melding){
+  var en = djAgendaEn();
+  djAgendaStatus('<div style="color:#5a6b80;font-size:12.5px;margin-bottom:8px;">' + (melding || (en ? 'Show your own Outlook appointments here. Only you can see them.' : 'Toon hier je eigen Outlook-afspraken. Alleen jij ziet ze.')) + '</div>' +
+    '<button type="button" onclick="djAgendaLaden(true)" style="background:#0f6cbd;color:#fff;border:none;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:13px;font-weight:700;">&#x1F4C5; ' + (en ? 'Connect my calendar' : 'Mijn agenda koppelen') + '</button>');
+}
+async function djAgendaLaden(interactief){
+  var en = djAgendaEn();
+  if (!document.getElementById('dj-agenda-body')) return;
+  var datum = (document.getElementById('f-datum') || {}).value;
+  if (!datum) { var n = new Date(); datum = n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); }
+  var token;
+  try { token = await djAgendaToken(!!interactief); }
+  catch(e) {
+    var msg = String((e && (e.errorMessage || e.message)) || e);
+    djAgendaKoppelKnop(/AADSTS65001|AADSTS90094|consent|admin/i.test(msg)
+      ? (en ? 'Permission needed: ask IT to approve "Calendars.ReadWrite" for the Dienst Journaal app.' : 'Toestemming nodig: vraag IT om "Calendars.ReadWrite" goed te keuren voor de Dienst Journaal-app.')
+      : (en ? 'Could not connect to your calendar: ' : 'Koppelen met je agenda lukte niet: ') + djAgendaEsc(msg));
+    return;
+  }
+  if (!token) { djAgendaKoppelKnop(); return; }
+  var van = new Date(datum + 'T00:00:00'), tot = new Date(datum + 'T00:00:00'); tot.setDate(tot.getDate() + 1);
+  var url = 'https://graph.microsoft.com/v1.0/me/calendarView?startDateTime=' + encodeURIComponent(van.toISOString()) +
+    '&endDateTime=' + encodeURIComponent(tot.toISOString()) +
+    '&$select=subject,start,end,location,isAllDay,isCancelled,showAs,webLink,onlineMeeting,organizer,isOrganizer&$orderby=start/dateTime&$top=50';
+  try {
+    var r = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) throw new Error('status ' + r.status);
+    var j = await r.json();
+    var items = (j.value || []).filter(function(ev){ return !ev.isCancelled; });
+    _djAgendaItems = items;
+    djAgendaRender(items, datum);
+  } catch(e) {
+    djAgendaStatus('<div style="color:#c0392b;font-size:12.5px;">' + (en ? 'Could not load calendar (' : 'Agenda laden mislukt (') + djAgendaEsc(e.message) + ').</div>');
+  }
+}
+function djAgendaRender(items, datum){
+  var en = djAgendaEn();
+  if (!items.length) {
+    djAgendaStatus('<div style="color:#8795a8;font-size:12.5px;font-style:italic;">' + (en ? 'No appointments on this day.' : 'Geen afspraken op deze dag.') + '</div>');
+    return;
+  }
+  var tijd = function(dt){ var d = new Date(dt.dateTime.replace(/\.\d+$/, '') + 'Z'); return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); };
+  var nu = new Date();
+  djAgendaStatus(items.map(function(ev){
+    var begin = new Date(ev.start.dateTime.replace(/\.\d+$/, '') + 'Z'), eind = new Date(ev.end.dateTime.replace(/\.\d+$/, '') + 'Z');
+    var bezig = !ev.isAllDay && begin <= nu && nu < eind;
+    var voorbij = !ev.isAllDay && eind <= nu;
+    var wanneer = ev.isAllDay ? (en ? 'All day' : 'Hele dag') : tijd(ev.start) + ' \u2013 ' + tijd(ev.end);
+    var plek = ev.location && ev.location.displayName ? ev.location.displayName : '';
+    var teams = ev.onlineMeeting && ev.onlineMeeting.joinUrl ? ev.onlineMeeting.joinUrl : '';
+    var bewerkbaar = ev.isOrganizer !== false;
+    return '<div ' + (bewerkbaar ? 'onclick="djAgendaBewerk(\'' + djAgendaEsc(ev.id) + '\')" title="' + (en ? 'Click to edit' : 'Klik om te bewerken') + '" ' : 'title="' + (en ? 'Invitation from someone else — change it in Outlook' : 'Uitnodiging van iemand anders — wijzigen via Outlook') + '" ') +
+      'style="display:flex;gap:10px;align-items:flex-start;padding:7px 8px;border-left:4px solid ' + (bezig ? '#1a7a40' : '#0f6cbd') + ';background:' + (bezig ? '#eef8f0' : '#f4f7fb') + ';border-radius:6px;margin-bottom:6px;' + (bewerkbaar ? 'cursor:pointer;' : '') + (voorbij ? 'opacity:.55;' : '') + '">' +
+      '<div style="min-width:92px;font-weight:700;color:var(--navy);font-size:12.5px;white-space:nowrap;">' + wanneer + (bezig ? '<div style="color:#1a7a40;font-size:10.5px;">' + (en ? 'now' : 'nu bezig') + '</div>' : '') + '</div>' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div style="font-weight:700;color:#17232b;font-size:13px;">' + djAgendaEsc(ev.subject || (en ? '(no subject)' : '(geen onderwerp)')) + '</div>' +
+        (plek ? '<div style="color:#5a6b80;font-size:11.5px;">&#x1F4CD; ' + djAgendaEsc(plek) + '</div>' : '') +
+      '</div>' +
+      '<div style="display:flex;gap:6px;flex-shrink:0;">' +
+        (teams ? '<a onclick="event.stopPropagation()" href="' + djAgendaEsc(teams) + '" target="_blank" rel="noopener" style="background:#5b5fc7;color:#fff;text-decoration:none;border-radius:5px;padding:4px 9px;font-size:11.5px;font-weight:700;">Teams</a>' : '') +
+        (ev.webLink ? '<a onclick="event.stopPropagation()" href="' + djAgendaEsc(ev.webLink) + '" target="_blank" rel="noopener" title="' + (en ? 'Open in Outlook' : 'Openen in Outlook') + '" style="background:#fff;color:#0f6cbd;border:1px solid #c8d7e8;text-decoration:none;border-radius:5px;padding:4px 9px;font-size:11.5px;font-weight:700;">Outlook</a>' : '') +
+      '</div></div>';
+  }).join(''));
+}
+
+// ── Afspraak aanmaken / wijzigen / verwijderen (gaat rechtstreeks naar Outlook) ──
+function djAgendaTz(){ return (sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM' ? 'GMT Standard Time' : 'W. Europe Standard Time'; }
+function djAgendaIsoNaarNL(iso){ var p = String(iso || '').split('-'); return p.length === 3 ? p[2]+'/'+p[1]+'/'+p[0] : ''; }
+function djAgendaNLNaarIso(t){
+  var m = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/.exec(String(t || '').trim());
+  if (!m) return null;
+  var d = new Date(+m[3], +m[2] - 1, +m[1]);
+  if (d.getDate() !== +m[1] || d.getMonth() !== +m[2] - 1) return null;
+  return m[3] + '-' + String(m[2]).padStart(2,'0') + '-' + String(m[1]).padStart(2,'0');
+}
+function djAgendaTijd(t){
+  var m = /^(\d{1,2})[:.]?(\d{2})$/.exec(String(t || '').trim());
+  if (!m || +m[1] > 23 || +m[2] > 59) return null;
+  return String(m[1]).padStart(2,'0') + ':' + m[2];
+}
+function djAgendaUtc(isoDatum, hhmm){ // lokale datum+tijd -> {dateTime, timeZone:'UTC'}
+  var d = new Date(isoDatum + 'T' + hhmm + ':00');
+  return { dateTime: d.toISOString().replace(/\.\d+Z$/, ''), timeZone: 'UTC' };
+}
+function djAgendaSluitEditor(){ var o = document.getElementById('dj-agenda-editor'); if (o) o.remove(); }
+function djAgendaEditor(ev){
+  var en = djAgendaEn();
+  djAgendaSluitEditor();
+  var datumIso = (document.getElementById('f-datum') || {}).value || '';
+  var van = '', tot = '', heleDag = false, onderwerp = '', plek = '';
+  if (ev) {
+    var b = new Date(ev.start.dateTime.replace(/\.\d+$/, '') + 'Z'), e = new Date(ev.end.dateTime.replace(/\.\d+$/, '') + 'Z');
+    heleDag = !!ev.isAllDay;
+    datumIso = heleDag ? ev.start.dateTime.slice(0, 10) : b.getFullYear() + '-' + String(b.getMonth()+1).padStart(2,'0') + '-' + String(b.getDate()).padStart(2,'0');
+    van = String(b.getHours()).padStart(2,'0') + ':' + String(b.getMinutes()).padStart(2,'0');
+    tot = String(e.getHours()).padStart(2,'0') + ':' + String(e.getMinutes()).padStart(2,'0');
+    onderwerp = ev.subject || ''; plek = (ev.location && ev.location.displayName) || '';
+  } else {
+    var nu = new Date(); var h = Math.min(22, nu.getHours() + 1);
+    van = String(h).padStart(2,'0') + ':00'; tot = String(h + 1).padStart(2,'0') + ':00';
+  }
+  var veld = 'width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;font-family:inherit;';
+  var lbl = 'display:block;font-size:11px;font-weight:700;color:#5a6b80;text-transform:uppercase;letter-spacing:.4px;margin:10px 0 4px;';
+  var o = document.createElement('div');
+  o.id = 'dj-agenda-editor';
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(0,20,40,.45);z-index:100002;display:flex;align-items:center;justify-content:center;padding:16px;';
+  o.innerHTML = '<div style="background:#fff;border-radius:12px;width:420px;max-width:100%;padding:18px 18px 14px;box-shadow:0 16px 40px rgba(0,0,0,.35);">' +
+    '<div style="font-weight:800;font-size:15px;color:var(--navy);margin-bottom:4px;">&#x1F4C5; ' + (ev ? (en ? 'Edit appointment' : 'Afspraak bewerken') : (en ? 'New appointment' : 'Nieuwe afspraak')) + '</div>' +
+    '<label style="' + lbl + '">' + (en ? 'Subject' : 'Onderwerp') + '</label><input id="dja-onderwerp" style="' + veld + '" value="' + djAgendaEsc(onderwerp) + '">' +
+    '<div style="display:flex;gap:8px;">' +
+      '<div style="flex:1.3;"><label style="' + lbl + '">' + (en ? 'Date' : 'Datum') + '</label><input id="dja-datum" placeholder="dd/mm/jjjj" style="' + veld + '" value="' + djAgendaIsoNaarNL(datumIso) + '"></div>' +
+      '<div style="flex:1;"><label style="' + lbl + '">' + (en ? 'From' : 'Van') + '</label><input id="dja-van" placeholder="uu:mm" style="' + veld + '" value="' + van + '"></div>' +
+      '<div style="flex:1;"><label style="' + lbl + '">' + (en ? 'To' : 'Tot') + '</label><input id="dja-tot" placeholder="uu:mm" style="' + veld + '" value="' + tot + '"></div>' +
+    '</div>' +
+    '<label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12.5px;color:#17232b;cursor:pointer;"><input type="checkbox" id="dja-heledag"' + (heleDag ? ' checked' : '') + ' onchange="document.getElementById(\'dja-van\').disabled=this.checked;document.getElementById(\'dja-tot\').disabled=this.checked;"> ' + (en ? 'All day' : 'Hele dag') + '</label>' +
+    '<label style="' + lbl + '">' + (en ? 'Location' : 'Locatie') + '</label><input id="dja-plek" style="' + veld + '" value="' + djAgendaEsc(plek) + '">' +
+    (ev ? '' : '<label style="' + lbl + '">' + (en ? 'Note' : 'Notitie') + '</label><textarea id="dja-notitie" rows="2" style="' + veld + 'resize:vertical;"></textarea>') +
+    '<div id="dja-fout" style="color:#c0392b;font-size:12px;margin-top:8px;min-height:14px;"></div>' +
+    '<div style="display:flex;gap:8px;margin-top:6px;">' +
+      (ev ? '<button type="button" onclick="djAgendaVerwijder(\'' + djAgendaEsc(ev.id) + '\')" style="background:none;border:1px solid #e8b4ae;color:#c0392b;border-radius:6px;padding:8px 12px;cursor:pointer;font-weight:700;font-size:12.5px;">' + (en ? 'Delete' : 'Verwijderen') + '</button>' : '') +
+      '<span style="flex:1"></span>' +
+      '<button type="button" onclick="djAgendaSluitEditor()" style="background:#fff;border:1px solid #c8d7e8;color:var(--navy);border-radius:6px;padding:8px 14px;cursor:pointer;font-weight:700;font-size:12.5px;">' + (en ? 'Cancel' : 'Annuleren') + '</button>' +
+      '<button type="button" id="dja-opslaan" onclick="djAgendaOpslaan(' + (ev ? '\'' + djAgendaEsc(ev.id) + '\'' : 'null') + ')" style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-weight:700;font-size:12.5px;">' + (en ? 'Save' : 'Opslaan') + '</button>' +
+    '</div></div>';
+  o.addEventListener('click', function(e){ if (e.target === o) djAgendaSluitEditor(); });
+  document.body.appendChild(o);
+  if (heleDag) { document.getElementById('dja-van').disabled = true; document.getElementById('dja-tot').disabled = true; }
+  setTimeout(function(){ var i = document.getElementById('dja-onderwerp'); if (i) i.focus(); }, 30);
+}
+function djAgendaNieuw(){ djAgendaEditor(null); }
+function djAgendaBewerk(id){ var ev = _djAgendaItems.find(function(x){ return x.id === id; }); if (ev) djAgendaEditor(ev); }
+async function djAgendaGraph(methode, pad, body){
+  var token = await djAgendaToken(true);
+  if (!token) throw new Error('niet ingelogd');
+  var r = await fetch('https://graph.microsoft.com/v1.0/me/events' + pad, {
+    method: methode,
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if (!r.ok) { var t = ''; try { t = (await r.json()).error.message; } catch(e){} throw new Error(t || ('status ' + r.status)); }
+  return r.status === 204 ? null : r.json();
+}
+async function djAgendaOpslaan(id){
+  var en = djAgendaEn();
+  var fout = function(m){ var f = document.getElementById('dja-fout'); if (f) f.textContent = m; };
+  var onderwerp = document.getElementById('dja-onderwerp').value.trim();
+  var datum = djAgendaNLNaarIso(document.getElementById('dja-datum').value);
+  var heleDag = document.getElementById('dja-heledag').checked;
+  var van = djAgendaTijd(document.getElementById('dja-van').value), tot = djAgendaTijd(document.getElementById('dja-tot').value);
+  if (!onderwerp) return fout(en ? 'Enter a subject.' : 'Vul een onderwerp in.');
+  if (!datum) return fout(en ? 'Invalid date — use dd/mm/yyyy.' : 'Ongeldige datum — gebruik dd/mm/jjjj.');
+  if (!heleDag && (!van || !tot)) return fout(en ? 'Invalid time — use hh:mm.' : 'Ongeldige tijd — gebruik uu:mm.');
+  if (!heleDag && tot <= van) return fout(en ? 'End time must be after start time.' : 'De eindtijd moet na de begintijd liggen.');
+  var body = { subject: onderwerp, isAllDay: heleDag, location: { displayName: document.getElementById('dja-plek').value.trim() } };
+  if (heleDag) {
+    var volgende = new Date(datum + 'T12:00:00'); volgende.setDate(volgende.getDate() + 1);
+    var vIso = volgende.getFullYear() + '-' + String(volgende.getMonth()+1).padStart(2,'0') + '-' + String(volgende.getDate()).padStart(2,'0');
+    body.start = { dateTime: datum + 'T00:00:00', timeZone: djAgendaTz() };
+    body.end   = { dateTime: vIso + 'T00:00:00', timeZone: djAgendaTz() };
+  } else {
+    body.start = djAgendaUtc(datum, van);
+    body.end   = djAgendaUtc(datum, tot);
+  }
+  var notitie = document.getElementById('dja-notitie');
+  if (!id && notitie && notitie.value.trim()) body.body = { contentType: 'text', content: notitie.value.trim() };
+  var knop = document.getElementById('dja-opslaan'); if (knop) { knop.disabled = true; knop.textContent = '…'; }
+  try {
+    if (id) await djAgendaGraph('PATCH', '/' + encodeURIComponent(id), body);
+    else    await djAgendaGraph('POST', '', body);
+    djAgendaSluitEditor();
+    djAgendaLaden(false);
+  } catch(e) {
+    if (knop) { knop.disabled = false; knop.textContent = en ? 'Save' : 'Opslaan'; }
+    fout((en ? 'Saving failed: ' : 'Opslaan mislukt: ') + e.message);
+  }
+}
+async function djAgendaVerwijder(id){
+  var en = djAgendaEn();
+  if (!confirm(en ? 'Delete this appointment from your Outlook calendar?' : 'Deze afspraak uit je Outlook-agenda verwijderen?')) return;
+  try {
+    await djAgendaGraph('DELETE', '/' + encodeURIComponent(id));
+    djAgendaSluitEditor();
+    djAgendaLaden(false);
+  } catch(e) {
+    var f = document.getElementById('dja-fout'); if (f) f.textContent = (en ? 'Delete failed: ' : 'Verwijderen mislukt: ') + e.message;
+  }
+}
+['djAgendaNieuw','djAgendaBewerk','djAgendaOpslaan','djAgendaVerwijder','djAgendaSluitEditor'].forEach(function(n){ try { window[n] = eval(n); } catch(e){} });
+function djAgendaStart(){
+  djAgendaLaden(false);
+  if (_djAgendaTimer) return;
+  _djAgendaTimer = setInterval(function(){ if (!document.hidden) djAgendaLaden(false); }, 10 * 60 * 1000);
+}
+window.djAgendaLaden = djAgendaLaden;
+document.addEventListener('DOMContentLoaded', function(){ setTimeout(djAgendaStart, 2500); });
+
+// ── Werkoverdracht automatisch opslaan, net als de Dagplanning: elke wijziging in de tekstvelden
+// wordt na 1,5 sec. voor de gekozen datum weggeschreven (lokaal + cloud). "Opslaan" blijft werken.
+window._woAutoTimer = null;
+var WO_AUTO_VELDEN = ['f-taken', 'f-ziek', 'f-incident', 'f-startup'];
+function woAutoOpslaanNu(datum, dienst){
+  datum = datum || (document.getElementById('f-datum') || {}).value;
+  dienst = dienst || (document.getElementById('f-dienst') || {}).value || 'Dag';
+  if (!datum) return;
+  var waarde = function(id){ var el = document.getElementById(id); return el ? el.value : ''; };
+  var velden = {
+    supOud: waarde('f-sup-oud'), supNieuw: waarde('f-sup-nieuw'),
+    taken: waarde('f-taken'), ziek: waarde('f-ziek'), incident: waarde('f-incident'), startup: waarde('f-startup'),
+    ziekLijst: (typeof ziekmSnapshot === 'function') ? ziekmSnapshot(datum) : [],
+    bijgewerktOp: new Date().toISOString()
+  };
+  var data = getData();
+  var best = data.filter(function(e){ return e.datum === datum && e.dienst === dienst; });
+  if (best.length) { var ix = data.indexOf(best[best.length-1]); data[ix] = Object.assign({}, data[ix], velden); }
+  else {
+    // Geen lege regels aanmaken als er niets is ingevuld.
+    if (!(velden.taken || velden.ziek || velden.incident || velden.startup)) return;
+    data.push(Object.assign({ id: Date.now(), datum: datum, dienst: dienst, materieel: [], tijden: [], units: [], sjorringen: [] }, velden));
+  }
+  saveData(data);
+  if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+}
+function woAutoOpslaanPlan(){
+  if (window._woAutoTimer) clearTimeout(window._woAutoTimer);
+  var datum = (document.getElementById('f-datum') || {}).value;
+  var dienst = (document.getElementById('f-dienst') || {}).value || 'Dag';
+  window._woAutoTimer = setTimeout(function(){ window._woAutoTimer = null; woAutoOpslaanNu(datum, dienst); }, 1500);
+}
+document.addEventListener('input', function(e){
+  if (e.target && WO_AUTO_VELDEN.indexOf(e.target.id) !== -1) woAutoOpslaanPlan();
+});
+// Nooit iets kwijt bij wegklikken/afsluiten: wachtende wijziging direct wegschrijven.
+window.addEventListener('pagehide', function(){ if (window._woAutoTimer) { clearTimeout(window._woAutoTimer); window._woAutoTimer = null; woAutoOpslaanNu(); } });
+document.addEventListener('visibilitychange', function(){ if (document.hidden && window._woAutoTimer) { clearTimeout(window._woAutoTimer); window._woAutoTimer = null; woAutoOpslaanNu(); } });
+// Na binnengehaalde collega-wijzigingen: het formulier voor de gekozen datum opnieuw vullen,
+// behalve het veld waarin je nu aan het typen bent.
+window.djWerkoverdrachtHerlaadInPlace = function(){
+  var el = document.getElementById('f-datum');
+  if (!el || !el.value || window._woAutoTimer) return;
+  var dienst = (document.getElementById('f-dienst') || {}).value || 'Dag';
+  var ents = getData().filter(function(e){ return e.datum === el.value && e.dienst === dienst; });
+  var e = ents[ents.length - 1];
+  var actief = document.activeElement ? document.activeElement.id : '';
+  if (e) {
+    [['f-taken','taken'],['f-ziek','ziek'],['f-incident','incident'],['f-startup','startup']].forEach(function(p){
+      var veld = document.getElementById(p[0]);
+      if (veld && p[0] !== actief && veld.value !== (e[p[1]] || '')) veld.value = e[p[1]] || '';
+    });
+  }
+  if (typeof ziekmRender === 'function' && !(actief && actief.indexOf('ziekm') === 0) && !(document.activeElement && document.activeElement.closest && document.activeElement.closest('#ziekm-lijst'))) ziekmRender();
+};
+
 function laadDagData() {
     var datum=document.getElementById('f-datum').value, dienst=document.getElementById('f-dienst').value;
     if(!datum) return;
-    var so=document.getElementById('f-sup-oud').value, sn=document.getElementById('f-sup-nieuw').value;
-    var ta=document.getElementById('f-taken').value, zk=document.getElementById('f-ziek').value;
-    var ic=document.getElementById('f-incident').value, st=document.getElementById('f-startup').value;
     var pd=document.getElementById('f-datum').dataset.prevDatum||datum, ps=document.getElementById('f-datum').dataset.prevDienst||dienst;
-    if((so||sn||ta||zk||ic||st)&&(pd!==datum||ps!==dienst)){
-      var data=getData(), best=data.filter(function(e){return e.datum===pd&&e.dienst===ps;});
-      var zl=(typeof ziekmSnapshot==='function')?ziekmSnapshot(pd):[];
-      if(best.length>0){var idx2=data.indexOf(best[best.length-1]);data[idx2]=Object.assign({},data[idx2],{supOud:so,supNieuw:sn,taken:ta,ziek:zk,ziekLijst:zl,incident:ic,startup:st});}
-      else data.push({id:Date.now(),datum:pd,dienst:ps,supOud:so,supNieuw:sn,taken:ta,ziek:zk,ziekLijst:zl,incident:ic,startup:st,materieel:[],tijden:[],units:[],sjorringen:[]});
-      saveData(data);
-    }
+    // Wat er voor de vorige datum nog getypt werd (automatisch opslaan stond nog te wachten)
+    // eerst voor díe datum wegschrijven. Vroeger werd hier bij elke datumwissel het hele
+    // formulier opnieuw weggeschreven — ook als er niets gewijzigd was, en dan over een nieuwere
+    // versie van een collega heen. Nu alleen echte, eigen wijzigingen (zoals bij de Dagplanning).
+    if (window._woAutoTimer && (pd!==datum||ps!==dienst)) { clearTimeout(window._woAutoTimer); window._woAutoTimer = null; woAutoOpslaanNu(pd, ps); }
     document.getElementById('f-datum').dataset.prevDatum=datum;
     document.getElementById('f-datum').dataset.prevDienst=dienst;
     var allD=getData(), ents=allD.filter(function(e){return e.datum===datum&&e.dienst===dienst;});
-    if(!ents.length){document.getElementById('f-taken').value='';document.getElementById('f-ziek').value='';document.getElementById('f-incident').value='';document.getElementById('f-startup').value='';syncSupervisorVanDagplan(datum);if(typeof ziekmRender==='function')ziekmRender();if(typeof fKnoppenMarkeer==='function')fKnoppenMarkeer();return;}
+    if(!ents.length){document.getElementById('f-taken').value='';document.getElementById('f-ziek').value='';document.getElementById('f-incident').value='';document.getElementById('f-startup').value='';syncSupervisorVanDagplan(datum);if(typeof ziekmRender==='function')ziekmRender();if(typeof fKnoppenMarkeer==='function')fKnoppenMarkeer();if(typeof djAgendaLaden==='function')djAgendaLaden(false);return;}
     var e=ents[ents.length-1];
     document.getElementById('f-taken').value=e.taken||'';document.getElementById('f-ziek').value=e.ziek||'';
     document.getElementById('f-incident').value=e.incident||'';document.getElementById('f-startup').value=e.startup||'';
@@ -18027,6 +18316,7 @@ function laadDagData() {
     syncSupervisorVanDagplan(datum);
     if (typeof ziekmRender === 'function') ziekmRender();
     if (typeof fKnoppenMarkeer === 'function') fKnoppenMarkeer();
+    if (typeof djAgendaLaden === 'function') djAgendaLaden(false);
   }
 
   function slaJournaalOp() {
@@ -18050,7 +18340,11 @@ function laadDagData() {
       sjorringen: getSjorringen(),
     };
     const data = getData();
-    data.push(entry);
+    // Bijwerken in plaats van een extra (dubbele) regel toevoegen voor dezelfde datum/dienst.
+    const bestaand = data.filter(function(e){ return e.datum === entry.datum && e.dienst === entry.dienst; });
+    if (bestaand.length) { const ix = data.indexOf(bestaand[bestaand.length-1]); entry.id = data[ix].id; data[ix] = Object.assign({}, data[ix], entry); }
+    else data.push(entry);
+    if (window._woAutoTimer) { clearTimeout(window._woAutoTimer); window._woAutoTimer = null; }
     saveData(data);
     showToast();
     setTimeout(resetForm, 500);
@@ -23405,6 +23699,7 @@ var DJ_VERTAAL_WOORDENBOEK = {
   "Openstaande Taken": "Outstanding Tasks",
   "Openstaande taken (één per regel)": "Outstanding tasks (one per line)",
   "Ziekmeldingen": "Sick Reports",
+  "Mijn agenda": "My calendar",
   "Namen ziek gemelde medewerkers": "Names of employees reported sick",
   "Bijzonderheden / Incidenten": "Remarks / Incidents",
   "Omschrijving incidenten of bijzonderheden": "Description of incidents or remarks",
