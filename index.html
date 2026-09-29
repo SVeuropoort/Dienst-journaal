@@ -2843,7 +2843,12 @@ document.addEventListener('contextmenu', function(e) {
     </div>
     <div style="border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:12px;margin-bottom:16px;">
       <div style="color:#e8a020;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Toegangsbeheer</div>
-      <div style="color:rgba(255,255,255,0.5);font-size:11px;margin-bottom:10px;">Per account welke omgevingen toegestaan zijn. Houd dit gelijk aan wie er in SharePoint zelf toegang heeft.</div>
+      <div style="color:rgba(255,255,255,0.5);font-size:11px;margin-bottom:10px;">Per account welke omgevingen toegestaan zijn. De accounts worden automatisch gelijkgehouden met de leden van de SharePoint-groep; nieuwe leden krijgen eerst geen rechten.</div>
+      <div style="display:flex;gap:6px;margin-bottom:6px;">
+        <button onclick="djToegangSyncGroep(false)" style="flex:1;padding:8px;background:#0f6cbd;border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;">&#x1F504; Synchroniseren met SharePoint-groep</button>
+        <button id="dj-toegang-opruimen" onclick="djToegangOpruimen()" style="display:none;padding:8px 10px;background:#8b1e1e;border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;">Opruimen</button>
+      </div>
+      <div id="dj-toegang-sync-status" style="color:rgba(255,255,255,0.6);font-size:11px;margin-bottom:8px;"></div>
       <div id="dj-toegang-lijst" style="margin-bottom:10px;overflow-x:auto;"></div>
       <div style="display:flex;gap:6px;">
         <input type="text" id="dj-toegang-nieuw" placeholder="naam@stenaline.com" style="flex:1;padding:8px;border:1px solid rgba(255,255,255,0.2);border-radius:6px;background:rgba(255,255,255,0.1);color:#fff;font-size:12.5px;box-sizing:border-box;">
@@ -3717,6 +3722,109 @@ var DJ_TOEGANG_GROEPEN = [
   { titel: 'Dashboards', keys: ['kpi', 'materieel', 'bluevi', 'vandenijssel'] },
   { titel: 'Modules', keys: ['certificeringen', 'maandafsluiting', 'salaris', 'ort', 'werkoverdracht'] }
 ];
+// ── Toegangsbeheer koppelen aan de SharePoint-groep ("Groepslidmaatschap" van de site Dienst
+// Journaal). Iedereen die lid of eigenaar van die Microsoft 365-groep is, verschijnt automatisch
+// in de lijst — nieuwe leden zonder rechten (je bepaalt daarna zelf wat ze mogen). Wie niet meer
+// in de groep zit wordt rood gemarkeerd; met "Opruimen" haal je die in één keer weg.
+// Vereist de Microsoft Graph-toestemming GroupMember.Read.All (eenmalige admin consent door IT).
+var DJ_GROEP_SCOPES = ['GroupMember.Read.All'];
+async function djGroepToken(){
+  if (typeof spInit === 'function') await spInit();
+  var accounts = _spMsalInstance.getAllAccounts();
+  var voorkeur = localStorage.getItem('dj_sp_account_username');
+  var account = (voorkeur && accounts.find(function(a){ return a.username === voorkeur; })) || accounts[0];
+  try {
+    if (!account) throw new Error('geen account');
+    return (await _spMsalInstance.acquireTokenSilent({ scopes: DJ_GROEP_SCOPES, account: account })).accessToken;
+  } catch(e) {
+    return (await _spMsalInstance.acquireTokenPopup({ scopes: DJ_GROEP_SCOPES })).accessToken;
+  }
+}
+async function djGraphAlles(url, token){
+  var uit = [];
+  while (url) {
+    var r = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) { var err = new Error('Graph ' + r.status); err.status = r.status; throw err; }
+    var j = await r.json();
+    uit = uit.concat(j.value || []);
+    url = j['@odata.nextLink'] || null;
+  }
+  return uit;
+}
+async function djGroepLeden(){
+  // De groep achter de site vinden via de documentbibliotheek (eigenaar = de groep).
+  var token = await spGetToken();
+  var siteId = await spGetSiteId();
+  var r = await fetch('https://graph.microsoft.com/v1.0/sites/' + siteId + '/drive?$select=owner', { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!r.ok) throw new Error('Kon de SharePoint-groep niet vinden (status ' + r.status + ')');
+  var d = await r.json();
+  var groepId = d && d.owner && d.owner.group && d.owner.group.id;
+  if (!groepId) throw new Error('Deze SharePoint-site is niet gekoppeld aan een Microsoft 365-groep.');
+  var gt = await djGroepToken();
+  var sel = '?$select=mail,userPrincipalName,displayName&$top=999';
+  var leden = await djGraphAlles('https://graph.microsoft.com/v1.0/groups/' + groepId + '/members' + sel, gt);
+  var eigenaren = await djGraphAlles('https://graph.microsoft.com/v1.0/groups/' + groepId + '/owners' + sel, gt);
+  var map = {};
+  leden.concat(eigenaren).forEach(function(u){
+    var email = String(u.mail || u.userPrincipalName || '').toLowerCase();
+    if (email && email.indexOf('@') > 0) map[email] = u.displayName || email;
+  });
+  return map;
+}
+function djToegangSyncStatus(tekst, kleur){
+  var el = document.getElementById('dj-toegang-sync-status');
+  if (el) { el.textContent = tekst; el.style.color = kleur || 'rgba(255,255,255,0.6)'; }
+}
+async function djToegangSyncGroep(stil){
+  djToegangSyncStatus('Groepsleden ophalen…');
+  var leden;
+  try {
+    leden = await djGroepLeden();
+  } catch(e) {
+    var msg = String((e && (e.errorMessage || e.message)) || e);
+    var geenToestemming = /AADSTS65001|AADSTS90094|consent|admin|toestemming|403/i.test(msg) || (e && e.status === 403);
+    djToegangSyncStatus(geenToestemming
+      ? 'Geen toestemming om groepsleden te lezen. Vraag IT om "admin consent" voor GroupMember.Read.All op de Dienst Journaal-app.'
+      : 'Synchroniseren mislukt: ' + msg, '#ff8080');
+    console.warn('Groep synchroniseren mislukt:', e);
+    return;
+  }
+  var lijst = djToegangGet();
+  var bekend = {};
+  var nieuw = 0, weg = 0, gewijzigd = false;
+  lijst.forEach(function(a){
+    var em = a.email.toLowerCase();
+    bekend[em] = true;
+    var inGroep = !!leden[em];
+    if (inGroep) {
+      if (a.nietInGroep) { delete a.nietInGroep; gewijzigd = true; }
+      if (leden[em] && a.naam !== leden[em]) { a.naam = leden[em]; gewijzigd = true; }
+    } else if (!a.nietInGroep) { a.nietInGroep = true; gewijzigd = true; }
+    if (a.nietInGroep) weg++;
+  });
+  Object.keys(leden).forEach(function(em){
+    if (bekend[em]) return;
+    var perms = {};
+    DJ_TOEGANG_OMGEVINGEN.forEach(function(o){ perms[o.key] = false; });
+    lijst.push({ email: em, naam: leden[em], nieuw: true, permissies: perms });
+    nieuw++; gewijzigd = true;
+  });
+  if (gewijzigd) djToegangSet(lijst);
+  djToegangRender();
+  var t = Object.keys(leden).length + ' groepsleden · ' + nieuw + ' nieuw toegevoegd' + (weg ? ' · ' + weg + ' niet meer in de groep' : '');
+  djToegangSyncStatus('\u2713 ' + t, '#3fb950');
+}
+function djToegangOpruimen(){
+  var lijst = djToegangGet();
+  var ik = (localStorage.getItem('dj_sp_account_username') || '').toLowerCase();
+  var weg = lijst.filter(function(a){ return a.nietInGroep && a.email.toLowerCase() !== ik; });
+  if (!weg.length) return;
+  if (!confirm('Deze ' + weg.length + ' account(s) zitten niet meer in de SharePoint-groep en worden verwijderd:\n\n' + weg.map(function(a){ return a.email; }).join('\n'))) return;
+  var over = lijst.filter(function(a){ return weg.indexOf(a) === -1; });
+  if (!over.length) return;
+  djToegangSet(over);
+  djToegangRender();
+}
 var _djToegangOpen = {}; // idx -> opengeklapt of niet (alleen visueel, wordt niet opgeslagen)
 function djToegangToggleOpen(idx){
   _djToegangOpen[idx] = !_djToegangOpen[idx];
@@ -3726,12 +3834,17 @@ function djToegangRender(){
   var container = document.getElementById('dj-toegang-lijst');
   if (!container) return;
   var lijst = djToegangGet();
+  var _opr = document.getElementById('dj-toegang-opruimen');
+  var _nWeg = lijst.filter(function(a){ return a.nietInGroep; }).length;
+  if (_opr) { _opr.style.display = _nWeg ? '' : 'none'; _opr.textContent = 'Opruimen (' + _nWeg + ')'; }
   container.innerHTML = lijst.map(function(entry, idx){
     var open = !!_djToegangOpen[idx];
     var aantalAan = DJ_TOEGANG_OMGEVINGEN.filter(function(o){ return entry.permissies && entry.permissies[o.key]; }).length;
     var header = '<div onclick="djToegangToggleOpen(' + idx + ')" style="display:flex;align-items:center;gap:8px;padding:10px 6px;cursor:pointer;">' +
       '<span style="color:rgba(255,255,255,0.5);font-size:10px;width:12px;flex-shrink:0;">' + (open ? '&#9660;' : '&#9654;') + '</span>' +
-      '<span style="color:#fff;font-size:12.5px;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;" title="' + entry.email.replace(/[<>"]/g, '') + '">' + entry.email.replace(/[<>]/g, '') + '</span>' +
+      '<span style="color:#fff;font-size:12.5px;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;' + (entry.nietInGroep ? 'text-decoration:line-through;opacity:.6;' : '') + '" title="' + (entry.naam ? String(entry.naam).replace(/[<>"]/g, '') + ' \u2014 ' : '') + entry.email.replace(/[<>"]/g, '') + '">' + entry.email.replace(/[<>]/g, '') + '</span>' +
+      (entry.nieuw ? '<span title="Nieuw lid van de SharePoint-groep — nog geen rechten toegekend" style="background:#e8a020;color:#001830;font-size:9px;font-weight:800;padding:1px 5px;border-radius:8px;flex-shrink:0;">NIEUW</span>' : '') +
+      (entry.nietInGroep ? '<span title="Staat niet (meer) in de SharePoint-groep" style="background:#8b1e1e;color:#fff;font-size:9px;font-weight:800;padding:1px 5px;border-radius:8px;flex-shrink:0;">NIET IN GROEP</span>' : '') +
       '<span style="color:rgba(255,255,255,0.4);font-size:10.5px;flex-shrink:0;">' + aantalAan + '/' + DJ_TOEGANG_OMGEVINGEN.length + '</span>' +
       (lijst.length > 1 ? '<button onclick="event.stopPropagation();djToegangVerwijderen(' + idx + ')" style="background:none;border:none;color:#ff8080;font-size:13px;cursor:pointer;padding:2px 4px;flex-shrink:0;">&#10005;</button>' : '<span style="width:18px;flex-shrink:0;"></span>') +
       '</div>';
@@ -3760,6 +3873,7 @@ function djToegangVakjeWijzig(idx, omgevingKey, aan){
   if (!lijst[idx]) return;
   if (!lijst[idx].permissies) lijst[idx].permissies = {};
   lijst[idx].permissies[omgevingKey] = aan;
+  delete lijst[idx].nieuw; // rechten bekeken/toegekend: niet langer "nieuw"
   djToegangSet(lijst);
   // Zorgt dat een net ingetrokken (of toegevoegde) toestemming meteen zichtbaar wordt in het
   // eigen scherm, zonder dat de pagina herladen hoeft te worden.
@@ -3809,6 +3923,7 @@ async function djAdminOpenen(){
   try { await djWwCloudPull(); } catch(e) { console.error('SharePoint ophalen bij openen paneel mislukt:', e); } // haal de nieuwste waarden op, mocht een ander apparaat net iets gewijzigd hebben
   if (typeof spIngelogd === 'function' && spIngelogd()) djSpStatusTonen('Ingelogd bij SharePoint.', '#3fb950');
   djToegangRender();
+  djToegangSyncGroep(true); // automatisch gelijktrekken met de SharePoint-groep
   var container = document.getElementById('dj-admin-velden');
   if (container) {
     container.innerHTML = DJ_WW_DEFS.map(function(def){
