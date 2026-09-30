@@ -10369,7 +10369,7 @@ document.getElementById('archOverlay').addEventListener('click',function(e){
           </div>
         </div><div class="card" id="ow-card" style="margin-bottom:20px;">
           <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
-            <div style="display:flex;align-items:center;gap:8px;"><div class="icon">&#x23F1;&#xFE0F;</div><h2>Overwerk &amp; productiviteit</h2></div>
+            <div style="display:flex;align-items:center;gap:8px;"><div class="icon">&#x23F1;&#xFE0F;</div><h2>Overwerk, inhuur &amp; productiviteit</h2></div>
             <button type="button" onclick="owInstellingen()" title="Tarieven en route &rarr; dienst instellen" style="background:none;border:none;cursor:pointer;font-size:16px;">&#x2699;&#xFE0F;</button>
           </div>
           <div id="ow-body" style="padding:16px;"></div>
@@ -26017,7 +26017,7 @@ var OW = (function(){
   function records(src, periode){
     var cfg = config(src.cfg, src.routes), maanden = periodeDatums(src.jaar, src.maand, periode);
     var dn = ['Zo','Ma','Di','Wo','Do','Vr','Za'];
-    var uit = [], overgeslagen = 0;
+    var uit = [], overgeslagen = 0, onvolledig = 0;
     Object.keys(src.dagplans).sort().forEach(function(iso){
       if (!maanden[iso.slice(0, 7)]) return;
       var dp = src.dagplans[iso]; if (!dp) return;
@@ -26048,6 +26048,8 @@ var OW = (function(){
         });
         if (!b.koppen || !heeftUnits) { if (b.koppen || heeftUnits) overgeslagen++; return; }
         var std = (src.std[dn[wd]] || {})[dienst === 'O' ? 'och_totaal' : 'av_totaal'] || null;
+        // Dagplanning duidelijk niet volledig ingevuld (bijv. 1 persoon op een dienst met honderden units): niet meetellen.
+        if (b.koppen < 3 || (std && b.koppen < std * 0.4)) { onvolledig++; return; }
         uit.push({
           iso: iso, datum: slash, dag: dn[wd], we: we, dienst: dienst, routes: rIdx.map(function(i){ return src.routes[i]; }),
           koppen: b.koppen, extra: b.extra, inhuur: b.inhuur, uren: b.uren, exUren: b.exUren, inhUren: b.inhUren, geschat: b.geschat,
@@ -26058,7 +26060,7 @@ var OW = (function(){
         });
       });
     });
-    return { rec: uit, overgeslagen: overgeslagen, cfg: cfg };
+    return { rec: uit, overgeslagen: overgeslagen, onvolledig: onvolledig, cfg: cfg };
   }
 
   function groep(rs){
@@ -26076,12 +26078,15 @@ var OW = (function(){
     };
   }
 
-  function analyse(src, periode, dienstFilter){
+  // soort: 'beide' (overwerk en/of inhuur), 'overwerk' of 'inhuur' — bepaalt wat 'extra inzet' is
+  function isExtraInzet(x, soort){ return soort === 'overwerk' ? x.extra > 0 : (soort === 'inhuur' ? x.inhuur > 0 : (x.extra > 0 || x.inhuur > 0)); }
+  function analyse(src, periode, dienstFilter, soort){
     var r = records(src, periode);
     var rs = r.rec.filter(function(x){ return !dienstFilter || dienstFilter === 'alle' || x.dienst === dienstFilter; });
-    var met = rs.filter(function(x){ return x.extra > 0; }), zonder = rs.filter(function(x){ return x.extra === 0; });
+    rs.forEach(function(x){ x._met = isExtraInzet(x, soort || 'beide'); });
+    var met = rs.filter(function(x){ return x._met; }), zonder = rs.filter(function(x){ return !x._met; });
     return {
-      rec: rs, cfg: r.cfg, overgeslagen: r.overgeslagen,
+      rec: rs, cfg: r.cfg, overgeslagen: r.overgeslagen, onvolledig: r.onvolledig,
       met: groep(met), zonder: groep(zonder), alle: groep(rs),
       onder: groep(rs.filter(function(x){ return x.tovStd !== null && x.tovStd < 0; })),
       op: groep(rs.filter(function(x){ return x.tovStd === 0; })),
@@ -26112,7 +26117,7 @@ var OW = (function(){
       '</tbody></table>';
   }
 
-  function spreiding(rs, en){
+  function spreiding(rs, en, L){
     var W = 640, H = 300, L = 48, R = 16, T = 14, B = 40;
     if (!rs.length) return '';
     var xs = rs.map(function(r){ return r.uren; }), ys = rs.map(function(r){ return r.units; });
@@ -26125,19 +26130,19 @@ var OW = (function(){
     for (var v = 0; v <= ymax; v += sy) g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(v) + '" y2="' + Y(v) + '" stroke="#e6ecf3"/><text x="' + (L - 6) + '" y="' + (Y(v) + 4) + '" text-anchor="end" font-size="10.5" fill="#5a7090">' + v + '</text>';
     for (var u = xmin; u <= xmax; u += sx) g += '<text x="' + X(u) + '" y="' + (H - B + 15) + '" text-anchor="middle" font-size="10.5" fill="#5a7090">' + u + '</text>';
     g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + (H - B) + '" y2="' + (H - B) + '" stroke="#9aa9bb"/>';
-    g += '<text x="' + ((L + W - R) / 2) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="11" fill="#5a7090">' + (en ? 'Man-hours in shift' : 'Manuren in de dienst') + '</text>';
+    g += '<text x="' + ((L + W - R) / 2) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="11" fill="#5a7090">' + (en ? 'Hours worked in the shift' : 'Gewerkte uren in de dienst') + '</text>';
     g += '<text transform="translate(12,' + ((T + H - B) / 2) + ') rotate(-90)" text-anchor="middle" font-size="11" fill="#5a7090">' + (en ? 'Units handled' : 'Units gelost + geladen') + '</text>';
     var pts = rs.map(function(r, i){
-      var x = X(r.uren), y = Y(r.units), kl = r.extra > 0 ? KL.met : KL.zonder;
-      var tip = r.datum + ' ' + (r.dienst === 'O' ? (en ? 'morning' : 'ochtend') : (en ? 'evening' : 'avond')) + ' — ' + r.koppen + (en ? ' staff' : ' pers.') + (r.extra ? ' (' + r.extra + ' extra)' : '') + ', ' + fmt(r.uren, 1) + (en ? ' h, ' : ' u, ') + r.units + ' units' + (r.handling !== null ? ', ' + (en ? 'handling ' : 'handling ') + fmt(r.handling, 0) + ' min' : '');
-      var vorm = r.extra > 0
+      var x = X(r.uren), y = Y(r.units), kl = r._met ? KL.met : KL.zonder;
+      var tip = r.datum + ' ' + (r.dienst === 'O' ? (en ? 'morning' : 'ochtend') : (en ? 'evening' : 'avond')) + ' — ' + r.koppen + (en ? ' staff' : ' pers.') + (r.extra ? ' (' + r.extra + (en ? ' overtime' : ' overwerk') + ')' : '') + (r.inhuur ? ' (' + r.inhuur + (en ? ' agency' : ' inhuur') + ')' : '') + ', ' + fmt(r.uren, 1) + (en ? ' h, ' : ' u, ') + r.units + ' units' + (r.handling !== null ? ', ' + (en ? 'handling ' : 'handling ') + fmt(r.handling, 0) + ' min' : '');
+      var vorm = r._met
         ? '<path d="M' + x + ',' + (y - 6) + ' L' + (x + 6) + ',' + y + ' L' + x + ',' + (y + 6) + ' L' + (x - 6) + ',' + y + ' Z" fill="' + kl + '" stroke="#fff" stroke-width="2"/>'
         : '<circle cx="' + x + '" cy="' + y + '" r="5" fill="' + kl + '" stroke="#fff" stroke-width="2"/>';
       return '<g class="ow-pt" data-tip="' + esc(tip) + '"><circle cx="' + x + '" cy="' + y + '" r="12" fill="transparent"/>' + vorm + '</g>';
     }).join('');
     var leg = '<div style="display:flex;gap:16px;font-size:12px;color:#1a2a4a;margin:0 0 6px 4px;">' +
-      '<span><svg width="12" height="12"><circle cx="6" cy="6" r="5" fill="' + KL.zonder + '"/></svg> ' + (en ? 'Without extra (overtime)' : 'Zonder Extra (overwerk)') + '</span>' +
-      '<span><svg width="12" height="12"><path d="M6,0 L12,6 L6,12 L0,6 Z" fill="' + KL.met + '"/></svg> ' + (en ? 'With extra (overtime)' : 'Met Extra (overwerk)') + '</span></div>';
+      '<span><svg width="12" height="12"><circle cx="6" cy="6" r="5" fill="' + KL.zonder + '"/></svg> ' + (en ? '' + L.Zonder + '' : '' + L.Zonder + '') + '</span>' +
+      '<span><svg width="12" height="12"><path d="M6,0 L12,6 L6,12 L0,6 Z" fill="' + KL.met + '"/></svg> ' + (en ? '' + L.Met + '' : '' + L.Met + '') + '</span></div>';
     return leg + '<div style="position:relative;overflow-x:auto;"><svg class="ow-svg" viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="max-width:760px;min-width:420px;display:block;font-family:inherit;">' + g + pts + '</svg>' +
       '<div class="ow-tip" style="position:absolute;display:none;pointer-events:none;background:#1a2a3a;color:#fff;font-size:11.5px;padding:6px 9px;border-radius:6px;max-width:260px;z-index:5;"></div></div>';
   }
@@ -26149,89 +26154,168 @@ var OW = (function(){
     return [kop].concat(rijen).map(function(r){ return r.map(function(c){ c = String(c); return /[;"\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }).join(';'); }).join('\r\n');
   }
 
+  // ── Eenvoudige weergave: eerst in gewone woorden, details daaronder ──
+  function hel(n, dec){ if (n === null || n === undefined || isNaN(n)) return '—'; return Number(n).toLocaleString('nl-NL', { minimumFractionDigits: 0, maximumFractionDigits: dec || 0 }); }
+  function zin(icoon, tekst, kleur){
+    return '<div style="display:flex;gap:12px;align-items:flex-start;padding:9px 0;border-bottom:1px solid #eef2f7;">' +
+      '<div style="font-size:22px;line-height:1;width:30px;text-align:center;flex:0 0 30px;">' + icoon + '</div>' +
+      '<div style="font-size:15px;line-height:1.45;color:#1a2a4a;flex:1;">' + tekst + '</div>' +
+      (kleur ? '<div title="" style="flex:0 0 12px;width:12px;height:12px;border-radius:50%;background:' + kleur + ';margin-top:5px;"></div>' : '') + '</div>';
+  }
+  function balkRij(label, uitleg, met, zonder, dec, eh, en, L){
+    var max = Math.max(met || 0, zonder || 0) || 1;
+    var balk = function(v, kl, naam){ var w = v === null ? 0 : Math.max(2, v / max * 100);
+      return '<div style="display:flex;align-items:center;gap:8px;margin:3px 0;"><div style="width:58px;font-size:12px;color:#5a7090;flex:0 0 58px;">' + naam + '</div>' +
+        '<div style="flex:1;background:#eef2f7;border-radius:4px;height:18px;"><div style="width:' + w + '%;background:' + kl + ';height:18px;border-radius:4px;"></div></div>' +
+        '<div style="width:74px;text-align:right;font-weight:700;font-size:14px;color:#1a2a4a;flex:0 0 74px;">' + (v === null ? '—' : hel(v, dec) + eh) + '</div></div>'; };
+    return '<div style="margin-bottom:14px;"><div style="font-weight:700;color:#003366;font-size:13.5px;">' + label + '</div>' +
+      (uitleg ? '<div style="font-size:11.5px;color:#8795a8;margin-bottom:3px;">' + uitleg + '</div>' : '') +
+      balk(met, KL.met, (en ? 'With' : 'Met')) + balk(zonder, KL.zonder, (en ? 'Without' : 'Zonder')) + '</div>';
+  }
+
   // opts: { en, periode, dienst, bewerkbaar, id }
   function render(el, src, opts){
     if (!el) return;
-    var en = !!opts.en, a = analyse(src, opts.periode, opts.dienst), id = opts.id || 'ow';
+    var en = !!opts.en, soort = opts.soort || 'beide', a = analyse(src, opts.periode, opts.dienst, soort), id = opts.id || 'ow';
+    var T = function(nl, eng){ return en ? eng : nl; };
+    var wat = { beide: T('overwerk of inhuur', 'overtime or agency staff'), overwerk: T('overwerk', 'overtime'), inhuur: T('inhuur', 'agency staff') }[soort];
+    var L = { met: T('met ', 'with ') + wat, zonder: T('zonder ', 'without ') + wat, Met: T('Met ', 'With ') + wat, Zonder: T('Zonder ', 'Without ') + wat,
+      Onderwerp: { beide: T('Extra inzet (overwerk of inhuur)', 'Extra staffing (overtime or agency)'), overwerk: T('Overwerk', 'Overtime'), inhuur: T('Inhuur', 'Agency staff') }[soort],
+      onderwerp: { beide: T('extra inzet (overwerk of inhuur)', 'extra staffing (overtime or agency)'), overwerk: T('overwerk', 'overtime'), inhuur: T('inhuur', 'agency staff') }[soort] };
     var tar = a.cfg.tarieven, m = a.met, z = a.zonder;
-    var periodeTxt = { maand: en ? 'this month' : 'deze maand', '3m': en ? 'last 3 months' : 'laatste 3 maanden', '6m': en ? 'last 6 months' : 'laatste 6 maanden' }[opts.periode] || '';
-    var knop = function(waarde, huidig, tekst, fn){ return '<button type="button" onclick="' + fn + '(\'' + waarde + '\')" style="padding:5px 11px;border:1px solid ' + (waarde === huidig ? '#003366' : '#c8d7e8') + ';background:' + (waarde === huidig ? '#003366' : '#fff') + ';color:' + (waarde === huidig ? '#fff' : '#003366') + ';border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">' + tekst + '</button>'; };
-    var h = '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">' +
-      knop('maand', opts.periode, en ? 'Month' : 'Maand', id + 'Periode') + knop('3m', opts.periode, en ? '3 months' : '3 maanden', id + 'Periode') + knop('6m', opts.periode, en ? '6 months' : '6 maanden', id + 'Periode') +
-      '<span style="width:12px;"></span>' +
-      knop('alle', opts.dienst, en ? 'Both shifts' : 'Beide diensten', id + 'Dienst') + knop('O', opts.dienst, en ? 'Morning' : 'Ochtend', id + 'Dienst') + knop('A', opts.dienst, en ? 'Evening' : 'Avond', id + 'Dienst') +
+    var periodeTxt = { maand: T('deze maand', 'this month'), '3m': T('de laatste 3 maanden', 'the last 3 months'), '6m': T('de laatste 6 maanden', 'the last 6 months') }[opts.periode] || '';
+    var knop = function(waarde, huidig, tekst, fn){ return '<button type="button" onclick="' + fn + '(\'' + waarde + '\')" style="padding:6px 12px;border:1px solid ' + (waarde === huidig ? '#003366' : '#c8d7e8') + ';background:' + (waarde === huidig ? '#003366' : '#fff') + ';color:' + (waarde === huidig ? '#fff' : '#003366') + ';border-radius:6px;cursor:pointer;font-size:12.5px;font-weight:600;">' + tekst + '</button>'; };
+    var h = '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">' +
+      '<span style="font-size:12px;color:#5a7090;margin-right:2px;">' + T('Periode:', 'Period:') + '</span>' +
+      knop('maand', opts.periode, T('Deze maand', 'This month'), id + 'Periode') + knop('3m', opts.periode, T('3 maanden', '3 months'), id + 'Periode') + knop('6m', opts.periode, T('6 maanden', '6 months'), id + 'Periode') +
+      '<span style="width:10px;"></span><span style="font-size:12px;color:#5a7090;margin-right:2px;">' + T('Dienst:', 'Shift:') + '</span>' +
+      knop('alle', opts.dienst, T('Allebei', 'Both'), id + 'Dienst') + knop('O', opts.dienst, T('Ochtend', 'Morning'), id + 'Dienst') + knop('A', opts.dienst, T('Avond', 'Evening'), id + 'Dienst') +
       '<span style="flex:1;"></span>' +
-      (a.rec.length ? '<button type="button" onclick="' + id + 'Csv()" style="padding:5px 11px;border:1px solid #c8d7e8;background:#fff;color:#003366;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">&#x2B07;&#xFE0F; ' + (en ? 'Export (Excel/CSV)' : 'Exporteer (Excel/CSV)') + '</button>' : '') +
+      (a.rec.length ? '<button type="button" onclick="' + id + 'Csv()" style="padding:6px 12px;border:1px solid #c8d7e8;background:#fff;color:#003366;border-radius:6px;cursor:pointer;font-size:12.5px;font-weight:600;">&#x2B07;&#xFE0F; ' + T('Naar Excel', 'To Excel') + '</button>' : '') +
+      '<div style="flex-basis:100%;height:0;"></div>' +
+      '<span style="font-size:12px;color:#5a7090;margin-right:2px;">' + T('Vergelijk:', 'Compare:') + '</span>' +
+      knop('beide', soort, T('Overwerk + inhuur', 'Overtime + agency'), id + 'Soort') + knop('overwerk', soort, T('Alleen overwerk', 'Overtime only'), id + 'Soort') + knop('inhuur', soort, T('Alleen inhuur', 'Agency only'), id + 'Soort') +
       '</div>';
     if (!a.rec.length) {
-      el.innerHTML = h + '<div style="color:#8795a8;font-size:13px;padding:18px;text-align:center;">' + (en ? 'No shifts with both staffing (Day planning) and units (Punctuality) for ' : 'Geen diensten met zowel bezetting (Dagplanning) als units (Punctuality) voor ') + periodeTxt + '.</div>';
+      el.innerHTML = h + '<div style="color:#5a7090;font-size:14px;padding:18px;text-align:center;">' + T('Nog geen diensten waarvan zowel de Dagplanning als Punctuality is ingevuld voor ', 'No shifts yet with both the Day planning and Punctuality filled in for ') + periodeTxt + '.</div>';
       return;
     }
-    // Kerncijfers
-    var dUnits = (m.units !== null && z.units !== null) ? m.units - z.units : null;
-    var exUrenPerDienst = m.n ? m.exUren / m.n : null;
-    var kostenPerDienst = (tar.extra !== null && exUrenPerDienst !== null) ? exUrenPerDienst * tar.extra : null;
-    h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">' +
-      tegel(en ? 'Shifts analysed' : 'Diensten geanalyseerd', a.rec.length, (m.n) + (en ? ' with extra · ' : ' met Extra · ') + (z.n) + (en ? ' without' : ' zonder')) +
-      tegel(en ? 'Units per man-hour' : 'Units per manuur', fmt(a.alle.upm, 2), (en ? 'with extra ' : 'met Extra ') + fmt(m.upm, 2) + ' · ' + (en ? 'without ' : 'zonder ') + fmt(z.upm, 2)) +
-      tegel(en ? 'Extra hours' : 'Extra uren', fmt(a.alle.exUren, 1), tar.extra !== null ? ('€ ' + fmt(a.alle.exUren * tar.extra, 0) + (en ? ' at €' : ' à €') + fmt(tar.extra, 2) + (en ? '/h' : '/u')) : (en ? 'set a rate via ⚙️' : 'stel een tarief in via ⚙️')) +
-      tegel(en ? 'Extra units per extra shift' : 'Meer units bij Extra', dUnits === null ? '—' : (dUnits > 0 ? '+' : '') + fmt(dUnits, 1), (kostenPerDienst !== null && dUnits > 0) ? ('≈ € ' + fmt(kostenPerDienst / dUnits, 2) + (en ? ' per extra unit' : ' per extra unit')) : (en ? 'average per shift' : 'gemiddeld per dienst')) +
-      '</div>';
-    // Vergelijking met/zonder Extra
-    var kol = [
-      { t: en ? 'Shifts' : 'Diensten', f: function(g){ return g.n; } },
-      { t: en ? 'Avg staff' : 'Gem. personeel', f: function(g){ return fmt(g.koppen, 1); } },
-      { t: en ? 'Avg man-hours' : 'Gem. manuren', f: function(g){ return fmt(g.uren, 1); } },
-      { t: en ? 'Avg units' : 'Gem. units', f: function(g){ return fmt(g.units, 0); } },
-      { t: en ? 'Units / man-hour' : 'Units / manuur', f: function(g){ return fmt(g.upm, 2); } },
-      { t: en ? 'Handling (min)' : 'Handling (min)', f: function(g){ return fmt(g.handling, 0) + (g.n ? ' <span style="color:#8795a8;font-size:10.5px;">(' + g.nHandling + ')</span>' : ''); } },
-      { t: en ? 'Departure on time' : 'Vertrek op tijd', f: function(g){ return g.opTijd === null ? '—' : fmt(g.opTijd * 100, 0) + '% <span style="color:#8795a8;font-size:10.5px;">(' + g.nOpTijd + ')</span>'; } },
-      { t: en ? 'Left behind / shift' : 'Achtergelaten / dienst', f: function(g){ return g.shutout === null ? '—' : fmt(g.shutout, 1) + ' <span style="color:#8795a8;font-size:10.5px;">(' + g.nShut + ')</span>'; } }
-    ];
-    var verschilRij = { naam: en ? 'Difference' : 'Verschil', g: null };
-    h += '<div style="font-weight:700;color:#003366;font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin:6px 0;">' + (en ? 'With vs without extra (overtime)' : 'Met vs zonder Extra (overwerk)') + '</div>' +
-      '<div style="overflow-x:auto;">' + vergelijkTabel([{ naam: '<span style="color:' + KL.met + ';">&#9670;</span> ' + (en ? 'With extra' : 'Met Extra'), g: m }, { naam: '<span style="color:' + KL.zonder + ';">&#9679;</span> ' + (en ? 'Without extra' : 'Zonder Extra'), g: z }], kol, en) + '</div>' +
-      '<div style="font-size:12px;color:#1a2a4a;margin:6px 2px 14px;line-height:1.6;">' + (en ? 'Difference with extra: ' : 'Verschil met Extra: ') +
-        verschil(m.units, z.units, 1, ' units') + ' · ' + verschil(m.upm, z.upm, 2, en ? ' units/man-hour' : ' units/manuur') + ' · ' +
-        (en ? 'handling ' : 'handling ') + verschil(m.handling, z.handling, 0, ' min', true) + ' · ' +
-        (en ? 'on time ' : 'op tijd ') + verschil(m.opTijd === null ? null : m.opTijd * 100, z.opTijd === null ? null : z.opTijd * 100, 0, '%') + ' · ' +
-        (en ? 'left behind ' : 'achtergelaten ') + verschil(m.shutout, z.shutout, 1, '', true) + '</div>';
-    // Bezetting t.o.v. standaard
-    if (a.onder.n + a.op.n + a.boven.n > 0) {
-      h += '<div style="font-weight:700;color:#003366;font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin:6px 0;">' + (en ? 'Staffing vs standard staffing' : 'Bezetting t.o.v. standaardbezetting') + '</div>' +
-        '<div style="overflow-x:auto;">' + vergelijkTabel([
-          { naam: en ? 'Below standard' : 'Onder standaard', g: a.onder }, { naam: en ? 'At standard' : 'Op standaard', g: a.op }, { naam: en ? 'Above standard' : 'Boven standaard', g: a.boven }
-        ], kol, en) + '</div><div style="height:14px;"></div>';
+    var GROEN = '#1a7a40', ROOD = '#c0392b', GRIJS = '#9aa9bb';
+    var beide = m.n > 0 && z.n > 0;
+    // ── 1. In gewone woorden ──
+    var zinnen = '';
+    zinnen += zin('&#x1F4CB;', T('We hebben <b>' + a.rec.length + ' diensten</b> bekeken over ' + periodeTxt + ': <b>' + m.n + '</b> ' + L.met + ' en <b>' + z.n + '</b> ' + L.zonder + '.',
+      'We looked at <b>' + a.rec.length + ' shifts</b> over ' + periodeTxt + ': <b>' + m.n + '</b> ' + L.met + ' and <b>' + z.n + '</b> without.'), null);
+    var conclusie = '';
+    if (beide) {
+      var dP = m.koppen - z.koppen;
+      zinnen += zin('&#x1F465;', T('' + L.Met + ' stonden er gemiddeld <b>' + hel(m.koppen, 0) + ' mensen</b> op de dienst, ' + L.zonder + ' <b>' + hel(z.koppen, 0) + '</b>. ' + (Math.abs(dP) >= 0.5 ? 'Dat is <b>' + hel(Math.abs(dP), 0) + (Math.round(Math.abs(dP)) === 1 ? ' persoon ' : ' mensen ') + (dP > 0 ? 'meer' : 'minder') + '</b>.' : ''),
+        '' + L.Met + ' there were on average <b>' + hel(m.koppen, 0) + ' people</b> on the shift, ' + L.zonder + ' <b>' + hel(z.koppen, 0) + '</b>.'), null);
+      var dU = m.units - z.units, dUp = z.units ? dU / z.units : 0;
+      var uTekst = Math.abs(dUp) < 0.05 ? T('bijna <b>evenveel</b> units', 'about <b>the same</b> number of units') : (dU > 0 ? T('<b>meer</b> units', '<b>more</b> units') : T('<b>minder</b> units', '<b>fewer</b> units'));
+      zinnen += zin('&#x1F4E6;', T('Er gingen ' + uTekst + ' over de kade: <b>' + hel(m.units, 0) + '</b> per dienst ' + L.met + ', tegen <b>' + hel(z.units, 0) + '</b> zonder.',
+        'We handled ' + uTekst + ': <b>' + hel(m.units, 0) + '</b> per shift ' + L.met + ', against <b>' + hel(z.units, 0) + '</b> without.'), Math.abs(dUp) < 0.05 ? GRIJS : (dU > 0 ? GROEN : ROOD));
+      if (m.handling !== null && z.handling !== null) {
+        var dH = m.handling - z.handling;
+        zinnen += zin('&#x23F1;&#xFE0F;', Math.abs(dH) < 5
+          ? T('Het laden en lossen duurde <b>ongeveer even lang</b> (' + hel(m.handling, 0) + ' tegen ' + hel(z.handling, 0) + ' minuten).', 'Loading and unloading took <b>about as long</b> (' + hel(m.handling, 0) + ' vs ' + hel(z.handling, 0) + ' minutes).')
+          : T('Het schip was ' + L.met + ' <b>' + hel(Math.abs(dH), 0) + ' minuten ' + (dH < 0 ? 'eerder' : 'later') + '</b> klaar met laden (van klep neer tot laden klaar).', '' + L.Met + ' the ship was <b>' + hel(Math.abs(dH), 0) + ' minutes ' + (dH < 0 ? 'faster' : 'slower') + '</b> (ramp down to loading complete).'),
+          Math.abs(dH) < 5 ? GRIJS : (dH < 0 ? GROEN : ROOD));
+      }
+      if (m.opTijd !== null && z.opTijd !== null) {
+        var dO = (m.opTijd - z.opTijd) * 100;
+        zinnen += zin('&#x1F6A2;', T('De boot vertrok ' + (Math.abs(dO) < 2 ? '<b>even vaak</b>' : (dO > 0 ? '<b>vaker</b>' : '<b>minder vaak</b>')) + ' op tijd: <b>' + hel(m.opTijd * 100, 0) + '%</b> ' + L.met + ', tegen <b>' + hel(z.opTijd * 100, 0) + '%</b> zonder.',
+          'The ship left on time ' + (Math.abs(dO) < 2 ? '<b>equally often</b>' : (dO > 0 ? '<b>more often</b>' : '<b>less often</b>')) + ': <b>' + hel(m.opTijd * 100, 0) + '%</b> ' + L.met + ', against <b>' + hel(z.opTijd * 100, 0) + '%</b> without.'),
+          Math.abs(dO) < 2 ? GRIJS : (dO > 0 ? GROEN : ROOD));
+      }
+      if (m.shutout !== null || z.shutout !== null) {
+        zinnen += zin('&#x1F6A7;', T('Achtergelaten units per dienst: <b>' + hel(m.shutout, 1) + '</b> ' + L.met + ', <b>' + hel(z.shutout, 1) + '</b> zonder.', 'Units left behind per shift: <b>' + hel(m.shutout, 1) + '</b> ' + L.met + ', <b>' + hel(z.shutout, 1) + '</b> without.'), null);
+      }
+      // conclusie
+      var sneller = m.handling !== null && z.handling !== null && m.handling - z.handling <= -5;
+      var vakerOpTijd = m.opTijd !== null && z.opTijd !== null && (m.opTijd - z.opTijd) * 100 >= 2;
+      var meerUnits = dUp >= 0.05;
+      if (meerUnits && (sneller || vakerOpTijd)) conclusie = T('' + L.Met + ' gaan er <b>meer units mee</b> én zijn we <b>' + (sneller ? 'sneller klaar' : 'vaker op tijd') + '</b>.', '' + L.Met + ' we handle <b>more units</b> and are <b>' + (sneller ? 'done faster' : 'more often on time') + '</b>.');
+      else if (meerUnits) conclusie = T('' + L.Met + ' gaan er <b>meer units mee</b>.', '' + L.Met + ' we handle <b>more units</b>.');
+      else if (sneller || vakerOpTijd) conclusie = T(L.Onderwerp + ' zorgt er vooral voor dat we <b>' + (sneller && vakerOpTijd ? 'sneller klaar zijn en vaker op tijd vertrekken' : (sneller ? 'sneller klaar zijn' : 'vaker op tijd vertrekken')) + '</b>. Er gaan niet veel méér units mee.',
+        L.Onderwerp + ' mainly means we are <b>' + (sneller && vakerOpTijd ? 'done faster and leave on time more often' : (sneller ? 'done faster' : 'more often on time')) + '</b>. It does not add many more units.');
+      else conclusie = T('In deze periode levert ' + L.onderwerp + ' <b>geen duidelijk voordeel</b> op in units, snelheid of stiptheid.', 'In this period ' + L.onderwerp + ' shows <b>no clear benefit</b> in units, speed or punctuality.');
+    } else {
+      conclusie = T('Er zijn in deze periode alleen diensten ' + (m.n ? 'mét ' : 'zónder ') + wat + ', dus we kunnen nog niet vergelijken. Kies een langere periode.', 'This period only has shifts ' + (m.n ? 'with ' : 'without ') + wat + ', so there is nothing to compare yet. Choose a longer period.');
     }
-    // Spreidingsdiagram
-    h += '<div style="font-weight:700;color:#003366;font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin:6px 0;">' + (en ? 'Man-hours vs units per shift' : 'Manuren vs units per dienst') + '</div>' + spreiding(a.rec, en);
-    // Detail
+    var kOw = tar.extra !== null ? a.alle.exUren * tar.extra : null, kInh = tar.inhuur !== null ? a.alle.inhUren * tar.inhuur : null;
+    var urenOw = soort !== 'inhuur', urenInh = soort !== 'overwerk';
+    var delen = [];
+    if (urenOw) delen.push('<b>' + hel(a.alle.exUren, 0) + T(' uur</b> overwerk', ' hours</b> of overtime') + (kOw !== null ? ' (\u2248 \u20AC ' + hel(kOw, 0) + ')' : ''));
+    if (urenInh) delen.push('<b>' + hel(a.alle.inhUren, 0) + T(' uur</b> inhuur', ' hours</b> of agency staff') + (kInh !== null ? ' (\u2248 \u20AC ' + hel(kInh, 0) + ')' : ''));
+    var totK = (urenOw ? (kOw || 0) : 0) + (urenInh ? (kInh || 0) : 0);
+    var mist = (urenOw && kOw === null) || (urenInh && kInh === null);
+    zinnen += zin('&#x1F4B6;', T('Er is ', 'There were ') + delen.join(T(' en ', ' and ')) + T(' ingezet', ' used') +
+      (delen.length > 1 && !mist ? T(', samen ongeveer <b>\u20AC ', ', together about <b>\u20AC ') + hel(totK, 0) + '</b>' : '') + '.' +
+      (mist ? ' <span style="color:#8795a8;">' + T('Vul bij \u2699\uFE0F de uurtarieven in om de kosten te zien.', 'Enter the hourly rates via \u2699\uFE0F to see the cost.') + '</span>' : ''), null);
+    var weinig = beide && (m.n < 10 || z.n < 10);
+    h += '<div style="background:#f4f7fb;border-radius:12px;padding:6px 16px 4px;margin-bottom:12px;">' +
+      '<div style="font-weight:800;color:#003366;font-size:13px;text-transform:uppercase;letter-spacing:.5px;padding:8px 0 2px;">' + T('Wat zien we?', 'What do we see?') + '</div>' + zinnen + '</div>' +
+      '<div style="background:#003366;color:#fff;border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:15.5px;line-height:1.5;">' +
+      '<div style="font-size:11.5px;text-transform:uppercase;letter-spacing:.8px;opacity:.75;font-weight:700;margin-bottom:3px;">' + T('In het kort', 'In short') + '</div>' + conclusie.replace(/<b>/g, '<b style="color:#ffd27a;">') +
+      (weinig ? '<div style="font-size:12px;opacity:.8;margin-top:6px;">' + T('Let op: nog weinig diensten om te vergelijken. Zie dit als een eerste indruk.', 'Note: still few shifts to compare. Treat this as a first impression.') + '</div>' : '') + '</div>';
+    // ── 2. Naast elkaar ──
+    if (beide) {
+      h += '<div style="font-weight:800;color:#003366;font-size:13px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">' + T('Naast elkaar (gemiddeld per dienst)', 'Side by side (average per shift)') + '</div>' +
+        '<div style="display:flex;gap:16px;font-size:12px;color:#1a2a4a;margin-bottom:10px;"><span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:' + KL.met + ';vertical-align:-1px;"></span> ' + T('' + L.Met + '', '' + L.Met + '') + '</span><span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:' + KL.zonder + ';vertical-align:-1px;"></span> ' + T('' + L.Zonder + '', '' + L.Zonder + '') + '</span></div>' +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:4px 36px;">' +
+        balkRij(T('Mensen op de dienst', 'People on the shift'), '', m.koppen, z.koppen, 0, '', en, L) +
+        balkRij(T('Units gelost + geladen', 'Units unloaded + loaded'), '', m.units, z.units, 0, '', en, L) +
+        balkRij(T('Minuten laden en lossen', 'Minutes loading and unloading'), T('van klep neer tot laden klaar — korter is beter', 'ramp down to loading complete — shorter is better'), m.handling, z.handling, 0, ' min', en, L) +
+        balkRij(T('Op tijd vertrokken', 'Left on time'), T('hoger is beter', 'higher is better'), m.opTijd === null ? null : m.opTijd * 100, z.opTijd === null ? null : z.opTijd * 100, 0, '%', en, L) +
+        '</div>';
+    }
+    // ── 3. Details ──
+    var kol = [
+      { t: T('Diensten', 'Shifts'), f: function(g){ return g.n; } },
+      { t: T('Mensen', 'People'), f: function(g){ return fmt(g.koppen, 1); } },
+      { t: T('Gewerkte uren', 'Hours worked'), f: function(g){ return fmt(g.uren, 1); } },
+      { t: 'Units', f: function(g){ return fmt(g.units, 0); } },
+      { t: T('Units per gewerkt uur', 'Units per hour worked'), f: function(g){ return fmt(g.upm, 2); } },
+      { t: T('Minuten laden/lossen', 'Minutes handling'), f: function(g){ return fmt(g.handling, 0); } },
+      { t: T('Op tijd', 'On time'), f: function(g){ return g.opTijd === null ? '—' : fmt(g.opTijd * 100, 0) + '%'; } },
+      { t: T('Achtergelaten', 'Left behind'), f: function(g){ return g.shutout === null ? '—' : fmt(g.shutout, 1); } }
+    ];
     var inp = 'width:52px;padding:3px 5px;border:1px solid #c8d7e8;border-radius:5px;font-size:12px;text-align:center;';
-    h += '<details style="margin-top:14px;"><summary style="cursor:pointer;font-weight:700;color:#003366;font-size:12.5px;">' + (en ? 'Show all shifts (' : 'Alle diensten tonen (') + a.rec.length + ')</summary><div style="overflow-x:auto;margin-top:8px;">' +
-      '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:820px;"><thead><tr style="background:#003366;color:#fff;">' +
-      [en ? 'Date' : 'Datum', en ? 'Shift' : 'Dienst', en ? 'Staff' : 'Pers.', 'Extra', 'Std', en ? 'Man-h' : 'Manuren', 'Units', en ? 'Units/mh' : 'Units/mu', 'Handling', en ? 'Departure' : 'Vertrek', en ? 'Left behind' : 'Achtergel.'].map(function(t){ return '<th style="padding:6px 8px;text-align:center;">' + t + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    h += '<details style="margin-top:8px;border-top:1px solid #e3e9f1;padding-top:10px;"><summary style="cursor:pointer;font-weight:700;color:#003366;font-size:13px;">' + T('Meer details (tabellen, grafiek en alle diensten)', 'More details (tables, chart and all shifts)') + '</summary><div style="margin-top:12px;">' +
+      '<div style="font-weight:700;color:#003366;font-size:12px;margin:6px 0;">' + T('Met en ' + L.zonder + '', 'With and ' + L.zonder + '') + '</div><div style="overflow-x:auto;">' +
+      vergelijkTabel([{ naam: T('' + L.Met + '', '' + L.Met + ''), g: m }, { naam: T('' + L.Zonder + '', '' + L.Zonder + ''), g: z }], kol, en) + '</div>';
+    if (a.onder.n + a.op.n + a.boven.n > 0) {
+      h += '<div style="font-weight:700;color:#003366;font-size:12px;margin:14px 0 6px;">' + T('Minder, precies genoeg of meer mensen dan de standaardbezetting', 'Fewer, exactly enough or more people than standard staffing') + '</div><div style="overflow-x:auto;">' +
+        vergelijkTabel([{ naam: T('Minder dan standaard', 'Below standard'), g: a.onder }, { naam: T('Precies standaard', 'At standard'), g: a.op }, { naam: T('Meer dan standaard', 'Above standard'), g: a.boven }], kol, en) + '</div>';
+    }
+    h += '<div style="font-weight:700;color:#003366;font-size:12px;margin:14px 0 6px;">' + T('Elke stip is één dienst: hoeveel uur er gewerkt is en hoeveel units er gingen', 'Each dot is one shift: hours worked and units handled') + '</div>' + spreiding(a.rec, en, L);
+    h += '<div style="font-weight:700;color:#003366;font-size:12px;margin:14px 0 6px;">' + T('Alle diensten', 'All shifts') + (opts.bewerkbaar ? ' <span style="font-weight:400;color:#8795a8;">' + T('(achtergelaten units kun je hier ook invullen)', '(you can also enter units left behind here)') + '</span>' : '') + '</div>' +
+      '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:820px;"><thead><tr style="background:#003366;color:#fff;">' +
+      [T('Datum', 'Date'), T('Dienst', 'Shift'), T('Mensen', 'People'), T('Overwerk', 'Overtime'), T('Inhuur', 'Agency'), T('Standaard', 'Standard'), T('Uren', 'Hours'), 'Units', T('Units/uur', 'Units/hour'), T('Laden/lossen', 'Handling'), T('Vertrek', 'Departure'), T('Achtergel.', 'Left behind')].map(function(t){ return '<th style="padding:6px 8px;text-align:center;">' + t + '</th>'; }).join('') + '</tr></thead><tbody>' +
       a.rec.map(function(r, i){
         var bg = i % 2 ? '#f4f7fb' : '#fff';
         var so = opts.bewerkbaar ? r.routeIdx.map(function(ri){ var v = ((a.cfg.shutout[r.datum] || {})[ri + 1] || {}).achter; return '<input style="' + inp + '" title="' + esc(src.routes[ri]) + '" value="' + (v == null ? '' : esc(v)) + '" placeholder="' + esc(src.routes[ri].split(' ')[0].slice(0, 3)) + '" onchange="' + id + 'Shutout(\'' + r.datum + '\',' + (ri + 1) + ',this.value)">'; }).join(' ') : (r.shutout === null ? '—' : r.shutout);
         return '<tr style="background:' + bg + ';"><td style="padding:5px 8px;font-weight:600;color:#003366;white-space:nowrap;">' + r.dag + ' ' + r.datum + '</td>' +
-          '<td style="text-align:center;">' + (r.dienst === 'O' ? (en ? 'Morning' : 'Ochtend') : (en ? 'Evening' : 'Avond')) + '</td>' +
-          '<td style="text-align:center;font-weight:700;">' + r.koppen + '</td><td style="text-align:center;color:' + KL.met + ';font-weight:700;">' + (r.extra || '') + '</td>' +
+          '<td style="text-align:center;">' + (r.dienst === 'O' ? T('Ochtend', 'Morning') : T('Avond', 'Evening')) + '</td>' +
+          '<td style="text-align:center;font-weight:700;">' + r.koppen + '</td><td style="text-align:center;color:' + KL.met + ';font-weight:700;">' + (r.extra || '') + '</td><td style="text-align:center;color:#b8960a;font-weight:700;">' + (r.inhuur || '') + '</td>' +
           '<td style="text-align:center;color:#5a7090;">' + (r.std === null ? '—' : r.std) + '</td><td style="text-align:center;">' + fmt(r.uren, 1) + (r.geschat ? '*' : '') + '</td>' +
           '<td style="text-align:center;font-weight:700;">' + r.units + '</td><td style="text-align:center;">' + fmt(r.upm, 2) + '</td>' +
           '<td style="text-align:center;">' + (r.handling === null ? '—' : fmt(r.handling, 0) + ' min') + '</td>' +
-          '<td style="text-align:center;color:' + (r.opTijd === null ? '#8795a8' : (r.opTijd ? '#1a7a40' : '#c0392b')) + ';font-weight:600;">' + (r.vertrekAfw === null ? '—' : (r.vertrekAfw > 0 ? '+' : '') + fmt(r.vertrekAfw, 0) + ' min') + '</td>' +
+          '<td style="text-align:center;color:' + (r.opTijd === null ? '#8795a8' : (r.opTijd ? '#1a7a40' : '#c0392b')) + ';font-weight:600;">' + (r.opTijd === null ? '—' : (r.opTijd ? T('op tijd', 'on time') : T('te laat', 'late')) + ' (' + (r.vertrekAfw > 0 ? '+' : '') + fmt(r.vertrekAfw, 0) + ')') + '</td>' +
           '<td style="text-align:center;white-space:nowrap;">' + so + '</td></tr>';
-      }).join('') + '</tbody></table></div></details>';
-    // Toelichting
-    h += '<div style="font-size:11px;color:#8795a8;margin-top:12px;line-height:1.55;">' +
-      (en ? '<b>How it is calculated:</b> staffing = everyone with a position in the Day planning for that shift; "Extra" = staff type EX (overtime). Units = unloaded + loaded of the routes linked to the shift (' : '<b>Zo wordt gerekend:</b> bezetting = iedereen met een positie in de Dagplanning voor die dienst; "Extra" = medewerkertype EX (overwerk). Units = gelost + geladen van de routes die bij de dienst horen (') +
-      src.routes.map(function(r, i){ return esc(r) + ' → ' + (a.cfg.dienst[i] === 'O' ? (en ? 'morning' : 'ochtend') : (a.cfg.dienst[i] === 'A' ? (en ? 'evening' : 'avond') : (en ? 'not counted' : 'niet meegeteld'))); }).join(', ') +
-      (en ? '). Handling = ramp down → loading complete. On time = departure within norm + margin. ' : '). Handling = klep neer → laden compleet. Op tijd = vertrek binnen norm + marge. ') +
-      (a.geschat ? (en ? '* No hours filled in: estimated at 8 h per person. ' : '* Geen uren ingevuld: geschat op 8 u per persoon. ') : '') +
-      (a.overgeslagen ? (en ? a.overgeslagen + ' shift(s) skipped because staffing or units were missing. ' : a.overgeslagen + ' dienst(en) overgeslagen omdat bezetting of units ontbrak. ') : '') +
-      (en ? 'Busy days often get more staff, so compare per route and weekday before drawing conclusions.' : 'Drukke dagen krijgen vaak meer mensen: vergelijk per route en weekdag voordat je conclusies trekt.') + '</div>';
+      }).join('') + '</tbody></table></div>';
+    h += '<div style="font-size:11.5px;color:#8795a8;margin-top:12px;line-height:1.6;">' +
+      T('<b>Hoe tellen we?</b> Mensen = iedereen met een positie in de Dagplanning. Overwerk = medewerkers met type EX ("Extra"), inhuur = medewerkers met type inhuur. Units = gelost + geladen van de afvaarten die bij de dienst horen (',
+        '<b>How do we count?</b> People = everyone with a position in the Day planning. Overtime = staff type EX ("Extra"), agency = staff type inhuur. Units = unloaded + loaded of the sailings for that shift (') +
+      src.routes.map(function(r, i){ return esc(r) + ' → ' + (a.cfg.dienst[i] === 'O' ? T('ochtend', 'morning') : (a.cfg.dienst[i] === 'A' ? T('avond', 'evening') : T('niet meegeteld', 'not counted'))); }).join(', ') + '). ' +
+      T('Op tijd = vertrokken binnen de norm plus marge. ', 'On time = departed within norm plus margin. ') +
+      (a.geschat ? T('* Geen uren ingevuld: gerekend met 8 uur per persoon. ', '* No hours filled in: counted as 8 hours per person. ') : '') +
+      (a.onvolledig ? T(a.onvolledig + ' dienst(en) niet meegeteld omdat de Dagplanning onvolledig lijkt (minder dan 3 mensen of minder dan 40% van de standaard). ', a.onvolledig + ' shift(s) left out because the Day planning looks incomplete (fewer than 3 people or under 40% of standard). ') : '') +
+      (a.overgeslagen ? T(a.overgeslagen + ' dienst(en) niet meegeteld omdat de Dagplanning of Punctuality ontbrak. ', a.overgeslagen + ' shift(s) left out because the Day planning or Punctuality was missing. ') : '') +
+      T('Drukke dagen krijgen vaak extra mensen; vergelijk daarom ook per route en weekdag.', 'Busy days often get extra staff, so also compare per route and weekday.') + '</div>';
+    h += '</div></details>';
     el.innerHTML = h;
-    // Hover op het spreidingsdiagram
     var svg = el.querySelector('.ow-svg'), tip = el.querySelector('.ow-tip');
     if (svg && tip) {
       Array.prototype.forEach.call(svg.querySelectorAll('.ow-pt'), function(p){
@@ -26252,7 +26336,7 @@ var OW = (function(){
 })();
 
 // ── Overwerk & productiviteit: koppeling met de hoofdapp ──
-var _owPeriode = 'maand', _owDienst = 'alle', _owJaar = new Date().getFullYear(), _owMaand = new Date().getMonth();
+var _owPeriode = 'maand', _owDienst = 'alle', _owSoort = 'beide', _owJaar = new Date().getFullYear(), _owMaand = new Date().getMonth();
 function owEn(){ return (sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM'; }
 function owKey(){ return tk('kpi_overwerk_v1'); }
 function owRoutes(){ return owEn() ? ['To Hoek van Holland','To Europoort'] : ['Harwich Ochtend','Harwich Middag','Immingham']; }
@@ -26282,12 +26366,13 @@ function owBron(){
 function owRenderKpi(jaar, maand){
   if (jaar !== undefined) { _owJaar = jaar; _owMaand = maand; }
   var el = document.getElementById('ow-body'); if (!el) return;
-  try { OW.render(el, owBron(), { en: owEn(), periode: _owPeriode, dienst: _owDienst, bewerkbaar: true, id: 'ow' }); }
+  try { OW.render(el, owBron(), { en: owEn(), periode: _owPeriode, dienst: _owDienst, soort: _owSoort, bewerkbaar: true, id: 'ow' }); }
   catch(e) { el.innerHTML = '<div style="color:#c0392b;font-size:12px;">Overwerk-analyse kon niet worden berekend: ' + OW.esc(e.message) + '</div>'; }
 }
 function owPeriode(p){ _owPeriode = p; owRenderKpi(); }
 function owDienst(d){ _owDienst = d; owRenderKpi(); }
-function owCsv(){ var a = OW.analyse(owBron(), _owPeriode, _owDienst); OW.download('overwerk-productiviteit_' + (sessionStorage.getItem('dj_terminal') || 'EP') + '_' + _owJaar + '-' + String(_owMaand + 1).padStart(2, '0') + '.csv', OW.csv(a.rec, owEn())); }
+function owSoort(x){ _owSoort = x; owRenderKpi(); }
+function owCsv(){ var a = OW.analyse(owBron(), _owPeriode, _owDienst, _owSoort); OW.download('overwerk-productiviteit_' + (sessionStorage.getItem('dj_terminal') || 'EP') + '_' + _owJaar + '-' + String(_owMaand + 1).padStart(2, '0') + '.csv', OW.csv(a.rec, owEn())); }
 function owShutout(datum, n, waarde, reden){
   var c = owCfg(); c.shutout[datum] = c.shutout[datum] || {};
   var oud = c.shutout[datum][n] || {};
@@ -26354,7 +26439,7 @@ function owShutoutVul(forceer){
     '</tbody></table><div style="color:#8795a8;font-size:11px;margin-top:6px;">' + (en ? 'Saved immediately. Used in KPI Dashboard → Overtime & productivity.' : 'Wordt direct opgeslagen. Wordt gebruikt in KPI Dashboard → Overwerk & productiviteit.') + '</div>';
 }
 setInterval(function(){ try { owShutoutVul(false); } catch(e){} }, 1000);
-['owRenderKpi','owPeriode','owDienst','owCsv','owShutout','owInstellingen','owInstellingenOpslaan','owShutoutVul','owKey']
+['owRenderKpi','owPeriode','owDienst','owSoort','owCsv','owShutout','owInstellingen','owInstellingenOpslaan','owShutoutVul','owKey']
   .forEach(function(n){ try { window[n] = eval(n); } catch(e){} });
 window.OW = OW;
 
