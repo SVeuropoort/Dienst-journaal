@@ -9,7 +9,7 @@ window.tk = window.tk || function(key) {
   var splitKeys = ['dienstjournaal_stena_v1','vaarschema_backup_v1','vs_data_v1',
     'materieel_status_v1','mat_standalone_v2','mat_custom_list',
     'plan_v3','dagPlanning_v2_state','dagPlanning_v2_lastDate',
-    'dagpl_cert_v1','dagpl_cert_v2','scheepzoeker_schepen','dagPlanning_vasteCelteksten_v1','telefoonlijst_home_v1','dagpl_cert_dates_v1','kade_vakken_v1','opleiding_shunten_v1','opleiding_lossen_v1','opleiding_laden_v1','opleiding_heftruck_v1','opleiding_reachstacker_v1'];
+    'dagpl_cert_v1','dagpl_cert_v2','scheepzoeker_schepen','dagPlanning_vasteCelteksten_v1','telefoonlijst_home_v1','dagpl_cert_dates_v1','kade_vakken_v1','kpi_overwerk_v1','opleiding_shunten_v1','opleiding_lossen_v1','opleiding_laden_v1','opleiding_heftruck_v1','opleiding_reachstacker_v1'];
   if (key.startsWith('dagplan_')) return pfx + key;
   if (splitKeys.indexOf(key) >= 0) return pfx + key;
   return key;
@@ -4764,6 +4764,15 @@ function djHerstelVaarschema(){
     </div>
 
 
+    <!-- Achtergelaten units (voor Overwerk & productiviteit) -->
+    <div class="card">
+      <div class="card-header">
+        <div class="icon">&#x1F6A7;</div>
+        <h2>Achtergelaten units (shut-out)</h2>
+      </div>
+      <div id="ow-shutout-body" style="padding:4px 4px 8px;"></div>
+    </div>
+
     <!-- Sjorringen -->
     <div class="card">
       <div class="card-header">
@@ -6334,7 +6343,8 @@ window.addEventListener('resize', () => {
     'werkoverdracht_abnormal_config_v1',
     'werkoverdracht_abnormal_lijst_v1',
     'std_bezetting_v1',
-    'pd_groepen_extra_v1'
+    'pd_groepen_extra_v1',
+    'kpi_overwerk_v1'
   ];
 
   function getTerminalPrefix() {
@@ -6575,6 +6585,7 @@ window.addEventListener('resize', () => {
     'werkoverdracht_abnormal_lijst_v1',
     'std_bezetting_v1',
     'pd_groepen_extra_v1',
+    'kpi_overwerk_v1',
     'werkorder_bedrijven_v1',
     'werkorder_prijzen_v1'
   ];
@@ -10356,6 +10367,12 @@ document.getElementById('archOverlay').addEventListener('click',function(e){
               </div>
             </div>
           </div>
+        </div><div class="card" id="ow-card" style="margin-bottom:20px;">
+          <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:8px;"><div class="icon">&#x23F1;&#xFE0F;</div><h2>Overwerk &amp; productiviteit</h2></div>
+            <button type="button" onclick="owInstellingen()" title="Tarieven en route &rarr; dienst instellen" style="background:none;border:none;cursor:pointer;font-size:16px;">&#x2699;&#xFE0F;</button>
+          </div>
+          <div id="ow-body" style="padding:16px;"></div>
         </div><div class="card" style="margin-bottom:20px;"><div class="card-header"><div class="icon">&#x1F550;</div><h2>Gemiddelde Vaarschema Tijden <span onclick="openKpiNormen()" style="cursor:pointer;font-size:16px;margin-left:8px;">&#x2699;&#xFE0F;</span></h2></div><div style="overflow-x:auto;padding:16px;"><table style="width:100%;border-collapse:collapse;min-width:700px;"><thead><tr id="kpi-tijden-hdr"></tr></thead><tbody id="kpi-tijden-body"></tbody></table></div></div><div class="card" style="margin-bottom:20px;"><div class="card-header"><div class="icon">&#x1F4E6;</div><h2>Totaal Geladen &amp; Gelost per Route</h2></div><div style="overflow-x:auto;padding:16px;"><table style="width:100%;border-collapse:collapse;"><thead><tr id="kpi-units-hdr"></tr></thead><tbody id="kpi-units-body"></tbody></table></div></div><div class="card" style="margin-bottom:20px;"><div class="card-header" onclick="toggleDagenoverzicht()" style="cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;"><div style="display:flex;align-items:center;gap:8px;"><div class="icon">&#x1F4C5;</div><h2>Dagenoverzicht</h2></div><span id="dag-arrow" style="font-size:18px;color:var(--navy);transition:transform 0.25s;">&#9660;</span></div><div id="dagenoverzicht-body" style="display:none;"><div style="overflow-x:auto;padding:16px;"><table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:var(--navy);color:#fff;"><th style="padding:8px 10px;text-align:left;">Datum</th><th style="padding:8px 10px;text-align:center;">Lossen</th><th style="padding:8px 10px;text-align:center;">Laden</th><th style="padding:8px 10px;text-align:center;">Tijden</th></tr></thead><tbody id="kpi-dag-body"></tbody></table></div></div></div><div class="card" id="kpi-normen-card" style="display:none;margin-top:20px;"><div class="card-header" onclick="toggleNormen()" style="cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;"><div style="display:flex;align-items:center;gap:8px;"><div class="icon">&#x1F6A8;</div><h2>Dagen buiten de normen</h2><span id="normen-count-badge" style="background:#c0392b;color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:4px;"></span></div><span id="normen-arrow" style="font-size:18px;color:#c0392b;transition:transform 0.25s;">&#9660;</span></div><div id="normen-body-wrap" style="display:none;"><div style="overflow-x:auto;padding:16px;"><table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:#c0392b;color:#fff;"><th style="padding:8px 10px;text-align:left;">Datum</th><th style="padding:8px 10px;text-align:left;">Route</th><th style="padding:8px 10px;text-align:left;">Kolom</th><th style="padding:8px 10px;text-align:center;">Werkelijk</th><th style="padding:8px 10px;text-align:center;">Norm</th><th style="padding:8px 10px;text-align:center;">Afwijking</th><th style="padding:8px 10px;text-align:left;">Opmerking</th></tr></thead><tbody id="kpi-normen-body-tbl"></tbody></table></div></div></div><div id="kpi-chart-card" style="display:none;margin-top:20px;"><div class="card-header" style="padding:16px 20px;"><div class="icon">&#x1F3AF;</div><h2>KPI Tijden &#x2013; Maandoverzicht</h2></div><div id="kpi-charts-wrap" style="padding:16px;display:flex;flex-wrap:wrap;gap:24px;">
 
         <!-- MAAND SNAPSHOTS -->
@@ -21101,6 +21118,7 @@ function wisselPunctualityDatum(dateStr) {
 
   function renderKPI(){
     renderTolynxKade();
+    try { if (typeof window.owRenderKpi === 'function') window.owRenderKpi(_kpiY, _kpiM); } catch(e) {}
     var lbl=document.getElementById('kpi-maand-label');
     if(lbl) lbl.textContent=_ML[_kpiM]+' '+_kpiY;
     var all=_vsGet();
@@ -25935,6 +25953,411 @@ document.addEventListener('input', function(e){ if (e.target && e.target.id && e
 document.addEventListener('change', function(e){ if (e.target && e.target.id && e.target.id.indexOf('abn-') === 0 && e.target.closest && e.target.closest('#nieuw-tab-abnormal')) abnBerekenen(); });
 ['abnInit','abnBerekenen','abnTekening','abnFocus','abnOpslaanInLijst','abnLaad','abnVerwijder','abnNieuw','abnInstellingen','abnInstellingenOpslaan','abnVulKeuzes','abnRenderLijst','abnConfigKey']
   .forEach(function(n){ try { window[n] = eval(n); } catch(e){} });
+
+// ═════════════════════════════════════════════════════════════════
+// OVERWERK & PRODUCTIVITEIT (gedeelde kern — staat identiek in index.html en kpi-mt.html)
+// Koppelt per dienst (ochtend/avond) de bezetting uit de Dagplanning aan de units en tijden
+// uit Punctuality. Vergelijkt diensten MET "Extra" (overwerk) met diensten ZONDER, en diensten
+// onder/op/boven de standaardbezetting. Instellingen (tarieven, route→dienst) en de ingevulde
+// achtergelaten units staan in <terminal>_kpi_overwerk_v1 en gaan mee in de cloud-sync, zodat
+// het MT-dashboard exact hetzelfde rekent.
+// ═════════════════════════════════════════════════════════════════
+var OW = (function(){
+  var TC_KLEP = 1, TC_LADEN = 5, TC_VERTREK = 7;
+  var KL = { zonder: '#2f6db5', met: '#9333ea' };
+  function num(v){ if (v === null || v === undefined || v === '') return null; var n = parseFloat(String(v).replace(',', '.')); return isNaN(n) ? null : n; }
+  function t2m(t){ if (!t) return null; var p = String(t).split(':'); if (p.length !== 2) return null; var h = parseInt(p[0], 10), m = parseInt(p[1], 10); return (isNaN(h) || isNaN(m)) ? null : h * 60 + m; }
+  function esc(t){ return String(t == null ? '' : t).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function fmt(n, dec){ if (n === null || n === undefined || isNaN(n)) return '—'; var r = Math.round(n * Math.pow(10, dec || 0)) / Math.pow(10, dec || 0); return String(r).replace('.', ','); }
+  function gem(arr){ var a = arr.filter(function(x){ return x !== null && x !== undefined && !isNaN(x); }); return a.length ? a.reduce(function(s, x){ return s + x; }, 0) / a.length : null; }
+  function som(arr){ return arr.reduce(function(s, x){ return s + (x || 0); }, 0); }
+  function isoNaarSlash(iso){ var p = iso.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+
+  function standaardConfig(routes){
+    var dienst = {};
+    routes.forEach(function(r, i){ dienst[i] = i === 0 ? 'O' : 'A'; });
+    return { tarieven: { extra: null, inhuur: null }, dienst: dienst, shutout: {} };
+  }
+  function config(ruw, routes){
+    var c = standaardConfig(routes);
+    if (ruw && typeof ruw === 'object') {
+      if (ruw.tarieven) { c.tarieven.extra = num(ruw.tarieven.extra); c.tarieven.inhuur = num(ruw.tarieven.inhuur); }
+      if (ruw.dienst) Object.keys(ruw.dienst).forEach(function(k){ if (ruw.dienst[k] === 'O' || ruw.dienst[k] === 'A' || ruw.dienst[k] === '-') c.dienst[k] = ruw.dienst[k]; });
+      if (ruw.shutout && typeof ruw.shutout === 'object') c.shutout = ruw.shutout;
+    }
+    return c;
+  }
+
+  // Per dienst de ingezette medewerkers (zelfde selectie als de tabel "Personeelsbezetting per dag":
+  // alleen wie een positie heeft gekregen in de Dagplanning).
+  function bezetting(dp){
+    var pos = dp.pos || {}, selO = {}, selA = {};
+    Object.keys(pos).forEach(function(k){ var v = pos[k]; if (!v) return; if (k.indexOf('a_') === 0 || k.indexOf('av_') === 0) selA[v] = 1; else selO[v] = 1; });
+    function tel(lijst, sel){
+      var ems = (lijst || []).filter(function(e){ return sel[e.name]; });
+      var isEx = function(e){ return (e.type || '').toUpperCase().indexOf('EX') >= 0; };
+      var isInh = function(e){ return !isEx(e) && (e.type || '').toLowerCase().indexOf('inhuur') >= 0; };
+      var uren = som(ems.map(function(e){ return num(e.uren); }));
+      var geschat = false;
+      if (!uren && ems.length) { uren = ems.length * 8; geschat = true; }
+      var exUren = som(ems.filter(isEx).map(function(e){ return num(e.uren) || 8; }));
+      var inhUren = som(ems.filter(isInh).map(function(e){ return num(e.uren) || 8; }));
+      return { koppen: ems.length, extra: ems.filter(isEx).length, inhuur: ems.filter(isInh).length, uren: uren, exUren: ems.some(isEx) ? exUren : 0, inhUren: ems.some(isInh) ? inhUren : 0, geschat: geschat };
+    }
+    return { O: tel(dp.ochEmps, selO), A: tel(dp.avondEmps, selA) };
+  }
+
+  function periodeDatums(jaar, maand, periode){
+    var n = periode === '6m' ? 6 : (periode === '3m' ? 3 : 1), res = {};
+    for (var i = 0; i < n; i++) { var d = new Date(jaar, maand - i, 1); res[d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')] = 1; }
+    return res;
+  }
+
+  // Bouwt één record per dienst-dag met zowel bezetting als units.
+  function records(src, periode){
+    var cfg = config(src.cfg, src.routes), maanden = periodeDatums(src.jaar, src.maand, periode);
+    var dn = ['Zo','Ma','Di','Wo','Do','Vr','Za'];
+    var uit = [], overgeslagen = 0;
+    Object.keys(src.dagplans).sort().forEach(function(iso){
+      if (!maanden[iso.slice(0, 7)]) return;
+      var dp = src.dagplans[iso]; if (!dp) return;
+      var slash = isoNaarSlash(iso), vs = src.vs[slash] || null;
+      var bez = bezetting(dp);
+      var p = iso.split('-'), datum = new Date(+p[0], +p[1] - 1, +p[2]), wd = datum.getDay(), we = wd === 0 || wd === 6;
+      ['O','A'].forEach(function(dienst){
+        var b = bez[dienst];
+        var rIdx = src.routes.map(function(r, i){ return i; }).filter(function(i){ return cfg.dienst[i] === dienst; });
+        if (!rIdx.length) return;
+        var units = 0, handling = [], vertrekAfw = [], opTijd = [], shut = [], heeftUnits = false;
+        rIdx.forEach(function(ri){
+          var n = ri + 1, u = (vs && vs.units) || {};
+          ['trailers','eigen','containers','trade'].forEach(function(f){
+            ['in','out'].forEach(function(dir){ var v = parseInt(u[dir + '-' + f + '-' + n], 10); if (!isNaN(v)) { units += v; if (v > 0) heeftUnits = true; } });
+          });
+          var tij = ((vs && vs.tijden) || [])[ri], t = (tij && tij.tijden) || [];
+          var k = t2m(t[TC_KLEP]), l = t2m(t[TC_LADEN]);
+          if (k !== null && l !== null) { var h = l - k; if (h < 0) h += 1440; if (h > 0 && h < 720) handling.push(h); }
+          var v = t2m(t[TC_VERTREK]), rn = src.routes[ri];
+          var nk = rn + '_' + TC_VERTREK, nv = (we && src.normen[nk + '_we'] && src.normen[nk + '_we'].tijd) ? src.normen[nk + '_we'] : src.normen[nk];
+          if (v !== null && nv && nv.tijd) {
+            var nm = t2m(nv.tijd), mg = parseInt(nv.marge, 10) || 0;
+            if (nm !== null) { var a = v - nm; if (a < -720) a += 1440; if (a > 720) a -= 1440; vertrekAfw.push(a); opTijd.push(a <= mg ? 1 : 0); }
+          }
+          var so = ((cfg.shutout[slash] || {})[n]);
+          if (so && num(so.achter) !== null) shut.push(num(so.achter));
+        });
+        if (!b.koppen || !heeftUnits) { if (b.koppen || heeftUnits) overgeslagen++; return; }
+        var std = (src.std[dn[wd]] || {})[dienst === 'O' ? 'och_totaal' : 'av_totaal'] || null;
+        uit.push({
+          iso: iso, datum: slash, dag: dn[wd], we: we, dienst: dienst, routes: rIdx.map(function(i){ return src.routes[i]; }),
+          koppen: b.koppen, extra: b.extra, inhuur: b.inhuur, uren: b.uren, exUren: b.exUren, inhUren: b.inhUren, geschat: b.geschat,
+          std: std, tovStd: std ? b.koppen - std : null,
+          units: units, upm: b.uren ? units / b.uren : null,
+          handling: gem(handling), vertrekAfw: gem(vertrekAfw), opTijd: opTijd.length ? (opTijd.every(function(x){ return x; }) ? 1 : 0) : null,
+          shutout: shut.length ? som(shut) : null, routeIdx: rIdx
+        });
+      });
+    });
+    return { rec: uit, overgeslagen: overgeslagen, cfg: cfg };
+  }
+
+  function groep(rs){
+    var u = som(rs.map(function(r){ return r.units; })), h = som(rs.map(function(r){ return r.uren; }));
+    var ot = rs.filter(function(r){ return r.opTijd !== null; });
+    var so = rs.filter(function(r){ return r.shutout !== null; });
+    return {
+      n: rs.length, koppen: gem(rs.map(function(r){ return r.koppen; })), uren: gem(rs.map(function(r){ return r.uren; })),
+      units: gem(rs.map(function(r){ return r.units; })), upm: h ? u / h : null,
+      handling: gem(rs.map(function(r){ return r.handling; })), nHandling: rs.filter(function(r){ return r.handling !== null; }).length,
+      opTijd: ot.length ? som(ot.map(function(r){ return r.opTijd; })) / ot.length : null, nOpTijd: ot.length,
+      vertrekAfw: gem(rs.map(function(r){ return r.vertrekAfw; })),
+      shutout: so.length ? gem(so.map(function(r){ return r.shutout; })) : null, nShut: so.length,
+      exUren: som(rs.map(function(r){ return r.exUren; })), exKoppen: gem(rs.map(function(r){ return r.extra; })), inhUren: som(rs.map(function(r){ return r.inhUren; }))
+    };
+  }
+
+  function analyse(src, periode, dienstFilter){
+    var r = records(src, periode);
+    var rs = r.rec.filter(function(x){ return !dienstFilter || dienstFilter === 'alle' || x.dienst === dienstFilter; });
+    var met = rs.filter(function(x){ return x.extra > 0; }), zonder = rs.filter(function(x){ return x.extra === 0; });
+    return {
+      rec: rs, cfg: r.cfg, overgeslagen: r.overgeslagen,
+      met: groep(met), zonder: groep(zonder), alle: groep(rs),
+      onder: groep(rs.filter(function(x){ return x.tovStd !== null && x.tovStd < 0; })),
+      op: groep(rs.filter(function(x){ return x.tovStd === 0; })),
+      boven: groep(rs.filter(function(x){ return x.tovStd !== null && x.tovStd > 0; })),
+      geschat: rs.some(function(x){ return x.geschat; })
+    };
+  }
+
+  // ── Weergave ──────────────────────────────────────────────────
+  function tegel(titel, waarde, sub, kleur){
+    return '<div style="flex:1;min-width:160px;background:#fff;border:1px solid #dde6f0;border-radius:10px;padding:12px 14px;">' +
+      '<div style="font-size:11px;color:#5a7090;text-transform:uppercase;letter-spacing:.5px;font-weight:700;">' + titel + '</div>' +
+      '<div style="font-size:24px;font-weight:800;color:' + (kleur || '#003366') + ';margin-top:2px;">' + waarde + '</div>' +
+      '<div style="font-size:11.5px;color:#5a7090;margin-top:2px;">' + sub + '</div></div>';
+  }
+  function verschil(a, b, dec, eh, lagerBeter){
+    if (a === null || b === null) return '<span style="color:#8795a8;">—</span>';
+    var d = a - b, goed = lagerBeter ? d < 0 : d > 0, kl = Math.abs(d) < Math.pow(10, -(dec || 0)) ? '#5a7090' : (goed ? '#1a7a40' : '#c0392b');
+    return '<b style="color:' + kl + ';">' + (d > 0 ? '+' : '') + fmt(d, dec) + (eh || '') + '</b>';
+  }
+
+  function vergelijkTabel(rijen, kolommen, en){
+    var th = 'padding:7px 9px;text-align:center;font-size:11px;';
+    var td = 'padding:7px 9px;text-align:center;border-bottom:1px solid #e3e9f1;';
+    return '<table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:640px;"><thead><tr style="background:#003366;color:#fff;">' +
+      '<th style="' + th + 'text-align:left;">' + (en ? 'Group' : 'Groep') + '</th>' + kolommen.map(function(k){ return '<th style="' + th + '">' + k.t + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      rijen.map(function(r){ return '<tr><td style="' + td + 'text-align:left;font-weight:700;color:#003366;">' + r.naam + '</td>' + kolommen.map(function(k){ return '<td style="' + td + '">' + k.f(r.g) + '</td>'; }).join('') + '</tr>'; }).join('') +
+      '</tbody></table>';
+  }
+
+  function spreiding(rs, en){
+    var W = 640, H = 300, L = 48, R = 16, T = 14, B = 40;
+    if (!rs.length) return '';
+    var xs = rs.map(function(r){ return r.uren; }), ys = rs.map(function(r){ return r.units; });
+    var xmax = Math.max.apply(null, xs) * 1.08 || 1, ymax = Math.max.apply(null, ys) * 1.08 || 1;
+    function stap(m){ var s = Math.pow(10, Math.floor(Math.log10(m / 4))); [1,2,5,10].some(function(f){ if (m / (s * f) <= 5) { s *= f; return true; } return false; }); return s; }
+    var xmin0 = Math.min.apply(null, xs) * 0.9, sx = stap(Math.max(xmax - xmin0, 1)), sy = stap(ymax);
+    var xmin = Math.max(0, Math.floor(xmin0 / sx) * sx);
+    var X = function(v){ return L + (v - xmin) / (xmax - xmin || 1) * (W - L - R); }, Y = function(v){ return H - B - v / ymax * (H - T - B); };
+    var g = '';
+    for (var v = 0; v <= ymax; v += sy) g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(v) + '" y2="' + Y(v) + '" stroke="#e6ecf3"/><text x="' + (L - 6) + '" y="' + (Y(v) + 4) + '" text-anchor="end" font-size="10.5" fill="#5a7090">' + v + '</text>';
+    for (var u = xmin; u <= xmax; u += sx) g += '<text x="' + X(u) + '" y="' + (H - B + 15) + '" text-anchor="middle" font-size="10.5" fill="#5a7090">' + u + '</text>';
+    g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + (H - B) + '" y2="' + (H - B) + '" stroke="#9aa9bb"/>';
+    g += '<text x="' + ((L + W - R) / 2) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="11" fill="#5a7090">' + (en ? 'Man-hours in shift' : 'Manuren in de dienst') + '</text>';
+    g += '<text transform="translate(12,' + ((T + H - B) / 2) + ') rotate(-90)" text-anchor="middle" font-size="11" fill="#5a7090">' + (en ? 'Units handled' : 'Units gelost + geladen') + '</text>';
+    var pts = rs.map(function(r, i){
+      var x = X(r.uren), y = Y(r.units), kl = r.extra > 0 ? KL.met : KL.zonder;
+      var tip = r.datum + ' ' + (r.dienst === 'O' ? (en ? 'morning' : 'ochtend') : (en ? 'evening' : 'avond')) + ' — ' + r.koppen + (en ? ' staff' : ' pers.') + (r.extra ? ' (' + r.extra + ' extra)' : '') + ', ' + fmt(r.uren, 1) + (en ? ' h, ' : ' u, ') + r.units + ' units' + (r.handling !== null ? ', ' + (en ? 'handling ' : 'handling ') + fmt(r.handling, 0) + ' min' : '');
+      var vorm = r.extra > 0
+        ? '<path d="M' + x + ',' + (y - 6) + ' L' + (x + 6) + ',' + y + ' L' + x + ',' + (y + 6) + ' L' + (x - 6) + ',' + y + ' Z" fill="' + kl + '" stroke="#fff" stroke-width="2"/>'
+        : '<circle cx="' + x + '" cy="' + y + '" r="5" fill="' + kl + '" stroke="#fff" stroke-width="2"/>';
+      return '<g class="ow-pt" data-tip="' + esc(tip) + '"><circle cx="' + x + '" cy="' + y + '" r="12" fill="transparent"/>' + vorm + '</g>';
+    }).join('');
+    var leg = '<div style="display:flex;gap:16px;font-size:12px;color:#1a2a4a;margin:0 0 6px 4px;">' +
+      '<span><svg width="12" height="12"><circle cx="6" cy="6" r="5" fill="' + KL.zonder + '"/></svg> ' + (en ? 'Without extra (overtime)' : 'Zonder Extra (overwerk)') + '</span>' +
+      '<span><svg width="12" height="12"><path d="M6,0 L12,6 L6,12 L0,6 Z" fill="' + KL.met + '"/></svg> ' + (en ? 'With extra (overtime)' : 'Met Extra (overwerk)') + '</span></div>';
+    return leg + '<div style="position:relative;overflow-x:auto;"><svg class="ow-svg" viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="max-width:760px;min-width:420px;display:block;font-family:inherit;">' + g + pts + '</svg>' +
+      '<div class="ow-tip" style="position:absolute;display:none;pointer-events:none;background:#1a2a3a;color:#fff;font-size:11.5px;padding:6px 9px;border-radius:6px;max-width:260px;z-index:5;"></div></div>';
+  }
+
+  function csv(rs, en){
+    var kop = en ? ['Date','Day','Shift','Routes','Staff','Extra','Hire','Standard','Man-hours','Extra hours','Units','Units per man-hour','Handling min (ramp down-loading complete)','Departure vs norm (min)','On time','Left behind']
+                 : ['Datum','Dag','Dienst','Routes','Personeel','Extra','Inhuur','Standaard','Manuren','Extra uren','Units','Units per manuur','Handling min (klep neer-laden compleet)','Vertrek t.o.v. norm (min)','Op tijd','Achtergelaten'];
+    var rijen = rs.map(function(r){ return [r.datum, r.dag, r.dienst === 'O' ? (en ? 'Morning' : 'Ochtend') : (en ? 'Evening' : 'Avond'), r.routes.join(' + '), r.koppen, r.extra, r.inhuur, r.std === null ? '' : r.std, fmt(r.uren, 1), fmt(r.exUren, 1), r.units, fmt(r.upm, 2), r.handling === null ? '' : fmt(r.handling, 0), r.vertrekAfw === null ? '' : fmt(r.vertrekAfw, 0), r.opTijd === null ? '' : (r.opTijd ? (en ? 'yes' : 'ja') : (en ? 'no' : 'nee')), r.shutout === null ? '' : r.shutout]; });
+    return [kop].concat(rijen).map(function(r){ return r.map(function(c){ c = String(c); return /[;"\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }).join(';'); }).join('\r\n');
+  }
+
+  // opts: { en, periode, dienst, bewerkbaar, id }
+  function render(el, src, opts){
+    if (!el) return;
+    var en = !!opts.en, a = analyse(src, opts.periode, opts.dienst), id = opts.id || 'ow';
+    var tar = a.cfg.tarieven, m = a.met, z = a.zonder;
+    var periodeTxt = { maand: en ? 'this month' : 'deze maand', '3m': en ? 'last 3 months' : 'laatste 3 maanden', '6m': en ? 'last 6 months' : 'laatste 6 maanden' }[opts.periode] || '';
+    var knop = function(waarde, huidig, tekst, fn){ return '<button type="button" onclick="' + fn + '(\'' + waarde + '\')" style="padding:5px 11px;border:1px solid ' + (waarde === huidig ? '#003366' : '#c8d7e8') + ';background:' + (waarde === huidig ? '#003366' : '#fff') + ';color:' + (waarde === huidig ? '#fff' : '#003366') + ';border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">' + tekst + '</button>'; };
+    var h = '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">' +
+      knop('maand', opts.periode, en ? 'Month' : 'Maand', id + 'Periode') + knop('3m', opts.periode, en ? '3 months' : '3 maanden', id + 'Periode') + knop('6m', opts.periode, en ? '6 months' : '6 maanden', id + 'Periode') +
+      '<span style="width:12px;"></span>' +
+      knop('alle', opts.dienst, en ? 'Both shifts' : 'Beide diensten', id + 'Dienst') + knop('O', opts.dienst, en ? 'Morning' : 'Ochtend', id + 'Dienst') + knop('A', opts.dienst, en ? 'Evening' : 'Avond', id + 'Dienst') +
+      '<span style="flex:1;"></span>' +
+      (a.rec.length ? '<button type="button" onclick="' + id + 'Csv()" style="padding:5px 11px;border:1px solid #c8d7e8;background:#fff;color:#003366;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">&#x2B07;&#xFE0F; ' + (en ? 'Export (Excel/CSV)' : 'Exporteer (Excel/CSV)') + '</button>' : '') +
+      '</div>';
+    if (!a.rec.length) {
+      el.innerHTML = h + '<div style="color:#8795a8;font-size:13px;padding:18px;text-align:center;">' + (en ? 'No shifts with both staffing (Day planning) and units (Punctuality) for ' : 'Geen diensten met zowel bezetting (Dagplanning) als units (Punctuality) voor ') + periodeTxt + '.</div>';
+      return;
+    }
+    // Kerncijfers
+    var dUnits = (m.units !== null && z.units !== null) ? m.units - z.units : null;
+    var exUrenPerDienst = m.n ? m.exUren / m.n : null;
+    var kostenPerDienst = (tar.extra !== null && exUrenPerDienst !== null) ? exUrenPerDienst * tar.extra : null;
+    h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">' +
+      tegel(en ? 'Shifts analysed' : 'Diensten geanalyseerd', a.rec.length, (m.n) + (en ? ' with extra · ' : ' met Extra · ') + (z.n) + (en ? ' without' : ' zonder')) +
+      tegel(en ? 'Units per man-hour' : 'Units per manuur', fmt(a.alle.upm, 2), (en ? 'with extra ' : 'met Extra ') + fmt(m.upm, 2) + ' · ' + (en ? 'without ' : 'zonder ') + fmt(z.upm, 2)) +
+      tegel(en ? 'Extra hours' : 'Extra uren', fmt(a.alle.exUren, 1), tar.extra !== null ? ('€ ' + fmt(a.alle.exUren * tar.extra, 0) + (en ? ' at €' : ' à €') + fmt(tar.extra, 2) + (en ? '/h' : '/u')) : (en ? 'set a rate via ⚙️' : 'stel een tarief in via ⚙️')) +
+      tegel(en ? 'Extra units per extra shift' : 'Meer units bij Extra', dUnits === null ? '—' : (dUnits > 0 ? '+' : '') + fmt(dUnits, 1), (kostenPerDienst !== null && dUnits > 0) ? ('≈ € ' + fmt(kostenPerDienst / dUnits, 2) + (en ? ' per extra unit' : ' per extra unit')) : (en ? 'average per shift' : 'gemiddeld per dienst')) +
+      '</div>';
+    // Vergelijking met/zonder Extra
+    var kol = [
+      { t: en ? 'Shifts' : 'Diensten', f: function(g){ return g.n; } },
+      { t: en ? 'Avg staff' : 'Gem. personeel', f: function(g){ return fmt(g.koppen, 1); } },
+      { t: en ? 'Avg man-hours' : 'Gem. manuren', f: function(g){ return fmt(g.uren, 1); } },
+      { t: en ? 'Avg units' : 'Gem. units', f: function(g){ return fmt(g.units, 0); } },
+      { t: en ? 'Units / man-hour' : 'Units / manuur', f: function(g){ return fmt(g.upm, 2); } },
+      { t: en ? 'Handling (min)' : 'Handling (min)', f: function(g){ return fmt(g.handling, 0) + (g.n ? ' <span style="color:#8795a8;font-size:10.5px;">(' + g.nHandling + ')</span>' : ''); } },
+      { t: en ? 'Departure on time' : 'Vertrek op tijd', f: function(g){ return g.opTijd === null ? '—' : fmt(g.opTijd * 100, 0) + '% <span style="color:#8795a8;font-size:10.5px;">(' + g.nOpTijd + ')</span>'; } },
+      { t: en ? 'Left behind / shift' : 'Achtergelaten / dienst', f: function(g){ return g.shutout === null ? '—' : fmt(g.shutout, 1) + ' <span style="color:#8795a8;font-size:10.5px;">(' + g.nShut + ')</span>'; } }
+    ];
+    var verschilRij = { naam: en ? 'Difference' : 'Verschil', g: null };
+    h += '<div style="font-weight:700;color:#003366;font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin:6px 0;">' + (en ? 'With vs without extra (overtime)' : 'Met vs zonder Extra (overwerk)') + '</div>' +
+      '<div style="overflow-x:auto;">' + vergelijkTabel([{ naam: '<span style="color:' + KL.met + ';">&#9670;</span> ' + (en ? 'With extra' : 'Met Extra'), g: m }, { naam: '<span style="color:' + KL.zonder + ';">&#9679;</span> ' + (en ? 'Without extra' : 'Zonder Extra'), g: z }], kol, en) + '</div>' +
+      '<div style="font-size:12px;color:#1a2a4a;margin:6px 2px 14px;line-height:1.6;">' + (en ? 'Difference with extra: ' : 'Verschil met Extra: ') +
+        verschil(m.units, z.units, 1, ' units') + ' · ' + verschil(m.upm, z.upm, 2, en ? ' units/man-hour' : ' units/manuur') + ' · ' +
+        (en ? 'handling ' : 'handling ') + verschil(m.handling, z.handling, 0, ' min', true) + ' · ' +
+        (en ? 'on time ' : 'op tijd ') + verschil(m.opTijd === null ? null : m.opTijd * 100, z.opTijd === null ? null : z.opTijd * 100, 0, '%') + ' · ' +
+        (en ? 'left behind ' : 'achtergelaten ') + verschil(m.shutout, z.shutout, 1, '', true) + '</div>';
+    // Bezetting t.o.v. standaard
+    if (a.onder.n + a.op.n + a.boven.n > 0) {
+      h += '<div style="font-weight:700;color:#003366;font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin:6px 0;">' + (en ? 'Staffing vs standard staffing' : 'Bezetting t.o.v. standaardbezetting') + '</div>' +
+        '<div style="overflow-x:auto;">' + vergelijkTabel([
+          { naam: en ? 'Below standard' : 'Onder standaard', g: a.onder }, { naam: en ? 'At standard' : 'Op standaard', g: a.op }, { naam: en ? 'Above standard' : 'Boven standaard', g: a.boven }
+        ], kol, en) + '</div><div style="height:14px;"></div>';
+    }
+    // Spreidingsdiagram
+    h += '<div style="font-weight:700;color:#003366;font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin:6px 0;">' + (en ? 'Man-hours vs units per shift' : 'Manuren vs units per dienst') + '</div>' + spreiding(a.rec, en);
+    // Detail
+    var inp = 'width:52px;padding:3px 5px;border:1px solid #c8d7e8;border-radius:5px;font-size:12px;text-align:center;';
+    h += '<details style="margin-top:14px;"><summary style="cursor:pointer;font-weight:700;color:#003366;font-size:12.5px;">' + (en ? 'Show all shifts (' : 'Alle diensten tonen (') + a.rec.length + ')</summary><div style="overflow-x:auto;margin-top:8px;">' +
+      '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:820px;"><thead><tr style="background:#003366;color:#fff;">' +
+      [en ? 'Date' : 'Datum', en ? 'Shift' : 'Dienst', en ? 'Staff' : 'Pers.', 'Extra', 'Std', en ? 'Man-h' : 'Manuren', 'Units', en ? 'Units/mh' : 'Units/mu', 'Handling', en ? 'Departure' : 'Vertrek', en ? 'Left behind' : 'Achtergel.'].map(function(t){ return '<th style="padding:6px 8px;text-align:center;">' + t + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      a.rec.map(function(r, i){
+        var bg = i % 2 ? '#f4f7fb' : '#fff';
+        var so = opts.bewerkbaar ? r.routeIdx.map(function(ri){ var v = ((a.cfg.shutout[r.datum] || {})[ri + 1] || {}).achter; return '<input style="' + inp + '" title="' + esc(src.routes[ri]) + '" value="' + (v == null ? '' : esc(v)) + '" placeholder="' + esc(src.routes[ri].split(' ')[0].slice(0, 3)) + '" onchange="' + id + 'Shutout(\'' + r.datum + '\',' + (ri + 1) + ',this.value)">'; }).join(' ') : (r.shutout === null ? '—' : r.shutout);
+        return '<tr style="background:' + bg + ';"><td style="padding:5px 8px;font-weight:600;color:#003366;white-space:nowrap;">' + r.dag + ' ' + r.datum + '</td>' +
+          '<td style="text-align:center;">' + (r.dienst === 'O' ? (en ? 'Morning' : 'Ochtend') : (en ? 'Evening' : 'Avond')) + '</td>' +
+          '<td style="text-align:center;font-weight:700;">' + r.koppen + '</td><td style="text-align:center;color:' + KL.met + ';font-weight:700;">' + (r.extra || '') + '</td>' +
+          '<td style="text-align:center;color:#5a7090;">' + (r.std === null ? '—' : r.std) + '</td><td style="text-align:center;">' + fmt(r.uren, 1) + (r.geschat ? '*' : '') + '</td>' +
+          '<td style="text-align:center;font-weight:700;">' + r.units + '</td><td style="text-align:center;">' + fmt(r.upm, 2) + '</td>' +
+          '<td style="text-align:center;">' + (r.handling === null ? '—' : fmt(r.handling, 0) + ' min') + '</td>' +
+          '<td style="text-align:center;color:' + (r.opTijd === null ? '#8795a8' : (r.opTijd ? '#1a7a40' : '#c0392b')) + ';font-weight:600;">' + (r.vertrekAfw === null ? '—' : (r.vertrekAfw > 0 ? '+' : '') + fmt(r.vertrekAfw, 0) + ' min') + '</td>' +
+          '<td style="text-align:center;white-space:nowrap;">' + so + '</td></tr>';
+      }).join('') + '</tbody></table></div></details>';
+    // Toelichting
+    h += '<div style="font-size:11px;color:#8795a8;margin-top:12px;line-height:1.55;">' +
+      (en ? '<b>How it is calculated:</b> staffing = everyone with a position in the Day planning for that shift; "Extra" = staff type EX (overtime). Units = unloaded + loaded of the routes linked to the shift (' : '<b>Zo wordt gerekend:</b> bezetting = iedereen met een positie in de Dagplanning voor die dienst; "Extra" = medewerkertype EX (overwerk). Units = gelost + geladen van de routes die bij de dienst horen (') +
+      src.routes.map(function(r, i){ return esc(r) + ' → ' + (a.cfg.dienst[i] === 'O' ? (en ? 'morning' : 'ochtend') : (a.cfg.dienst[i] === 'A' ? (en ? 'evening' : 'avond') : (en ? 'not counted' : 'niet meegeteld'))); }).join(', ') +
+      (en ? '). Handling = ramp down → loading complete. On time = departure within norm + margin. ' : '). Handling = klep neer → laden compleet. Op tijd = vertrek binnen norm + marge. ') +
+      (a.geschat ? (en ? '* No hours filled in: estimated at 8 h per person. ' : '* Geen uren ingevuld: geschat op 8 u per persoon. ') : '') +
+      (a.overgeslagen ? (en ? a.overgeslagen + ' shift(s) skipped because staffing or units were missing. ' : a.overgeslagen + ' dienst(en) overgeslagen omdat bezetting of units ontbrak. ') : '') +
+      (en ? 'Busy days often get more staff, so compare per route and weekday before drawing conclusions.' : 'Drukke dagen krijgen vaak meer mensen: vergelijk per route en weekdag voordat je conclusies trekt.') + '</div>';
+    el.innerHTML = h;
+    // Hover op het spreidingsdiagram
+    var svg = el.querySelector('.ow-svg'), tip = el.querySelector('.ow-tip');
+    if (svg && tip) {
+      Array.prototype.forEach.call(svg.querySelectorAll('.ow-pt'), function(p){
+        p.addEventListener('mouseenter', function(){ tip.textContent = p.getAttribute('data-tip'); tip.style.display = 'block'; });
+        p.addEventListener('mousemove', function(ev){ var bx = tip.parentNode.getBoundingClientRect(); tip.style.left = Math.min(ev.clientX - bx.left + 12, bx.width - 270) + 'px'; tip.style.top = (ev.clientY - bx.top + 12) + 'px'; });
+        p.addEventListener('mouseleave', function(){ tip.style.display = 'none'; });
+      });
+    }
+  }
+
+  function download(naam, tekst){
+    var blob = new Blob(['﻿' + tekst], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = naam;
+    document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+
+  return { analyse: analyse, render: render, csv: csv, download: download, config: config, num: num, esc: esc };
+})();
+
+// ── Overwerk & productiviteit: koppeling met de hoofdapp ──
+var _owPeriode = 'maand', _owDienst = 'alle', _owJaar = new Date().getFullYear(), _owMaand = new Date().getMonth();
+function owEn(){ return (sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM'; }
+function owKey(){ return tk('kpi_overwerk_v1'); }
+function owRoutes(){ return owEn() ? ['To Hoek van Holland','To Europoort'] : ['Harwich Ochtend','Harwich Middag','Immingham']; }
+function owLeesJson(k, def){ try { var v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? def : v; } catch(e){ return def; } }
+function owRuw(){ return owLeesJson(owKey(), null); }
+function owCfg(){ return OW.config(owRuw(), owRoutes()); }
+function owCfgOpslaan(c){ localStorage.setItem(owKey(), JSON.stringify(c)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }
+function owDagplans(){
+  var res = {}, pfx = getTerminalPrefix() + 'dagplan_';
+  for (var i = 0; i < localStorage.length; i++) {
+    var k = localStorage.key(i); if (!k || k.indexOf(pfx) !== 0) continue;
+    var v = owLeesJson(k, null); if (v) res[k.slice(pfx.length)] = v;
+  }
+  var st = owLeesJson(tk('dagPlanning_v2_state'), null);
+  if (st && st.planDate && ((st.ochEmps || []).length || (st.avondEmps || []).length)) {
+    var ex = res[st.planDate];
+    if (!ex || !(ex.ochEmps || []).length || (st.ochEmps || []).length > (ex.ochEmps || []).length) res[st.planDate] = st;
+  }
+  var dates = owLeesJson('dagPlanning_dates_v1', {});
+  Object.keys(dates || {}).forEach(function(d){ var x = dates[d], ex = res[d]; if (x && (!ex || (!(ex.ochEmps || []).length && !(ex.avondEmps || []).length)) && ((x.ochEmps || []).length || (x.avondEmps || []).length)) res[d] = x; });
+  return res;
+}
+function owBron(){
+  return { routes: owRoutes(), vs: owLeesJson(tk('vs_data_v1'), {}), dagplans: owDagplans(), normen: owLeesJson('kpi_normen_v1', {}) || {},
+    std: owLeesJson(tk('std_bezetting_v1'), null) || owLeesJson('std_bezetting_v1', {}) || {}, cfg: owRuw(), jaar: _owJaar, maand: _owMaand };
+}
+function owRenderKpi(jaar, maand){
+  if (jaar !== undefined) { _owJaar = jaar; _owMaand = maand; }
+  var el = document.getElementById('ow-body'); if (!el) return;
+  try { OW.render(el, owBron(), { en: owEn(), periode: _owPeriode, dienst: _owDienst, bewerkbaar: true, id: 'ow' }); }
+  catch(e) { el.innerHTML = '<div style="color:#c0392b;font-size:12px;">Overwerk-analyse kon niet worden berekend: ' + OW.esc(e.message) + '</div>'; }
+}
+function owPeriode(p){ _owPeriode = p; owRenderKpi(); }
+function owDienst(d){ _owDienst = d; owRenderKpi(); }
+function owCsv(){ var a = OW.analyse(owBron(), _owPeriode, _owDienst); OW.download('overwerk-productiviteit_' + (sessionStorage.getItem('dj_terminal') || 'EP') + '_' + _owJaar + '-' + String(_owMaand + 1).padStart(2, '0') + '.csv', OW.csv(a.rec, owEn())); }
+function owShutout(datum, n, waarde, reden){
+  var c = owCfg(); c.shutout[datum] = c.shutout[datum] || {};
+  var oud = c.shutout[datum][n] || {};
+  var v = OW.num(waarde);
+  c.shutout[datum][n] = { achter: v === null ? '' : v, reden: reden !== undefined ? String(reden) : (oud.reden || '') };
+  if (c.shutout[datum][n].achter === '' && !c.shutout[datum][n].reden) delete c.shutout[datum][n];
+  if (!Object.keys(c.shutout[datum]).length) delete c.shutout[datum];
+  owCfgOpslaan(c);
+}
+function owInstellingen(){
+  var en = owEn(), c = owCfg(), routes = owRoutes();
+  var oud = document.getElementById('ow-instel'); if (oud) oud.remove();
+  var inp = 'width:100%;box-sizing:border-box;padding:7px 8px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;';
+  var num = function(v){ return v === null || v === undefined ? '' : String(v).replace('.', ','); };
+  var o = document.createElement('div'); o.id = 'ow-instel';
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(0,20,40,.45);z-index:100002;display:flex;align-items:center;justify-content:center;padding:16px;';
+  o.innerHTML = '<div style="background:#fff;border-radius:12px;width:480px;max-width:100%;max-height:90vh;overflow:auto;padding:18px;box-shadow:0 16px 40px rgba(0,0,0,.35);">' +
+    '<div style="font-weight:800;font-size:15px;color:var(--navy);margin-bottom:12px;">&#x2699;&#xFE0F; ' + (en ? 'Overtime & productivity settings' : 'Instellingen overwerk & productiviteit') + '</div>' +
+    '<div style="font-weight:700;color:var(--navy);margin-bottom:6px;">' + (en ? 'Hourly rates (for cost calculation)' : 'Uurtarieven (voor de kostenberekening)') + '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
+    '<label style="font-size:12px;color:#5a7090;">' + (en ? 'Overtime / Extra (€/h)' : 'Overwerk / Extra (€/u)') + '<input id="ow-i-extra" style="' + inp + '" value="' + num(c.tarieven.extra) + '" placeholder="bijv. 45,00" inputmode="decimal"></label>' +
+    '<label style="font-size:12px;color:#5a7090;">' + (en ? 'Agency staff (€/h)' : 'Inhuur (€/u)') + '<input id="ow-i-inhuur" style="' + inp + '" value="' + num(c.tarieven.inhuur) + '" placeholder="optioneel" inputmode="decimal"></label></div>' +
+    '<div style="font-weight:700;color:var(--navy);margin:14px 0 6px;">' + (en ? 'Which shift handles which sailing?' : 'Welke dienst behandelt welke afvaart?') + '</div>' +
+    routes.map(function(r, i){ return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><span style="flex:1;font-size:13px;">' + OW.esc(r) + '</span><select data-ow-route="' + i + '" style="padding:6px 8px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;">' +
+      [['O', en ? 'Morning' : 'Ochtend'], ['A', en ? 'Evening' : 'Avond'], ['-', en ? 'Do not count' : 'Niet meetellen']].map(function(p){ return '<option value="' + p[0] + '"' + (c.dienst[i] === p[0] ? ' selected' : '') + '>' + p[1] + '</option>'; }).join('') + '</select></div>'; }).join('') +
+    '<div style="color:#8795a8;font-size:11px;margin-top:8px;">' + (en ? 'These settings sync to the cloud, so the MT dashboard calculates the same way.' : 'Deze instellingen gaan mee in de cloud-sync, zodat het MT-dashboard hetzelfde rekent.') + '</div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">' +
+    '<button type="button" onclick="document.getElementById(\'ow-instel\').remove()" style="background:#fff;border:1px solid #c8d7e8;color:var(--navy);border-radius:6px;padding:8px 14px;cursor:pointer;font-weight:700;">' + (en ? 'Cancel' : 'Annuleren') + '</button>' +
+    '<button type="button" onclick="owInstellingenOpslaan()" style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-weight:700;">' + (en ? 'Save' : 'Opslaan') + '</button></div></div>';
+  o.addEventListener('click', function(e){ if (e.target === o) o.remove(); });
+  document.body.appendChild(o);
+}
+function owInstellingenOpslaan(){
+  var c = owCfg();
+  c.tarieven.extra = OW.num(document.getElementById('ow-i-extra').value);
+  c.tarieven.inhuur = OW.num(document.getElementById('ow-i-inhuur').value);
+  Array.prototype.forEach.call(document.querySelectorAll('#ow-instel [data-ow-route]'), function(s){ c.dienst[s.getAttribute('data-ow-route')] = s.value; });
+  owCfgOpslaan(c);
+  document.getElementById('ow-instel').remove();
+  owRenderKpi(); owShutoutVul(true);
+}
+// ── Punctuality: achtergelaten units per afvaart (los van de gewone Opslaan-knop, slaat direct op) ──
+var _owShutoutSleutel = null;
+function owShutoutVul(forceer){
+  var box = document.getElementById('ow-shutout-body'); if (!box) return;
+  var dEl = document.getElementById('vs-datum'), iso = dEl ? dEl.value : '';
+  var sleutel = iso + '|' + (sessionStorage.getItem('dj_terminal') || 'EP') + '|' + (window._vsLocked ? 1 : 0);
+  if (!forceer && sleutel === _owShutoutSleutel) return;
+  if (!forceer && box.contains(document.activeElement)) return; // niet verversen terwijl iemand typt
+  _owShutoutSleutel = sleutel;
+  var en = owEn(), routes = owRoutes();
+  if (!iso) { box.innerHTML = '<div style="color:#8795a8;font-size:12px;">' + (en ? 'Choose a date first.' : 'Kies eerst een datum.') + '</div>'; return; }
+  var p = iso.split('-'), datum = p[2] + '/' + p[1] + '/' + p[0], c = owCfg(), dag = c.shutout[datum] || {};
+  var dis = window._vsLocked ? ' disabled' : '';
+  var inp = 'padding:7px 8px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;box-sizing:border-box;';
+  box.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr>' +
+    '<th style="text-align:left;font-size:10.5px;color:#5a6b80;text-transform:uppercase;padding:4px 6px;">Route</th>' +
+    '<th style="text-align:left;font-size:10.5px;color:#5a6b80;text-transform:uppercase;padding:4px 6px;width:120px;">' + (en ? 'Units left behind' : 'Achtergelaten units') + '</th>' +
+    '<th style="text-align:left;font-size:10.5px;color:#5a6b80;text-transform:uppercase;padding:4px 6px;">' + (en ? 'Reason (optional)' : 'Reden (optioneel)') + '</th></tr></thead><tbody>' +
+    routes.map(function(r, i){ var v = dag[i + 1] || {};
+      return '<tr><td style="padding:5px 6px;font-weight:700;color:var(--navy);">' + OW.esc(r) + '</td>' +
+        '<td style="padding:5px 6px;"><input type="number" min="0" inputmode="numeric" placeholder="0" style="' + inp + 'width:100px;" value="' + (v.achter === undefined ? '' : OW.esc(v.achter)) + '"' + dis + ' onchange="owShutout(\'' + datum + '\',' + (i + 1) + ',this.value)"></td>' +
+        '<td style="padding:5px 6px;"><input type="text" placeholder="' + (en ? 'e.g. ship full, not enough staff' : 'bijv. schip vol, te weinig personeel') + '" style="' + inp + 'width:100%;" value="' + OW.esc(v.reden || '') + '"' + dis + ' onchange="owShutout(\'' + datum + '\',' + (i + 1) + ',this.closest(\'tr\').querySelector(\'input[type=number]\').value,this.value)"></td></tr>'; }).join('') +
+    '</tbody></table><div style="color:#8795a8;font-size:11px;margin-top:6px;">' + (en ? 'Saved immediately. Used in KPI Dashboard → Overtime & productivity.' : 'Wordt direct opgeslagen. Wordt gebruikt in KPI Dashboard → Overwerk & productiviteit.') + '</div>';
+}
+setInterval(function(){ try { owShutoutVul(false); } catch(e){} }, 1000);
+['owRenderKpi','owPeriode','owDienst','owCsv','owShutout','owInstellingen','owInstellingenOpslaan','owShutoutVul','owKey']
+  .forEach(function(n){ try { window[n] = eval(n); } catch(e){} });
+window.OW = OW;
+
 
 // ===== TOOLBOX (Werkoverdracht) =====
 // Toolbox-documenten (PDF) per terminal. Metadata (naam/datum) staat in localStorage
