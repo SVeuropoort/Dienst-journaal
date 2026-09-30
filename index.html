@@ -4554,6 +4554,7 @@ function djHerstelVaarschema(){
                 <button id="pd-cat-btn-groep" onclick="pdToonCategorie('groep')" style="flex:1;padding:6px 4px;border:1px solid #ccd6e5;border-radius:6px;background:#eef3fa;color:var(--navy);font-size:11px;font-weight:700;cursor:pointer;">Groepen</button>
                 <button id="pd-cat-btn-uit_dienst" onclick="pdToonCategorie('uit_dienst')" style="flex:1;padding:6px 4px;border:1px solid #ccd6e5;border-radius:6px;background:#eef3fa;color:var(--navy);font-size:11px;font-weight:700;cursor:pointer;">Uit dienst</button>
               </div>
+              <div style="font-size:10.5px;color:var(--muted);margin:0 2px 5px;">&#x1F912; = ziekmeldingen afgelopen 12 maanden &nbsp;·&nbsp; getal rechts = registraties in het dossier</div>
               <div id="pd-medewerkers-lijst" style="max-height:520px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;"></div>
             </div>
             <div style="flex:1;min-width:300px;">
@@ -18040,6 +18041,8 @@ function ziekmSave(lijst){
   if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
   // Ook de momentopname in de overdracht van de gekozen dag bijwerken.
   if (typeof woAutoOpslaanPlan === 'function') woAutoOpslaanPlan();
+  // Aantal ziekmeldingen achter de namen in het Personeelsdossier bijwerken
+  try { if (typeof pdRenderLijst === 'function' && document.getElementById('pd-medewerkers-lijst')) pdRenderLijst(); } catch(e) {}
 }
 function ziekmVandaagIso(){ var d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function ziekmDatum(){ var el = document.getElementById('f-datum'); return (el && el.value) || ziekmVandaagIso(); }
@@ -27537,10 +27540,27 @@ function pdVerwijderDefinitief(naam){
   pdRenderLijst();
 }
 
+// ── Aantal ziekmeldingen per medewerker in de afgelopen 12 maanden (uit Werkoverdracht → Ziekmeldingen) ──
+function pdZiekNorm(n){ return String(n || '').replace(/ \([^)]+\)$/, '').toLowerCase().replace(/[\s.]+/g, ''); }
+function pdZiekTelling(){
+  var grens = new Date(); grens.setFullYear(grens.getFullYear() - 1);
+  var g = grens.getFullYear() + '-' + String(grens.getMonth() + 1).padStart(2, '0') + '-' + String(grens.getDate()).padStart(2, '0');
+  var lijst = (typeof ziekmGet === 'function') ? ziekmGet() : [];
+  var tel = {};
+  lijst.forEach(function(z){ if (!z || !z.naam || !z.gemeldOp || z.gemeldOp < g) return; var k = pdZiekNorm(z.naam); tel[k] = (tel[k] || 0) + 1; });
+  return tel;
+}
+function pdZiekBadge(tel, naam, actief){
+  var n = tel[pdZiekNorm(naam)] || 0;
+  var kleur = actief ? (n ? '#ffd2a8' : '#9fb6cf') : (n >= 3 ? '#c0392b' : (n ? '#b06f00' : '#b8c4d2'));
+  var rand = actief ? 'rgba(255,255,255,.35)' : (n >= 3 ? '#f5b7b1' : (n ? '#f3d19e' : '#e3e9f1'));
+  return '<span title="' + n + ' ziekmelding' + (n === 1 ? '' : 'en') + ' in de afgelopen 12 maanden" style="font-size:10.5px;font-weight:700;color:' + kleur + ';border:1px solid ' + rand + ';border-radius:10px;padding:1px 7px;white-space:nowrap;">&#x1F912; ' + n + '</span>';
+}
 function pdRenderLijst(){
   var el = document.getElementById('pd-medewerkers-lijst');
   if (!el) return;
   var data = pdData();
+  var _ziekTel = pdZiekTelling();
 
   if (_pdCategorie === 'groep' && !_pdGroepGeselecteerd) {
     // Niveau 1: overzicht van de groepen zelf
@@ -27570,6 +27590,7 @@ function pdRenderLijst(){
       return '<div onclick="pdSelecteer(\'' + naam.replace(/'/g, "\\'") + '\')" style="padding:9px 14px;cursor:pointer;border-bottom:1px solid #f0f2f5;font-size:13px;display:flex;justify-content:space-between;align-items:center;' + (actief ? 'background:var(--navy);color:#fff;font-weight:700;' : 'background:#fff;color:' + (isContainer?'#999;font-style:italic;':'#333;')) + '">' +
         '<span>' + pdEsc(label) + '</span>' +
         '<span style="display:flex;align-items:center;gap:10px;flex-shrink:0;">' +
+        (isContainer ? '' : pdZiekBadge(_ziekTel, naam, actief)) +
         '<span style="font-size:11px;' + (actief ? 'color:#cfe0f2;' : 'color:var(--muted);') + '">' + (data[naam]||[]).length + '</span>' +
         (isContainer ? '' : '<button onclick="event.stopPropagation();pdVerwijderGroepslid(\'' + naam.replace(/'/g, "\\'") + '\')" title="Deze persoon volledig verwijderen uit ' + pdEsc(groep) + '" style="background:none;border:none;color:' + (actief ? '#ffb3ab' : '#c0392b') + ';cursor:pointer;font-size:14px;padding:0;line-height:1;">&#x2715;</button>') +
         '</span>' +
@@ -27593,6 +27614,7 @@ function pdRenderLijst(){
     return '<div onclick="pdSelecteer(\'' + naam.replace(/'/g, "\\'") + '\')" style="padding:9px 14px;cursor:pointer;border-bottom:1px solid #f0f2f5;font-size:13px;display:flex;justify-content:space-between;align-items:center;' + (actief ? 'background:var(--navy);color:#fff;font-weight:700;' : 'background:#fff;' + (uitDienst?'color:#999;font-style:italic;':'color:#333;')) + '">' +
       '<span>' + pdEsc(naam) + '</span>' +
       '<span style="display:flex;align-items:center;gap:10px;flex-shrink:0;">' +
+      pdZiekBadge(_ziekTel, naam, actief) +
       '<span style="font-size:11px;' + (actief ? 'color:#cfe0f2;' : 'color:var(--muted);') + '">' + (data[naam]||[]).length + '</span>' +
       (uitDienst ? '<button onclick="event.stopPropagation();pdVerwijderDefinitief(\'' + naam.replace(/'/g, "\\'") + '\')" title="Definitief verwijderen uit het hele systeem" style="background:none;border:none;color:#c0392b;cursor:pointer;font-size:14px;padding:0;line-height:1;">&#x2715;</button>' : '') +
       '</span>' +
