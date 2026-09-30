@@ -6704,7 +6704,8 @@ window.addEventListener('resize', () => {
         _djLivePollLaatsteWijziging = gewijzigd;
         return;
       }
-      if (!djKanVeiligHerladen()) return; // iemand is net aan het typen — volgende ronde opnieuw
+      if (dpActief && !djKanVeiligHerladen()) return; // iemand is net aan het typen — volgende ronde opnieuw
+      // (Punctuality: het veld waarin iemand staat wordt bij het bijwerken overgeslagen, dus hier geen wachtrij nodig)
       // Vlak vóór het (mogelijk trage) ophalen nogmaals checken: een eigen wijziging kan er in de
       // tussentijd bij zijn gekomen. Bewust _djLivePollLaatsteWijziging nog NIET bijwerken hier —
       // zo ziet de volgende ronde deze update alsnog als "nieuw" en probeert hij opnieuw zodra de
@@ -19519,14 +19520,25 @@ function wisselPunctualityDatum(dateStr) {
     window.addEventListener('pagehide', function(){ if (window._vsAutoTimer) { clearTimeout(window._vsAutoTimer); opslaan(); } });
     // Live-verversing: nieuwe data van een collega in het scherm zetten zonder te herladen
     window.djPunctualityHerlaadInPlace = function(){
+      // Zet de nieuwste (cloud)waarden van de gekozen dag in de velden, zonder te herladen en
+      // zonder het veld waarin iemand nu staat aan te raken. Werkt dus ook als je ergens hebt geklikt.
       var d = document.getElementById('vs-datum');
-      if (!d || !d.value || window._vsAutoTimer) return;
-      var act = document.activeElement;
-      if (act && act.closest && act.closest('#view-punctuality') && (act.tagName === 'INPUT' || act.tagName === 'TEXTAREA') && act.id !== 'vs-datum') return;
-      var slotWas = window._vsLocked;
-      if (typeof window.wisselPunctualityDatum === 'function') window.wisselPunctualityDatum(d.value);
-      // Het slotje laten zoals de gebruiker het had (het herladen zet het anders terug op de standaard)
-      setTimeout(function(){ if (window._vsLocked !== slotWas && typeof toggleVsLock === 'function') toggleVsLock(); }, 120);
+      if (!d || !d.value || window._vsAutoTimer) return false;
+      var p = d.value.split('-'), dag = p[2] + '/' + p[1] + '/' + p[0], e = null;
+      try { e = (JSON.parse(localStorage.getItem(tk('vs_data_v1')) || '{}') || {})[dag] || null; } catch(x) {}
+      if (!e) return false;
+      var act = document.activeElement, gewijzigd = 0;
+      var zet = function(el, w){ if (!el || el === act) return; w = w == null ? '' : String(w); if (el.value !== w) { el.value = w; gewijzigd++; el.style.transition = 'background .6s'; el.style.background = '#fff3b0'; setTimeout(function(){ el.style.background = ''; }, 1200); } };
+      var rows = document.querySelectorAll('#view-punctuality .tijden-table tbody tr');
+      Array.prototype.forEach.call(rows, function(tr, ri){
+        var t = ((e.tijden || [])[ri] || {}).tijden || [];
+        Array.prototype.forEach.call(tr.querySelectorAll('input'), function(inp, ci){ zet(inp, t[ci]); });
+      });
+      Object.keys(e.units || {}).forEach(function(k){ zet(document.querySelector('#view-punctuality [id="u-' + k + '"]'), e.units[k]); });
+      if (e.sjor) Object.keys(e.sjor).forEach(function(k){ zet(document.getElementById('sjor-' + k), e.sjor[k]); });
+      if (gewijzigd && typeof berekenUnitsTotalen === 'function') berekenUnitsTotalen();
+      if (gewijzigd && typeof updateVaarschemaLabel === 'function') updateVaarschemaLabel(e.opgeslagenOp);
+      return gewijzigd > 0;
     };
   })();
 
