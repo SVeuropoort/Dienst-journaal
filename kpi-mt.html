@@ -879,7 +879,7 @@ function mtRenderKpi(){
       var bg = ri%2===0 ? 'var(--surface)' : 'var(--surface2)';
       return '<tr><td style="padding:8px 10px;font-weight:600;color:var(--navy);background:var(--surface2);border:1px solid var(--border);white-space:nowrap;">'+route+'</td>'+sums.map(function(s,i){
         var avg = cnts[i]>0 ? mt_m2t(s/cnts[i]) : '&#x2014;';
-        var sub = cnts[i]>0 ? '<br><small style="color:var(--muted);font-weight:400;">n='+cnts[i]+'</small>' : '';
+        var sub = cnts[i]>0 ? '<br><small style="color:var(--muted);font-weight:400;">'+cnts[i]+(isImm?(cnts[i]===1?' day':' days'):(cnts[i]===1?' dag':' dagen'))+'</small>' : '';
         var cb=bg, cc=cnts[i]>0?'var(--navy)':'var(--muted)', cbr='1px solid var(--border)';
         if (cnts[i]>0) { var nv=nm[route+'_'+i]; var _ev=KPINORM.gem(nv,entries,ri,i,s/cnts[i]); if (_ev) { if (_ev.duur!==undefined) sub+='<br><small style="color:var(--muted);font-weight:400;">'+Math.round(_ev.duur)+' min</small>'; if (true) { if (_ev.afw<=_ev.marge) { cb='#d4f5e2'; cc='#1a7a40'; cbr='2px solid #1a7a40'; } else { cb='#fde8e8'; cc='#c0392b'; cbr='2px solid #c0392b'; } } } }
         return '<td style="text-align:center;padding:7px 6px;border:'+cbr+';background:'+cb+';font-weight:'+(cnts[i]>0?'700':'400')+';color:'+cc+';">'+avg+sub+'</td>';
