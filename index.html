@@ -4418,6 +4418,7 @@ function djHerstelVaarschema(){
       <button id="nieuw-tab-btn-overdracht" onclick="nieuwToonTab('overdracht')" style="padding:9px 18px;border:none;border-radius:6px 6px 0 0;background:var(--navy);color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#x21C4; Overdracht</button>
       <button id="nieuw-tab-btn-personeelsdossier" onclick="nieuwToonTab('personeelsdossier')" style="padding:9px 18px;border:none;border-radius:6px 6px 0 0;background:#e8eef5;color:var(--navy);font-family:'Barlow Condensed',sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#x1F4C1; Personeelsdossier</button>
       <button id="nieuw-tab-btn-toolbox" onclick="nieuwToonTab('toolbox')" style="padding:9px 18px;border:none;border-radius:6px 6px 0 0;background:#e8eef5;color:var(--navy);font-family:'Barlow Condensed',sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#x1F9F0; Toolbox</button>
+      <button id="nieuw-tab-btn-abnormal" onclick="nieuwToonTab('abnormal')" style="padding:9px 18px;border:none;border-radius:6px 6px 0 0;background:#e8eef5;color:var(--navy);font-family:'Barlow Condensed',sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#x1F69B; Abnormal loads</button>
     </div>
 
     <div id="nieuw-tab-overdracht">
@@ -4564,6 +4565,55 @@ function djHerstelVaarschema(){
       </div>
     </div>
 
+    <div id="nieuw-tab-abnormal" style="display:none;">
+      <style>
+        .abn-tabel{width:100%;border-collapse:collapse;font-size:12.5px;}
+        .abn-tabel th{font-size:10.5px;color:#5a6b80;text-transform:uppercase;letter-spacing:.4px;padding:5px 8px;border-bottom:2px solid #dde4ee;}
+        .abn-tabel td{padding:6px 8px;border-bottom:1px solid #e3e9f1;vertical-align:middle;}
+        .abn-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 14px;}
+      </style>
+      <div class="card">
+        <div class="card-header">
+          <div class="icon">&#x1F69B;</div>
+          <h2>Abnormal loads declaration</h2>
+          <span style="flex:1"></span>
+          <button type="button" onclick="abnNieuw()" class="dp-dagknop" style="margin-right:6px;">&#x1F4C4; Nieuw</button>
+          <button type="button" onclick="abnInstellingen()" title="Schepen, ligplaatsen en waterhoogtes aanpassen" style="background:none;border:1px solid #c8d7e8;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:15px;">&#x2699;&#xFE0F;</button>
+        </div>
+        <div id="abn-uitslag" style="background:#f4f7fb;border-radius:10px;padding:12px 14px;margin-bottom:14px;"></div>
+        <div style="font-weight:700;color:var(--navy);font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Sailing requested</div>
+        <div class="abn-grid" style="margin-bottom:14px;">
+          <div class="field" style="grid-column:span 2;"><label>Referentie / omschrijving</label><input type="text" id="abn-ref" placeholder="bijv. klant, kenteken of lading" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
+          <div class="field"><label>Datum</label><input type="text" id="abn-datum" placeholder="dd/mm/jjjj" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
+          <div class="field"><label>Tijd / afvaart</label><input type="text" id="abn-tijd" placeholder="bijv. dagafvaart" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
+          <div class="field"><label>Schip</label><select id="abn-schip" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></select></div>
+          <div class="field"><label>Ligplaats</label><select id="abn-ligplaats" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></select></div>
+        </div>
+        <div style="font-weight:700;color:var(--navy);font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Lading + voertuig</div>
+        <div class="abn-grid">
+          <div class="field"><label>Totale lengte (m)</label><input type="text" id="abn-lengte" placeholder="0,00" inputmode="decimal" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
+          <div class="field"><label>Breedte (m)</label><input type="text" id="abn-breedte" placeholder="0,00" inputmode="decimal" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
+          <div class="field"><label>Hoogte (m)</label><input type="text" id="abn-hoogte" placeholder="0,00" inputmode="decimal" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
+          <div class="field"><label>Totaal gewicht (t)</label><input type="text" id="abn-gewicht" placeholder="lading + voertuig" inputmode="decimal" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
+          <div class="field"><label>Aantal assen</label><input type="text" id="abn-assen" placeholder="0" inputmode="decimal" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
+          <div class="field"><label>Asdruk (berekend)</label><div id="abn-asdruk" style="padding:8px 9px;border:1px dashed #c8d7e8;border-radius:6px;font-size:13px;font-weight:700;color:var(--navy);background:#f8fafc;">&mdash;</div></div>
+          <div class="field"><label>Asafstand (m)</label><input type="text" id="abn-afstand" placeholder="0,00" inputmode="decimal" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
+          <div class="field"><label>Bodemvrijheid (cm)</label><input type="text" id="abn-bodem" placeholder="0" inputmode="decimal" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
+          <div class="field"><label>Waterhoogte (m)</label><input type="text" id="abn-water" placeholder="0,00" inputmode="decimal" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
+        </div>
+        <div style="color:#8795a8;font-size:11px;margin-top:6px;">Waterhoogte: zie de getijden op het startscherm. Decimalen mogen met een komma.</div>
+        <div style="font-weight:700;color:var(--navy);font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin:16px 0 6px;">Controles</div>
+        <table class="abn-tabel" id="abn-controles"></table>
+        <div style="display:flex;justify-content:flex-end;margin-top:12px;">
+          <button type="button" class="btn-primary" onclick="abnOpslaanInLijst()">&#x1F4BE; Opslaan in lijst</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="icon">&#x1F4CB;</div><h2>Opgeslagen aanvragen</h2></div>
+        <div style="color:#8795a8;font-size:11px;margin:-4px 0 8px;">Het stoplicht wordt steeds opnieuw berekend met de huidige schip- en ligplaatsgegevens.</div>
+        <div id="abn-lijst"></div>
+      </div>
+    </div>
     <div id="nieuw-tab-toolbox" style="display:none;">
       <div class="card">
         <div class="card-header"><div class="icon">&#x1F9F0;</div><h2>Toolbox</h2></div>
@@ -6276,6 +6326,8 @@ window.addEventListener('resize', () => {
     'opleiding_overzicht_uitgesloten_v1',
     'werkoverdracht_toolbox_v1',
     'werkoverdracht_ziekmeldingen_v1',
+    'werkoverdracht_abnormal_config_v1',
+    'werkoverdracht_abnormal_lijst_v1',
     'std_bezetting_v1',
     'pd_groepen_extra_v1'
   ];
@@ -6514,6 +6566,8 @@ window.addEventListener('resize', () => {
     'dagPlanning_vasteCelteksten_v1',
     'werkoverdracht_toolbox_v1',
     'werkoverdracht_ziekmeldingen_v1',
+    'werkoverdracht_abnormal_config_v1',
+    'werkoverdracht_abnormal_lijst_v1',
     'std_bezetting_v1',
     'pd_groepen_extra_v1',
     'werkorder_bedrijven_v1',
@@ -25573,7 +25627,7 @@ function navWerkoverdracht(label, btn, subtab, callback) {
   }, 60);
 }
 function nieuwToonTab(tab){
-  var tabs = ['overdracht', 'personeelsdossier', 'toolbox'];
+  var tabs = ['overdracht', 'personeelsdossier', 'toolbox', 'abnormal'];
   tabs.forEach(function(t){
     var body = document.getElementById('nieuw-tab-' + t);
     var btn = document.getElementById('nieuw-tab-btn-' + t);
@@ -25582,8 +25636,221 @@ function nieuwToonTab(tab){
   });
   if (tab === 'personeelsdossier' && typeof pdInit === 'function') pdInit();
   if (tab === 'toolbox' && typeof toolboxRender === 'function') toolboxRender();
+  if (tab === 'abnormal' && typeof abnInit === 'function') abnInit();
   if (typeof djVertaalPaginaEngels === 'function') setTimeout(djVertaalPaginaEngels, 60);
 }
+
+// ═════════════════════════════════════════════════════════════════
+// ABNORMAL LOADS (Werkoverdracht-tabblad). Controle of afwijkende vracht mee kan met een schip,
+// naar het Excel-systeem "abnormal_loads_Europoort.xlsx":
+//   lengte ≤ max lengte ligplaats · breedte ≤ max breedte schip · hoogte ≤ max hoogte schip
+//   totaal gewicht ≤ max gewicht ligplaats · asdruk (gewicht / assen) < max asdruk schip
+//   bodemvrijheid ≥ min. bodemvrijheid schip · waterhoogte tussen min en max
+// Stoplicht: ROOD = minstens één controle "Nee"; ORANJE = nog niet alles ingevuld (of gegevens van
+// schip/ligplaats onbekend); GROEN = alles akkoord. Schepen, ligplaatsen en waterhoogtes zijn aan
+// te passen via het tandwiel. Instellingen + opgeslagen aanvragen worden per terminal gesynchroniseerd.
+// ═════════════════════════════════════════════════════════════════
+var ABN_STANDAARD = {
+  schepen: [
+    { naam: 'Fionia',     breedte: 6,    hoogte: 5.5,  asdruk: 15,   bodem: 25 },
+    { naam: 'Jutlandia',  breedte: 6,    hoogte: 5.5,  asdruk: 15,   bodem: 25 },
+    { naam: 'Forerunner', breedte: 6,    hoogte: 6.6,  asdruk: 15,   bodem: 25 },
+    { naam: 'Sommerset',  breedte: 6,    hoogte: 5,    asdruk: 15,   bodem: 25 },
+    { naam: 'Hollandica', breedte: null, hoogte: null, asdruk: null, bodem: null },
+    { naam: 'Britannica', breedte: null, hoogte: null, asdruk: null, bodem: null }
+  ],
+  ligplaatsen: [
+    { naam: 'Eur North', lengte: 36,   gewicht: 200 },
+    { naam: 'Eur South', lengte: 32,   gewicht: 200 },
+    { naam: 'HVH West',  lengte: null, gewicht: null },
+    { naam: 'HVH South', lengte: null, gewicht: null }
+  ],
+  waterMin: 0.75, waterMax: 2.25
+};
+var ABN_VELDEN = ['ref','datum','tijd','schip','ligplaats','lengte','breedte','hoogte','gewicht','assen','afstand','bodem','water'];
+function abnEn(){ return (sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM'; }
+function abnEsc(t){ return String(t == null ? '' : t).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function abnNum(v){ if (v === null || v === undefined) return null; var t = String(v).trim().replace(',', '.'); if (t === '' || t === '?') return null; var n = parseFloat(t); return isNaN(n) ? null : n; }
+function abnFmt(n, dec){ if (n === null || n === undefined || isNaN(n)) return '\u2014'; var r = Math.round(n * Math.pow(10, dec)) / Math.pow(10, dec); return String(r).replace('.', ','); }
+function abnConfigKey(){ return tk('werkoverdracht_abnormal_config_v1'); }
+function abnLijstKey(){ return tk('werkoverdracht_abnormal_lijst_v1'); }
+function abnConfig(){
+  try { var c = JSON.parse(localStorage.getItem(abnConfigKey()) || 'null'); if (c && Array.isArray(c.schepen) && Array.isArray(c.ligplaatsen)) return c; } catch(e){}
+  return JSON.parse(JSON.stringify(ABN_STANDAARD));
+}
+function abnConfigOpslaan(c){ localStorage.setItem(abnConfigKey(), JSON.stringify(c)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }
+function abnLijst(){ try { var l = JSON.parse(localStorage.getItem(abnLijstKey()) || '[]'); return Array.isArray(l) ? l : []; } catch(e){ return []; } }
+function abnLijstOpslaan(l){ localStorage.setItem(abnLijstKey(), JSON.stringify(l)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }
+function abnWaarden(){
+  var w = {};
+  ABN_VELDEN.forEach(function(v){ var el = document.getElementById('abn-' + v); w[v] = el ? el.value : ''; });
+  return w;
+}
+function abnZetWaarden(w){
+  ABN_VELDEN.forEach(function(v){ var el = document.getElementById('abn-' + v); if (el) el.value = (w && w[v] != null) ? w[v] : ''; });
+}
+// Alle controles uitrekenen. Per controle: status 'ok' | 'nee' | 'open' (ontbreekt).
+function abnBeoordeel(w, cfg){
+  var en = abnEn();
+  var schip = cfg.schepen.find(function(s){ return s.naam === w.schip; }) || null;
+  var lig = cfg.ligplaatsen.find(function(l){ return l.naam === w.ligplaats; }) || null;
+  var gewicht = abnNum(w.gewicht), assen = abnNum(w.assen);
+  var asdruk = (gewicht !== null && assen) ? gewicht / assen : null;
+  var regels = [];
+  function regel(naam, waarde, eenheid, limiet, limTekst, test, dec){
+    var st;
+    if (waarde === null) st = 'open';
+    else if (limiet === null || limiet === undefined) st = 'open';
+    else st = test(waarde, limiet) ? 'ok' : 'nee';
+    regels.push({ naam: naam, waarde: waarde === null ? '\u2014' : abnFmt(waarde, dec) + ' ' + eenheid,
+      limiet: (limiet === null || limiet === undefined) ? (en ? 'unknown' : 'onbekend') : limTekst + ' ' + abnFmt(limiet, dec) + ' ' + eenheid, st: st });
+  }
+  if (!schip) regels.push({ naam: en ? 'Vessel' : 'Schip', waarde: en ? 'not chosen' : 'niet gekozen', limiet: '', st: 'open' });
+  if (!lig) regels.push({ naam: en ? 'Berth' : 'Ligplaats', waarde: en ? 'not chosen' : 'niet gekozen', limiet: '', st: 'open' });
+  regel(en ? 'Length' : 'Lengte', abnNum(w.lengte), 'm', lig ? lig.lengte : null, 'max', function(a, b){ return a <= b; }, 2);
+  regel(en ? 'Width' : 'Breedte', abnNum(w.breedte), 'm', schip ? schip.breedte : null, 'max', function(a, b){ return a <= b; }, 2);
+  regel(en ? 'Height' : 'Hoogte', abnNum(w.hoogte), 'm', schip ? schip.hoogte : null, 'max', function(a, b){ return a <= b; }, 2);
+  regel(en ? 'Total weight' : 'Totaal gewicht', gewicht, 't', lig ? lig.gewicht : null, 'max', function(a, b){ return a <= b; }, 1);
+  regel(en ? 'Axle load' : 'Asdruk', asdruk, en ? 't/axle' : 't/as', schip ? schip.asdruk : null, en ? 'below' : 'onder', function(a, b){ return a < b; }, 2);
+  regel(en ? 'Ground clearance' : 'Bodemvrijheid', abnNum(w.bodem), 'cm', schip ? schip.bodem : null, 'min', function(a, b){ return a >= b; }, 0);
+  var water = abnNum(w.water);
+  regels.push({ naam: en ? 'Water height' : 'Waterhoogte', waarde: water === null ? '\u2014' : abnFmt(water, 2) + ' m',
+    limiet: abnFmt(cfg.waterMin, 2) + ' \u2013 ' + abnFmt(cfg.waterMax, 2) + ' m',
+    st: water === null ? 'open' : ((water >= cfg.waterMin && water <= cfg.waterMax) ? 'ok' : 'nee') });
+  var status = regels.some(function(r){ return r.st === 'nee'; }) ? 'rood' : (regels.some(function(r){ return r.st === 'open'; }) ? 'oranje' : 'groen');
+  return { regels: regels, status: status, asdruk: asdruk };
+}
+function abnStoplichtHtml(status, groot){
+  var d = groot ? 30 : 12;
+  var kleur = { rood: '#d93025', oranje: '#f29900', groen: '#1e8e3e' };
+  return '<span style="display:inline-flex;flex-direction:' + (groot ? 'column' : 'row') + ';gap:' + (groot ? 6 : 3) + 'px;background:#1b2530;padding:' + (groot ? '8px' : '3px') + ';border-radius:' + (groot ? 12 : 8) + 'px;vertical-align:middle;">' +
+    ['rood','oranje','groen'].map(function(k){ return '<span style="width:' + d + 'px;height:' + d + 'px;border-radius:50%;background:' + (k === status ? kleur[k] : '#3a4652') + ';' + (k === status ? 'box-shadow:0 0 ' + (groot ? 12 : 5) + 'px ' + kleur[k] + ';' : '') + '"></span>'; }).join('') + '</span>';
+}
+function abnVulKeuzes(){
+  var cfg = abnConfig(), en = abnEn();
+  [['abn-schip', cfg.schepen, en ? '— Choose vessel —' : '— Kies schip —'], ['abn-ligplaats', cfg.ligplaatsen, en ? '— Choose berth —' : '— Kies ligplaats —']].forEach(function(p){
+    var sel = document.getElementById(p[0]); if (!sel) return;
+    var huidig = sel.value;
+    sel.innerHTML = '<option value="">' + p[2] + '</option>' + p[1].map(function(x){ return '<option value="' + abnEsc(x.naam) + '">' + abnEsc(x.naam) + '</option>'; }).join('');
+    if (huidig && p[1].some(function(x){ return x.naam === huidig; })) sel.value = huidig;
+  });
+}
+function abnBerekenen(){
+  var w = abnWaarden(), cfg = abnConfig(), en = abnEn();
+  try { localStorage.setItem(tk('abn_huidig'), JSON.stringify(w)); } catch(e){}
+  var b = abnBeoordeel(w, cfg);
+  var asEl = document.getElementById('abn-asdruk'); if (asEl) asEl.textContent = b.asdruk === null ? '\u2014' : abnFmt(b.asdruk, 2) + (en ? ' t/axle' : ' t/as');
+  var tekst = {
+    rood:   en ? 'NOT ACCEPTED \u2014 cannot go on this sailing' : 'NIET AKKOORD \u2014 kan niet mee',
+    oranje: en ? 'INCOMPLETE \u2014 not all data filled in yet' : 'ONVOLLEDIG \u2014 nog niet alle gegevens ingevuld',
+    groen:  en ? 'ACCEPTED \u2014 can go on this sailing' : 'AKKOORD \u2014 kan mee'
+  }[b.status];
+  var kleur = { rood: '#d93025', oranje: '#b06f00', groen: '#1e8e3e' }[b.status];
+  var redenen = b.regels.filter(function(r){ return r.st === (b.status === 'rood' ? 'nee' : 'open'); }).map(function(r){ return r.naam; });
+  var box = document.getElementById('abn-uitslag');
+  if (box) box.innerHTML = '<div style="display:flex;gap:16px;align-items:center;">' + abnStoplichtHtml(b.status, true) +
+    '<div><div style="font-size:20px;font-weight:800;color:' + kleur + ';font-family:\'Barlow Condensed\',sans-serif;letter-spacing:.5px;">' + tekst + '</div>' +
+    (redenen.length && b.status !== 'groen' ? '<div style="color:#5a6b80;font-size:12.5px;margin-top:3px;">' + (b.status === 'rood' ? (en ? 'Exceeded: ' : 'Overschreden: ') : (en ? 'Still missing: ' : 'Nog open: ')) + abnEsc(redenen.join(', ')) + '</div>' : '') +
+    '</div></div>';
+  var tabel = document.getElementById('abn-controles');
+  var stTekst = { ok: en ? 'OK' : 'Akkoord', nee: en ? 'No' : 'Nee', open: en ? 'Open' : 'Open' };
+  var stKleur = { ok: '#1e8e3e', nee: '#d93025', open: '#f29900' };
+  if (tabel) tabel.innerHTML = '<tr><th style="text-align:left;">' + (en ? 'Check' : 'Controle') + '</th><th style="text-align:left;">' + (en ? 'Value' : 'Waarde') + '</th><th style="text-align:left;">' + (en ? 'Limit' : 'Limiet') + '</th><th></th></tr>' +
+    b.regels.map(function(r){ return '<tr><td style="font-weight:700;color:var(--navy);">' + abnEsc(r.naam) + '</td><td>' + abnEsc(r.waarde) + '</td><td style="color:#5a6b80;">' + abnEsc(r.limiet) + '</td>' +
+      '<td style="white-space:nowrap;"><span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:' + stKleur[r.st] + ';vertical-align:middle;margin-right:5px;"></span><b style="color:' + stKleur[r.st] + ';">' + stTekst[r.st] + '</b></td></tr>'; }).join('');
+  return b;
+}
+function abnRenderLijst(){
+  var el = document.getElementById('abn-lijst'); if (!el) return;
+  var en = abnEn(), cfg = abnConfig();
+  var lijst = abnLijst();
+  if (!lijst.length) { el.innerHTML = '<div style="color:#8795a8;font-size:12.5px;font-style:italic;">' + (en ? 'No saved declarations yet.' : 'Nog geen opgeslagen aanvragen.') + '</div>'; return; }
+  el.innerHTML = '<table class="abn-tabel">' + lijst.slice().reverse().map(function(a){
+    var st = abnBeoordeel(a.waarden, cfg).status; // opnieuw beoordeeld met de huidige scheepsgegevens
+    return '<tr><td>' + abnStoplichtHtml(st, false) + '</td><td style="font-weight:700;color:var(--navy);">' + abnEsc(a.waarden.ref || (en ? '(no reference)' : '(geen referentie)')) + '</td>' +
+      '<td>' + abnEsc(a.waarden.datum || '') + '</td><td>' + abnEsc(a.waarden.schip || '') + '</td><td>' + abnEsc(a.waarden.ligplaats || '') + '</td>' +
+      '<td style="text-align:right;white-space:nowrap;"><button type="button" onclick="abnLaad(\'' + abnEsc(a.id) + '\')" class="dp-dagknop" style="padding:3px 9px;">' + (en ? 'Open' : 'Openen') + '</button> ' +
+      '<button type="button" onclick="abnVerwijder(\'' + abnEsc(a.id) + '\')" title="' + (en ? 'Delete' : 'Verwijderen') + '" style="background:none;border:none;color:#c0392b;cursor:pointer;font-size:14px;">&#x2715;</button></td></tr>';
+  }).join('') + '</table>';
+}
+function abnOpslaanInLijst(){
+  var w = abnWaarden(), en = abnEn();
+  if (!w.ref.trim()) { alert(en ? 'Enter a reference / description first.' : 'Vul eerst een referentie / omschrijving in.'); var r = document.getElementById('abn-ref'); if (r) r.focus(); return; }
+  var lijst = abnLijst();
+  var bestaand = lijst.find(function(a){ return (a.waarden.ref || '').trim().toLowerCase() === w.ref.trim().toLowerCase(); });
+  if (bestaand) { bestaand.waarden = w; bestaand.bijgewerkt = new Date().toISOString(); }
+  else lijst.push({ id: Date.now().toString(36), waarden: w, aangemaakt: new Date().toISOString() });
+  abnLijstOpslaan(lijst.slice(-100));
+  abnRenderLijst();
+}
+function abnLaad(id){ var a = abnLijst().find(function(x){ return x.id === id; }); if (!a) return; abnZetWaarden(a.waarden); abnBerekenen(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+function abnVerwijder(id){ if (!confirm(abnEn() ? 'Delete this declaration?' : 'Deze aanvraag verwijderen?')) return; abnLijstOpslaan(abnLijst().filter(function(x){ return x.id !== id; })); abnRenderLijst(); }
+function abnNieuw(){ abnZetWaarden({}); var n = new Date(); var d = document.getElementById('abn-datum'); if (d) d.value = String(n.getDate()).padStart(2,'0') + '/' + String(n.getMonth()+1).padStart(2,'0') + '/' + n.getFullYear(); abnBerekenen(); }
+// ── Tandwiel: schepen, ligplaatsen en waterhoogtes aanpassen ──
+function abnInstellingen(){
+  var en = abnEn(), cfg = abnConfig();
+  var oud = document.getElementById('abn-instel'); if (oud) oud.remove();
+  var inp = 'width:100%;box-sizing:border-box;padding:5px 6px;border:1px solid #c8d7e8;border-radius:5px;font-size:12.5px;';
+  var num = function(v){ return v === null || v === undefined ? '' : String(v).replace('.', ','); };
+  var schipRij = function(s){ return '<tr class="abn-s"><td><input style="' + inp + '" data-v="naam" value="' + abnEsc(s.naam || '') + '"></td>' +
+    ['breedte','hoogte','asdruk','bodem'].map(function(k){ return '<td><input style="' + inp + 'width:70px;" data-v="' + k + '" value="' + num(s[k]) + '" placeholder="?"></td>'; }).join('') +
+    '<td><button type="button" onclick="this.closest(\'tr\').remove()" style="background:none;border:none;color:#c0392b;cursor:pointer;">&#x2715;</button></td></tr>'; };
+  var ligRij = function(l){ return '<tr class="abn-l"><td><input style="' + inp + '" data-v="naam" value="' + abnEsc(l.naam || '') + '"></td>' +
+    ['lengte','gewicht'].map(function(k){ return '<td><input style="' + inp + 'width:70px;" data-v="' + k + '" value="' + num(l[k]) + '" placeholder="?"></td>'; }).join('') +
+    '<td><button type="button" onclick="this.closest(\'tr\').remove()" style="background:none;border:none;color:#c0392b;cursor:pointer;">&#x2715;</button></td></tr>'; };
+  window._abnSchipRij = schipRij; window._abnLigRij = ligRij;
+  var th = 'text-align:left;font-size:10.5px;color:#5a6b80;text-transform:uppercase;padding:3px 4px;';
+  var o = document.createElement('div');
+  o.id = 'abn-instel';
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(0,20,40,.45);z-index:100002;display:flex;align-items:center;justify-content:center;padding:16px;';
+  o.innerHTML = '<div style="background:#fff;border-radius:12px;width:640px;max-width:100%;max-height:90vh;overflow:auto;padding:18px;box-shadow:0 16px 40px rgba(0,0,0,.35);">' +
+    '<div style="font-weight:800;font-size:15px;color:var(--navy);margin-bottom:10px;">&#x2699;&#xFE0F; ' + (en ? 'Abnormal loads settings' : 'Instellingen abnormal loads') + '</div>' +
+    '<div style="font-weight:700;color:var(--navy);margin:6px 0 4px;">' + (en ? 'Vessels' : 'Schepen') + '</div>' +
+    '<table style="width:100%;border-collapse:collapse;"><thead><tr><th style="' + th + '">' + (en ? 'Name' : 'Naam') + '</th><th style="' + th + '">' + (en ? 'Max width (m)' : 'Max breedte (m)') + '</th><th style="' + th + '">' + (en ? 'Max height (m)' : 'Max hoogte (m)') + '</th><th style="' + th + '">' + (en ? 'Max axle load (t)' : 'Max asdruk (t)') + '</th><th style="' + th + '">' + (en ? 'Min clearance (cm)' : 'Min bodemvrijheid (cm)') + '</th><th></th></tr></thead><tbody id="abn-i-schepen">' + cfg.schepen.map(schipRij).join('') + '</tbody></table>' +
+    '<button type="button" onclick="document.getElementById(\'abn-i-schepen\').insertAdjacentHTML(\'beforeend\', window._abnSchipRij({}))" class="dp-dagknop" style="margin-top:6px;">&#x2795; ' + (en ? 'Add vessel' : 'Schip toevoegen') + '</button>' +
+    '<div style="font-weight:700;color:var(--navy);margin:14px 0 4px;">' + (en ? 'Berths' : 'Ligplaatsen') + '</div>' +
+    '<table style="width:100%;border-collapse:collapse;"><thead><tr><th style="' + th + '">' + (en ? 'Name' : 'Naam') + '</th><th style="' + th + '">' + (en ? 'Max length (m)' : 'Max lengte (m)') + '</th><th style="' + th + '">' + (en ? 'Max total weight (t)' : 'Max totaal gewicht (t)') + '</th><th></th></tr></thead><tbody id="abn-i-lig">' + cfg.ligplaatsen.map(ligRij).join('') + '</tbody></table>' +
+    '<button type="button" onclick="document.getElementById(\'abn-i-lig\').insertAdjacentHTML(\'beforeend\', window._abnLigRij({}))" class="dp-dagknop" style="margin-top:6px;">&#x2795; ' + (en ? 'Add berth' : 'Ligplaats toevoegen') + '</button>' +
+    '<div style="font-weight:700;color:var(--navy);margin:14px 0 4px;">' + (en ? 'Water height (m)' : 'Waterhoogte (m)') + '</div>' +
+    '<div style="display:flex;gap:10px;align-items:center;font-size:12.5px;">min <input id="abn-i-wmin" style="' + inp + 'width:80px;" value="' + num(cfg.waterMin) + '"> max <input id="abn-i-wmax" style="' + inp + 'width:80px;" value="' + num(cfg.waterMax) + '"></div>' +
+    '<div style="color:#8795a8;font-size:11px;margin-top:10px;">' + (en ? 'Leave a field empty (or "?") when unknown: the check then stays orange.' : 'Laat een veld leeg (of "?") als het onbekend is: die controle blijft dan oranje.') + '</div>' +
+    '<div style="display:flex;gap:8px;margin-top:14px;"><button type="button" onclick="if(confirm(\'' + (en ? 'Restore the default values from the Excel sheet?' : 'Standaardwaarden uit het Excel-bestand terugzetten?') + '\')){localStorage.removeItem(abnConfigKey());if(typeof autoCloudOpslaan===\'function\')autoCloudOpslaan();document.getElementById(\'abn-instel\').remove();abnVulKeuzes();abnBerekenen();abnRenderLijst();}" style="background:none;border:1px solid #c8d7e8;color:#5a6b80;border-radius:6px;padding:8px 12px;cursor:pointer;font-size:12px;">' + (en ? 'Defaults' : 'Standaard') + '</button><span style="flex:1"></span>' +
+    '<button type="button" onclick="document.getElementById(\'abn-instel\').remove()" style="background:#fff;border:1px solid #c8d7e8;color:var(--navy);border-radius:6px;padding:8px 14px;cursor:pointer;font-weight:700;">' + (en ? 'Cancel' : 'Annuleren') + '</button>' +
+    '<button type="button" onclick="abnInstellingenOpslaan()" style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-weight:700;">' + (en ? 'Save' : 'Opslaan') + '</button></div></div>';
+  o.addEventListener('click', function(e){ if (e.target === o) o.remove(); });
+  document.body.appendChild(o);
+}
+function abnInstellingenOpslaan(){
+  var lees = function(sel, velden){
+    return Array.prototype.map.call(document.querySelectorAll(sel), function(tr){
+      var r = {};
+      velden.forEach(function(k){ var el = tr.querySelector('[data-v="' + k + '"]'); r[k] = k === 'naam' ? (el ? el.value.trim() : '') : abnNum(el ? el.value : ''); });
+      return r;
+    }).filter(function(r){ return r.naam; });
+  };
+  var cfg = {
+    schepen: lees('#abn-i-schepen tr.abn-s', ['naam','breedte','hoogte','asdruk','bodem']),
+    ligplaatsen: lees('#abn-i-lig tr.abn-l', ['naam','lengte','gewicht']),
+    waterMin: abnNum(document.getElementById('abn-i-wmin').value),
+    waterMax: abnNum(document.getElementById('abn-i-wmax').value)
+  };
+  if (cfg.waterMin === null) cfg.waterMin = ABN_STANDAARD.waterMin;
+  if (cfg.waterMax === null) cfg.waterMax = ABN_STANDAARD.waterMax;
+  abnConfigOpslaan(cfg);
+  document.getElementById('abn-instel').remove();
+  abnVulKeuzes(); abnBerekenen(); abnRenderLijst();
+}
+function abnInit(){
+  abnVulKeuzes();
+  var w = null; try { w = JSON.parse(localStorage.getItem(tk('abn_huidig')) || 'null'); } catch(e){}
+  if (w) abnZetWaarden(w);
+  else { var d = document.getElementById('abn-datum'); if (d && !d.value) { var n = new Date(); d.value = String(n.getDate()).padStart(2,'0') + '/' + String(n.getMonth()+1).padStart(2,'0') + '/' + n.getFullYear(); } }
+  abnBerekenen(); abnRenderLijst();
+}
+document.addEventListener('input', function(e){ if (e.target && e.target.id && e.target.id.indexOf('abn-') === 0 && e.target.closest && e.target.closest('#nieuw-tab-abnormal')) abnBerekenen(); });
+document.addEventListener('change', function(e){ if (e.target && e.target.id && e.target.id.indexOf('abn-') === 0 && e.target.closest && e.target.closest('#nieuw-tab-abnormal')) abnBerekenen(); });
+['abnInit','abnBerekenen','abnOpslaanInLijst','abnLaad','abnVerwijder','abnNieuw','abnInstellingen','abnInstellingenOpslaan','abnVulKeuzes','abnRenderLijst','abnConfigKey']
+  .forEach(function(n){ try { window[n] = eval(n); } catch(e){} });
 
 // ===== TOOLBOX (Werkoverdracht) =====
 // Toolbox-documenten (PDF) per terminal. Metadata (naam/datum) staat in localStorage
