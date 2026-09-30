@@ -6681,7 +6681,11 @@ window.addEventListener('resize', () => {
   async function djLivePollTick(){
     try {
       var dpView = document.getElementById('view-dagplanning');
-      if (!dpView || !dpView.classList.contains('active')) return; // alleen relevant als open
+      var puView = document.getElementById('view-punctuality');
+      var dpActief = !!(dpView && dpView.classList.contains('active'));
+      var puActief = !!(puView && puView.classList.contains('active'));
+      if (!dpActief && !puActief) return; // alleen relevant als Dagplanning of Punctuality open staat
+      if (window._vsAutoTimer) return; // Punctuality: eigen wijziging staat nog te wachten
       if (_syncBezig) return; // niet tegelijk met een handmatige opslaan/ophalen
       if (_autoSaveTimer) return; // eigen wijziging staat nog in de 2-sec.-wachtrij om weg te schrijven
       if (!djStartOphalenKlaar()) return; // start-ophalen nog niet klaar
@@ -6710,9 +6714,12 @@ window.addEventListener('resize', () => {
       if (_syncBezig || _autoSaveTimer) return; // en nogmaals vlak vóór het toepassen
       if (window.djHeeftOnopgeslagenWerk && window.djHeeftOnopgeslagenWerk()) return;
       if (window._woAutoTimer) return; // Werkoverdracht: getypte tekst staat nog te wachten
+      if (window._vsAutoTimer) return; // Punctuality: getypte tijd staat nog te wachten
       if (!result || !result.data) { _djLivePollLaatsteWijziging = gewijzigd; return; }
       setSyncData(result.data);
       _djLivePollLaatsteWijziging = gewijzigd;
+      if (puActief && typeof window.djPunctualityHerlaadInPlace === 'function') window.djPunctualityHerlaadInPlace();
+      if (!dpActief) { if (typeof showSyncStatus === 'function') showSyncStatus('\u2713 Bijgewerkt door collega', 'ok'); return; }
       if (typeof window.djDagplanningHerlaadInPlace === 'function') {
         window.djDagplanningHerlaadInPlace();
       } else {
@@ -6789,6 +6796,57 @@ window.addEventListener('resize', () => {
     } catch(e){}
   })();
 
+  // ══════════════════════════════════════════════════════════════════
+  // Punctuality samenwerken: alle dagen staan in één sleutel (vs_data_v1). Vroeger won bij het
+  // opslaan de héle lokale kopie, zodat een collega met een oudere kopie andermans invoer kon
+  // wissen. Nu wordt per dag én per veld samengevoegd: elk veld krijgt bij wijzigen een tijdstempel
+  // (_ts) en de nieuwste waarde wint. Zo werken twee mensen tegelijk aan dezelfde dag zonder elkaar
+  // te overschrijven — net als bij de Dagplanning.
+  // ══════════════════════════════════════════════════════════════════
+  function djVsVeldenVan(e){
+    var v = {};
+    ((e && e.tijden) || []).forEach(function(r, ri){ ((r && r.tijden) || []).forEach(function(t, ci){ v['t-' + ri + '-' + ci] = t || ''; }); });
+    Object.keys((e && e.units) || {}).forEach(function(k){ v['u:' + k] = e.units[k]; });
+    Object.keys((e && e.sjor) || {}).forEach(function(k){ v['s:' + k] = e.sjor[k]; });
+    return v;
+  }
+  function djVsDagSamenvoegen(c, l){
+    if (!c) return l; if (!l) return c;
+    var tc = c._ts || {}, tl = l._ts || {}, vc = djVsVeldenVan(c), vl = djVsVeldenVan(l);
+    var uit = { datum: l.datum || c.datum, tijden: [], units: {}, sjor: {}, _ts: {} };
+    var velden = {}; Object.keys(vc).concat(Object.keys(vl)).forEach(function(k){ velden[k] = 1; });
+    Object.keys(velden).forEach(function(k){
+      var a = tc[k] || 0, b = tl[k] || 0, w;
+      if (b > a) w = vl[k]; else if (a > b) w = vc[k];
+      else w = (vl[k] !== undefined && vl[k] !== '') ? vl[k] : vc[k]; // geen tijdstempels (oude data): niet leeg over gevuld
+      if (Math.max(a, b)) uit._ts[k] = Math.max(a, b);
+      if (k.indexOf('t-') === 0) { var p = k.split('-'), ri = +p[1], ci = +p[2];
+        while (uit.tijden.length <= ri) uit.tijden.push({ route: '', tijden: [] });
+        var rl = ((l.tijden || [])[ri] || {}).route || ((c.tijden || [])[ri] || {}).route || '';
+        uit.tijden[ri].route = rl; uit.tijden[ri].tijden[ci] = w == null ? '' : w; }
+      else if (k.indexOf('u:') === 0) uit.units[k.slice(2)] = w == null ? '' : w;
+      else if (k.indexOf('s:') === 0) uit.sjor[k.slice(2)] = w == null ? '' : w;
+    });
+    uit.tijden.forEach(function(r){ for (var i = 0; i < r.tijden.length; i++) if (r.tijden[i] === undefined) r.tijden[i] = ''; });
+    var gc = c._gewijzigd || 0, gl = l._gewijzigd || 0;
+    uit._gewijzigd = Math.max(gc, gl);
+    uit.opgeslagenOp = gl >= gc ? (l.opgeslagenOp || c.opgeslagenOp) : (c.opgeslagenOp || l.opgeslagenOp);
+    return uit;
+  }
+  function djVsSamenvoegen(cloud, lokaal){
+    if (!cloud || typeof cloud !== 'object') return lokaal;
+    if (!lokaal || typeof lokaal !== 'object') return cloud;
+    var uit = {};
+    Object.keys(cloud).concat(Object.keys(lokaal)).forEach(function(d){ if (!(d in uit)) uit[d] = djVsDagSamenvoegen(cloud[d], lokaal[d]); });
+    return uit;
+  }
+  window.djVsSamenvoegen = djVsSamenvoegen;
+  function djSamenvoegenMetCloud(cloudData, lokaal){
+    var data = Object.assign({}, cloudData, lokaal);
+    Object.keys(lokaal).forEach(function(k){ if (/(^|_)vs_data_v1$/.test(k) && cloudData[k]) data[k] = djVsSamenvoegen(cloudData[k], lokaal[k]); });
+    return data;
+  }
+
   async function cloudOpslaan(toonFouten) {
     if (_syncBezig) {
       // Er loopt al een opslag. Vroeger werd deze aanvraag dan stil genegeerd — waardoor een
@@ -6835,7 +6893,7 @@ window.addEventListener('resize', () => {
       // Materieel-garage) stilletjes wissen, ook als deze actie daar helemaal niets mee te maken had.
       var result = await spOphalenBestand(rowId + '.json');
       var cloudData = (result && result.data) || {};
-      var data = Object.assign({}, cloudData, lokaal);
+      var data = djSamenvoegenMetCloud(cloudData, lokaal);
       _laatsteBekendeCloudData = data;
       await spOpslaanBestand(rowId + '.json', { data: data, updated_at: new Date().toISOString() });
       _gelukt = true;
@@ -6969,7 +7027,7 @@ window.addEventListener('resize', () => {
       // daarom de laatst bekende cloud-inhoud (bijgehouden door cloudOpslaan()) als basis, zodat
       // sleutels die alleen door andere apps worden bijgewerkt (zoals Materieel-garage) niet
       // alsnog verdwijnen door deze laatste-redmiddel-opslag.
-      var data = Object.assign({}, _laatsteBekendeCloudData, lokaal);
+      var data = djSamenvoegenMetCloud(_laatsteBekendeCloudData || {}, lokaal);
       var url = 'https://graph.microsoft.com/v1.0/sites/' + _spSiteId + '/drive/root:/Data/' + encodeURIComponent(rowId + '.json') + ':/content';
       // keepalive: fetch die tijdens het sluiten/verlaten van de pagina toch wordt afgemaakt
       // door de browser (in tegenstelling tot een gewone fetch, die dan wordt afgebroken).
@@ -19409,7 +19467,70 @@ function wisselPunctualityDatum(dateStr) {
   var _owp=wisselPunctualityDatum;wisselPunctualityDatum=function(d){_owp(d);setTimeout(function(){setVsLock(!isVandaag(d));},50);};window.wisselPunctualityDatum=wisselPunctualityDatum;
   setTimeout(function(){var vd=document.getElementById('vs-datum');setVsLock(vd&&vd.value?!isVandaag(vd.value):false);},300);
 
-    window.laadVaarschema = function laadVaarschema() {
+  // Tijdvelden: bij typen automatisch een dubbele punt invoegen (0730 -> 07:30). Deze functie werd
+  // al aangeroepen door de invoervelden, maar bestond nog niet (gaf bij elke toets een foutmelding).
+  if (typeof window.formatTijdInput !== 'function') window.formatTijdInput = function(el){
+    if (!el) return; var c = el.selectionStart, oud = el.value;
+    var cijfers = oud.replace(/\D/g, '').slice(0, 4);
+    var nieuw = cijfers.length > 2 ? cijfers.slice(0, 2) + ':' + cijfers.slice(2) : cijfers;
+    if (nieuw !== oud) { el.value = nieuw; try { var pos = Math.min(nieuw.length, c + (nieuw.length - oud.length)); el.setSelectionRange(pos, pos); } catch(e) {} }
+  };
+  // ── Punctuality: automatisch opslaan per veld (zoals de Dagplanning) ──
+  // Elke wijziging krijgt een tijdstempel per veld; 1,5 sec na de laatste toetsaanslag wordt de dag
+  // opgeslagen en gaat hij via de gewone cloud-sync (met samenvoegen per veld) naar de collega's.
+  (function(){
+    var vuil = {};
+    function veldSleutel(el){
+      if (!el) return null;
+      if (el.classList.contains('tijden-input')) {
+        var tr = el.closest('tr'); if (!tr) return null;
+        var rows = Array.prototype.slice.call(document.querySelectorAll('#view-punctuality .tijden-table tbody tr'));
+        var ri = rows.indexOf(tr), ci = Array.prototype.slice.call(tr.querySelectorAll('input')).indexOf(el);
+        return ri >= 0 && ci >= 0 ? 't-' + ri + '-' + ci : null;
+      }
+      if (el.id && el.id.indexOf('u-') === 0) return 'u:' + el.id.slice(2);
+      if (el.id && el.id.indexOf('sjor-') === 0) return 's:' + el.id.slice(5);
+      return null;
+    }
+    function opslaan(){
+      window._vsAutoTimer = null;
+      var d = document.getElementById('vs-datum'); if (!d || !d.value || typeof window.slaVaarschemaOp !== 'function') { vuil = {}; return; }
+      var st = Object.assign({}, vuil); vuil = {};
+      var sleutel = tk('vs_data_v1'), p = d.value.split('-'), dag = p[2] + '/' + p[1] + '/' + p[0];
+      var oud = {}; try { oud = (JSON.parse(localStorage.getItem(sleutel) || '{}') || {})[dag] || {}; } catch(e) {}
+      window.slaVaarschemaOp();
+      try {
+        var alles = JSON.parse(localStorage.getItem(sleutel) || '{}') || {};
+        if (alles[dag]) { alles[dag]._ts = Object.assign({}, oud._ts || {}, st); alles[dag]._gewijzigd = Date.now(); localStorage.setItem(sleutel, JSON.stringify(alles)); }
+      } catch(e) {}
+      if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+    }
+    function wijziging(ev){
+      var el = ev.target; if (!el || !el.closest || !el.closest('#view-punctuality')) return;
+      var k = veldSleutel(el); if (!k) return;
+      vuil[k] = Date.now();
+      if (window._vsAutoTimer) clearTimeout(window._vsAutoTimer);
+      window._vsAutoTimer = setTimeout(opslaan, 1500);
+    }
+    document.addEventListener('input', wijziging, true);
+    document.addEventListener('change', wijziging, true);
+    // Bij wisselen van datum of verlaten van de pagina: wachtende wijziging direct opslaan
+    document.addEventListener('focusin', function(ev){ if (window._vsAutoTimer && ev.target && ev.target.id === 'vs-datum') { clearTimeout(window._vsAutoTimer); opslaan(); } }, true);
+    window.addEventListener('pagehide', function(){ if (window._vsAutoTimer) { clearTimeout(window._vsAutoTimer); opslaan(); } });
+    // Live-verversing: nieuwe data van een collega in het scherm zetten zonder te herladen
+    window.djPunctualityHerlaadInPlace = function(){
+      var d = document.getElementById('vs-datum');
+      if (!d || !d.value || window._vsAutoTimer) return;
+      var act = document.activeElement;
+      if (act && act.closest && act.closest('#view-punctuality') && (act.tagName === 'INPUT' || act.tagName === 'TEXTAREA') && act.id !== 'vs-datum') return;
+      var slotWas = window._vsLocked;
+      if (typeof window.wisselPunctualityDatum === 'function') window.wisselPunctualityDatum(d.value);
+      // Het slotje laten zoals de gebruiker het had (het herladen zet het anders terug op de standaard)
+      setTimeout(function(){ if (window._vsLocked !== slotWas && typeof toggleVsLock === 'function') toggleVsLock(); }, 120);
+    };
+  })();
+
+  window.laadVaarschema = function laadVaarschema() {
     var vsDp = document.getElementById('vs-datum');
     if (vsDp && vsDp.value) wisselPunctualityDatum(vsDp.value);
   };
@@ -20304,7 +20425,9 @@ function wisselPunctualityDatum(dateStr) {
 
     // Save
     var all = _vsGet();
-    all[key] = { datum:key, opgeslagenOp: new Date().toLocaleString('nl-NL'), tijden:tijden, units:units, sjor:sjor };
+    var _oudE = all[key] || {};
+    // tijdstempels per veld bewaren (nodig voor samenvoegen met collega's)
+    all[key] = { datum:key, opgeslagenOp: new Date().toLocaleString('nl-NL'), tijden:tijden, units:units, sjor:sjor, _ts: _oudE._ts || {}, _gewijzigd: _oudE._gewijzigd || 0 };
     _vsSet(all);
 
     // Show confirmation
