@@ -4418,7 +4418,6 @@ function djHerstelVaarschema(){
       <button id="nieuw-tab-btn-overdracht" onclick="nieuwToonTab('overdracht')" style="padding:9px 18px;border:none;border-radius:6px 6px 0 0;background:var(--navy);color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#x21C4; Overdracht</button>
       <button id="nieuw-tab-btn-personeelsdossier" onclick="nieuwToonTab('personeelsdossier')" style="padding:9px 18px;border:none;border-radius:6px 6px 0 0;background:#e8eef5;color:var(--navy);font-family:'Barlow Condensed',sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#x1F4C1; Personeelsdossier</button>
       <button id="nieuw-tab-btn-toolbox" onclick="nieuwToonTab('toolbox')" style="padding:9px 18px;border:none;border-radius:6px 6px 0 0;background:#e8eef5;color:var(--navy);font-family:'Barlow Condensed',sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#x1F9F0; Toolbox</button>
-      <button id="nieuw-tab-btn-abnormal" onclick="nieuwToonTab('abnormal')" style="padding:9px 18px;border:none;border-radius:6px 6px 0 0;background:#e8eef5;color:var(--navy);font-family:'Barlow Condensed',sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#x1F69B; Abnormal loads</button>
     </div>
 
     <div id="nieuw-tab-overdracht">
@@ -4565,55 +4564,6 @@ function djHerstelVaarschema(){
       </div>
     </div>
 
-    <div id="nieuw-tab-abnormal" style="display:none;">
-      <style>
-        .abn-tabel{width:100%;border-collapse:collapse;font-size:12.5px;}
-        .abn-tabel th{font-size:10.5px;color:#5a6b80;text-transform:uppercase;letter-spacing:.4px;padding:5px 8px;border-bottom:2px solid #dde4ee;}
-        .abn-tabel td{padding:6px 8px;border-bottom:1px solid #e3e9f1;vertical-align:middle;}
-        .abn-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 14px;}
-      </style>
-      <div class="card">
-        <div class="card-header">
-          <div class="icon">&#x1F69B;</div>
-          <h2>Abnormal loads declaration</h2>
-          <span style="flex:1"></span>
-          <button type="button" onclick="abnNieuw()" class="dp-dagknop" style="margin-right:6px;">&#x1F4C4; Nieuw</button>
-          <button type="button" onclick="abnInstellingen()" title="Schepen, ligplaatsen en waterhoogtes aanpassen" style="background:none;border:1px solid #c8d7e8;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:15px;">&#x2699;&#xFE0F;</button>
-        </div>
-        <div id="abn-uitslag" style="background:#f4f7fb;border-radius:10px;padding:12px 14px;margin-bottom:14px;"></div>
-        <div style="font-weight:700;color:var(--navy);font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Sailing requested</div>
-        <div class="abn-grid" style="margin-bottom:14px;">
-          <div class="field" style="grid-column:span 2;"><label>Referentie / omschrijving</label><input type="text" id="abn-ref" placeholder="bijv. klant, kenteken of lading" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
-          <div class="field"><label>Datum</label><input type="text" id="abn-datum" placeholder="dd/mm/jjjj" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
-          <div class="field"><label>Tijd / afvaart</label><input type="text" id="abn-tijd" placeholder="bijv. dagafvaart" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
-          <div class="field"><label>Schip</label><select id="abn-schip" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></select></div>
-          <div class="field"><label>Ligplaats</label><select id="abn-ligplaats" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></select></div>
-        </div>
-        <div style="font-weight:700;color:var(--navy);font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Lading + voertuig</div>
-        <div class="abn-grid">
-          <div class="field"><label>Totale lengte (m)</label><input type="text" id="abn-lengte" placeholder="0,00" inputmode="decimal" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
-          <div class="field"><label>Breedte (m)</label><input type="text" id="abn-breedte" placeholder="0,00" inputmode="decimal" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
-          <div class="field"><label>Hoogte (m)</label><input type="text" id="abn-hoogte" placeholder="0,00" inputmode="decimal" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
-          <div class="field"><label>Totaal gewicht (t)</label><input type="text" id="abn-gewicht" placeholder="lading + voertuig" inputmode="decimal" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
-          <div class="field"><label>Aantal assen</label><input type="text" id="abn-assen" placeholder="0" inputmode="decimal" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
-          <div class="field"><label>Asdruk (berekend)</label><div id="abn-asdruk" style="padding:8px 9px;border:1px dashed #c8d7e8;border-radius:6px;font-size:13px;font-weight:700;color:var(--navy);background:#f8fafc;">&mdash;</div></div>
-          <div class="field"><label>Asafstand (m)</label><input type="text" id="abn-afstand" placeholder="0,00" inputmode="decimal" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
-          <div class="field"><label>Bodemvrijheid (cm)</label><input type="text" id="abn-bodem" placeholder="0" inputmode="decimal" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
-          <div class="field"><label>Waterhoogte (m)</label><input type="text" id="abn-water" placeholder="0,00" inputmode="decimal" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
-        </div>
-        <div style="color:#8795a8;font-size:11px;margin-top:6px;">Waterhoogte: zie de getijden op het startscherm. Decimalen mogen met een komma.</div>
-        <div style="font-weight:700;color:var(--navy);font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin:16px 0 6px;">Controles</div>
-        <table class="abn-tabel" id="abn-controles"></table>
-        <div style="display:flex;justify-content:flex-end;margin-top:12px;">
-          <button type="button" class="btn-primary" onclick="abnOpslaanInLijst()">&#x1F4BE; Opslaan in lijst</button>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header"><div class="icon">&#x1F4CB;</div><h2>Opgeslagen aanvragen</h2></div>
-        <div style="color:#8795a8;font-size:11px;margin:-4px 0 8px;">Het stoplicht wordt steeds opnieuw berekend met de huidige schip- en ligplaatsgegevens.</div>
-        <div id="abn-lijst"></div>
-      </div>
-    </div>
     <div id="nieuw-tab-toolbox" style="display:none;">
       <div class="card">
         <div class="card-header"><div class="icon">&#x1F9F0;</div><h2>Toolbox</h2></div>
@@ -5101,6 +5051,61 @@ function djHerstelVaarschema(){
 
   <!-- ===== WERKORDER ===== -->
   <div id="view-werkorder" class="view">
+    <!-- Tabbladen Werkorder: formulier | Abnormal loads -->
+    <div style="display:flex;gap:4px;max-width:1150px;margin:12px auto 0;padding:0 16px;">
+      <button id="wo-tab-btn-formulier" onclick="woTabToon('formulier')" style="padding:9px 18px;border:none;border-radius:6px 6px 0 0;background:var(--navy);color:#fff;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#x1F4DD; Werkorder</button>
+      <button id="wo-tab-btn-abnormal" onclick="woTabToon('abnormal')" style="padding:9px 18px;border:none;border-radius:6px 6px 0 0;background:#e8eef5;color:var(--navy);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#x1F69B; Abnormal loads</button>
+    </div>
+    <div id="nieuw-tab-abnormal" style="display:none;max-width:1150px;margin:0 auto;padding:10px 16px 30px;">
+      <style>
+        .abn-tabel{width:100%;border-collapse:collapse;font-size:12.5px;}
+        .abn-tabel th{font-size:10.5px;color:#5a6b80;text-transform:uppercase;letter-spacing:.4px;padding:5px 8px;border-bottom:2px solid #dde4ee;}
+        .abn-tabel td{padding:6px 8px;border-bottom:1px solid #e3e9f1;vertical-align:middle;}
+        .abn-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 14px;}
+      </style>
+      <div class="card">
+        <div class="card-header">
+          <div class="icon">&#x1F69B;</div>
+          <h2>Abnormal loads declaration</h2>
+          <span style="flex:1"></span>
+          <button type="button" onclick="abnNieuw()" class="dp-dagknop" style="margin-right:6px;">&#x1F4C4; Nieuw</button>
+          <button type="button" onclick="abnInstellingen()" title="Schepen, ligplaatsen en waterhoogtes aanpassen" style="background:none;border:1px solid #c8d7e8;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:15px;">&#x2699;&#xFE0F;</button>
+        </div>
+        <div id="abn-uitslag" style="background:#f4f7fb;border-radius:10px;padding:12px 14px;margin-bottom:14px;"></div>
+        <div style="font-weight:700;color:var(--navy);font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Sailing requested</div>
+        <div class="abn-grid" style="margin-bottom:14px;">
+          <div class="field" style="grid-column:span 2;"><label>Referentie / omschrijving</label><input type="text" id="abn-ref" placeholder="bijv. klant, kenteken of lading" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
+          <div class="field"><label>Datum</label><input type="text" id="abn-datum" placeholder="dd/mm/jjjj" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
+          <div class="field"><label>Tijd / afvaart</label><input type="text" id="abn-tijd" placeholder="bijv. dagafvaart" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
+          <div class="field"><label>Schip</label><select id="abn-schip" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></select></div>
+          <div class="field"><label>Ligplaats</label><select id="abn-ligplaats" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></select></div>
+        </div>
+        <div style="font-weight:700;color:var(--navy);font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Lading + voertuig</div>
+        <div id="abn-tekening" style="background:#fff;border:1px solid #dde4ee;border-radius:10px;padding:8px 10px 4px;margin-bottom:12px;"></div>
+        <div class="abn-grid">
+          <div class="field"><label>Totale lengte (m)</label><input type="text" id="abn-lengte" placeholder="0,00" inputmode="decimal" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
+          <div class="field"><label>Breedte (m)</label><input type="text" id="abn-breedte" placeholder="0,00" inputmode="decimal" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
+          <div class="field"><label>Hoogte (m)</label><input type="text" id="abn-hoogte" placeholder="0,00" inputmode="decimal" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
+          <div class="field"><label>Totaal gewicht (t)</label><input type="text" id="abn-gewicht" placeholder="lading + voertuig" inputmode="decimal" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
+          <div class="field"><label>Aantal assen</label><input type="text" id="abn-assen" placeholder="0" inputmode="decimal" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
+          <div class="field"><label>Asdruk (berekend)</label><div id="abn-asdruk" style="padding:8px 9px;border:1px dashed #c8d7e8;border-radius:6px;font-size:13px;font-weight:700;color:var(--navy);background:#f8fafc;">&mdash;</div></div>
+          <div class="field"><label>Asafstand (m)</label><input type="text" id="abn-afstand" placeholder="0,00" inputmode="decimal" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
+          <div class="field"><label>Bodemvrijheid (cm)</label><input type="text" id="abn-bodem" placeholder="0" inputmode="decimal" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
+          <div class="field"><label>Waterhoogte (m)</label><input type="text" id="abn-water" placeholder="0,00" inputmode="decimal" style="width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;"></div>
+        </div>
+        <div style="color:#8795a8;font-size:11px;margin-top:6px;">Waterhoogte: zie de getijden op het startscherm. Decimalen mogen met een komma.</div>
+        <div style="font-weight:700;color:var(--navy);font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin:16px 0 6px;">Controles</div>
+        <table class="abn-tabel" id="abn-controles"></table>
+        <div style="display:flex;justify-content:flex-end;margin-top:12px;">
+          <button type="button" class="btn-primary" onclick="abnOpslaanInLijst()">&#x1F4BE; Opslaan in lijst</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="icon">&#x1F4CB;</div><h2>Opgeslagen aanvragen</h2></div>
+        <div style="color:#8795a8;font-size:11px;margin:-4px 0 8px;">Het stoplicht wordt steeds opnieuw berekend met de huidige schip- en ligplaatsgegevens.</div>
+        <div id="abn-lijst"></div>
+      </div>
+    </div>
     <div id="werkorder-view" style="padding:0;">
 
 
@@ -25627,7 +25632,7 @@ function navWerkoverdracht(label, btn, subtab, callback) {
   }, 60);
 }
 function nieuwToonTab(tab){
-  var tabs = ['overdracht', 'personeelsdossier', 'toolbox', 'abnormal'];
+  var tabs = ['overdracht', 'personeelsdossier', 'toolbox'];
   tabs.forEach(function(t){
     var body = document.getElementById('nieuw-tab-' + t);
     var btn = document.getElementById('nieuw-tab-btn-' + t);
@@ -25636,12 +25641,25 @@ function nieuwToonTab(tab){
   });
   if (tab === 'personeelsdossier' && typeof pdInit === 'function') pdInit();
   if (tab === 'toolbox' && typeof toolboxRender === 'function') toolboxRender();
-  if (tab === 'abnormal' && typeof abnInit === 'function') abnInit();
   if (typeof djVertaalPaginaEngels === 'function') setTimeout(djVertaalPaginaEngels, 60);
 }
 
+// Tabbladen in Werkorder: het werkorder-formulier en Abnormal loads.
+function woTabToon(tab){
+  var form = document.getElementById('werkorder-view'), abn = document.getElementById('nieuw-tab-abnormal');
+  if (form) form.style.display = tab === 'formulier' ? '' : 'none';
+  if (abn) abn.style.display = tab === 'abnormal' ? 'block' : 'none';
+  [['formulier','wo-tab-btn-formulier'],['abnormal','wo-tab-btn-abnormal']].forEach(function(p){
+    var b = document.getElementById(p[1]); if (!b) return;
+    b.style.background = p[0] === tab ? 'var(--navy)' : '#e8eef5'; b.style.color = p[0] === tab ? '#fff' : 'var(--navy)';
+  });
+  if (tab === 'abnormal' && typeof abnInit === 'function') abnInit();
+  if (typeof djVertaalPaginaEngels === 'function') setTimeout(djVertaalPaginaEngels, 60);
+}
+window.woTabToon = woTabToon;
+
 // ═════════════════════════════════════════════════════════════════
-// ABNORMAL LOADS (Werkoverdracht-tabblad). Controle of afwijkende vracht mee kan met een schip,
+// ABNORMAL LOADS (tabblad in Werkorder). Controle of afwijkende vracht mee kan met een schip,
 // naar het Excel-systeem "abnormal_loads_Europoort.xlsx":
 //   lengte ≤ max lengte ligplaats · breedte ≤ max breedte schip · hoogte ≤ max hoogte schip
 //   totaal gewicht ≤ max gewicht ligplaats · asdruk (gewicht / assen) < max asdruk schip
@@ -25697,22 +25715,22 @@ function abnBeoordeel(w, cfg){
   var gewicht = abnNum(w.gewicht), assen = abnNum(w.assen);
   var asdruk = (gewicht !== null && assen) ? gewicht / assen : null;
   var regels = [];
-  function regel(naam, waarde, eenheid, limiet, limTekst, test, dec){
+  function regel(naam, waarde, eenheid, limiet, limTekst, test, dec, key){
     var st;
     if (waarde === null) st = 'open';
     else if (limiet === null || limiet === undefined) st = 'open';
     else st = test(waarde, limiet) ? 'ok' : 'nee';
     regels.push({ naam: naam, waarde: waarde === null ? '\u2014' : abnFmt(waarde, dec) + ' ' + eenheid,
-      limiet: (limiet === null || limiet === undefined) ? (en ? 'unknown' : 'onbekend') : limTekst + ' ' + abnFmt(limiet, dec) + ' ' + eenheid, st: st });
+      limiet: (limiet === null || limiet === undefined) ? (en ? 'unknown' : 'onbekend') : limTekst + ' ' + abnFmt(limiet, dec) + ' ' + eenheid, st: st, key: key, lim: limiet });
   }
   if (!schip) regels.push({ naam: en ? 'Vessel' : 'Schip', waarde: en ? 'not chosen' : 'niet gekozen', limiet: '', st: 'open' });
   if (!lig) regels.push({ naam: en ? 'Berth' : 'Ligplaats', waarde: en ? 'not chosen' : 'niet gekozen', limiet: '', st: 'open' });
-  regel(en ? 'Length' : 'Lengte', abnNum(w.lengte), 'm', lig ? lig.lengte : null, 'max', function(a, b){ return a <= b; }, 2);
-  regel(en ? 'Width' : 'Breedte', abnNum(w.breedte), 'm', schip ? schip.breedte : null, 'max', function(a, b){ return a <= b; }, 2);
-  regel(en ? 'Height' : 'Hoogte', abnNum(w.hoogte), 'm', schip ? schip.hoogte : null, 'max', function(a, b){ return a <= b; }, 2);
-  regel(en ? 'Total weight' : 'Totaal gewicht', gewicht, 't', lig ? lig.gewicht : null, 'max', function(a, b){ return a <= b; }, 1);
-  regel(en ? 'Axle load' : 'Asdruk', asdruk, en ? 't/axle' : 't/as', schip ? schip.asdruk : null, en ? 'below' : 'onder', function(a, b){ return a < b; }, 2);
-  regel(en ? 'Ground clearance' : 'Bodemvrijheid', abnNum(w.bodem), 'cm', schip ? schip.bodem : null, 'min', function(a, b){ return a >= b; }, 0);
+  regel(en ? 'Length' : 'Lengte', abnNum(w.lengte), 'm', lig ? lig.lengte : null, 'max', function(a, b){ return a <= b; }, 2, 'lengte');
+  regel(en ? 'Width' : 'Breedte', abnNum(w.breedte), 'm', schip ? schip.breedte : null, 'max', function(a, b){ return a <= b; }, 2, 'breedte');
+  regel(en ? 'Height' : 'Hoogte', abnNum(w.hoogte), 'm', schip ? schip.hoogte : null, 'max', function(a, b){ return a <= b; }, 2, 'hoogte');
+  regel(en ? 'Total weight' : 'Totaal gewicht', gewicht, 't', lig ? lig.gewicht : null, 'max', function(a, b){ return a <= b; }, 1, 'gewicht');
+  regel(en ? 'Axle load' : 'Asdruk', asdruk, en ? 't/axle' : 't/as', schip ? schip.asdruk : null, en ? 'below' : 'onder', function(a, b){ return a < b; }, 2, 'asdruk');
+  regel(en ? 'Ground clearance' : 'Bodemvrijheid', abnNum(w.bodem), 'cm', schip ? schip.bodem : null, 'min', function(a, b){ return a >= b; }, 0, 'bodem');
   var water = abnNum(w.water);
   regels.push({ naam: en ? 'Water height' : 'Waterhoogte', waarde: water === null ? '\u2014' : abnFmt(water, 2) + ' m',
     limiet: abnFmt(cfg.waterMin, 2) + ' \u2013 ' + abnFmt(cfg.waterMax, 2) + ' m',
@@ -25758,7 +25776,73 @@ function abnBerekenen(){
   if (tabel) tabel.innerHTML = '<tr><th style="text-align:left;">' + (en ? 'Check' : 'Controle') + '</th><th style="text-align:left;">' + (en ? 'Value' : 'Waarde') + '</th><th style="text-align:left;">' + (en ? 'Limit' : 'Limiet') + '</th><th></th></tr>' +
     b.regels.map(function(r){ return '<tr><td style="font-weight:700;color:var(--navy);">' + abnEsc(r.naam) + '</td><td>' + abnEsc(r.waarde) + '</td><td style="color:#5a6b80;">' + abnEsc(r.limiet) + '</td>' +
       '<td style="white-space:nowrap;"><span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:' + stKleur[r.st] + ';vertical-align:middle;margin-right:5px;"></span><b style="color:' + stKleur[r.st] + ';">' + stTekst[r.st] + '</b></td></tr>'; }).join('');
+  abnTekening(w, b);
   return b;
+}
+// ── Tekening dieplader (zoals in de Excel): maatpijlen met live waarden, gekleurd per controle ──
+function abnFocus(v){ var el = document.getElementById('abn-' + v); if (el) { el.focus(); if (el.select) el.select(); } }
+function abnTekening(w, b){
+  var box = document.getElementById('abn-tekening'); if (!box) return;
+  var en = abnEn();
+  var kl = { ok: '#1e8e3e', nee: '#d93025', open: '#b06f00', info: '#003366' };
+  var st = {}; b.regels.forEach(function(r){ if (r.key) st[r.key] = r; });
+  function kleur(k){ return st[k] ? kl[st[k].st] : kl.info; }
+  function waarde(v, dec, eh){ var n = abnNum(v); return n === null ? '—' : abnFmt(n, dec) + ' ' + eh; }
+  function lim(k, dec){ var r = st[k]; return (r && r.lim !== null && r.lim !== undefined) ? ' (' + (k === 'bodem' ? 'min ' : 'max ') + abnFmt(r.lim, dec) + ')' : ''; }
+  var pijl = function(id, c){ return '<marker id="' + id + '" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="' + c + '"/></marker>'; };
+  function maat(x1, y1, x2, y2, k){ var c = kleur(k), id = 'abnp-' + k; return '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="' + c + '" stroke-width="2" marker-start="url(#' + id + ')" marker-end="url(#' + id + ')"/>'; }
+  function label(x, y, anker, titel, tekst, k, veld){
+    return '<g style="cursor:pointer" onclick="abnFocus(\'' + veld + '\')"><title>' + abnEsc(en ? 'Click to edit' : 'Klik om in te vullen') + '</title>' +
+      '<text x="' + x + '" y="' + y + '" text-anchor="' + anker + '" font-size="12" fill="#5a6b80">' + abnEsc(titel) + '</text>' +
+      '<text x="' + x + '" y="' + (y + 17) + '" text-anchor="' + anker + '" font-size="16" font-weight="700" fill="' + kleur(k) + '">' + abnEsc(tekst) + '</text></g>';
+  }
+  function wiel(cx){ return '<circle cx="' + cx + '" cy="228" r="22" fill="#fff" stroke="#1a2a3a" stroke-width="2"/><circle cx="' + cx + '" cy="228" r="8" fill="#c8d7e8" stroke="#1a2a3a" stroke-width="1.2"/>'; }
+  var lijn = 'stroke="#1a2a3a" stroke-width="2" stroke-linejoin="round"';
+  var assen = abnNum(w.assen);
+  var svg = '<div style="overflow-x:auto;"><svg viewBox="0 0 1120 305" width="100%" style="display:block;min-width:620px;max-height:320px;font-family:Barlow,sans-serif;" role="img" aria-label="' + (en ? 'Low loader with dimensions' : 'Dieplader met afmetingen') + '">' +
+    '<defs>' + ['lengte','hoogte','breedte','bodem','afstand'].map(function(k){ return pijl('abnp-' + k, kleur(k)); }).join('') + '</defs>' +
+    // grond
+    '<line x1="10" y1="250" x2="930" y2="250" stroke="#1a2a3a" stroke-width="3"/>' +
+    // lading
+    '<rect x="200" y="62" width="650" height="126" rx="4" fill="#eef3f9" stroke="#1a2a3a" stroke-width="2"/>' +
+    // trekker: cabine + chassis
+    '<path d="M40,205 L40,142 L72,100 L168,100 L168,205 Z" fill="#fff" ' + lijn + '/>' +
+    '<path d="M80,112 L156,112 L156,148 L60,148 Z" fill="#dce8f6" stroke="#1a2a3a" stroke-width="1.5"/>' +
+    '<rect x="40" y="200" width="300" height="12" fill="#fff" ' + lijn + '/>' +
+    // oplegger met verlaagde laadvloer (bak)
+    '<path d="M180,188 L870,188 L870,210 L592,210 L576,222 L376,222 L360,210 L180,210 Z" fill="#fff" ' + lijn + '/>' +
+    wiel(100) + wiel(255) + wiel(305) + wiel(660) + wiel(718) + wiel(776) +
+    // maatpijlen
+    maat(40, 40, 870, 40, 'lengte') +
+    '<line x1="40" y1="30" x2="40" y2="98" stroke="#9aa9bb" stroke-dasharray="3 3"/><line x1="870" y1="30" x2="870" y2="186" stroke="#9aa9bb" stroke-dasharray="3 3"/>' +
+    maat(895, 62, 895, 248, 'hoogte') +
+    '<line x1="852" y1="62" x2="905" y2="62" stroke="#9aa9bb" stroke-dasharray="3 3"/>' +
+    maat(330, 238, 636, 238, 'afstand') +
+    maat(476, 224, 476, 248, 'bodem') +
+    // labels
+    label(455, 12, 'middle', en ? 'Total length' : 'Totale lengte', waarde(w.lengte, 2, 'm') + lim('lengte', 2), 'lengte', 'lengte') +
+    label(905, 140, 'start', en ? 'Height' : 'Hoogte', waarde(w.hoogte, 2, 'm'), 'hoogte', 'hoogte') +
+    '<text x="905" y="176" font-size="11" fill="#5a6b80">' + abnEsc(lim('hoogte', 2)) + '</text>' +
+    label(330, 268, 'start', en ? 'Axle distance' : 'Asafstand', waarde(w.afstand, 2, 'm'), 'afstand', 'afstand') +
+    label(636, 268, 'end', en ? 'Ground clearance' : 'Bodemvrijheid', waarde(w.bodem, 0, 'cm') + lim('bodem', 0), 'bodem', 'bodem') +
+    // gegevens op de lading (zoals het blok in de Excel)
+    label(345, 100, 'middle', en ? 'Weight load + vehicle' : 'Gewicht lading + voertuig', waarde(w.gewicht, 1, 't') + lim('gewicht', 0), 'gewicht', 'gewicht') +
+    label(525, 100, 'middle', en ? 'Number of axles' : 'Aantal assen', assen === null ? '—' : abnFmt(assen, 0), 'info', 'assen') +
+    label(705, 100, 'middle', en ? 'Axle load' : 'Asdruk', (b.asdruk === null ? '—' : abnFmt(b.asdruk, 2) + (en ? ' t/axle' : ' t/as')) + lim('asdruk', 0), 'asdruk', 'assen') +
+    // achteraanzicht voor de breedte
+    '<text x="1045" y="52" text-anchor="middle" font-size="11" fill="#5a6b80">' + (en ? 'Rear view' : 'Achteraanzicht') + '</text>' +
+    '<rect x="985" y="62" width="120" height="126" rx="4" fill="#eef3f9" stroke="#1a2a3a" stroke-width="2"/>' +
+    '<rect x="995" y="188" width="100" height="22" fill="#fff" ' + lijn + '/>' +
+    '<rect x="997" y="210" width="26" height="40" rx="5" fill="#fff" ' + lijn + '/><rect x="1067" y="210" width="26" height="40" rx="5" fill="#fff" ' + lijn + '/>' +
+    '<line x1="970" y1="250" x2="1115" y2="250" stroke="#1a2a3a" stroke-width="3"/>' +
+    maat(985, 262, 1105, 262, 'breedte') +
+    '<g style="cursor:pointer" onclick="abnFocus(\'breedte\')"><text x="1045" y="284" text-anchor="middle" font-size="12" fill="#5a6b80">' + (en ? 'Width' : 'Breedte') + '</text>' +
+    '<text x="1045" y="301" text-anchor="middle" font-size="16" font-weight="700" fill="' + kleur('breedte') + '">' + abnEsc(waarde(w.breedte, 2, 'm') + lim('breedte', 0)) + '</text></g>' +
+    '</svg></div>';
+  box.innerHTML = svg +
+    '<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:#5a6b80;padding:2px 2px 4px;">' +
+    [['ok', en ? 'within limit' : 'binnen limiet'], ['nee', en ? 'exceeded' : 'overschreden'], ['open', en ? 'open / unknown' : 'open / onbekend']].map(function(p){ return '<span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:' + kl[p[0]] + ';margin-right:4px;"></span>' + p[1] + '</span>'; }).join('') +
+    '<span style="margin-left:auto;">' + (en ? 'Click a value to edit it' : 'Klik op een waarde om die in te vullen') + '</span></div>';
 }
 function abnRenderLijst(){
   var el = document.getElementById('abn-lijst'); if (!el) return;
@@ -25849,7 +25933,7 @@ function abnInit(){
 }
 document.addEventListener('input', function(e){ if (e.target && e.target.id && e.target.id.indexOf('abn-') === 0 && e.target.closest && e.target.closest('#nieuw-tab-abnormal')) abnBerekenen(); });
 document.addEventListener('change', function(e){ if (e.target && e.target.id && e.target.id.indexOf('abn-') === 0 && e.target.closest && e.target.closest('#nieuw-tab-abnormal')) abnBerekenen(); });
-['abnInit','abnBerekenen','abnOpslaanInLijst','abnLaad','abnVerwijder','abnNieuw','abnInstellingen','abnInstellingenOpslaan','abnVulKeuzes','abnRenderLijst','abnConfigKey']
+['abnInit','abnBerekenen','abnTekening','abnFocus','abnOpslaanInLijst','abnLaad','abnVerwijder','abnNieuw','abnInstellingen','abnInstellingenOpslaan','abnVulKeuzes','abnRenderLijst','abnConfigKey']
   .forEach(function(n){ try { window[n] = eval(n); } catch(e){} });
 
 // ===== TOOLBOX (Werkoverdracht) =====
