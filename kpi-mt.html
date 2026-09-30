@@ -217,7 +217,7 @@
 
       <div class="card">
         <div class="card-header"><div>&#x1F4F8;</div><h2>Opgeslagen maandoverzichten</h2></div>
-        <div style="padding:16px;color:var(--muted);font-size:13px;">Deze maandoverzichten worden niet naar de cloud gesynchroniseerd door de hoofdapp en zijn daarom hier niet beschikbaar. Ze zijn wel te vinden in het KPI Dashboard van de hoofdapp zelf, per apparaat.</div>
+        <div id="kpi-snapshots-lijst" style="padding:16px;"></div>
       </div>
     </div>
   </main>
@@ -685,6 +685,7 @@ function mtKpiStapMaand(d){
 function mtRenderKpi(){
   mtRenderTolynxKade();
   try { owMtRender(); } catch(e) {}
+  try { mtSnapRender(); } catch(e) {}
   var _ML = mt_ML(), _RT = mt_RT();
   var isImm = mtTerminal === 'IMM';
   var lbl = document.getElementById('kpi-maand-label');
@@ -1643,6 +1644,174 @@ function owMtPeriode(p){ _owPeriode = p; owMtRender(); }
 function owMtDienst(d){ _owDienst = d; owMtRender(); }
 function owMtSoort(x){ _owSoort = x; owMtRender(); }
 function owMtCsv(){ var a = OW.analyse(owMtBron(), _owPeriode, _owDienst, _owSoort); OW.download('overwerk-productiviteit_' + mtTerminal + '_' + _kpiY + '-' + String(_kpiM + 1).padStart(2, '0') + '.csv', OW.csv(a.rec, mtTerminal === 'IMM')); }
+
+
+// ═════════════════════════════════════════════════════════════════
+// OPGESLAGEN MAANDOVERZICHTEN (gedeelde kern — identiek in index.html en kpi-mt.html)
+// Elke afgesloten maand wordt als compacte samenvatting bewaard in <terminal>_kpi_snapshot_JJJJ_MM
+// (gaat mee in de cloud-sync). Zo blijven de cijfers bewaard, ook als de ruwe dagdata later wordt
+// opgeruimd. Een bestaand overzicht wordt alleen vervangen door een versie met minstens evenveel dagen.
+// ═════════════════════════════════════════════════════════════════
+var KPISNAP = (function(){
+  var TC = ['Eerste lijn','Klep neer','Aanvang lossen','Schip leeg','Eerste eigen rijder','Laden compleet','Ramp op','Vertrek'];
+  var VELDEN = ['trailers','eigen','containers','trade'];
+  var MND_NL = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December'];
+  var MND_EN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  function t2m(t){ if (!t) return null; var p = String(t).split(':'); if (p.length !== 2) return null; var h = parseInt(p[0], 10), m = parseInt(p[1], 10); return (isNaN(h) || isNaN(m)) ? null : h * 60 + m; }
+  function m2t(m){ if (m === null || m === undefined || isNaN(m)) return '—'; m = Math.round(m); return String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); }
+  function esc(t){ return String(t == null ? '' : t).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function sleutelDeel(jaar, maand){ return jaar + '_' + String(maand + 1).padStart(2, '0'); }
+  function inMaand(datum, jaar, maand){ var p = String(datum || '').split('/'); return p.length === 3 && parseInt(p[1], 10) === maand + 1 && parseInt(p[2], 10) === jaar; }
+  function isWeekend(datum){ var p = String(datum).split('/'); if (p.length !== 3) return false; var d = new Date(+p[2], +p[1] - 1, +p[0]).getDay(); return d === 0 || d === 6; }
+  function NORM(){ return (typeof window !== 'undefined' && window.KPINORM) ? window.KPINORM : null; }
+
+  // Maanden (jaar/maand) waarvoor ruwe Punctuality-data bestaat
+  function maandenMetData(vs){
+    var m = {};
+    Object.keys(vs || {}).forEach(function(k){ var e = vs[k]; var p = String((e && e.datum) || k).split('/'); if (p.length === 3) m[p[2] + '_' + p[1].padStart(2, '0')] = { jaar: +p[2], maand: +p[1] - 1 }; });
+    return Object.keys(m).sort().map(function(k){ return m[k]; });
+  }
+
+  // Samenvatting van één maand maken uit de ruwe data
+  function maak(vs, dagplans, routes, normen, jaar, maand, en){
+    var entries = Object.keys(vs || {}).map(function(k){ return vs[k]; }).filter(function(e){ return e && inMaand(e.datum, jaar, maand); });
+    if (!entries.length) return null;
+    var N = NORM(), tot = { gelost: 0, geladen: 0, buitenNorm: 0, meetpunten: 0, opTijd: 0 };
+    var rs = routes.map(function(naam, ri){
+      var r = { naam: naam, gelost: 0, geladen: 0, tijden: [], stipt: [], schipLeegDuur: null };
+      entries.forEach(function(e){ var u = e.units || {}; VELDEN.forEach(function(f){ r.gelost += parseInt(u['in-' + f + '-' + (ri + 1)], 10) || 0; r.geladen += parseInt(u['out-' + f + '-' + (ri + 1)], 10) || 0; }); });
+      var duren = [];
+      TC.forEach(function(kol, ti){
+        var som = 0, n = 0, bin = 0, buit = 0, heeftNorm = false;
+        entries.forEach(function(e){
+          var rij = (e.tijden || [])[ri], t = ((rij && rij.tijden) || [])[ti], m = t2m(t);
+          if (m === null) return;
+          som += m; n++;
+          if (N) {
+            var nk = naam + '_' + ti, we = isWeekend(e.datum);
+            var nv = (we && N.heeft(normen[nk + '_we'], ti)) ? normen[nk + '_we'] : normen[nk];
+            if (N.heeft(nv, ti)) heeftNorm = true;
+            var ev = N.check(nv, rij, ti, t);
+            if (ev) { if (ev.afw <= ev.marge) bin++; else buit++; }
+          }
+          if (ti === 3) { var k = t2m(((rij && rij.tijden) || [])[1]); if (k !== null) { var d = m - k; if (d < 0) d += 1440; duren.push(d); } }
+        });
+        r.tijden.push({ gem: n ? som / n : null, n: n });
+        r.stipt.push(heeftNorm && (bin + buit) ? { bin: bin, buit: buit } : null);
+        if (heeftNorm) { tot.meetpunten += bin + buit; tot.opTijd += bin; tot.buitenNorm += buit; }
+      });
+      if (duren.length) r.schipLeegDuur = { gem: duren.reduce(function(s, x){ return s + x; }, 0) / duren.length, n: duren.length };
+      tot.gelost += r.gelost; tot.geladen += r.geladen;
+      return r;
+    });
+    // Bezetting uit de Dagplanning (zelfde selectie als "Personeelsbezetting per dag")
+    var pers = { dagen: 0, O: 0, A: 0, extra: 0, inhuur: 0, uren: 0 };
+    Object.keys(dagplans || {}).forEach(function(iso){
+      var p = iso.split('-'); if (p.length !== 3 || +p[0] !== jaar || +p[1] !== maand + 1) return;
+      var dp = dagplans[iso]; if (!dp) return;
+      var pos = dp.pos || {}, sO = {}, sA = {};
+      Object.keys(pos).forEach(function(k){ var v = pos[k]; if (!v) return; if (k.indexOf('a_') === 0 || k.indexOf('av_') === 0) sA[v] = 1; else sO[v] = 1; });
+      var o = (dp.ochEmps || []).filter(function(e){ return sO[e.name]; }), a = (dp.avondEmps || []).filter(function(e){ return sA[e.name]; });
+      if (!o.length && !a.length) return;
+      pers.dagen++; pers.O += o.length; pers.A += a.length;
+      o.concat(a).forEach(function(e){ var t = (e.type || ''); if (t.toUpperCase().indexOf('EX') >= 0) pers.extra++; else if (t.toLowerCase().indexOf('inhuur') >= 0) pers.inhuur++; pers.uren += parseFloat(e.uren) || 0; });
+    });
+    return { v: 2, jaar: jaar, maand: maand, label: (en ? MND_EN : MND_NL)[maand] + ' ' + jaar, dagen: entries.length, routes: rs, totaal: tot, personeel: pers, opgeslagenOp: new Date().toISOString() };
+  }
+
+  // Vergelijk zonder tijdstempel (om onnodig opslaan/synchroniseren te voorkomen)
+  function zelfde(a, b){ if (!a || !b) return false; var x = JSON.parse(JSON.stringify(a)), y = JSON.parse(JSON.stringify(b)); delete x.opgeslagenOp; delete y.opgeslagenOp; delete x.label; delete y.label; return JSON.stringify(x) === JSON.stringify(y); }
+
+  // Oud formaat (met ruwe entries) omzetten naar een samenvatting
+  function normaliseer(s, routes, normen, en){
+    if (!s) return null;
+    if (s.v === 2) return s;
+    if (Array.isArray(s.entries) && s.jaar !== undefined && s.maand !== undefined) {
+      var vs = {}; s.entries.forEach(function(e){ if (e && e.datum) vs[e.datum] = e; });
+      var n = maak(vs, {}, routes, normen, s.jaar, s.maand, en); if (n) n.opgeslagenOp = s.opgeslagenOp || n.opgeslagenOp; return n;
+    }
+    return null;
+  }
+
+  // Alle overzichten verzamelen: opgeslagen + (nog niet opgeslagen) afgesloten maanden uit ruwe data
+  // lees(key) → object|null. prefix = 'EP_' enz.
+  function lijst(o){
+    var res = {}, nu = new Date(), dezeMaand = nu.getFullYear() * 12 + nu.getMonth();
+    o.sleutels.forEach(function(k){
+      if (k.indexOf(o.prefix + 'kpi_snapshot_') !== 0) return;
+      var s = normaliseer(o.lees(k), o.routes, o.normen, o.en); if (s) res[sleutelDeel(s.jaar, s.maand)] = s;
+    });
+    maandenMetData(o.vs).forEach(function(m){
+      if (m.jaar * 12 + m.maand >= dezeMaand) return; // lopende maand nog niet
+      var sd = sleutelDeel(m.jaar, m.maand), nieuw = maak(o.vs, o.dagplans, o.routes, o.normen, m.jaar, m.maand, o.en);
+      if (nieuw && (!res[sd] || nieuw.dagen >= res[sd].dagen)) { if (res[sd] && zelfde(res[sd], nieuw)) return; nieuw._nieuw = true; res[sd] = nieuw; }
+    });
+    return Object.keys(res).sort().reverse().map(function(k){ return res[k]; });
+  }
+
+  function pct(a, b){ return b ? Math.round(a / b * 100) + '%' : '—'; }
+  function render(el, overzichten, en){
+    if (!el) return;
+    var T = function(nl, e){ return en ? e : nl; };
+    if (!overzichten.length) { el.innerHTML = '<p style="color:#5a7090;font-size:13px;margin:0;">' + T('Nog geen afgesloten maanden. Een maand wordt automatisch bewaard zodra hij voorbij is.', 'No completed months yet. A month is saved automatically once it has ended.') + '</p>'; return; }
+    var th = 'padding:7px 9px;font-size:11px;text-align:center;';
+    var h = '<div style="font-size:12px;color:#5a7090;margin-bottom:10px;">' + T('Elke afgesloten maand wordt automatisch bewaard. Deze cijfers blijven staan, ook als de dagdata later wordt opgeruimd. Klik op een maand voor de details.', 'Every completed month is saved automatically. These figures stay, even if the daily data is cleaned up later. Click a month for details.') + '</div>' +
+      '<div style="overflow-x:auto;"><div style="min-width:640px;">' +
+      '<div style="display:grid;grid-template-columns:1.4fr .6fr .8fr .8fr .9fr .8fr 1fr;background:#003366;color:#fff;border-radius:6px 6px 0 0;font-weight:700;">' +
+      [T('Maand', 'Month'), T('Dagen', 'Days'), T('Gelost', 'Unloaded'), T('Geladen', 'Loaded'), T('Op tijd', 'On time'), T('Te laat', 'Late'), T('Gem. bezetting', 'Avg staffing')].map(function(t, i){ return '<div style="' + th + (i === 0 ? 'text-align:left;' : '') + '">' + t + '</div>'; }).join('') + '</div>';
+    overzichten.forEach(function(s, i){
+      var t = s.totaal || {}, p = s.personeel || {};
+      var kl = t.meetpunten ? (t.opTijd / t.meetpunten >= 0.8 ? '#1a7a40' : (t.opTijd / t.meetpunten >= 0.6 ? '#b06f00' : '#c0392b')) : '#5a7090';
+      var bez = p.dagen ? (Math.round(p.O / p.dagen * 10) / 10 + ' / ' + Math.round(p.A / p.dagen * 10) / 10).replace(/\./g, ',') : '—';
+      var td = 'padding:8px 9px;text-align:center;font-size:12.5px;';
+      h += '<details style="border:1px solid #dde6f0;border-top:none;background:' + (i % 2 ? '#f6f9fc' : '#fff') + ';">' +
+        '<summary style="list-style:none;cursor:pointer;display:grid;grid-template-columns:1.4fr .6fr .8fr .8fr .9fr .8fr 1fr;align-items:center;">' +
+        '<div style="' + td + 'text-align:left;font-weight:700;color:#003366;">&#x25B8; ' + esc((en ? MND_EN : MND_NL)[s.maand] + ' ' + s.jaar) + (s._nieuw ? ' <span style="font-size:10px;color:#8795a8;font-weight:400;">' + T('(uit dagdata)', '(from daily data)') + '</span>' : '') + '</div>' +
+        '<div style="' + td + '">' + s.dagen + '</div><div style="' + td + 'color:#1a5c9a;font-weight:700;">' + (t.gelost || 0) + '</div><div style="' + td + 'color:#1a7a40;font-weight:700;">' + (t.geladen || 0) + '</div>' +
+        '<div style="' + td + 'color:' + kl + ';font-weight:800;">' + pct(t.opTijd, t.meetpunten) + '</div><div style="' + td + 'color:' + (t.buitenNorm ? '#c0392b' : '#5a7090') + ';">' + (t.meetpunten ? t.buitenNorm : '—') + '</div>' +
+        '<div style="' + td + '" title="' + T('ochtend / avond', 'morning / evening') + '">' + bez + '</div></summary>' +
+        '<div style="padding:10px 12px 14px;border-top:1px dashed #dde6f0;">' + detail(s, en) + '</div></details>';
+    });
+    h += '</div></div>';
+    el.innerHTML = h;
+  }
+  function detail(s, en){
+    var T = function(nl, e){ return en ? e : nl; };
+    var kol = [1, 3, 5, 7]; // Klep neer, Schip leeg, Laden compleet, Vertrek
+    var th = 'padding:6px 8px;font-size:11px;text-align:center;background:#e8f0fb;color:#003366;';
+    var h = '<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr><th style="' + th + 'text-align:left;">Route</th><th style="' + th + '">' + T('Gelost', 'Unloaded') + '</th><th style="' + th + '">' + T('Geladen', 'Loaded') + '</th>' +
+      kol.map(function(ti){ return '<th style="' + th + '">' + TC[ti] + '</th>'; }).join('') + '</tr></thead><tbody>';
+    (s.routes || []).forEach(function(r){
+      h += '<tr><td style="padding:6px 8px;font-weight:700;color:#003366;border-bottom:1px solid #eef2f7;">' + esc(r.naam) + '</td>' +
+        '<td style="text-align:center;border-bottom:1px solid #eef2f7;">' + r.gelost + '</td><td style="text-align:center;border-bottom:1px solid #eef2f7;">' + r.geladen + '</td>' +
+        kol.map(function(ti){
+          var tj = (r.tijden || [])[ti] || {}, st = (r.stipt || [])[ti];
+          var waarde = ti === 3 && r.schipLeegDuur ? Math.round(r.schipLeegDuur.gem) + ' min' : m2t(tj.gem);
+          var sub = st ? '<div style="font-size:10.5px;font-weight:700;color:' + (st.bin / (st.bin + st.buit) >= 0.8 ? '#1a7a40' : '#c0392b') + ';">' + pct(st.bin, st.bin + st.buit) + T(' op tijd', ' on time') + '</div>' : '';
+          return '<td style="text-align:center;padding:5px 6px;border-bottom:1px solid #eef2f7;"><b>' + waarde + '</b>' + sub + '</td>';
+        }).join('') + '</tr>';
+    });
+    h += '</tbody></table>';
+    var p = s.personeel || {};
+    h += '<div style="font-size:11.5px;color:#5a7090;margin-top:8px;">' +
+      (p.dagen ? T('Bezetting: ', 'Staffing: ') + p.dagen + T(' dagen gepland · gemiddeld ', ' days planned · average ') + String(Math.round(p.O / p.dagen * 10) / 10).replace('.', ',') + T(' ochtend en ', ' morning and ') + String(Math.round(p.A / p.dagen * 10) / 10).replace('.', ',') + T(' avond · ', ' evening · ') + p.extra + T(' keer overwerk · ', ' overtime shifts · ') + p.inhuur + T(' keer inhuur', ' agency shifts') + ' · ' : '') +
+      T('Schip leeg = gemiddelde duur na klep neer. ', 'Ship empty = average duration after ramp down. ') +
+      (s.opgeslagenOp && !s._nieuw ? T('Bewaard op ', 'Saved on ') + new Date(s.opgeslagenOp).toLocaleDateString('nl-NL') + '.' : '') + '</div>';
+    return h;
+  }
+  return { maak: maak, lijst: lijst, render: render, zelfde: zelfde, sleutelDeel: sleutelDeel, maandenMetData: maandenMetData };
+})();
+if (typeof window !== 'undefined') window.KPISNAP = KPISNAP;
+
+// ── Opgeslagen maandoverzichten (alleen-lezen, uit de clouddata) ──
+function mtSnapRender(){
+  var el = document.getElementById('kpi-snapshots-lijst'); if (!el) return;
+  var en = mtTerminal === 'IMM';
+  try {
+    KPISNAP.render(el, KPISNAP.lijst({ routes: mt_RT(), vs: mt_vsGet(), dagplans: owMtBron().dagplans, normen: mtGetKpiNormen() || {}, en: en,
+      prefix: mtTerminalPrefix(), sleutels: Object.keys(CLOUD_DATA), lees: function(k){ try { return JSON.parse(LS.getItem(k)); } catch(e){ return null; } } }), en);
+  } catch(e) { el.innerHTML = '<p style="color:#c0392b;font-size:12px;">Maandoverzichten konden niet worden geladen: ' + e.message + '</p>'; }
+}
 
 </script>
 </body>
