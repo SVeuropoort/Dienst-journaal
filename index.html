@@ -21029,6 +21029,65 @@ function wisselPunctualityDatum(dateStr) {
       return removed;
     } catch(e) { return 0; }
   }
+// ── KPI-normen: "Schip leeg" is geen kloktijd maar een aantal minuten NA "Klep neer" (zelfde dag, zelfde route) ──
+var KPINORM = (function(){
+  var KOLOM = 3, KLEP = 1; // _TC[3] = 'Schip leeg', _TC[1] = 'Klep neer'
+  function t2m(t){ if (!t) return null; var p = String(t).split(':'); if (p.length !== 2) return null; var h = parseInt(p[0], 10), m = parseInt(p[1], 10); return (isNaN(h) || isNaN(m)) ? null : h * 60 + m; }
+  function isNaKlep(nv){ return !!nv && nv.naKlep !== undefined && nv.naKlep !== null && nv.naKlep !== '' && !isNaN(parseInt(nv.naKlep, 10)); }
+  function heeft(nv, ti){ if (ti === KOLOM) return isNaKlep(nv); return !!nv && (isNaKlep(nv) || !!nv.tijd); }
+  function marge(nv){ return nv && nv.marge ? parseInt(nv.marge, 10) || 0 : 0; }
+  function tekst(nv, en){ if (isNaKlep(nv)) return (en ? 'ramp +' : 'klep +') + parseInt(nv.naKlep, 10) + 'm'; return nv && nv.tijd ? nv.tijd : ''; }
+  function duur(rij, ti){ var k = t2m(((rij && rij.tijden) || [])[KLEP]), t = t2m(((rij && rij.tijden) || [])[ti]); if (k === null || t === null) return null; var d = t - k; if (d < 0) d += 1440; return d; }
+  // Eén meting toetsen. Geeft { afw, marge, extra } of null (geen norm / niet te bepalen).
+  function check(nv, rij, ti, t){
+    if (!heeft(nv, ti)) return null;
+    if (isNaKlep(nv)) { var d = duur(rij, ti); if (d === null) return null; var n = parseInt(nv.naKlep, 10); return { afw: d - n, marge: marge(nv), extra: ' (' + d + ' min)' }; }
+    var nm = t2m(nv.tijd), tm = t2m(t); if (nm === null || tm === null) return null;
+    return { afw: tm - nm, marge: marge(nv), extra: '' };
+  }
+  // Gemiddelde van een maand toetsen (tabel "Gemiddelde Vaarschema Tijden").
+  function gem(nv, entries, ri, ti, gemMin){
+    if (!heeft(nv, ti)) return null;
+    if (isNaKlep(nv)) {
+      var ds = []; (entries || []).forEach(function(e){ var d = duur((e.tijden || [])[ri], ti); if (d !== null) ds.push(d); });
+      if (!ds.length) return null;
+      var g = ds.reduce(function(s, x){ return s + x; }, 0) / ds.length;
+      return { afw: g - parseInt(nv.naKlep, 10), marge: marge(nv), duur: g };
+    }
+    var nm = t2m(nv.tijd); if (nm === null) return null;
+    return { afw: gemMin - nm, marge: marge(nv) };
+  }
+  return { KOLOM: KOLOM, heeft: heeft, isNaKlep: isNaKlep, tekst: tekst, check: check, gem: gem };
+})();
+if (typeof window !== 'undefined') window.KPINORM = KPINORM;
+
+// ── Punctualiteit per meetpunt: kaarten gegroepeerd in blokken per afvaart ──
+function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
+  var volgorde = routes.slice();
+  // Europoort: in de volgorde van de dag — Harwich ochtend, Immingham, Harwich middag
+  if (volgorde.indexOf('Harwich Ochtend') >= 0 && volgorde.indexOf('Immingham') >= 0 && volgorde.indexOf('Harwich Middag') >= 0)
+    volgorde = ['Harwich Ochtend', 'Immingham', 'Harwich Middag'];
+  var blok = function(titel, sub, inhoud, rand){
+    return '<div style="margin-bottom:18px;">' +
+      '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;background:#e8f0fb;border-left:5px solid ' + (rand || '#003366') + ';padding:8px 12px;border-radius:6px;margin-bottom:10px;">' +
+      '<span style="font-size:14px;font-weight:800;color:#003366;letter-spacing:.3px;">' + titel + '</span>' +
+      (sub ? '<span style="font-size:11.5px;color:#5a7090;font-weight:600;">' + sub + '</span>' : '') + '</div>' +
+      '<div style="' + rijStijl + '">' + inhoud + '</div></div>';
+  };
+  var html = volgorde.map(function(route){
+    var eigen = colStats.filter(function(s){ return s.route === route; });
+    if (!eigen.length) return '';
+    var ok = eigen.filter(function(s){ var ing = s.bin + s.buit + (s.gn || 0); return !s.hasN || (ing > 0 && s.bin / ing * 100 >= 80); }).length;
+    var sub = eigen.length + (en ? ' measuring points' : ' meetpunten') + ' · ' + ok + (en ? ' KPI OK' : ' KPI OK') + (ok < eigen.length ? ' · ' + (eigen.length - ok) + (en ? ' need attention' : ' aandacht') : '');
+    return blok('&#x26F4;&#xFE0F; ' + route, sub, eigen.map(kaart).join(''), ok < eigen.length ? '#c0392b' : '#1a7a40');
+  }).join('');
+  // Routes die (nog) niet in de vaste volgorde staan
+  var rest = colStats.filter(function(s){ return volgorde.indexOf(s.route) < 0; });
+  if (rest.length) html += blok(en ? 'Other' : 'Overig', '', rest.map(kaart).join(''));
+  if (tolynxHtml) html += blok('&#x1F69B; ' + (en ? 'Quay capacity' : 'Kade capaciteit'), '', tolynxHtml);
+  return html;
+}
+
   function _t2m(t){if(!t)return null;var p=t.split(':');if(p.length!==2)return null;return parseInt(p[0])*60+parseInt(p[1]);}
   function _m2t(m){if(m===null||isNaN(m))return '—';return String(Math.floor(m/60)%24).padStart(2,'0')+':'+String(Math.round(m%60)).padStart(2,'0');}
 
@@ -21051,9 +21110,12 @@ function wisselPunctualityDatum(dateStr) {
       _TC.forEach(function(col,ci){
         var k=rt+'_'+ci, nv=nm[k]||{};
         html+='<div style="border:1px solid var(--border);border-radius:6px;padding:8px;background:#fafcff;">';
-        html+='<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">'+col+'</div>';
+        html+='<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:'+(ci===KPINORM.KOLOM?'2':'6')+'px;">'+col+'</div>';
+        if(ci===KPINORM.KOLOM) html+='<div style="font-size:9.5px;color:#5a7090;margin-bottom:4px;">'+(_immNormen?'minutes after ramp down':'minuten na klep neer')+'</div>';
         html+='<div style="display:flex;gap:4px;align-items:center;">';
-        html+='<input type="text" placeholder="--:--" maxlength="5" data-key="'+k+'" data-field="tijd" value="'+(nv.tijd||'')+'" style="width:60px;padding:4px 6px;border:1px solid #c8d7e8;border-radius:4px;font-size:12px;text-align:center;">';
+        html+=(ci===KPINORM.KOLOM
+          ? '<input type="number" min="0" max="600" placeholder="min" data-key="'+k+'" data-field="naKlep" value="'+(KPINORM.isNaKlep(nv)?parseInt(nv.naKlep,10):'')+'" title="'+(_immNormen?'Minutes after ramp down':'Aantal minuten na klep neer')+'" style="width:60px;padding:4px 6px;border:1px solid #c8d7e8;border-radius:4px;font-size:12px;text-align:center;">'
+          : '<input type="text" placeholder="--:--" maxlength="5" data-key="'+k+'" data-field="tijd" value="'+(nv.tijd||'')+'" style="width:60px;padding:4px 6px;border:1px solid #c8d7e8;border-radius:4px;font-size:12px;text-align:center;">');
         html+='<span style="font-size:10px;color:#888;">&#177;</span>';
         html+='<input type="number" min="0" max="120" placeholder="min" data-key="'+k+'" data-field="marge" value="'+(nv.marge||'')+'" style="width:48px;padding:4px 6px;border:1px solid #c8d7e8;border-radius:4px;font-size:12px;text-align:center;">';
         html+='<span style="font-size:10px;color:#888;">min</span>';
@@ -21067,9 +21129,11 @@ function wisselPunctualityDatum(dateStr) {
         var kw=rt+'_'+ci+'_we', nv=nm[kw]||{}, wd=nm[rt+'_'+ci]||{};
         html+='<div style="border:1px solid #e8d080;border-radius:6px;padding:8px;background:#fffbf0;">';
         html+='<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:3px;">'+col+'</div>';
-        html+='<div style="font-size:9px;color:#bbb;margin-bottom:4px;">'+(_immNormen?'weekday':'werkdag')+': '+(wd.tijd||'--:--')+'</div>';
+        html+='<div style="font-size:9px;color:#bbb;margin-bottom:4px;">'+(_immNormen?'weekday':'werkdag')+': '+(ci===KPINORM.KOLOM?(KPINORM.isNaKlep(wd)?'+'+parseInt(wd.naKlep,10)+' min':'--'):(wd.tijd||'--:--'))+'</div>';
         html+='<div style="display:flex;gap:4px;align-items:center;">';
-        html+='<input type="text" placeholder="--:--" maxlength="5" data-key="'+kw+'" data-field="tijd" value="'+(nv.tijd||'')+'" style="width:60px;padding:4px 6px;border:1px solid #e8d080;border-radius:4px;font-size:12px;text-align:center;">';
+        html+=(ci===KPINORM.KOLOM
+          ? '<input type="number" min="0" max="600" placeholder="min" data-key="'+kw+'" data-field="naKlep" value="'+(KPINORM.isNaKlep(nv)?parseInt(nv.naKlep,10):'')+'" title="'+(_immNormen?'Minutes after ramp down':'Aantal minuten na klep neer')+'" style="width:60px;padding:4px 6px;border:1px solid #e8d080;border-radius:4px;font-size:12px;text-align:center;">'
+          : '<input type="text" placeholder="--:--" maxlength="5" data-key="'+kw+'" data-field="tijd" value="'+(nv.tijd||'')+'" style="width:60px;padding:4px 6px;border:1px solid #e8d080;border-radius:4px;font-size:12px;text-align:center;">');
         html+='<span style="font-size:10px;color:#888;">&#177;</span>';
         html+='<input type="number" min="0" max="120" placeholder="min" data-key="'+kw+'" data-field="marge" value="'+(nv.marge||'')+'" style="width:48px;padding:4px 6px;border:1px solid #e8d080;border-radius:4px;font-size:12px;text-align:center;">';
         html+='<span style="font-size:10px;color:#888;">min</span>';
@@ -21103,12 +21167,18 @@ function wisselPunctualityDatum(dateStr) {
       if(!nm[k]) nm[k]={};
       if(v) {
         nm[k][f]=v; // Sla alleen op als er een waarde is
+      } else if(f==='naKlep') {
+        // "Schip leeg" (minuten na klep neer) leeggemaakt -> norm vervalt
+        delete nm[k][f];
+        if(!nm[k].tijd && !nm[k].marge && !nm[k].naKlep) delete nm[k];
       } else if(nm[k][f] && k.indexOf('_we')>-1) {
         // Weekendveld leeggemaakt -> verwijder die key
         delete nm[k][f];
-        if(!nm[k].tijd && !nm[k].marge) delete nm[k];
+        if(!nm[k].tijd && !nm[k].marge && !nm[k].naKlep) delete nm[k];
       }
     });
+    // "Schip leeg" gebruikt nu minuten na klep neer: een oude kloktijd-norm daar vervalt.
+    Object.keys(nm).forEach(function(k){ if(new RegExp('_'+KPINORM.KOLOM+'(_we)?$').test(k) && nm[k]){ delete nm[k].tijd; if(!nm[k].naKlep && !nm[k].marge) delete nm[k]; } });
     localStorage.setItem('kpi_normen_v1',JSON.stringify(nm));
     if (typeof window.autoCloudOpslaan === 'function') window.autoCloudOpslaan();
     document.getElementById('kpi-normen-msg').textContent=((sessionStorage.getItem('dj_terminal')||'EP')==='IMM') ? '\u2713 Saved!' : '\u2713 Opgeslagen!';
@@ -21316,7 +21386,7 @@ function wisselPunctualityDatum(dateStr) {
     var tH=document.getElementById('kpi-tijden-hdr'),tB=document.getElementById('kpi-tijden-body');
     var nm=getKpiNormen();
     if(tH&&tB){
-      tH.innerHTML='<th style="background:var(--navy);color:#fff;padding:8px 10px;text-align:left;font-size:11px;">Route</th>'+_TC.map(function(h,hi){var nv=nm[_RT[0]+'_'+hi];var ns=nv&&nv.tijd?'<br><small style="color:#a8c4e8;font-weight:400;">'+nv.tijd+(nv.marge?'&#177;'+nv.marge+'m':'')+'</small>':'';return '<th style="background:var(--navy);color:#fff;padding:8px 6px;font-size:10px;text-align:center;white-space:nowrap;">'+h+ns+'</th>';}).join('');
+      tH.innerHTML='<th style="background:var(--navy);color:#fff;padding:8px 10px;text-align:left;font-size:11px;">Route</th>'+_TC.map(function(h,hi){var nv=nm[_RT[0]+'_'+hi];var ns=KPINORM.heeft(nv,hi)?'<br><small style="color:#a8c4e8;font-weight:400;">'+KPINORM.tekst(nv,(sessionStorage.getItem('dj_terminal')||'EP')==='IMM')+(nv.marge?'&#177;'+nv.marge+'m':'')+'</small>':'';return '<th style="background:var(--navy);color:#fff;padding:8px 6px;font-size:10px;text-align:center;white-space:nowrap;">'+h+ns+'</th>';}).join('');
       tB.innerHTML=_RT.map(function(route,ri){
         var sums=new Array(8).fill(0),cnts=new Array(8).fill(0);
         entries.forEach(function(e){var rij=(e.tijden||[])[ri];if(!rij)return;(rij.tijden||[]).forEach(function(t,ti){var m=_t2m(t);if(m!==null){sums[ti]+=m;cnts[ti]++;}});});
@@ -21325,7 +21395,7 @@ function wisselPunctualityDatum(dateStr) {
           var avg=cnts[i]>0?_m2t(s/cnts[i]):'&#x2014;';
           var sub=cnts[i]>0?'<br><small style="color:var(--muted);font-weight:400;">n='+cnts[i]+'</small>':'';
           var cb=bg,cc=cnts[i]>0?'var(--navy)':'var(--muted)',cbr='1px solid var(--border)';
-          if(cnts[i]>0){var nv=nm[route+'_'+i];if(nv&&nv.tijd){var nm2=_t2m(nv.tijd),mg=nv.marge?parseInt(nv.marge):0,av=s/cnts[i];if(nm2!==null){if(av<=nm2+mg){cb='#d4f5e2';cc='#1a7a40';cbr='2px solid #1a7a40';}else{cb='#fde8e8';cc='#c0392b';cbr='2px solid #c0392b';}}}}
+          if(cnts[i]>0){var nv=nm[route+'_'+i];var _ev=KPINORM.gem(nv,entries,ri,i,s/cnts[i]);if(_ev){if(_ev.duur!==undefined)sub+='<br><small style="color:var(--muted);font-weight:400;">'+Math.round(_ev.duur)+' min</small>';if(true){if(_ev.afw<=_ev.marge){cb='#d4f5e2';cc='#1a7a40';cbr='2px solid #1a7a40';}else{cb='#fde8e8';cc='#c0392b';cbr='2px solid #c0392b';}}}}
           return '<td style="text-align:center;padding:7px 6px;border:'+cbr+';background:'+cb+';font-weight:'+(cnts[i]>0?'700':'400')+';color:'+cc+';">'+avg+sub+'</td>';
         }).join('')+'</tr>';
       }).join('');
@@ -21435,7 +21505,7 @@ function wisselPunctualityDatum(dateStr) {
     var nT=document.getElementById('kpi-normen-body-tbl'),nC=document.getElementById('kpi-normen-card');
     if(nT&&nC){
       var normen=getKpiNormen(),bRows=[];
-      entries.forEach(function(e){_RT.forEach(function(route,ri){var rij=(e.tijden||[])[ri];if(!rij)return;(rij.tijden||[]).forEach(function(t,ti){if(!t)return;var _d=e.datum?e.datum.split('/'):[],_isWE=false;if(_d.length===3){var _wd=new Date(parseInt(_d[2]),parseInt(_d[1])-1,parseInt(_d[0]));_isWE=_wd.getDay()===0||_wd.getDay()===6;}var _nk=route+'_'+ti+(_isWE&&normen[route+'_'+ti+'_we']?'_we':'');var nv=normen[_nk];if(!nv||!nv.tijd)return;var nm2=_t2m(nv.tijd);if(nm2===null)return;var mg=nv.marge?parseInt(nv.marge):0,tM=_t2m(t);if(tM===null)return;var afw=tM-nm2;if(afw>mg)bRows.push({datum:e.datum,route:route,kolom:_TC[ti],werkelijk:t,norm:nv.tijd,marge:mg,afwijking:afw,isWE:_isWE,opm:[(e.sjor&&(e.sjor.opm||e.sjor['opm']))||(e.units&&e.units['opmerking-lossing'])||(e.units&&e.units['opmerking-lading'])].filter(Boolean).join(' | ')});});});});
+      entries.forEach(function(e){_RT.forEach(function(route,ri){var rij=(e.tijden||[])[ri];if(!rij)return;(rij.tijden||[]).forEach(function(t,ti){if(!t)return;var _d=e.datum?e.datum.split('/'):[],_isWE=false;if(_d.length===3){var _wd=new Date(parseInt(_d[2]),parseInt(_d[1])-1,parseInt(_d[0]));_isWE=_wd.getDay()===0||_wd.getDay()===6;}var _nk=route+'_'+ti+(_isWE&&KPINORM.heeft(normen[route+'_'+ti+'_we'],ti)?'_we':'');var nv=normen[_nk];var _ev=KPINORM.check(nv,rij,ti,t);if(!_ev)return;var mg=_ev.marge,afw=_ev.afw;if(afw>mg)bRows.push({datum:e.datum,route:route,kolom:_TC[ti],werkelijk:t+_ev.extra,norm:KPINORM.tekst(nv,(sessionStorage.getItem('dj_terminal')||'EP')==='IMM'),marge:mg,afwijking:afw,isWE:_isWE,opm:[(e.sjor&&(e.sjor.opm||e.sjor['opm']))||(e.units&&e.units['opmerking-lossing'])||(e.units&&e.units['opmerking-lading'])].filter(Boolean).join(' | ')});});});});
       if(!bRows.length){nC.style.display='none';}else{nC.style.display='block';var _immNb=(sessionStorage.getItem('dj_terminal')||'EP')==='IMM';var _nb=document.getElementById('normen-count-badge');if(_nb)_nb.textContent=_immNb ? (bRows.length+' row'+(bRows.length===1?'':'s')) : (bRows.length+' regel'+(bRows.length===1?'':'s'));nT.innerHTML=bRows.map(function(r,i){var bg=r.isWE?(i%2===0?'#fff3cd':'#ffeaa7'):(i%2===0?'#fff5f5':'#fde8e8'),aw=(r.afwijking>0?'+':'')+r.afwijking+' min',weBadge=r.isWE?'<span style="background:#e67e22;color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:5px;vertical-align:middle;">WE</span>':'';return '<tr onclick="kpiNormRegelNaarPunctualiteit(\''+r.datum+'\')" title="'+(_immNb?'Click to go to this day in Punctuality':'Klik om naar deze dag in Punctuality te gaan')+'" style="cursor:pointer;background:'+bg+';" onmouseover="this.style.filter=\'brightness(0.94)\'" onmouseout="this.style.filter=\'none\'"><td style="padding:7px 10px;border:1px solid #f5b7b1;font-weight:700;color:var(--navy);">'+r.datum+weBadge+'</td><td style="padding:7px 10px;border:1px solid #f5b7b1;">'+r.route+'</td><td style="padding:7px 10px;border:1px solid #f5b7b1;">'+r.kolom+'</td><td style="text-align:center;padding:7px 10px;border:1px solid #f5b7b1;font-weight:700;color:#c0392b;">'+r.werkelijk+'</td><td style="text-align:center;padding:7px 10px;border:1px solid #f5b7b1;color:#555;">'+r.norm+'&#177;'+r.marge+'m</td><td style="text-align:center;padding:7px 10px;border:1px solid #f5b7b1;font-weight:700;color:#c0392b;">'+aw+'</td><td onclick="event.stopPropagation()" style="padding:7px 10px;border:1px solid #f5b7b1;color:'+(r.opm?'var(--navy)':'#aaa')+';font-style:'+(r.opm?'normal':'italic')+';cursor:text;">'+(r.opm||'&#x2014;')+'</td></tr>';}).join('');}
     }
 
@@ -21449,7 +21519,7 @@ function wisselPunctualityDatum(dateStr) {
         _RT.forEach(function(route,ri){
           var bin=0,buit=0,gn=0,leeg=0,normT=null,normM=0,hasN=false;
           var nv=normen2[route+'_'+ci];
-          if(nv&&nv.tijd){normT=nv.tijd;normM=nv.marge?parseInt(nv.marge):0;hasN=true;}
+          if(KPINORM.heeft(nv,ci)){normT=KPINORM.tekst(nv,(sessionStorage.getItem('dj_terminal')||'EP')==='IMM');normM=nv.marge?parseInt(nv.marge):0;hasN=true;}
           entries.forEach(function(e){
             var _d=e.datum?e.datum.split('/'):[],_isWE=false;
             if(_d.length===3){var _wd=new Date(parseInt(_d[2]),parseInt(_d[1])-1,parseInt(_d[0]));_isWE=_wd.getDay()===0||_wd.getDay()===6;}
@@ -21462,9 +21532,10 @@ function wisselPunctualityDatum(dateStr) {
             // gebruik weekend-norm indien beschikbaar (en die daadwerkelijk een tijd heeft ingevuld —
             // anders valt terug op de basisnorm, ook al bestaat er wel een leeg weekend-object)
             var _nk=route+'_'+ci+(_isWE&&normen2[route+'_'+ci+'_we']?'_we':'');
-            var nv2=(normen2[_nk]&&normen2[_nk].tijd)?normen2[_nk]:normen2[route+'_'+ci];
-            if(!nv2||!nv2.tijd){gn++;}
-            else{var nm2=_t2m(nv2.tijd),mg2=nv2.marge?parseInt(nv2.marge):0;if(tM<=nm2+mg2)bin++;else buit++;}
+            var nv2=KPINORM.heeft(normen2[_nk],ci)?normen2[_nk]:normen2[route+'_'+ci];
+            var _ev2=KPINORM.check(nv2,rij,ci,t);
+            if(!_ev2){gn++;}
+            else{if(_ev2.afw<=_ev2.marge)bin++;else buit++;}
           });
           if(bin+buit+gn+leeg>0)
             colStats.push({kolom:kolom,route:route,bin:bin,buit:buit,gn:gn,leeg:leeg,normT:normT,normM:normM,hasN:hasN});
@@ -21477,7 +21548,8 @@ function wisselPunctualityDatum(dateStr) {
       else{
         cC.style.display='block';
         var _immPie = (sessionStorage.getItem('dj_terminal')||'EP')==='IMM';
-        cW.innerHTML=colStats.map(function(s){
+        cW.style.display='block';
+        var _pieKaart=function(s){
           var tot=s.bin+s.buit+(s.gn||0)+s.leeg; // altijd = entries.length → cirkel = 100%
           var ingevuld=s.bin+s.buit+(s.gn||0);
           var pct=s.hasN?(ingevuld>0?Math.round(s.bin/ingevuld*100):0):null;
@@ -21512,7 +21584,8 @@ function wisselPunctualityDatum(dateStr) {
             '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">'+paths+donut+lbls+'</svg>'+
             '<div style="font-size:9px;color:#999;margin-top:1px;">'+(s.hasN?(_immPie?'norm ':'norm ')+s.normT+(s.normM?'&#177;'+s.normM+'m':'')+'  &#x2022;  ':'')+tot+(_immPie?' data points':' meetpunten')+'</div>'+
             '<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;justify-content:center;">'+leg+'</div></div>';
-        }).join('') + tolynxKaartHtml;
+        };
+        cW.innerHTML=kpiPieBlokken(colStats,_pieKaart,tolynxKaartHtml,_RT,_immPie,'display:flex;flex-wrap:wrap;gap:16px;');
       }
     }
   }
