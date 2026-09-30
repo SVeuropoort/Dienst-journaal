@@ -33,6 +33,8 @@
   .card-header h2{font-size:15px;margin:0;color:var(--navy);}
   #kpi-placeholder{color:var(--muted);font-size:13px;padding:40px;text-align:center;}
   #kpi-content{transition:opacity 0.25s ease;}
+  .card.mt-dicht > :not(.mt-kop){display:none !important;}
+  .card.mt-dicht > .mt-kop{margin-bottom:0 !important;}
   footer.mt-foot{max-width:1200px;margin:0 auto;padding:0 24px 32px;color:var(--muted);font-size:11px;text-align:center;}
 </style>
 </head>
@@ -553,7 +555,41 @@ function mtNaarPunctualiteit(datumSlash){
     encodeURIComponent(iso) + '&terminal=' + encodeURIComponent(mtTerminal);
 }
 
+
+// ── Inklapbare kaarten: klik op de kop van een kaart om hem open/dicht te vouwen ──
+// Dagenoverzicht en Dagen buiten de normen staan standaard dicht. De keuze wordt per apparaat onthouden.
+function mtKaartenInklapbaar(){
+  var standaardDicht = ['Dagenoverzicht', 'Dagen buiten de normen'];
+  var bewaard = {}; try { bewaard = JSON.parse(localStorage.getItem('kpi_mt_ingeklapt_v1') || '{}') || {}; } catch(e){}
+  Array.prototype.forEach.call(document.querySelectorAll('#kpi-content .card'), function(card){
+    var hdr = card.querySelector(':scope > .card-header') || card.firstElementChild; if (!hdr || hdr.getAttribute('data-inklap')) return;
+    hdr.classList.add('mt-kop');
+    var h2 = hdr.querySelector('h2'); var naam = h2 ? h2.textContent.replace(/\s+/g, ' ').trim() : ''; if (!naam) return;
+    naam = naam.replace(/\s*\d+\s*(regel|regels|row|rows)$/i, '');
+    hdr.setAttribute('data-inklap', naam);
+    hdr.style.cursor = 'pointer'; hdr.style.userSelect = 'none';
+    if (getComputedStyle(hdr).display !== 'flex') hdr.style.display = 'flex';
+    var pijl = document.createElement('span');
+    pijl.style.cssText = 'margin-left:auto;font-size:16px;color:var(--navy);transition:transform .2s;padding-left:10px;';
+    pijl.textContent = '▼';
+    hdr.appendChild(pijl);
+    var zet = function(dicht){
+      card.classList.toggle('mt-dicht', dicht);
+      pijl.style.transform = dicht ? 'rotate(-90deg)' : 'none';
+      hdr.style.borderBottom = dicht ? 'none' : '';
+      hdr.title = dicht ? 'Klik om open te klappen' : 'Klik om dicht te klappen';
+    };
+    var dicht = (naam in bewaard) ? !!bewaard[naam] : standaardDicht.indexOf(naam) >= 0;
+    zet(dicht);
+    hdr.addEventListener('click', function(ev){
+      if (ev.target.closest('button')) return; // knoppen in de kop blijven gewoon werken
+      dicht = !dicht; zet(dicht);
+      bewaard[naam] = dicht; try { localStorage.setItem('kpi_mt_ingeklapt_v1', JSON.stringify(bewaard)); } catch(e){}
+    });
+  });
+}
 function mtInit(){
+  try { mtKaartenInklapbaar(); } catch(e) {}
   mtWisselTerminal(mtTerminal);
   // Automatisch verversen elke 60 seconden, zoals bij de materieel-garage-pagina.
   setInterval(function(){ mtLaadTerminalData(mtTerminal); }, 60000);
@@ -616,14 +652,14 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
       '<div style="' + rijStijl + '">' + inhoud + '</div></div>';
   };
   var html = volgorde.map(function(route){
-    var eigen = colStats.filter(function(s){ return s.route === route; });
+    var eigen = colStats.filter(function(s){ return s.route === route && s.bin + s.buit > 0; });
     if (!eigen.length) return '';
-    var ok = eigen.filter(function(s){ var ing = s.bin + s.buit + (s.gn || 0); return !s.hasN || (ing > 0 && s.bin / ing * 100 >= 80); }).length;
+    var ok = eigen.filter(function(s){ var ing = s.bin + s.buit; return !s.hasN || (ing > 0 && s.bin / ing * 100 >= 80); }).length;
     var sub = eigen.length + (en ? ' measuring points' : ' meetpunten') + ' · ' + ok + (en ? ' KPI OK' : ' KPI OK') + (ok < eigen.length ? ' · ' + (eigen.length - ok) + (en ? ' need attention' : ' aandacht') : '');
     return blok('&#x26F4;&#xFE0F; ' + route, sub, eigen.map(kaart).join(''), ok < eigen.length ? '#c0392b' : '#1a7a40');
   }).join('');
   // Routes die (nog) niet in de vaste volgorde staan
-  var rest = colStats.filter(function(s){ return volgorde.indexOf(s.route) < 0; });
+  var rest = colStats.filter(function(s){ return volgorde.indexOf(s.route) < 0 && s.bin + s.buit > 0; });
   if (rest.length) html += blok(en ? 'Other' : 'Overig', '', rest.map(kaart).join(''));
   if (tolynxHtml) html += blok('&#x1F69B; ' + (en ? 'Quay capacity' : 'Kade capaciteit'), '', tolynxHtml);
   return html;
@@ -933,16 +969,15 @@ function mtRenderKpi(){
     cC.style.display = 'block';
     cW.style.display = 'block';
     var _pieKaart = function(s){
-      var tot = s.bin+s.buit+(s.gn||0)+s.leeg;
-      var ingevuld = s.bin+s.buit+(s.gn||0);
+      var tot = s.bin+s.buit; // alleen afvaarten die er echt waren: niet ingevulde tijden tellen niet mee
+      var ingevuld = s.bin+s.buit;
       var pct = s.hasN ? (ingevuld>0 ? Math.round(s.bin/ingevuld*100) : 0) : null;
       var ok = !s.hasN || pct>=80;
       var kc = !s.hasN ? '#3498db' : pct>=80 ? '#1a7a40' : pct>=60 ? '#e67e22' : '#c0392b';
       var segs = s.hasN
         ? [s.bin>0?{l:(isImm?'On time':'Op tijd'),v:s.bin,c:'#27ae60'}:null,
            s.buit>0?{l:(isImm?'Late':'Te laat'),v:s.buit,c:'#e74c3c'}:null,
-           s.gn>0?{l:(isImm?'No matching norm':'Geen passende norm'),v:s.gn,c:'#f39c12'}:null,
-           s.leeg>0?{l:(isImm?'Not filled in':'Niet ingevuld'),v:s.leeg,c:'#cccccc'}:null].filter(Boolean)
+           ].filter(Boolean)
         : [s.gn>0?{l:(isImm?'Filled in':'Ingevuld'),v:s.gn,c:'#3498db'}:null, s.leeg>0?{l:(isImm?'Not filled in':'Niet ingevuld'),v:s.leeg,c:'#cccccc'}:null].filter(Boolean);
       var R=60,cx=100,cy=90,W=200,H=210,cum=-90,paths='',lbls='',totDeg=0;
       segs.forEach(function(seg,si){
