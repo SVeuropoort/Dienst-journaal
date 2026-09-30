@@ -10373,6 +10373,9 @@ document.getElementById('archOverlay').addEventListener('click',function(e){
             <button type="button" onclick="owInstellingen()" title="Tarieven en route &rarr; dienst instellen" style="background:none;border:none;cursor:pointer;font-size:16px;">&#x2699;&#xFE0F;</button>
           </div>
           <div id="ow-body" style="padding:16px;"></div>
+        </div><div class="card" id="vz-card" style="margin-bottom:20px;">
+          <div class="card-header"><div class="icon">&#x1F912;</div><h2>Verzuim &amp; bezetting</h2></div>
+          <div id="vz-body" style="padding:16px;"></div>
         </div><div class="card" style="margin-bottom:20px;"><div class="card-header"><div class="icon">&#x1F550;</div><h2>Gemiddelde Vaarschema Tijden <span onclick="openKpiNormen()" style="cursor:pointer;font-size:16px;margin-left:8px;">&#x2699;&#xFE0F;</span></h2></div><div style="overflow-x:auto;padding:16px;"><table style="width:100%;border-collapse:collapse;min-width:700px;"><thead><tr id="kpi-tijden-hdr"></tr></thead><tbody id="kpi-tijden-body"></tbody></table></div></div><div class="card" style="margin-bottom:20px;"><div class="card-header"><div class="icon">&#x1F4E6;</div><h2>Totaal Geladen &amp; Gelost per Route</h2></div><div style="overflow-x:auto;padding:16px;"><table style="width:100%;border-collapse:collapse;"><thead><tr id="kpi-units-hdr"></tr></thead><tbody id="kpi-units-body"></tbody></table></div></div><div class="card" style="margin-bottom:20px;"><div class="card-header" onclick="toggleDagenoverzicht()" style="cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;"><div style="display:flex;align-items:center;gap:8px;"><div class="icon">&#x1F4C5;</div><h2>Dagenoverzicht</h2></div><span id="dag-arrow" style="font-size:18px;color:var(--navy);transition:transform 0.25s;">&#9660;</span></div><div id="dagenoverzicht-body" style="display:none;"><div style="overflow-x:auto;padding:16px;"><table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:var(--navy);color:#fff;"><th style="padding:8px 10px;text-align:left;">Datum</th><th style="padding:8px 10px;text-align:center;">Lossen</th><th style="padding:8px 10px;text-align:center;">Laden</th><th style="padding:8px 10px;text-align:center;">Tijden</th></tr></thead><tbody id="kpi-dag-body"></tbody></table></div></div></div><div class="card" id="kpi-normen-card" style="display:none;margin-top:20px;"><div class="card-header" onclick="toggleNormen()" style="cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;"><div style="display:flex;align-items:center;gap:8px;"><div class="icon">&#x1F6A8;</div><h2>Dagen buiten de normen</h2><span id="normen-count-badge" style="background:#c0392b;color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:4px;"></span></div><span id="normen-arrow" style="font-size:18px;color:#c0392b;transition:transform 0.25s;">&#9660;</span></div><div id="normen-body-wrap" style="display:none;"><div style="overflow-x:auto;padding:16px;"><table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:#c0392b;color:#fff;"><th style="padding:8px 10px;text-align:left;">Datum</th><th style="padding:8px 10px;text-align:left;">Route</th><th style="padding:8px 10px;text-align:left;">Kolom</th><th style="padding:8px 10px;text-align:center;">Werkelijk</th><th style="padding:8px 10px;text-align:center;">Norm</th><th style="padding:8px 10px;text-align:center;">Afwijking</th><th style="padding:8px 10px;text-align:left;">Opmerking</th></tr></thead><tbody id="kpi-normen-body-tbl"></tbody></table></div></div></div><div id="kpi-chart-card" style="display:none;margin-top:20px;"><div class="card-header" style="padding:16px 20px;"><div class="icon">&#x1F3AF;</div><h2>KPI Tijden &#x2013; Maandoverzicht</h2></div><div id="kpi-charts-wrap" style="padding:16px;display:flex;flex-wrap:wrap;gap:24px;"></div></div>
 
         <!-- MAAND SNAPSHOTS -->
@@ -21191,6 +21194,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
   function renderKPI(){
     renderTolynxKade();
     try { if (typeof window.owRenderKpi === 'function') window.owRenderKpi(_kpiY, _kpiM); } catch(e) {}
+    try { if (typeof window.vzRenderKpi === 'function') window.vzRenderKpi(); } catch(e) {}
     try { if (typeof window.kpiSnapRender === 'function') window.kpiSnapRender(); } catch(e) {}
     var lbl=document.getElementById('kpi-maand-label');
     if(lbl) lbl.textContent=_ML[_kpiM]+' '+_kpiY;
@@ -26519,6 +26523,188 @@ setInterval(function(){ try { owShutoutVul(false); } catch(e){} }, 1000);
 window.OW = OW;
 
 // ═════════════════════════════════════════════════════════════════
+// VERZUIM & BEZETTING (gedeelde kern — identiek in index.html en kpi-mt.html)
+// Koppelt de ziekmeldingen (Werkoverdracht) aan de Dagplanning, de standaardbezetting en de
+// vertrektijden uit Punctuality. Toont ALLEEN tellingen: geen namen of bijzonderheden (privacy/AVG).
+// ═════════════════════════════════════════════════════════════════
+var VZ = (function(){
+  var MND_NL = ['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'];
+  var MND_EN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var DN = ['Zo','Ma','Di','Wo','Do','Vr','Za'];
+  function hel(n, dec){ if (n === null || n === undefined || isNaN(n)) return '—'; return Number(n).toLocaleString('nl-NL', { minimumFractionDigits: 0, maximumFractionDigits: dec || 0 }); }
+  function iso(d){ return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function slash(i){ var p = i.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+  function dagenTussen(a, b){ return Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 86400000); }
+  function maandSleutel(j, m){ return j + '-' + String(m + 1).padStart(2, '0'); }
+  function periodeMaanden(jaar, maand, n){ var r = []; for (var i = n - 1; i >= 0; i--) { var d = new Date(jaar, maand - i, 1); r.push({ jaar: d.getFullYear(), maand: d.getMonth(), key: maandSleutel(d.getFullYear(), d.getMonth()) }); } return r; }
+
+  function bezetting(dp){
+    var pos = dp.pos || {}, sO = {}, sA = {};
+    Object.keys(pos).forEach(function(k){ var v = pos[k]; if (!v) return; if (k.indexOf('a_') === 0 || k.indexOf('av_') === 0) sA[v] = 1; else sO[v] = 1; });
+    var tel = function(l, s){ var ems = (l || []).filter(function(e){ return s[e.name]; });
+      return { n: ems.length, exUren: ems.filter(function(e){ return (e.type || '').toUpperCase().indexOf('EX') >= 0; }).reduce(function(t, e){ return t + (parseFloat(e.uren) || 8); }, 0) }; };
+    return { O: tel(dp.ochEmps, sO), A: tel(dp.avondEmps, sA) };
+  }
+
+  // Eén record per dag met een ingevulde Dagplanning
+  function dagen(src, maandenSet){
+    var N = (typeof window !== 'undefined' && window.KPINORM) ? window.KPINORM : null;
+    var ziek = (src.ziek || []).filter(function(z){ return z && z.gemeldOp; });
+    var res = [];
+    Object.keys(src.dagplans || {}).sort().forEach(function(d){
+      if (!maandenSet[d.slice(0, 7)]) return;
+      var dp = src.dagplans[d]; if (!dp) return;
+      var b = bezetting(dp); if (!b.O.n && !b.A.n) return;
+      var wd = new Date(d + 'T12:00:00').getDay(), we = wd === 0 || wd === 6;
+      var std = src.std[DN[wd]] || {}, sO = std.och_totaal || null, sA = std.av_totaal || null;
+      var tekortO = sO ? Math.max(0, sO - b.O.n) : 0, tekortA = sA ? Math.max(0, sA - b.A.n) : 0;
+      var zieken = ziek.filter(function(z){ return z.gemeldOp <= d && (!z.beterOp || d < z.beterOp); }).length;
+      var bin = 0, tot = 0, e = (src.vs || {})[slash(d)];
+      if (e && N) (src.routes || []).forEach(function(r, ri){
+        var rij = (e.tijden || [])[ri], t = ((rij && rij.tijden) || [])[7]; if (!t) return;
+        var nk = r + '_7', nv = (we && N.heeft(src.normen[nk + '_we'], 7)) ? src.normen[nk + '_we'] : src.normen[nk];
+        var ev = N.check(nv, rij, 7, t); if (ev) { tot++; if (ev.afw <= ev.marge) bin++; }
+      });
+      res.push({ iso: d, dag: DN[wd], zieken: zieken, O: b.O.n, A: b.A.n, stdO: sO, stdA: sA, tekort: tekortO + tekortA,
+        onder: tekortO > 0 || tekortA > 0, heeftStd: !!(sO || sA), exUren: b.O.exUren + b.A.exUren, bin: bin, tot: tot });
+    });
+    return res;
+  }
+
+  function samenvatting(src, maanden){
+    var set = {}; maanden.forEach(function(m){ set[m.key] = 1; });
+    var ds = dagen(src, set);
+    var start = maanden[0].key + '-01', eind = iso(new Date(maanden[maanden.length - 1].jaar, maanden[maanden.length - 1].maand + 1, 0));
+    var ziek = (src.ziek || []).filter(function(z){ return z && z.gemeldOp; });
+    var nieuw = ziek.filter(function(z){ return z.gemeldOp >= start && z.gemeldOp <= eind; }).length;
+    var afgerond = ziek.filter(function(z){ return z.beterOp && z.beterOp >= start && z.beterOp <= eind; });
+    var duur = afgerond.length ? afgerond.reduce(function(s, z){ return s + Math.max(1, dagenTussen(z.gemeldOp, z.beterOp)); }, 0) / afgerond.length : null;
+    var nogZiek = ziek.filter(function(z){ return z.gemeldOp <= eind && (!z.beterOp || z.beterOp > eind); }).length;
+    var ziektedagen = ds.reduce(function(s, d){ return s + d.zieken; }, 0);
+    var gewerkt = ds.reduce(function(s, d){ return s + d.O + d.A; }, 0);
+    var pct = (gewerkt + ziektedagen) ? ziektedagen / (gewerkt + ziektedagen) * 100 : null;
+    var metStd = ds.filter(function(d){ return d.heeftStd; }), onder = metStd.filter(function(d){ return d.onder; }), vol = metStd.filter(function(d){ return !d.onder; });
+    var groep = function(l){ var b = l.reduce(function(s, d){ return s + d.bin; }, 0), t = l.reduce(function(s, d){ return s + d.tot; }, 0);
+      return { n: l.length, opTijd: t ? b / t * 100 : null, afvaarten: t, exUren: l.length ? l.reduce(function(s, d){ return s + d.exUren; }, 0) / l.length : null, tekort: l.length ? l.reduce(function(s, d){ return s + d.tekort; }, 0) / l.length : null }; };
+    return { dagen: ds, nieuw: nieuw, afgerond: afgerond.length, duur: duur, nogZiek: nogZiek, ziektedagen: ziektedagen, gewerkt: gewerkt, pct: pct,
+      metStd: metStd.length, onder: groep(onder), vol: groep(vol),
+      z0: groep(ds.filter(function(d){ return d.zieken === 0; })), z1: groep(ds.filter(function(d){ return d.zieken === 1; })), z2: groep(ds.filter(function(d){ return d.zieken >= 2; })) };
+  }
+
+  // Compacte versie voor de maandoverzichten
+  function maandKort(src, jaar, maand){
+    var s = samenvatting(src, [{ jaar: jaar, maand: maand, key: maandSleutel(jaar, maand) }]);
+    if (!s.dagen.length && !s.nieuw) return null;
+    return { meldingen: s.nieuw, ziektedagen: s.ziektedagen, pct: s.pct === null ? null : Math.round(s.pct * 10) / 10, onderDagen: s.onder.n, dagenMetStd: s.metStd };
+  }
+
+  function zin(icoon, tekst, kleur){
+    return '<div style="display:flex;gap:12px;align-items:flex-start;padding:9px 0;border-bottom:1px solid #eef2f7;">' +
+      '<div style="font-size:22px;line-height:1;width:30px;text-align:center;flex:0 0 30px;">' + icoon + '</div>' +
+      '<div style="font-size:15px;line-height:1.45;color:#1a2a4a;flex:1;">' + tekst + '</div>' +
+      (kleur ? '<div style="flex:0 0 12px;width:12px;height:12px;border-radius:50%;background:' + kleur + ';margin-top:5px;"></div>' : '') + '</div>';
+  }
+  function tegel(titel, waarde, sub){
+    return '<div style="flex:1;min-width:150px;background:#fff;border:1px solid #dde6f0;border-radius:10px;padding:12px 14px;">' +
+      '<div style="font-size:11px;color:#5a7090;text-transform:uppercase;letter-spacing:.5px;font-weight:700;">' + titel + '</div>' +
+      '<div style="font-size:26px;font-weight:800;color:#003366;margin-top:2px;">' + waarde + '</div>' +
+      '<div style="font-size:11.5px;color:#5a7090;margin-top:2px;">' + sub + '</div></div>';
+  }
+  function trend(src, jaar, maand, en){
+    var ms = periodeMaanden(jaar, maand, 6);
+    var w = ms.map(function(m){ var s = samenvatting(src, [m]); return { m: m, pct: s.dagen.length ? s.pct : null, nieuw: s.nieuw }; });
+    var max = Math.max.apply(null, w.map(function(x){ return x.pct || 0; }).concat([5]));
+    var W = 560, H = 170, L = 10, B = 28, T = 22, bw = (W - L * 2) / 6;
+    var g = '<line x1="' + L + '" x2="' + (W - L) + '" y1="' + (H - B) + '" y2="' + (H - B) + '" stroke="#9aa9bb"/>';
+    w.forEach(function(x, i){
+      var cx = L + bw * i + bw / 2, h = x.pct === null ? 0 : x.pct / max * (H - B - T), y = H - B - h, huidig = i === w.length - 1;
+      var tip = (en ? MND_EN : MND_NL)[x.m.maand] + ' ' + x.m.jaar + ': ' + (x.pct === null ? (en ? 'no data' : 'geen data') : hel(x.pct, 1) + '% ' + (en ? 'absence, ' : 'verzuim, ') + x.nieuw + (en ? ' new reports' : ' nieuwe meldingen'));
+      g += '<g><title>' + tip + '</title>' +
+        (x.pct === null ? '<text x="' + cx + '" y="' + (H - B - 6) + '" text-anchor="middle" font-size="11" fill="#9aa9bb">—</text>'
+          : '<path d="M' + (cx - 18) + ',' + (H - B) + ' L' + (cx - 18) + ',' + (y + 4) + ' Q' + (cx - 18) + ',' + y + ' ' + (cx - 14) + ',' + y + ' L' + (cx + 14) + ',' + y + ' Q' + (cx + 18) + ',' + y + ' ' + (cx + 18) + ',' + (y + 4) + ' L' + (cx + 18) + ',' + (H - B) + ' Z" fill="' + (huidig ? '#003366' : '#7f9cc0') + '"/>' +
+            '<text x="' + cx + '" y="' + (y - 6) + '" text-anchor="middle" font-size="12" font-weight="700" fill="#1a2a4a">' + hel(x.pct, 1) + '%</text>') +
+        '<text x="' + cx + '" y="' + (H - 9) + '" text-anchor="middle" font-size="11" fill="#5a7090"' + (huidig ? ' font-weight="700"' : '') + '>' + (en ? MND_EN : MND_NL)[x.m.maand].slice(0, 3) + '</text></g>';
+    });
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="max-width:620px;display:block;font-family:inherit;">' + g + '</svg>';
+  }
+
+  // opts: { en, periode: 'maand'|'3m'|'6m', id }
+  function render(el, src, opts){
+    if (!el) return;
+    var en = !!opts.en, T = function(nl, e){ return en ? e : nl; }, id = opts.id || 'vz';
+    var n = opts.periode === '6m' ? 6 : (opts.periode === '3m' ? 3 : 1);
+    var ms = periodeMaanden(src.jaar, src.maand, n), s = samenvatting(src, ms);
+    var periodeTxt = n === 1 ? T('in ' + MND_NL[src.maand] + ' ' + src.jaar, 'in ' + MND_EN[src.maand] + ' ' + src.jaar) : T('de laatste ' + n + ' maanden', 'the last ' + n + ' months');
+    var knop = function(w, tekst){ var on = w === opts.periode; return '<button type="button" onclick="' + id + 'Periode(\'' + w + '\')" style="padding:6px 12px;border:1px solid ' + (on ? '#003366' : '#c8d7e8') + ';background:' + (on ? '#003366' : '#fff') + ';color:' + (on ? '#fff' : '#003366') + ';border-radius:6px;cursor:pointer;font-size:12.5px;font-weight:600;">' + tekst + '</button>'; };
+    var h = '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px;"><span style="font-size:12px;color:#5a7090;margin-right:2px;">' + T('Periode:', 'Period:') + '</span>' +
+      knop('maand', T('Deze maand', 'This month')) + knop('3m', T('3 maanden', '3 months')) + knop('6m', T('6 maanden', '6 months')) +
+      '<span style="flex:1;"></span><span style="font-size:11.5px;color:#8795a8;">&#x1F512; ' + T('Alleen aantallen, geen namen', 'Counts only, no names') + '</span></div>';
+    if (!s.dagen.length && !s.nieuw) {
+      el.innerHTML = h + '<div style="color:#5a7090;font-size:14px;padding:18px;text-align:center;">' + T('Nog geen Dagplanning of ziekmeldingen ', 'No Day planning or sick reports yet ') + periodeTxt + '.</div>';
+      return;
+    }
+    var GROEN = '#1a7a40', ROOD = '#c0392b', GRIJS = '#9aa9bb';
+    // Kerncijfers
+    h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">' +
+      tegel(T('Verzuim', 'Absence'), s.pct === null ? '—' : hel(s.pct, 1) + '%', T('van de geplande mensdagen', 'of planned person-days')) +
+      tegel(T('Nieuwe ziekmeldingen', 'New sick reports'), s.nieuw, s.nogZiek + T(' nu nog ziek', ' still sick')) +
+      tegel(T('Ziektedagen', 'Sick days'), hel(s.ziektedagen, 0), T('op dagen met een Dagplanning', 'on days with a Day planning')) +
+      tegel(T('Gem. duur melding', 'Avg duration'), s.duur === null ? '—' : hel(s.duur, 1) + T(' dagen', ' days'), s.afgerond + T(' beter gemeld', ' reported fit')) +
+      '</div>';
+    // In gewone woorden
+    var zinnen = '';
+    if (s.metStd) {
+      zinnen += zin('&#x1F465;', T('Op <b>' + s.onder.n + ' van de ' + s.metStd + ' dagen</b> stonden er minder mensen dan de standaardbezetting' + (s.onder.n ? ', gemiddeld <b>' + hel(s.onder.tekort, 1) + ' ' + (s.onder.tekort === 1 ? 'persoon' : 'mensen') + ' te weinig</b>.' : '.'),
+        'On <b>' + s.onder.n + ' of ' + s.metStd + ' days</b> staffing was below standard' + (s.onder.n ? ', on average <b>' + hel(s.onder.tekort, 1) + ' people short</b>.' : '.')), s.onder.n ? (s.onder.n / s.metStd > 0.25 ? ROOD : GRIJS) : GROEN);
+    }
+    var conclusie = [];
+    if (s.onder.opTijd !== null && s.vol.opTijd !== null && s.onder.n && s.vol.n) {
+      var dO = s.vol.opTijd - s.onder.opTijd;
+      zinnen += zin('&#x1F6A2;', T('Op dagen met onderbezetting vertrok de boot in <b>' + hel(s.onder.opTijd, 0) + '%</b> van de afvaarten op tijd, op volle dagen in <b>' + hel(s.vol.opTijd, 0) + '%</b>.',
+        'On understaffed days <b>' + hel(s.onder.opTijd, 0) + '%</b> of sailings left on time, on fully staffed days <b>' + hel(s.vol.opTijd, 0) + '%</b>.'), Math.abs(dO) < 3 ? GRIJS : (dO > 0 ? ROOD : GROEN));
+      if (dO >= 3) conclusie.push(T('onderbezetting kost stiptheid: <b>' + hel(dO, 0) + '% minder</b> afvaarten op tijd', 'understaffing costs punctuality: <b>' + hel(dO, 0) + '% fewer</b> sailings on time'));
+    }
+    if (s.z2.n && s.z0.n && s.z2.exUren !== null && s.z0.exUren !== null) {
+      var dX = s.z2.exUren - s.z0.exUren;
+      zinnen += zin('&#x23F1;&#xFE0F;', T('Op dagen met <b>2 of meer zieken</b> werd er gemiddeld <b>' + hel(s.z2.exUren, 0) + ' uur</b> overwerk ingezet, op dagen zonder zieken <b>' + hel(s.z0.exUren, 0) + ' uur</b>.',
+        'On days with <b>2 or more sick</b> staff, on average <b>' + hel(s.z2.exUren, 0) + ' hours</b> of overtime were used, on days without sickness <b>' + hel(s.z0.exUren, 0) + ' hours</b>.'), Math.abs(dX) < 2 ? GRIJS : (dX > 0 ? ROOD : GROEN));
+      if (dX >= 2) conclusie.push(T('verzuim wordt opgevangen met overwerk: <b>+' + hel(dX, 0) + ' uur</b> per dag bij 2+ zieken', 'absence is covered with overtime: <b>+' + hel(dX, 0) + ' hours</b> per day with 2+ sick'));
+    } else if (s.z1.n && s.z0.n && s.z1.exUren !== null) {
+      zinnen += zin('&#x23F1;&#xFE0F;', T('Op dagen met een zieke werd er gemiddeld <b>' + hel(s.z1.exUren, 0) + ' uur</b> overwerk ingezet, op dagen zonder zieken <b>' + hel(s.z0.exUren, 0) + ' uur</b>.',
+        'On days with one sick employee <b>' + hel(s.z1.exUren, 0) + ' hours</b> of overtime were used on average, on days without sickness <b>' + hel(s.z0.exUren, 0) + ' hours</b>.'), null);
+    }
+    var tekst = conclusie.length ? T('In het kort: ', 'In short: ') + conclusie.join(T(' en ', ' and ')) + '.'
+      : (s.pct === null ? T('Nog te weinig gegevens om een verband te zien.', 'Not enough data yet to see a link.') : T('In deze periode zien we <b>geen duidelijk effect</b> van verzuim op stiptheid of overwerk.', 'In this period there is <b>no clear effect</b> of absence on punctuality or overtime.'));
+    if (zinnen) h += '<div style="background:#f4f7fb;border-radius:12px;padding:6px 16px 4px;margin-bottom:12px;"><div style="font-weight:800;color:#003366;font-size:13px;text-transform:uppercase;letter-spacing:.5px;padding:8px 0 2px;">' + T('Wat zien we?', 'What do we see?') + '</div>' + zinnen + '</div>';
+    h += '<div style="background:#003366;color:#fff;border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:15.5px;line-height:1.5;"><div style="font-size:11.5px;text-transform:uppercase;letter-spacing:.8px;opacity:.75;font-weight:700;margin-bottom:3px;">' + T('In het kort', 'In short') + '</div>' +
+      tekst.replace(/^(In het kort: |In short: )/, '').replace(/<b>/g, '<b style="color:#ffd27a;">').replace(/^./, function(c){ return c.toUpperCase(); }) + '</div>';
+    // Trend
+    h += '<div style="font-weight:800;color:#003366;font-size:13px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">' + T('Verzuim per maand (laatste 6 maanden)', 'Absence per month (last 6 months)') + '</div>' + trend(src, src.jaar, src.maand, en);
+    // Details
+    var th = 'padding:6px 8px;text-align:center;font-size:11px;';
+    h += '<details style="margin-top:12px;border-top:1px solid #e3e9f1;padding-top:10px;"><summary style="cursor:pointer;font-weight:700;color:#003366;font-size:13px;">' + T('Meer details (per dag)', 'More details (per day)') + '</summary>' +
+      '<div style="overflow-x:auto;margin-top:10px;"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:620px;"><thead><tr style="background:#003366;color:#fff;">' +
+      [T('Datum', 'Date'), T('Zieken', 'Sick'), T('Ochtend', 'Morning'), T('Avond', 'Evening'), T('Tekort', 'Short'), T('Overwerk-uren', 'Overtime h'), T('Op tijd vertrokken', 'Left on time')].map(function(t, i){ return '<th style="' + th + (i === 0 ? 'text-align:left;' : '') + '">' + t + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      s.dagen.map(function(d, i){
+        var cel = function(n, std){ return '<b style="color:' + (std && n < std ? ROOD : '#1a2a4a') + ';">' + n + '</b>' + (std ? '<span style="color:#8795a8;"> / ' + std + '</span>' : ''); };
+        return '<tr style="background:' + (i % 2 ? '#f4f7fb' : '#fff') + ';"><td style="padding:5px 8px;font-weight:600;color:#003366;white-space:nowrap;">' + d.dag + ' ' + slash(d.iso) + '</td>' +
+          '<td style="text-align:center;font-weight:700;color:' + (d.zieken ? ROOD : '#8795a8') + ';">' + (d.zieken || '—') + '</td>' +
+          '<td style="text-align:center;">' + cel(d.O, d.stdO) + '</td><td style="text-align:center;">' + cel(d.A, d.stdA) + '</td>' +
+          '<td style="text-align:center;color:' + (d.tekort ? ROOD : '#8795a8') + ';">' + (d.tekort || '—') + '</td>' +
+          '<td style="text-align:center;">' + (d.exUren ? hel(d.exUren, 1) : '—') + '</td>' +
+          '<td style="text-align:center;">' + (d.tot ? d.bin + ' / ' + d.tot : '—') + '</td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<div style="font-size:11.5px;color:#8795a8;margin-top:10px;line-height:1.6;">' +
+      T('<b>Hoe tellen we?</b> Zieken = medewerkers die op die dag ziek gemeld stonden in Werkoverdracht. Verzuim = ziektedagen gedeeld door (gewerkte + zieke mensdagen), alleen op dagen met een Dagplanning. Tekort = mensen minder dan de standaardbezetting (ochtend + avond). Op tijd = vertrek binnen norm + marge. Een ziekmelding zegt niet in welke dienst iemand zou werken; daarom tellen we per dag. Er worden bewust geen namen getoond.',
+        '<b>How do we count?</b> Sick = employees reported sick in Shift handover on that day. Absence = sick days divided by (worked + sick person-days), only on days with a Day planning. Short = fewer people than standard staffing (morning + evening). On time = departure within norm + margin. A sick report does not say which shift someone would have worked, so we count per day. Names are deliberately not shown.') +
+      '</div></details>';
+    el.innerHTML = h;
+  }
+  return { render: render, maandKort: maandKort, samenvatting: samenvatting };
+})();
+if (typeof window !== 'undefined') window.VZ = VZ;
+
+// ═════════════════════════════════════════════════════════════════
 // OPGESLAGEN MAANDOVERZICHTEN (gedeelde kern — identiek in index.html en kpi-mt.html)
 // Elke afgesloten maand wordt als compacte samenvatting bewaard in <terminal>_kpi_snapshot_JJJJ_MM
 // (gaat mee in de cloud-sync). Zo blijven de cijfers bewaard, ook als de ruwe dagdata later wordt
@@ -26545,7 +26731,7 @@ var KPISNAP = (function(){
   }
 
   // Samenvatting van één maand maken uit de ruwe data
-  function maak(vs, dagplans, routes, normen, jaar, maand, en){
+  function maak(vs, dagplans, routes, normen, jaar, maand, en, extra){
     var entries = Object.keys(vs || {}).map(function(k){ return vs[k]; }).filter(function(e){ return e && inMaand(e.datum, jaar, maand); });
     if (!entries.length) return null;
     var N = NORM(), tot = { gelost: 0, geladen: 0, buitenNorm: 0, meetpunten: 0, opTijd: 0 };
@@ -26588,7 +26774,9 @@ var KPISNAP = (function(){
       pers.dagen++; pers.O += o.length; pers.A += a.length;
       o.concat(a).forEach(function(e){ var t = (e.type || ''); if (t.toUpperCase().indexOf('EX') >= 0) pers.extra++; else if (t.toLowerCase().indexOf('inhuur') >= 0) pers.inhuur++; pers.uren += parseFloat(e.uren) || 0; });
     });
-    return { v: 2, jaar: jaar, maand: maand, label: (en ? MND_EN : MND_NL)[maand] + ' ' + jaar, dagen: entries.length, routes: rs, totaal: tot, personeel: pers, opgeslagenOp: new Date().toISOString() };
+    var verzuim = null;
+    if (extra && extra.ziek && typeof window !== 'undefined' && window.VZ) { try { verzuim = window.VZ.maandKort({ ziek: extra.ziek, dagplans: dagplans, std: extra.std || {}, vs: vs, normen: normen, routes: routes }, jaar, maand); } catch(e){} }
+    return { v: 2, jaar: jaar, maand: maand, label: (en ? MND_EN : MND_NL)[maand] + ' ' + jaar, dagen: entries.length, routes: rs, totaal: tot, personeel: pers, verzuim: verzuim, opgeslagenOp: new Date().toISOString() };
   }
 
   // Vergelijk zonder tijdstempel (om onnodig opslaan/synchroniseren te voorkomen)
@@ -26615,7 +26803,7 @@ var KPISNAP = (function(){
     });
     maandenMetData(o.vs).forEach(function(m){
       if (m.jaar * 12 + m.maand >= dezeMaand) return; // lopende maand nog niet
-      var sd = sleutelDeel(m.jaar, m.maand), nieuw = maak(o.vs, o.dagplans, o.routes, o.normen, m.jaar, m.maand, o.en);
+      var sd = sleutelDeel(m.jaar, m.maand), nieuw = maak(o.vs, o.dagplans, o.routes, o.normen, m.jaar, m.maand, o.en, { ziek: o.ziek, std: o.std });
       if (nieuw && (!res[sd] || nieuw.dagen >= res[sd].dagen)) { if (res[sd] && zelfde(res[sd], nieuw)) return; nieuw._nieuw = true; res[sd] = nieuw; }
     });
     return Object.keys(res).sort().reverse().map(function(k){ return res[k]; });
@@ -26629,18 +26817,19 @@ var KPISNAP = (function(){
     var th = 'padding:7px 9px;font-size:11px;text-align:center;';
     var h = '<div style="font-size:12px;color:#5a7090;margin-bottom:10px;">' + T('Elke afgesloten maand wordt automatisch bewaard. Deze cijfers blijven staan, ook als de dagdata later wordt opgeruimd. Klik op een maand voor de details.', 'Every completed month is saved automatically. These figures stay, even if the daily data is cleaned up later. Click a month for details.') + '</div>' +
       '<div style="overflow-x:auto;"><div style="min-width:640px;">' +
-      '<div style="display:grid;grid-template-columns:1.4fr .6fr .8fr .8fr .9fr .8fr 1fr;background:#003366;color:#fff;border-radius:6px 6px 0 0;font-weight:700;">' +
-      [T('Maand', 'Month'), T('Dagen', 'Days'), T('Gelost', 'Unloaded'), T('Geladen', 'Loaded'), T('Op tijd', 'On time'), T('Te laat', 'Late'), T('Gem. bezetting', 'Avg staffing')].map(function(t, i){ return '<div style="' + th + (i === 0 ? 'text-align:left;' : '') + '">' + t + '</div>'; }).join('') + '</div>';
+      '<div style="display:grid;grid-template-columns:1.4fr .6fr .8fr .8fr .8fr .7fr .8fr 1fr;background:#003366;color:#fff;border-radius:6px 6px 0 0;font-weight:700;">' +
+      [T('Maand', 'Month'), T('Dagen', 'Days'), T('Gelost', 'Unloaded'), T('Geladen', 'Loaded'), T('Op tijd', 'On time'), T('Te laat', 'Late'), T('Verzuim', 'Absence'), T('Gem. bezetting', 'Avg staffing')].map(function(t, i){ return '<div style="' + th + (i === 0 ? 'text-align:left;' : '') + '">' + t + '</div>'; }).join('') + '</div>';
     overzichten.forEach(function(s, i){
       var t = s.totaal || {}, p = s.personeel || {};
       var kl = t.meetpunten ? (t.opTijd / t.meetpunten >= 0.8 ? '#1a7a40' : (t.opTijd / t.meetpunten >= 0.6 ? '#b06f00' : '#c0392b')) : '#5a7090';
       var bez = p.dagen ? (Math.round(p.O / p.dagen * 10) / 10 + ' / ' + Math.round(p.A / p.dagen * 10) / 10).replace(/\./g, ',') : '—';
       var td = 'padding:8px 9px;text-align:center;font-size:12.5px;';
       h += '<details style="border:1px solid #dde6f0;border-top:none;background:' + (i % 2 ? '#f6f9fc' : '#fff') + ';">' +
-        '<summary style="list-style:none;cursor:pointer;display:grid;grid-template-columns:1.4fr .6fr .8fr .8fr .9fr .8fr 1fr;align-items:center;">' +
+        '<summary style="list-style:none;cursor:pointer;display:grid;grid-template-columns:1.4fr .6fr .8fr .8fr .8fr .7fr .8fr 1fr;align-items:center;">' +
         '<div style="' + td + 'text-align:left;font-weight:700;color:#003366;">&#x25B8; ' + esc((en ? MND_EN : MND_NL)[s.maand] + ' ' + s.jaar) + (s._nieuw ? ' <span style="font-size:10px;color:#8795a8;font-weight:400;">' + T('(uit dagdata)', '(from daily data)') + '</span>' : '') + '</div>' +
         '<div style="' + td + '">' + s.dagen + '</div><div style="' + td + 'color:#1a5c9a;font-weight:700;">' + (t.gelost || 0) + '</div><div style="' + td + 'color:#1a7a40;font-weight:700;">' + (t.geladen || 0) + '</div>' +
         '<div style="' + td + 'color:' + kl + ';font-weight:800;">' + pct(t.opTijd, t.meetpunten) + '</div><div style="' + td + 'color:' + (t.buitenNorm ? '#c0392b' : '#5a7090') + ';">' + (t.meetpunten ? t.buitenNorm : '—') + '</div>' +
+        '<div style="' + td + '">' + (s.verzuim && s.verzuim.pct !== null ? String(s.verzuim.pct).replace('.', ',') + '%' : '\u2014') + '</div>' +
         '<div style="' + td + '" title="' + T('ochtend / avond', 'morning / evening') + '">' + bez + '</div></summary>' +
         '<div style="padding:10px 12px 14px;border-top:1px dashed #dde6f0;">' + detail(s, en) + '</div></details>';
     });
@@ -26667,6 +26856,7 @@ var KPISNAP = (function(){
     var p = s.personeel || {};
     h += '<div style="font-size:11.5px;color:#5a7090;margin-top:8px;">' +
       (p.dagen ? T('Bezetting: ', 'Staffing: ') + p.dagen + T(' dagen gepland · gemiddeld ', ' days planned · average ') + String(Math.round(p.O / p.dagen * 10) / 10).replace('.', ',') + T(' ochtend en ', ' morning and ') + String(Math.round(p.A / p.dagen * 10) / 10).replace('.', ',') + T(' avond · ', ' evening · ') + p.extra + T(' keer overwerk · ', ' overtime shifts · ') + p.inhuur + T(' keer inhuur', ' agency shifts') + ' · ' : '') +
+      (s.verzuim ? T('Verzuim: ', 'Absence: ') + s.verzuim.meldingen + T(' nieuwe ziekmeldingen, ', ' new sick reports, ') + s.verzuim.ziektedagen + T(' ziektedagen, ', ' sick days, ') + s.verzuim.onderDagen + T(' dagen onder de standaardbezetting · ', ' days below standard staffing · ') : '') +
       T('Schip leeg = gemiddelde duur na klep neer. ', 'Ship empty = average duration after ramp down. ') +
       (s.opgeslagenOp && !s._nieuw ? T('Bewaard op ', 'Saved on ') + new Date(s.opgeslagenOp).toLocaleDateString('nl-NL') + '.' : '') + '</div>';
     return h;
@@ -26679,6 +26869,7 @@ if (typeof window !== 'undefined') window.KPISNAP = KPISNAP;
 function kpiSnapBron(){
   var sl = []; for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k) sl.push(k); }
   return { routes: owRoutes(), vs: owLeesJson(tk('vs_data_v1'), {}) || {}, dagplans: owDagplans(), normen: owLeesJson('kpi_normen_v1', {}) || {},
+    ziek: owLeesJson(tk('werkoverdracht_ziekmeldingen_v1'), []) || [], std: owLeesJson(tk('std_bezetting_v1'), null) || owLeesJson('std_bezetting_v1', {}) || {},
     en: owEn(), prefix: getTerminalPrefix(), sleutels: sl, lees: function(k){ return owLeesJson(k, null); } };
 }
 // Bewaart elke afgesloten maand die nog niet (of met minder dagen) is opgeslagen. Wacht tot de clouddata
@@ -26700,6 +26891,19 @@ function kpiSnapRender(){
   catch(e) { el.innerHTML = '<p style="color:#c0392b;font-size:12px;">Maandoverzichten konden niet worden geladen: ' + OW.esc(e.message) + '</p>'; }
 }
 window.kpiSnapAuto = kpiSnapAuto; window.kpiSnapRender = kpiSnapRender;
+// ── Verzuim & bezetting (hoofdapp) ──
+var _vzPeriode = 'maand';
+function vzBron(){
+  return { ziek: owLeesJson(tk('werkoverdracht_ziekmeldingen_v1'), []) || [], dagplans: owDagplans(), std: owLeesJson(tk('std_bezetting_v1'), null) || owLeesJson('std_bezetting_v1', {}) || {},
+    vs: owLeesJson(tk('vs_data_v1'), {}) || {}, normen: owLeesJson('kpi_normen_v1', {}) || {}, routes: owRoutes(), jaar: _owJaar, maand: _owMaand };
+}
+function vzRenderKpi(){
+  var el = document.getElementById('vz-body'); if (!el) return;
+  try { VZ.render(el, vzBron(), { en: owEn(), periode: _vzPeriode, id: 'vz' }); }
+  catch(e) { el.innerHTML = '<div style="color:#c0392b;font-size:12px;">Verzuim kon niet worden berekend: ' + OW.esc(e.message) + '</div>'; }
+}
+function vzPeriode(p){ _vzPeriode = p; vzRenderKpi(); }
+window.vzRenderKpi = vzRenderKpi; window.vzPeriode = vzPeriode;
 
 
 // ===== TOOLBOX (Werkoverdracht) =====
