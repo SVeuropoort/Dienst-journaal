@@ -26201,6 +26201,7 @@ var OW = (function(){
       if (ruw.tarieven) { c.tarieven.extra = num(ruw.tarieven.extra); c.tarieven.inhuur = num(ruw.tarieven.inhuur); }
       if (ruw.dienst) Object.keys(ruw.dienst).forEach(function(k){ if (ruw.dienst[k] === 'O' || ruw.dienst[k] === 'A' || ruw.dienst[k] === '-') c.dienst[k] = ruw.dienst[k]; });
       if (ruw.shutout && typeof ruw.shutout === 'object') c.shutout = ruw.shutout;
+      if (num(ruw.werkdagen)) c.werkdagen = num(ruw.werkdagen);
     }
     return c;
   }
@@ -26612,6 +26613,9 @@ function owInstellingen(){
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
     '<label style="font-size:12px;color:#5a7090;">' + (en ? 'Overtime / Extra (€/h)' : 'Overwerk / Extra (€/u)') + '<input id="ow-i-extra" style="' + inp + '" value="' + num(c.tarieven.extra) + '" placeholder="bijv. 45,00" inputmode="decimal"></label>' +
     '<label style="font-size:12px;color:#5a7090;">' + (en ? 'Agency staff (€/h)' : 'Inhuur (€/u)') + '<input id="ow-i-inhuur" style="' + inp + '" value="' + num(c.tarieven.inhuur) + '" placeholder="optioneel" inputmode="decimal"></label></div>' +
+    '<div style="font-weight:700;color:var(--navy);margin:14px 0 6px;">' + (en ? 'Work days per week (for absence %)' : 'Werkdagen per week (voor verzuim%)') + '</div>' +
+    '<input id="ow-i-werkdagen" style="' + inp + 'width:90px;" value="' + num((owRuw() || {}).werkdagen || 5) + '" inputmode="decimal">' +
+    '<div style="color:#8795a8;font-size:11px;margin-top:3px;">' + (en ? 'How many days a week an employee works on average (e.g. 5).' : 'Hoeveel dagen per week een medewerker gemiddeld werkt (bijv. 5).') + '</div>' +
     '<div style="font-weight:700;color:var(--navy);margin:14px 0 6px;">' + (en ? 'Which shift handles which sailing?' : 'Welke dienst behandelt welke afvaart?') + '</div>' +
     routes.map(function(r, i){ return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><span style="flex:1;font-size:13px;">' + OW.esc(r) + '</span><select data-ow-route="' + i + '" style="padding:6px 8px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;">' +
       [['O', en ? 'Morning' : 'Ochtend'], ['A', en ? 'Evening' : 'Avond'], ['-', en ? 'Do not count' : 'Niet meetellen']].map(function(p){ return '<option value="' + p[0] + '"' + (c.dienst[i] === p[0] ? ' selected' : '') + '>' + p[1] + '</option>'; }).join('') + '</select></div>'; }).join('') +
@@ -26627,7 +26631,9 @@ function owInstellingenOpslaan(){
   c.tarieven.extra = OW.num(document.getElementById('ow-i-extra').value);
   c.tarieven.inhuur = OW.num(document.getElementById('ow-i-inhuur').value);
   Array.prototype.forEach.call(document.querySelectorAll('#ow-instel [data-ow-route]'), function(s){ c.dienst[s.getAttribute('data-ow-route')] = s.value; });
+  var _wd = OW.num(document.getElementById('ow-i-werkdagen').value); c.werkdagen = (_wd && _wd > 0 && _wd <= 7) ? _wd : 5;
   owCfgOpslaan(c);
+  if (typeof vzRenderKpi === 'function') vzRenderKpi();
   document.getElementById('ow-instel').remove();
   owRenderKpi(); owShutoutVul(true);
 }
@@ -26718,13 +26724,17 @@ var VZ = (function(){
     var afgerond = ziek.filter(function(z){ return z.beterOp && z.beterOp >= start && z.beterOp <= eind; });
     var duur = afgerond.length ? afgerond.reduce(function(s, z){ return s + Math.max(1, dagenTussen(z.gemeldOp, z.beterOp)); }, 0) / afgerond.length : null;
     var nogZiek = ziek.filter(function(z){ return z.gemeldOp <= eind && (!z.beterOp || z.beterOp > eind); }).length;
-    var ziektedagen = ds.reduce(function(s, d){ return s + d.zieken; }, 0);
+    // Een zieke staat 7 dagen per week ziek gemeld, maar zou gemiddeld maar op X van die dagen werken
+    // (standaard 5). Daarom tellen we zieke kalenderdagen om naar gemiste WERKdagen: × X/7.
+    var werkdagen = parseFloat(src.werkdagen) > 0 ? Math.min(7, parseFloat(src.werkdagen)) : 5;
+    var ziekeKalenderdagen = ds.reduce(function(s, d){ return s + d.zieken; }, 0);
+    var ziektedagen = ziekeKalenderdagen * werkdagen / 7;
     var gewerkt = ds.reduce(function(s, d){ return s + d.O + d.A; }, 0);
     var pct = (gewerkt + ziektedagen) ? ziektedagen / (gewerkt + ziektedagen) * 100 : null;
     var metStd = ds.filter(function(d){ return d.heeftStd; }), onder = metStd.filter(function(d){ return d.onder; }), vol = metStd.filter(function(d){ return !d.onder; });
     var groep = function(l){ var b = l.reduce(function(s, d){ return s + d.bin; }, 0), t = l.reduce(function(s, d){ return s + d.tot; }, 0);
       return { n: l.length, opTijd: t ? b / t * 100 : null, afvaarten: t, exUren: l.length ? l.reduce(function(s, d){ return s + d.exUren; }, 0) / l.length : null, tekort: l.length ? l.reduce(function(s, d){ return s + d.tekort; }, 0) / l.length : null }; };
-    return { dagen: ds, nieuw: nieuw, afgerond: afgerond.length, duur: duur, nogZiek: nogZiek, ziektedagen: ziektedagen, gewerkt: gewerkt, pct: pct,
+    return { dagen: ds, nieuw: nieuw, afgerond: afgerond.length, duur: duur, nogZiek: nogZiek, ziektedagen: ziektedagen, ziekeKalenderdagen: ziekeKalenderdagen, werkdagen: werkdagen, gewerkt: gewerkt, pct: pct,
       metStd: metStd.length, onder: groep(onder), vol: groep(vol),
       z0: groep(ds.filter(function(d){ return d.zieken === 0; })), z1: groep(ds.filter(function(d){ return d.zieken === 1; })), z2: groep(ds.filter(function(d){ return d.zieken >= 2; })) };
   }
@@ -26733,7 +26743,7 @@ var VZ = (function(){
   function maandKort(src, jaar, maand){
     var s = samenvatting(src, [{ jaar: jaar, maand: maand, key: maandSleutel(jaar, maand) }]);
     if (!s.dagen.length && !s.nieuw) return null;
-    return { meldingen: s.nieuw, ziektedagen: s.ziektedagen, pct: s.pct === null ? null : Math.round(s.pct * 10) / 10, onderDagen: s.onder.n, dagenMetStd: s.metStd };
+    return { meldingen: s.nieuw, ziektedagen: Math.round(s.ziektedagen), pct: s.pct === null ? null : Math.round(s.pct * 10) / 10, onderDagen: s.onder.n, dagenMetStd: s.metStd };
   }
 
   function zin(icoon, tekst, kleur){
@@ -26786,7 +26796,7 @@ var VZ = (function(){
     h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">' +
       tegel(T('Verzuim', 'Absence'), s.pct === null ? '—' : hel(s.pct, 1) + '%', T('van de geplande mensdagen', 'of planned person-days')) +
       tegel(T('Nieuwe ziekmeldingen', 'New sick reports'), s.nieuw, s.nogZiek + T(' nu nog ziek', ' still sick')) +
-      tegel(T('Ziektedagen', 'Sick days'), hel(s.ziektedagen, 0), T('op dagen met een Dagplanning', 'on days with a Day planning')) +
+      tegel(T('Gemiste werkdagen', 'Missed work days'), hel(s.ziektedagen, 0), hel(s.ziekeKalenderdagen, 0) + T(' ziek gemelde dagen × ', ' reported sick days × ') + hel(s.werkdagen, 1) + '/7') +
       tegel(T('Gem. duur melding', 'Avg duration'), s.duur === null ? '—' : hel(s.duur, 1) + T(' dagen', ' days'), s.afgerond + T(' beter gemeld', ' reported fit')) +
       '</div>';
     // In gewone woorden
@@ -26833,8 +26843,8 @@ var VZ = (function(){
           '<td style="text-align:center;">' + (d.tot ? d.bin + ' / ' + d.tot : '—') + '</td></tr>';
       }).join('') + '</tbody></table></div>' +
       '<div style="font-size:11.5px;color:#8795a8;margin-top:10px;line-height:1.6;">' +
-      T('<b>Hoe tellen we?</b> Zieken = medewerkers die op die dag ziek gemeld stonden in Werkoverdracht. Verzuim = ziektedagen gedeeld door (gewerkte + zieke mensdagen), alleen op dagen met een Dagplanning. Tekort = mensen minder dan de standaardbezetting (ochtend + avond). Op tijd = vertrek binnen norm + marge. Een ziekmelding zegt niet in welke dienst iemand zou werken; daarom tellen we per dag. Er worden bewust geen namen getoond.',
-        '<b>How do we count?</b> Sick = employees reported sick in Shift handover on that day. Absence = sick days divided by (worked + sick person-days), only on days with a Day planning. Short = fewer people than standard staffing (morning + evening). On time = departure within norm + margin. A sick report does not say which shift someone would have worked, so we count per day. Names are deliberately not shown.') +
+      T('<b>Hoe tellen we?</b> Zieken = medewerkers die op die dag ziek gemeld stonden in Werkoverdracht. Iemand staat 7 dagen per week ziek gemeld, maar werkt gemiddeld ' + hel(s.werkdagen, 1) + ' dagen per week; daarom tellen we zieke dagen om naar gemiste werkdagen (× ' + hel(s.werkdagen, 1) + '/7). Verzuim = gemiste werkdagen gedeeld door (gewerkte mensdagen + gemiste werkdagen), alleen op dagen met een Dagplanning. Het aantal werkdagen per week stel je in bij \u2699\uFE0F van Overwerk & productiviteit. Tekort = mensen minder dan de standaardbezetting (ochtend + avond). Op tijd = vertrek binnen norm + marge. Een ziekmelding zegt niet in welke dienst iemand zou werken; daarom tellen we per dag. Er worden bewust geen namen getoond.',
+        '<b>How do we count?</b> Sick = employees reported sick in Shift handover on that day. Someone is reported sick 7 days a week but works ' + hel(s.werkdagen, 1) + ' days a week on average, so sick days are converted to missed work days (× ' + hel(s.werkdagen, 1) + '/7). Absence = missed work days divided by (worked person-days + missed work days), only on days with a Day planning. Short = fewer people than standard staffing (morning + evening). On time = departure within norm + margin. A sick report does not say which shift someone would have worked, so we count per day. Names are deliberately not shown.') +
       '</div></details>';
     el.innerHTML = h;
   }
@@ -26913,7 +26923,7 @@ var KPISNAP = (function(){
       o.concat(a).forEach(function(e){ var t = (e.type || ''); if (t.toUpperCase().indexOf('EX') >= 0) pers.extra++; else if (t.toLowerCase().indexOf('inhuur') >= 0) pers.inhuur++; pers.uren += parseFloat(e.uren) || 0; });
     });
     var verzuim = null;
-    if (extra && extra.ziek && typeof window !== 'undefined' && window.VZ) { try { verzuim = window.VZ.maandKort({ ziek: extra.ziek, dagplans: dagplans, std: extra.std || {}, vs: vs, normen: normen, routes: routes }, jaar, maand); } catch(e){} }
+    if (extra && extra.ziek && typeof window !== 'undefined' && window.VZ) { try { verzuim = window.VZ.maandKort({ werkdagen: extra.werkdagen, ziek: extra.ziek, dagplans: dagplans, std: extra.std || {}, vs: vs, normen: normen, routes: routes }, jaar, maand); } catch(e){} }
     return { v: 2, jaar: jaar, maand: maand, label: (en ? MND_EN : MND_NL)[maand] + ' ' + jaar, dagen: entries.length, routes: rs, totaal: tot, personeel: pers, verzuim: verzuim, opgeslagenOp: new Date().toISOString() };
   }
 
@@ -26941,7 +26951,7 @@ var KPISNAP = (function(){
     });
     maandenMetData(o.vs).forEach(function(m){
       if (m.jaar * 12 + m.maand >= dezeMaand) return; // lopende maand nog niet
-      var sd = sleutelDeel(m.jaar, m.maand), nieuw = maak(o.vs, o.dagplans, o.routes, o.normen, m.jaar, m.maand, o.en, { ziek: o.ziek, std: o.std });
+      var sd = sleutelDeel(m.jaar, m.maand), nieuw = maak(o.vs, o.dagplans, o.routes, o.normen, m.jaar, m.maand, o.en, { ziek: o.ziek, std: o.std, werkdagen: o.werkdagen });
       if (nieuw && (!res[sd] || nieuw.dagen >= res[sd].dagen)) { if (res[sd] && zelfde(res[sd], nieuw)) return; nieuw._nieuw = true; res[sd] = nieuw; }
     });
     return Object.keys(res).sort().reverse().map(function(k){ return res[k]; });
@@ -27007,7 +27017,7 @@ if (typeof window !== 'undefined') window.KPISNAP = KPISNAP;
 function kpiSnapBron(){
   var sl = []; for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k) sl.push(k); }
   return { routes: owRoutes(), vs: owLeesJson(tk('vs_data_v1'), {}) || {}, dagplans: owDagplans(), normen: owLeesJson('kpi_normen_v1', {}) || {},
-    ziek: owLeesJson(tk('werkoverdracht_ziekmeldingen_v1'), []) || [], std: owLeesJson(tk('std_bezetting_v1'), null) || owLeesJson('std_bezetting_v1', {}) || {},
+    werkdagen: (owRuw() || {}).werkdagen, ziek: owLeesJson(tk('werkoverdracht_ziekmeldingen_v1'), []) || [], std: owLeesJson(tk('std_bezetting_v1'), null) || owLeesJson('std_bezetting_v1', {}) || {},
     en: owEn(), prefix: getTerminalPrefix(), sleutels: sl, lees: function(k){ return owLeesJson(k, null); } };
 }
 // Bewaart elke afgesloten maand die nog niet (of met minder dagen) is opgeslagen. Wacht tot de clouddata
@@ -27032,7 +27042,7 @@ window.kpiSnapAuto = kpiSnapAuto; window.kpiSnapRender = kpiSnapRender;
 // ── Verzuim & bezetting (hoofdapp) ──
 var _vzPeriode = 'maand';
 function vzBron(){
-  return { ziek: owLeesJson(tk('werkoverdracht_ziekmeldingen_v1'), []) || [], dagplans: owDagplans(), std: owLeesJson(tk('std_bezetting_v1'), null) || owLeesJson('std_bezetting_v1', {}) || {},
+  return { werkdagen: (owRuw() || {}).werkdagen, ziek: owLeesJson(tk('werkoverdracht_ziekmeldingen_v1'), []) || [], dagplans: owDagplans(), std: owLeesJson(tk('std_bezetting_v1'), null) || owLeesJson('std_bezetting_v1', {}) || {},
     vs: owLeesJson(tk('vs_data_v1'), {}) || {}, normen: owLeesJson('kpi_normen_v1', {}) || {}, routes: owRoutes(), jaar: _owJaar, maand: _owMaand };
 }
 function vzRenderKpi(){
