@@ -9760,15 +9760,16 @@ function printTab(){
     + '@page { size: A3 landscape; margin: 5mm; }'
     + '@media print { @page { size: A3 landscape; margin: 5mm; } }'
     + '</style></head><body>'
-    + panelHtml
-    + extraHtml
+    + '<div id="dpPrintWrap" style="width:max-content;">' + panelHtml + extraHtml + '</div>'
     + '<script>'
     // Auto-scale to fill A3 width exactly, then print
     + 'window.onload = function(){'
-    +   'var panel = document.getElementById("' + panelId + '");'
+    // Planning + weer/getijden SAMEN schalen, zodat alles op precies één A3-pagina past
+    // (anders liep de bronregel van het weer door naar een tweede, bijna lege pagina).
+    +   'var panel = document.getElementById("dpPrintWrap");'
     +   'if (!panel) { window.print(); return; }'
     +   'var W = 410 * 3.7795;' // mm to px at 96dpi
-    +   'var H = 287 * 3.7795;'
+    +   'var H = 284 * 3.7795;'
     +   'var nW = panel.scrollWidth;'
     +   'var nH = panel.scrollHeight;'
     +   'var scale = Math.min(W / nW, H / nH);'
@@ -9776,6 +9777,8 @@ function printTab(){
     +   'panel.style.transformOrigin = "top left";'
     +   'panel.style.width = nW + "px";'
     +   'document.body.style.width = Math.round(nW * scale) + "px";'
+    +   'document.documentElement.style.height = document.body.style.height = "284mm";'
+    +   'document.documentElement.style.overflow = document.body.style.overflow = "hidden";'
     +   'setTimeout(function(){ window.print(); window.close(); }, 400);'
     + '};'
     + '<\/script>'
