@@ -26566,91 +26566,86 @@ var OW = (function(){
     var tar = a.cfg.tarieven, m = a.met, z = a.zonder;
     var periodeTxt = { maand: T('deze maand', 'this month'), '3m': T('de laatste 3 maanden', 'the last 3 months'), '6m': T('de laatste 6 maanden', 'the last 6 months') }[opts.periode] || '';
     var knop = function(waarde, huidig, tekst, fn){ return '<button type="button" onclick="' + fn + '(\'' + waarde + '\')" style="padding:6px 12px;border:1px solid ' + (waarde === huidig ? '#003366' : '#c8d7e8') + ';background:' + (waarde === huidig ? '#003366' : '#fff') + ';color:' + (waarde === huidig ? '#fff' : '#003366') + ';border-radius:6px;cursor:pointer;font-size:12.5px;font-weight:600;">' + tekst + '</button>'; };
-    var h = '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">' +
+    var GROEN = '#1a7a40', ROOD = '#c0392b';
+    // ── Kop: alleen de periode (de rest staat onder "Meer details") ──
+    var h = '<div style="font-size:14px;color:#1a2a4a;line-height:1.5;margin-bottom:12px;">' +
+      T('<b>Wat is dit?</b> We vergelijken diensten <b>met extra mensen</b> (overwerk of inhuur) met diensten <b>zonder extra mensen</b>. Zo zie je of extra inzet ook iets oplevert: meer werk verzet, sneller klaar of vaker op tijd.',
+        '<b>What is this?</b> We compare shifts <b>with extra staff</b> (overtime or agency) to shifts <b>without extra staff</b>, to see whether extra staffing pays off: more work done, finished faster or more often on time.') + '</div>' +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">' +
       '<span style="font-size:12px;color:#5a7090;margin-right:2px;">' + T('Periode:', 'Period:') + '</span>' +
       knop('maand', opts.periode, T('Deze maand', 'This month'), id + 'Periode') + knop('3m', opts.periode, T('3 maanden', '3 months'), id + 'Periode') + knop('6m', opts.periode, T('6 maanden', '6 months'), id + 'Periode') +
-      '<span style="width:10px;"></span><span style="font-size:12px;color:#5a7090;margin-right:2px;">' + T('Dienst:', 'Shift:') + '</span>' +
-      knop('alle', opts.dienst, T('Allebei', 'Both'), id + 'Dienst') + knop('O', opts.dienst, T('Ochtend', 'Morning'), id + 'Dienst') + knop('A', opts.dienst, T('Avond', 'Evening'), id + 'Dienst') +
       '<span style="flex:1;"></span>' +
       (a.rec.length ? '<button type="button" onclick="' + id + 'Csv()" style="padding:6px 12px;border:1px solid #c8d7e8;background:#fff;color:#003366;border-radius:6px;cursor:pointer;font-size:12.5px;font-weight:600;">&#x2B07;&#xFE0F; ' + T('Naar Excel', 'To Excel') + '</button>' : '') +
-      '<div style="flex-basis:100%;height:0;"></div>' +
-      '<span style="font-size:12px;color:#5a7090;margin-right:2px;">' + T('Vergelijk:', 'Compare:') + '</span>' +
-      knop('beide', soort, T('Overwerk + inhuur', 'Overtime + agency'), id + 'Soort') + knop('overwerk', soort, T('Alleen overwerk', 'Overtime only'), id + 'Soort') + knop('inhuur', soort, T('Alleen inhuur', 'Agency only'), id + 'Soort') +
       '</div>';
     if (!a.rec.length) {
       el.innerHTML = h + '<div style="color:#5a7090;font-size:14px;padding:18px;text-align:center;">' + T('Nog geen diensten waarvan zowel de Dagplanning als Punctuality is ingevuld voor ', 'No shifts yet with both the Day planning and Punctuality filled in for ') + periodeTxt + '.</div>';
       return;
     }
-    var GROEN = '#1a7a40', ROOD = '#c0392b', GRIJS = '#9aa9bb';
-    var beide = m.n > 0 && z.n > 0;
-    // ── 1. In gewone woorden ──
-    var zinnen = '';
-    zinnen += zin('&#x1F4CB;', T('We hebben <b>' + a.rec.length + ' diensten</b> bekeken over ' + periodeTxt + ': <b>' + m.n + '</b> ' + L.met + ' en <b>' + z.n + '</b> ' + L.zonder + '.',
-      'We looked at <b>' + a.rec.length + ' shifts</b> over ' + periodeTxt + ': <b>' + m.n + '</b> ' + L.met + ' and <b>' + z.n + '</b> without.'), null);
-    var conclusie = '';
-    if (beide) {
-      var dP = m.koppen - z.koppen;
-      zinnen += zin('&#x1F465;', T('' + L.Met + ' stonden er gemiddeld <b>' + hel(m.koppen, 0) + ' mensen</b> op de dienst, ' + L.zonder + ' <b>' + hel(z.koppen, 0) + '</b>. ' + (Math.abs(dP) >= 0.5 ? 'Dat is <b>' + hel(Math.abs(dP), 0) + (Math.round(Math.abs(dP)) === 1 ? ' persoon ' : ' mensen ') + (dP > 0 ? 'meer' : 'minder') + '</b>.' : ''),
-        '' + L.Met + ' there were on average <b>' + hel(m.koppen, 0) + ' people</b> on the shift, ' + L.zonder + ' <b>' + hel(z.koppen, 0) + '</b>.'), null);
-      var dU = m.units - z.units, dUp = z.units ? dU / z.units : 0;
-      var uTekst = Math.abs(dUp) < 0.05 ? T('bijna <b>evenveel</b> units', 'about <b>the same</b> number of units') : (dU > 0 ? T('<b>meer</b> units', '<b>more</b> units') : T('<b>minder</b> units', '<b>fewer</b> units'));
-      zinnen += zin('&#x1F4E6;', T('Er gingen ' + uTekst + ' over de kade: <b>' + hel(m.units, 0) + '</b> per dienst ' + L.met + ', tegen <b>' + hel(z.units, 0) + '</b> zonder.',
-        'We handled ' + uTekst + ': <b>' + hel(m.units, 0) + '</b> per shift ' + L.met + ', against <b>' + hel(z.units, 0) + '</b> without.'), Math.abs(dUp) < 0.05 ? GRIJS : (dU > 0 ? GROEN : ROOD));
+    var genoeg = m.n >= 3 && z.n >= 3;
+    // ── 1. Het antwoord in één zin ──
+    var punten = [], minpunten = [];
+    if (genoeg) {
+      var dU = (m.units !== null && z.units) ? (m.units - z.units) / z.units : 0;
+      if (dU >= 0.05) punten.push(T('er gaat <b>' + hel(dU * 100, 0) + '% meer werk</b> over de kade', '<b>' + hel(dU * 100, 0) + '% more work</b> is handled'));
+      if (dU <= -0.05) minpunten.push(T('er gaat <b>minder werk</b> over de kade', '<b>less work</b> is handled'));
       if (m.handling !== null && z.handling !== null) {
         var dH = m.handling - z.handling;
-        zinnen += zin('&#x23F1;&#xFE0F;', Math.abs(dH) < 5
-          ? T('Het laden en lossen duurde <b>ongeveer even lang</b> (' + hel(m.handling, 0) + ' tegen ' + hel(z.handling, 0) + ' minuten).', 'Loading and unloading took <b>about as long</b> (' + hel(m.handling, 0) + ' vs ' + hel(z.handling, 0) + ' minutes).')
-          : T('Het schip was ' + L.met + ' <b>' + hel(Math.abs(dH), 0) + ' minuten ' + (dH < 0 ? 'eerder' : 'later') + '</b> klaar met laden (van klep neer tot laden klaar).', '' + L.Met + ' the ship was <b>' + hel(Math.abs(dH), 0) + ' minutes ' + (dH < 0 ? 'faster' : 'slower') + '</b> (ramp down to loading complete).'),
-          Math.abs(dH) < 5 ? GRIJS : (dH < 0 ? GROEN : ROOD));
+        if (dH <= -5) punten.push(T('het schip is <b>' + hel(-dH, 0) + ' minuten eerder klaar</b>', 'the ship is <b>done ' + hel(-dH, 0) + ' minutes sooner</b>'));
+        if (dH >= 5) minpunten.push(T('het schip is <b>' + hel(dH, 0) + ' minuten later klaar</b>', 'the ship is <b>done ' + hel(dH, 0) + ' minutes later</b>'));
       }
       if (m.opTijd !== null && z.opTijd !== null) {
         var dO = (m.opTijd - z.opTijd) * 100;
-        zinnen += zin('&#x1F6A2;', T('De boot vertrok ' + (Math.abs(dO) < 2 ? '<b>even vaak</b>' : (dO > 0 ? '<b>vaker</b>' : '<b>minder vaak</b>')) + ' op tijd: <b>' + hel(m.opTijd * 100, 0) + '%</b> ' + L.met + ', tegen <b>' + hel(z.opTijd * 100, 0) + '%</b> zonder.',
-          'The ship left on time ' + (Math.abs(dO) < 2 ? '<b>equally often</b>' : (dO > 0 ? '<b>more often</b>' : '<b>less often</b>')) + ': <b>' + hel(m.opTijd * 100, 0) + '%</b> ' + L.met + ', against <b>' + hel(z.opTijd * 100, 0) + '%</b> without.'),
-          Math.abs(dO) < 2 ? GRIJS : (dO > 0 ? GROEN : ROOD));
+        if (dO >= 3) punten.push(T('de boot vertrekt <b>vaker op tijd</b> (' + hel(m.opTijd * 100, 0) + '% tegen ' + hel(z.opTijd * 100, 0) + '%)', 'the ship <b>leaves on time more often</b> (' + hel(m.opTijd * 100, 0) + '% vs ' + hel(z.opTijd * 100, 0) + '%)'));
+        if (dO <= -3) minpunten.push(T('de boot vertrekt <b>minder vaak op tijd</b>', 'the ship <b>leaves on time less often</b>'));
       }
-      if (m.shutout !== null || z.shutout !== null) {
-        zinnen += zin('&#x1F6A7;', T('Achtergelaten units per dienst: <b>' + hel(m.shutout, 1) + '</b> ' + L.met + ', <b>' + hel(z.shutout, 1) + '</b> zonder.', 'Units left behind per shift: <b>' + hel(m.shutout, 1) + '</b> ' + L.met + ', <b>' + hel(z.shutout, 1) + '</b> without.'), null);
-      }
-      // conclusie
-      var sneller = m.handling !== null && z.handling !== null && m.handling - z.handling <= -5;
-      var vakerOpTijd = m.opTijd !== null && z.opTijd !== null && (m.opTijd - z.opTijd) * 100 >= 2;
-      var meerUnits = dUp >= 0.05;
-      if (meerUnits && (sneller || vakerOpTijd)) conclusie = T('' + L.Met + ' gaan er <b>meer units mee</b> én zijn we <b>' + (sneller ? 'sneller klaar' : 'vaker op tijd') + '</b>.', '' + L.Met + ' we handle <b>more units</b> and are <b>' + (sneller ? 'done faster' : 'more often on time') + '</b>.');
-      else if (meerUnits) conclusie = T('' + L.Met + ' gaan er <b>meer units mee</b>.', '' + L.Met + ' we handle <b>more units</b>.');
-      else if (sneller || vakerOpTijd) conclusie = T(L.Onderwerp + ' zorgt er vooral voor dat we <b>' + (sneller && vakerOpTijd ? 'sneller klaar zijn en vaker op tijd vertrekken' : (sneller ? 'sneller klaar zijn' : 'vaker op tijd vertrekken')) + '</b>. Er gaan niet veel méér units mee.',
-        L.Onderwerp + ' mainly means we are <b>' + (sneller && vakerOpTijd ? 'done faster and leave on time more often' : (sneller ? 'done faster' : 'more often on time')) + '</b>. It does not add many more units.');
-      else conclusie = T('In deze periode levert ' + L.onderwerp + ' <b>geen duidelijk voordeel</b> op in units, snelheid of stiptheid.', 'In this period ' + L.onderwerp + ' shows <b>no clear benefit</b> in units, speed or punctuality.');
-    } else {
-      conclusie = T('Er zijn in deze periode alleen diensten ' + (m.n ? 'mét ' : 'zónder ') + wat + ', dus we kunnen nog niet vergelijken. Kies een langere periode.', 'This period only has shifts ' + (m.n ? 'with ' : 'without ') + wat + ', so there is nothing to compare yet. Choose a longer period.');
     }
+    var zin1, icoon, kleur;
+    if (!genoeg) { icoon = '&#x23F3;'; kleur = '#5a7090';
+      zin1 = T('Nog te weinig diensten om te vergelijken: <b>' + m.n + '</b> met en <b>' + z.n + '</b> zonder extra mensen in ' + periodeTxt + '. Kies hierboven een langere periode.',
+               'Not enough shifts to compare yet: <b>' + m.n + '</b> with and <b>' + z.n + '</b> without extra staff in ' + periodeTxt + '. Choose a longer period above.'); }
+    else if (punten.length) { icoon = '&#x2705;'; kleur = GROEN;
+      zin1 = T('Extra mensen helpen: ', 'Extra staff helps: ') + punten.join(T(' en ', ' and ')) + '.' + (minpunten.length ? ' ' + T('Maar ', 'But ') + minpunten.join(T(' en ', ' and ')) + '.' : ''); }
+    else if (minpunten.length) { icoon = '&#x26A0;&#xFE0F;'; kleur = ROOD;
+      zin1 = T('Extra mensen leveren hier niets op: ', 'Extra staff does not pay off here: ') + minpunten.join(T(' en ', ' and ')) + '.'; }
+    else { icoon = '&#x2796;'; kleur = '#5a7090';
+      zin1 = T('Met of zonder extra mensen: <b>geen duidelijk verschil</b> in werk, snelheid of stiptheid.', 'With or without extra staff: <b>no clear difference</b> in work, speed or punctuality.'); }
+    h += '<div style="display:flex;gap:14px;align-items:flex-start;background:#003366;color:#fff;border-radius:12px;padding:16px 18px;margin-bottom:16px;">' +
+      '<div style="font-size:30px;line-height:1;">' + icoon + '</div><div style="font-size:16.5px;line-height:1.5;">' + zin1.replace(/<b>/g, '<b style="color:#ffd27a;">') + '</div></div>';
+    // ── 2. Naast elkaar: twee kolommen ──
+    var kolom = function(titel, sub, kl, g, ander, isMet){
+      // ✔ alleen bij een duidelijk verschil (zelfde drempels als de samenvatting hierboven)
+      var rij = function(label, waarde, hoger, eh, dec, verg, drempel){
+        var beter = (verg !== null && verg !== undefined && waarde !== null && waarde !== undefined && Math.abs(waarde - verg) >= (drempel || 0.5)) ? ((waarde > verg) === hoger) : false;
+        return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:9px 0;border-bottom:1px solid #eef2f7;">' +
+          '<span style="font-size:13.5px;color:#3a4a5e;">' + label + '</span>' +
+          '<span style="font-size:20px;font-weight:800;color:#003366;white-space:nowrap;">' + (waarde === null || waarde === undefined ? '—' : hel(waarde, dec) + eh) + (beter ? ' <span style="color:' + GROEN + ';font-size:15px;" title="' + T('beter', 'better') + '">&#x2714;</span>' : '') + '</span></div>';
+      };
+      return '<div style="flex:1;min-width:250px;background:#fff;border:2px solid ' + kl + ';border-radius:12px;overflow:hidden;">' +
+        '<div style="background:' + kl + ';color:#fff;padding:10px 14px;"><div style="font-weight:800;font-size:15px;">' + titel + '</div><div style="font-size:12px;opacity:.85;">' + sub + '</div></div>' +
+        '<div style="padding:4px 14px 8px;">' +
+        rij(T('Mensen op de dienst', 'People on the shift'), g.koppen, true, '', 0, null) +
+        rij(T('Units gelost + geladen', 'Units unloaded + loaded'), g.units, true, '', 0, ander.units, ander.units ? ander.units * 0.05 : 1) +
+        rij(T('Minuten laden en lossen', 'Minutes loading/unloading'), g.handling, false, ' min', 0, ander.handling, 5) +
+        rij(T('Op tijd vertrokken', 'Left on time'), g.opTijd === null ? null : g.opTijd * 100, true, '%', 0, ander.opTijd === null ? null : ander.opTijd * 100, 3) +
+        (g.shutout !== null || ander.shutout !== null ? rij(T('Achtergelaten units', 'Units left behind'), g.shutout, false, '', 1, ander.shutout) : '') +
+        '</div></div>';
+    };
+    h += '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:6px;">' +
+      kolom(T('&#x2795; MET extra mensen', '&#x2795; WITH extra staff'), m.n + T(' diensten met ', ' shifts with ') + wat, KL.met, m, z, true) +
+      kolom(T('ZONDER extra mensen', 'WITHOUT extra staff'), z.n + T(' diensten zonder ', ' shifts without ') + wat, KL.zonder, z, m, false) + '</div>' +
+      '<div style="font-size:11.5px;color:#8795a8;margin-bottom:14px;">' + T('Gemiddelde per dienst. &#x2714; = beter dan de andere kolom.', 'Average per shift. &#x2714; = better than the other column.') + '</div>';
+    // ── 3. Kosten ──
     var kOw = tar.extra !== null ? a.alle.exUren * tar.extra : null, kInh = tar.inhuur !== null ? a.alle.inhUren * tar.inhuur : null;
-    var urenOw = soort !== 'inhuur', urenInh = soort !== 'overwerk';
-    var delen = [];
-    if (urenOw) delen.push('<b>' + hel(a.alle.exUren, 0) + T(' uur</b> overwerk', ' hours</b> of overtime') + (kOw !== null ? ' (\u2248 \u20AC ' + hel(kOw, 0) + ')' : ''));
-    if (urenInh) delen.push('<b>' + hel(a.alle.inhUren, 0) + T(' uur</b> inhuur', ' hours</b> of agency staff') + (kInh !== null ? ' (\u2248 \u20AC ' + hel(kInh, 0) + ')' : ''));
-    var totK = (urenOw ? (kOw || 0) : 0) + (urenInh ? (kInh || 0) : 0);
-    var mist = (urenOw && kOw === null) || (urenInh && kInh === null);
-    zinnen += zin('&#x1F4B6;', T('Er is ', 'There were ') + delen.join(T(' en ', ' and ')) + T(' ingezet', ' used') +
-      (delen.length > 1 && !mist ? T(', samen ongeveer <b>\u20AC ', ', together about <b>\u20AC ') + hel(totK, 0) + '</b>' : '') + '.' +
-      (mist ? ' <span style="color:#8795a8;">' + T('Vul bij \u2699\uFE0F de uurtarieven in om de kosten te zien.', 'Enter the hourly rates via \u2699\uFE0F to see the cost.') + '</span>' : ''), null);
-    var weinig = beide && (m.n < 10 || z.n < 10);
-    h += '<div style="background:#f4f7fb;border-radius:12px;padding:6px 16px 4px;margin-bottom:12px;">' +
-      '<div style="font-weight:800;color:#003366;font-size:13px;text-transform:uppercase;letter-spacing:.5px;padding:8px 0 2px;">' + T('Wat zien we?', 'What do we see?') + '</div>' + zinnen + '</div>' +
-      '<div style="background:#003366;color:#fff;border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:15.5px;line-height:1.5;">' +
-      '<div style="font-size:11.5px;text-transform:uppercase;letter-spacing:.8px;opacity:.75;font-weight:700;margin-bottom:3px;">' + T('In het kort', 'In short') + '</div>' + conclusie.replace(/<b>/g, '<b style="color:#ffd27a;">') +
-      (weinig ? '<div style="font-size:12px;opacity:.8;margin-top:6px;">' + T('Let op: nog weinig diensten om te vergelijken. Zie dit als een eerste indruk.', 'Note: still few shifts to compare. Treat this as a first impression.') + '</div>' : '') + '</div>';
-    // ── 2. Naast elkaar ──
-    if (beide) {
-      h += '<div style="font-weight:800;color:#003366;font-size:13px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">' + T('Naast elkaar (gemiddeld per dienst)', 'Side by side (average per shift)') + '</div>' +
-        '<div style="display:flex;gap:16px;font-size:12px;color:#1a2a4a;margin-bottom:10px;"><span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:' + KL.met + ';vertical-align:-1px;"></span> ' + T('' + L.Met + '', '' + L.Met + '') + '</span><span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:' + KL.zonder + ';vertical-align:-1px;"></span> ' + T('' + L.Zonder + '', '' + L.Zonder + '') + '</span></div>' +
-        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:4px 36px;">' +
-        balkRij(T('Mensen op de dienst', 'People on the shift'), '', m.koppen, z.koppen, 0, '', en, L) +
-        balkRij(T('Units gelost + geladen', 'Units unloaded + loaded'), '', m.units, z.units, 0, '', en, L) +
-        balkRij(T('Minuten laden en lossen', 'Minutes loading and unloading'), T('van klep neer tot laden klaar — korter is beter', 'ramp down to loading complete — shorter is better'), m.handling, z.handling, 0, ' min', en, L) +
-        balkRij(T('Op tijd vertrokken', 'Left on time'), T('hoger is beter', 'higher is better'), m.opTijd === null ? null : m.opTijd * 100, z.opTijd === null ? null : z.opTijd * 100, 0, '%', en, L) +
-        '</div>';
-    }
+    h += '<div style="display:flex;gap:12px;align-items:center;background:#f4f7fb;border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:14px;color:#1a2a4a;">' +
+      '<span style="font-size:22px;">&#x1F4B6;</span><span>' +
+      T('Ingezet ' + periodeTxt + ': <b>' + hel(a.alle.exUren, 0) + ' uur overwerk</b>' + (kOw !== null ? ' (≈ € ' + hel(kOw, 0) + ')' : '') + ' en <b>' + hel(a.alle.inhUren, 0) + ' uur inhuur</b>' + (kInh !== null ? ' (≈ € ' + hel(kInh, 0) + ')' : '') + '.',
+        'Used ' + periodeTxt + ': <b>' + hel(a.alle.exUren, 0) + ' hours overtime</b>' + (kOw !== null ? ' (≈ € ' + hel(kOw, 0) + ')' : '') + ' and <b>' + hel(a.alle.inhUren, 0) + ' hours agency</b>' + (kInh !== null ? ' (≈ € ' + hel(kInh, 0) + ')' : '') + '.') +
+      ((kOw === null || kInh === null) ? ' <span style="color:#8795a8;">' + T('Vul bij ⚙️ de uurtarieven in om de kosten te zien.', 'Enter the hourly rates via ⚙️ to see the cost.') + '</span>' : '') + '</span></div>';
+    var detailKnoppen = '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:4px 0 12px;">' +
+      '<span style="font-size:12px;color:#5a7090;margin-right:2px;">' + T('Dienst:', 'Shift:') + '</span>' +
+      knop('alle', opts.dienst, T('Allebei', 'Both'), id + 'Dienst') + knop('O', opts.dienst, T('Ochtend', 'Morning'), id + 'Dienst') + knop('A', opts.dienst, T('Avond', 'Evening'), id + 'Dienst') +
+      '<span style="width:10px;"></span><span style="font-size:12px;color:#5a7090;margin-right:2px;">' + T('Extra mensen =', 'Extra staff =') + '</span>' +
+      knop('beide', soort, T('Overwerk + inhuur', 'Overtime + agency'), id + 'Soort') + knop('overwerk', soort, T('Alleen overwerk', 'Overtime only'), id + 'Soort') + knop('inhuur', soort, T('Alleen inhuur', 'Agency only'), id + 'Soort') + '</div>';
     // ── 3. Details ──
     var kol = [
       { t: T('Diensten', 'Shifts'), f: function(g){ return g.n; } },
@@ -26663,7 +26658,7 @@ var OW = (function(){
       { t: T('Achtergelaten', 'Left behind'), f: function(g){ return g.shutout === null ? '—' : fmt(g.shutout, 1); } }
     ];
     var inp = 'width:52px;padding:3px 5px;border:1px solid #c8d7e8;border-radius:5px;font-size:12px;text-align:center;';
-    h += '<details style="margin-top:8px;border-top:1px solid #e3e9f1;padding-top:10px;"><summary style="cursor:pointer;font-weight:700;color:#003366;font-size:13px;">' + T('Meer details (tabellen, grafiek en alle diensten)', 'More details (tables, chart and all shifts)') + '</summary><div style="margin-top:12px;">' +
+    h += '<details style="margin-top:8px;border-top:1px solid #e3e9f1;padding-top:10px;"><summary style="cursor:pointer;font-weight:700;color:#003366;font-size:13px;">' + T('Meer details (tabellen, grafiek en alle diensten)', 'More details (tables, chart and all shifts)') + '</summary><div style="margin-top:12px;">' + detailKnoppen +
       '<div style="font-weight:700;color:#003366;font-size:12px;margin:6px 0;">' + T('Met en ' + L.zonder + '', 'With and ' + L.zonder + '') + '</div><div style="overflow-x:auto;">' +
       vergelijkTabel([{ naam: T('' + L.Met + '', '' + L.Met + ''), g: m }, { naam: T('' + L.Zonder + '', '' + L.Zonder + ''), g: z }], kol, en) + '</div>';
     if (a.onder.n + a.op.n + a.boven.n > 0) {
@@ -26717,7 +26712,7 @@ var OW = (function(){
 })();
 
 // ── Overwerk & productiviteit: koppeling met de hoofdapp ──
-var _owPeriode = 'maand', _owDienst = 'alle', _owSoort = 'beide', _owJaar = new Date().getFullYear(), _owMaand = new Date().getMonth();
+var _owPeriode = '3m', _owDienst = 'alle', _owSoort = 'beide', _owJaar = new Date().getFullYear(), _owMaand = new Date().getMonth();
 function owEn(){ return (sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM'; }
 function owKey(){ return tk('kpi_overwerk_v1'); }
 function owRoutes(){ return owEn() ? ['To Hoek van Holland','To Europoort'] : ['Harwich Ochtend','Harwich Middag','Immingham']; }
