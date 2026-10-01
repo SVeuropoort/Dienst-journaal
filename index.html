@@ -23794,6 +23794,121 @@ if(_sfrEd) _sfrEd.addEventListener('keypress', function(e){if(e.key==='Enter')ca
   <button onclick="navTo('schade','SCHADE FORMULIER',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x1F4CB; Schade Formulier</button>
   <button onclick="navTo('opleidingen','OPLEIDINGEN',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:none;color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x1F393; Opleidingen</button>
 </div>
+<script>
+// ══════════════════════════════════════════════════════════════════
+// Uitklapmenu: onderdelen met eigen tabbladen klappen naar rechts uit, zodat je in één klik
+// direct op het juiste tabblad komt. Desktop: met de muis eroverheen. Touch/telefoon: tik op het
+// pijltje (›). Is er rechts te weinig ruimte, dan klapt het onder het menu-item uit.
+// ══════════════════════════════════════════════════════════════════
+(function(){
+  function en(){ return (sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM'; }
+  function na(fn, ms){ setTimeout(function(){ try { fn(); } catch(e) {} }, ms || 120); }
+  function scrollNaar(id){ na(function(){ var el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 450); }
+  var MENU = [
+    { knop: "button[onclick^=\"navTo('dagplanning'\"]", subs: function(){ return [
+      { l: en() ? 'Morning' : 'Ochtend', i: '&#x1F305;', f: function(){ showTab('ochtend'); } },
+      { l: en() ? 'Evening' : 'Avond', i: '&#x1F306;', f: function(){ showTab('avond'); } } ]; } },
+    { knop: '#nav-btn-materieel', subs: function(){ var bhv = document.getElementById('matTabBhv'); return [
+      { l: en() ? 'Equipment status' : 'Status materieel', i: '&#x1F69B;', f: function(){ matShowSubTab('status'); } } ].concat(
+      (!bhv || bhv.style.display === 'none') ? [] : [{ l: 'BHV / EHBO', i: '&#x26D1;&#xFE0F;', f: function(){ matShowSubTab('bhv'); } }]); } },
+    { knop: '#nav-btn-werkoverdracht', eigen: true, subs: function(){ return [
+      { l: en() ? 'Handover' : 'Overdracht', i: '&#x21C4;', sub: 'overdracht' },
+      { l: en() ? 'Personnel file' : 'Personeelsdossier', i: '&#x1F4C1;', sub: 'personeelsdossier' },
+      { l: 'Toolbox', i: '&#x1F9F0;', sub: 'toolbox' } ]; } },
+    { knop: "button[onclick^=\"navTo('werkorder'\"]", subs: function(){ return [
+      { l: en() ? 'Work order' : 'Werkorder', i: '&#x1F4DD;', f: function(){ woTabToon('formulier'); } },
+      { l: 'Abnormal loads', i: '&#x1F69B;', f: function(){ woTabToon('abnormal'); } } ]; } },
+    { knop: '#nav-btn-kpi', subs: function(){ return [
+      { l: en() ? 'Punctuality per point' : 'Punctualiteit per meetpunt', i: '&#x1F3AF;', f: function(){ scrollNaar('kpi-chart-card'); } },
+      { l: en() ? 'Overtime & productivity' : 'Overwerk & productiviteit', i: '&#x23F1;&#xFE0F;', f: function(){ scrollNaar('ow-card'); } },
+      { l: en() ? 'Absence & staffing' : 'Verzuim & bezetting', i: '&#x1F912;', f: function(){ scrollNaar('vz-card'); } },
+      { l: en() ? 'Saved monthly overviews' : 'Maandoverzichten', i: '&#x1F4F8;', f: function(){ scrollNaar('kpi-snapshots-lijst'); } } ]; } },
+    { knop: '#nav-btn-aowdash', subs: function(){ return [
+      { l: en() ? 'State pension calculation' : 'AOW berekening', i: '&#x1F4B0;', f: function(){ aowSwitchTab('aow'); } },
+      { l: en() ? 'SFR / ESW leave' : 'SFR / ESW verlof', i: '&#x1F4C5;', f: function(){ aowSwitchTab('sfr'); } },
+      { l: en() ? 'Explanation & CLA' : 'Toelichting & CAO', i: '&#x2139;&#xFE0F;', f: function(){ aowSwitchTab('uitleg'); } } ]; } },
+    { knop: "button[onclick^=\"navTo('opleidingen'\"]", subs: function(){
+      return (typeof OPLEIDINGEN_FORMS !== 'undefined' ? OPLEIDINGEN_FORMS : []).map(function(f){
+        return { l: String(f.naam_kort || f.titel).replace(/^📋\s*/, ''), i: f.id === 'overzicht' ? '&#x1F4CB;' : '&#x1F393;', f: function(){ oplToonTab(f.id); } }; }); } }
+  ];
+
+  var fly = null, sluitTimer = null, huidigeKnop = null, geopendOp = 0;
+  function maakFly(){
+    if (fly) return fly;
+    fly = document.createElement('div');
+    fly.id = 'navFlyout';
+    fly.style.cssText = 'display:none;position:fixed;background:#0a2448;border:1px solid rgba(255,255,255,0.2);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.5);min-width:210px;z-index:100000;overflow:hidden;';
+    fly.addEventListener('mouseenter', function(){ clearTimeout(sluitTimer); });
+    fly.addEventListener('mouseleave', planSluiten);
+    document.body.appendChild(fly);
+    return fly;
+  }
+  function sluit(){ clearTimeout(sluitTimer); if (fly) fly.style.display = 'none'; if (huidigeKnop) huidigeKnop.style.background = 'transparent'; huidigeKnop = null;
+    Array.prototype.forEach.call(document.querySelectorAll('.nav-sub-inline'), function(x){ x.remove(); }); }
+  function planSluiten(){ clearTimeout(sluitTimer); sluitTimer = setTimeout(sluit, 260); }
+  function kies(item, s){
+    sluit();
+    var btn = document.querySelector(item.knop);
+    if (item.eigen) { // Werkoverdracht: eigen functie met toegangscontrole en subtab
+      navWerkoverdracht('WERKOVERDRACHT \uD83D\uDD12', btn, s.sub);
+    } else {
+      if (btn) btn.click();
+      na(s.f, 140);
+    }
+    var nm = document.getElementById('navMenu'); if (nm) nm.style.display = 'none';
+  }
+  function itemHtml(s, i){
+    return '<button type="button" data-i="' + i + '" style="display:flex;align-items:center;gap:10px;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:11px 18px;cursor:pointer;text-align:left;" onmouseover="this.style.background=\'rgba(255,255,255,0.08)\'" onmouseout="this.style.background=\'transparent\'"><span style="width:18px;text-align:center;">' + s.i + '</span><span>' + s.l + '</span></button>';
+  }
+  function open(item, btn){
+    clearTimeout(sluitTimer);
+    if (huidigeKnop === btn && ((fly && fly.style.display === 'block') || document.querySelector('.nav-sub-inline'))) return;
+    sluit();
+    var subs = item.subs(); if (!subs.length) return;
+    huidigeKnop = btn; geopendOp = Date.now(); btn.style.background = 'rgba(255,255,255,0.10)';
+    var r = btn.getBoundingClientRect();
+    var html = subs.map(itemHtml).join('');
+    if (window.innerWidth - r.right >= 220) {
+      var f = maakFly(); f.innerHTML = html; f.style.display = 'block';
+      f.style.left = (r.right + 4) + 'px';
+      var top = r.top; f.style.top = top + 'px';
+      var h = f.offsetHeight; if (top + h > window.innerHeight - 8) f.style.top = Math.max(8, window.innerHeight - 8 - h) + 'px';
+      bind(f, item, subs);
+    } else { // te smal (telefoon): onder het menu-item uitklappen
+      var d = document.createElement('div'); d.className = 'nav-sub-inline'; d.style.cssText = 'background:#071a36;border-bottom:1px solid rgba(255,255,255,0.08);';
+      d.innerHTML = html.replace(/padding:11px 18px/g, 'padding:10px 18px 10px 34px'); btn.insertAdjacentElement('afterend', d); bind(d, item, subs);
+    }
+  }
+  function bind(el, item, subs){
+    Array.prototype.forEach.call(el.querySelectorAll('button[data-i]'), function(b){
+      b.addEventListener('click', function(ev){ ev.stopPropagation(); kies(item, subs[+b.getAttribute('data-i')]); });
+    });
+  }
+  function init(){
+    MENU.forEach(function(item){
+      var btn = document.querySelector('#navMenu ' + item.knop); if (!btn || btn.getAttribute('data-heeft-sub')) return;
+      btn.setAttribute('data-heeft-sub', '1');
+      var pijl = document.createElement('span');
+      pijl.innerHTML = '&#x203A;';
+      pijl.title = en() ? 'Show tabs' : 'Tabbladen tonen';
+      pijl.style.cssText = 'float:right;font-size:20px;line-height:15px;padding:0 2px 0 14px;opacity:.75;';
+      btn.appendChild(pijl);
+      btn.addEventListener('mouseenter', function(){ if (window.matchMedia && window.matchMedia('(hover: hover)').matches) open(item, btn); });
+      btn.addEventListener('mouseleave', planSluiten);
+      pijl.addEventListener('click', function(ev){ ev.stopPropagation(); ev.preventDefault(); if (huidigeKnop === btn) { if (Date.now() - geopendOp > 400) sluit(); } else open(item, btn); });
+    });
+    // Andere menu-items: flyout dicht bij eroverheen gaan
+    Array.prototype.forEach.call(document.querySelectorAll('#navMenu > button'), function(b){
+      if (!b.getAttribute('data-heeft-sub')) b.addEventListener('mouseenter', sluit);
+    });
+    // Menu dicht = uitklapmenu ook dicht
+    var nm = document.getElementById('navMenu');
+    if (nm && window.MutationObserver) new MutationObserver(function(){ if (nm.style.display === 'none') sluit(); }).observe(nm, { attributes: true, attributeFilter: ['style'] });
+    document.addEventListener('click', function(ev){ if (fly && fly.style.display === 'block' && !fly.contains(ev.target) && !(nm && nm.contains(ev.target))) sluit(); });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+</script>
 
 <script>
 function djVerbergTabsVoorTerminal(){
