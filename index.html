@@ -10408,7 +10408,7 @@ document.getElementById('archOverlay').addEventListener('click',function(e){
 
 
     <!-- KPI -->
-    <div id="arch-kpi" class="arch-subview" style="display:block;"><div style="padding:20px 0;"><div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap;"><button onclick="kpiStapMaand(-1)" style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:16px;">&#8592;</button><div style="font-size:22px;font-weight:700;color:var(--navy);min-width:160px;text-align:center;" id="kpi-maand-label">&#x2014;</div><button onclick="kpiStapMaand(1)" style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:16px;">&#8594;</button><span id="kpi-dagen-label" style="font-size:12px;color:var(--muted);margin-left:8px;"></span><button onclick="kpiOpruimen()" title="Verwijder dagdata ouder dan 60 dagen" style="margin-left:16px;background:#c0392b;color:#fff;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:11px;font-weight:700;">&#x1F9F9; Opruimen</button></div><div id="kpi-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:20px;"></div>
+    <div id="arch-kpi" class="arch-subview" style="display:block;"><div style="padding:20px 0;"><div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap;"><button onclick="kpiStapMaand(-1)" style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:16px;">&#8592;</button><div style="font-size:22px;font-weight:700;color:var(--navy);min-width:160px;text-align:center;" id="kpi-maand-label">&#x2014;</div><button onclick="kpiStapMaand(1)" style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:16px;">&#8594;</button><span id="kpi-dagen-label" style="font-size:12px;color:var(--muted);margin-left:8px;"></span><button onclick="kpiOpruimen()" title="Verwijder dagdata ouder dan 60 dagen" style="margin-left:16px;background:#c0392b;color:#fff;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:11px;font-weight:700;">&#x1F9F9; Opruimen</button></div><div class="card" id="sc-card" style="margin-bottom:20px;"><div class="card-header"><div class="icon">&#x1F4C8;</div><h2>Scorekaart &mdash; beter of slechter?</h2></div><div id="sc-body" style="padding:16px;"></div></div><div id="kpi-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:20px;"></div>
 
         <!-- Personeels overzicht -->
         <div class="card" style="margin-bottom:20px;">
@@ -21369,6 +21369,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
     renderTolynxKade();
     try { if (typeof window.owRenderKpi === 'function') window.owRenderKpi(_kpiY, _kpiM); } catch(e) {}
     try { if (typeof window.vzRenderKpi === 'function') window.vzRenderKpi(); } catch(e) {}
+    try { if (typeof window.scRenderKpi === 'function') window.scRenderKpi(); } catch(e) {}
     try { if (typeof window.kpiSnapRender === 'function') window.kpiSnapRender(); } catch(e) {}
     var lbl=document.getElementById('kpi-maand-label');
     if(lbl) lbl.textContent=_ML[_kpiM]+' '+_kpiY;
@@ -27012,6 +27013,152 @@ var VZ = (function(){
 if (typeof window !== 'undefined') window.VZ = VZ;
 
 // ═════════════════════════════════════════════════════════════════
+// SCORECARD — beter of slechter dan vorige maand / vorig jaar (identiek in index.html en kpi-mt.html)
+// 8 KPI's uit de bestaande data. Een lopende maand wordt eerlijk vergeleken: 1 t/m vandaag tegen
+// 1 t/m dezelfde dag van de vergelijkingsmaand. Zijn de dagdata van een vergelijkingsmaand er niet
+// meer, dan wordt het bewaarde maandoverzicht gebruikt (altijd de hele maand).
+// ═════════════════════════════════════════════════════════════════
+var SC = (function(){
+  var MND_NL = ['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'];
+  var MND_EN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var DN = ['Zo','Ma','Di','Wo','Do','Vr','Za'];
+  var VELDEN = ['trailers','eigen','containers','trade'];
+  // hoger = beter? dec = decimalen, eh = eenheid
+  var KPIS = [
+    { key: 'opTijd',     nl: 'Op tijd vertrokken',            en: 'Departed on time',        hoger: true,  dec: 0, eh: '%',  pct: true, icoon: '&#x1F6A2;' },
+    { key: 'handling',   nl: 'Klep neer → laden klaar', en: 'Ramp down → loaded', hoger: false, dec: 0, eh: ' min', icoon: '&#x23F1;&#xFE0F;' },
+    { key: 'unitsDag',   nl: 'Units per dag',                 en: 'Units per day',           hoger: true,  dec: 0, eh: '',   icoon: '&#x1F4E6;' },
+    { key: 'unitsUur',   nl: 'Units per gewerkt uur',         en: 'Units per hour worked',   hoger: true,  dec: 2, eh: '',   icoon: '&#x2699;&#xFE0F;' },
+    { key: 'extraUren',  nl: 'Overwerk + inhuur / dag',   en: 'Overtime + agency / day', hoger: false, dec: 1, eh: ' u', icoon: '&#x1F552;' },
+    { key: 'verzuim',    nl: 'Verzuim',                       en: 'Absence',                 hoger: false, dec: 1, eh: '%',  pct: true, icoon: '&#x1F912;' },
+    { key: 'onder',      nl: 'Dagen onderbezet', en: 'Days understaffed', hoger: false, dec: 0, eh: '%', pct: true, icoon: '&#x1F465;' },
+    { key: 'achter',     nl: 'Achtergelaten / dag', en: 'Left behind / day', hoger: false, dec: 1, eh: '', icoon: '&#x1F6A7;' }
+  ];
+  function t2m(t){ if (!t) return null; var p = String(t).split(':'); if (p.length !== 2) return null; var h = parseInt(p[0], 10), m = parseInt(p[1], 10); return (isNaN(h) || isNaN(m)) ? null : h * 60 + m; }
+  function iso(j, m, d){ return j + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0'); }
+  function slashNaarIso(s){ var p = String(s || '').split('/'); return p.length === 3 ? p[2] + '-' + p[1].padStart(2, '0') + '-' + p[0].padStart(2, '0') : null; }
+  function dagenInMaand(j, m){ return new Date(j, m + 1, 0).getDate(); }
+  function hel(n, dec){ if (n === null || n === undefined || isNaN(n)) return '—'; return Number(n).toLocaleString('nl-NL', { minimumFractionDigits: 0, maximumFractionDigits: dec || 0 }); }
+  function N(){ return (typeof window !== 'undefined' && window.KPINORM) ? window.KPINORM : null; }
+
+  // De 8 KPI's berekenen over [start, eind] (ISO-datums, inclusief)
+  function bereken(src, start, eind){
+    var K = N(), normen = src.normen || {}, routes = src.routes || [];
+    var dagenVs = 0, units = 0, bin = 0, tot = 0, hand = [], achter = 0, unitsPerDag = {};
+    var cfgShut = (src.shutout || {});
+    Object.keys(src.vs || {}).forEach(function(k){
+      var e = src.vs[k]; var d = slashNaarIso((e && e.datum) || k); if (!d || d < start || d > eind) return;
+      var u = e.units || {}, du = 0;
+      routes.forEach(function(r, ri){ VELDEN.forEach(function(f){ du += (parseInt(u['in-' + f + '-' + (ri + 1)], 10) || 0) + (parseInt(u['out-' + f + '-' + (ri + 1)], 10) || 0); }); });
+      if (du > 0) { dagenVs++; units += du; unitsPerDag[d] = du; }
+      var wd = new Date(d + 'T12:00:00').getDay(), we = wd === 0 || wd === 6;
+      routes.forEach(function(r, ri){
+        var rij = (e.tijden || [])[ri], t = (rij && rij.tijden) || [];
+        var kl = t2m(t[1]), lc = t2m(t[5]); if (kl !== null && lc !== null) { var h = lc - kl; if (h < 0) h += 1440; if (h > 0 && h < 720) hand.push(h); }
+        if (K && t[7]) { var nk = r + '_7', nv = (we && K.heeft(normen[nk + '_we'], 7)) ? normen[nk + '_we'] : normen[nk]; var ev = K.check(nv, rij, 7, t[7]); if (ev) { tot++; if (ev.afw <= ev.marge) bin++; } }
+      });
+      var so = cfgShut[(e && e.datum) || k] || {};
+      Object.keys(so).forEach(function(n){ achter += parseFloat(so[n] && so[n].achter) || 0; });
+    });
+    // Bezetting, uren, verzuim
+    var werkdagen = parseFloat(src.werkdagen) > 0 ? Math.min(7, parseFloat(src.werkdagen)) : 5;
+    var ziek = (src.ziek || []).filter(function(z){ return z && z.gemeldOp; });
+    var dpDagen = 0, extraUren = 0, gewerkt = 0, zieken = 0, onder = 0, metStd = 0, urenMetUnits = 0, unitsMetUren = 0;
+    Object.keys(src.dagplans || {}).forEach(function(d){
+      if (d < start || d > eind) return;
+      var dp = src.dagplans[d]; if (!dp) return;
+      var pos = dp.pos || {}, sO = {}, sA = {};
+      Object.keys(pos).forEach(function(k){ var v = pos[k]; if (!v) return; if (k.indexOf('a_') === 0 || k.indexOf('av_') === 0) sA[v] = 1; else sO[v] = 1; });
+      var o = (dp.ochEmps || []).filter(function(e){ return sO[e.name]; }), a = (dp.avondEmps || []).filter(function(e){ return sA[e.name]; });
+      if (!o.length && !a.length) return;
+      dpDagen++;
+      var alle = o.concat(a), uren = 0;
+      alle.forEach(function(e){ var u = parseFloat(e.uren) || 8, t = (e.type || ''); uren += u; if (t.toUpperCase().indexOf('EX') >= 0 || t.toLowerCase().indexOf('inhuur') >= 0) extraUren += u; });
+      if (unitsPerDag[d]) { urenMetUnits += uren; unitsMetUren += unitsPerDag[d]; }
+      gewerkt += alle.length;
+      zieken += ziek.filter(function(z){ return z.gemeldOp <= d && (!z.beterOp || d < z.beterOp); }).length;
+      var std = (src.std || {})[DN[new Date(d + 'T12:00:00').getDay()]] || {};
+      if (std.och_totaal || std.av_totaal) { metStd++; if ((std.och_totaal && o.length < std.och_totaal) || (std.av_totaal && a.length < std.av_totaal)) onder++; }
+    });
+    var gemist = zieken * werkdagen / 7;
+    return {
+      dagen: dagenVs, dpDagen: dpDagen,
+      opTijd: tot ? bin / tot * 100 : null,
+      handling: hand.length ? hand.reduce(function(s, x){ return s + x; }, 0) / hand.length : null,
+      unitsDag: dagenVs ? units / dagenVs : null,
+      unitsUur: urenMetUnits ? unitsMetUren / urenMetUnits : null,
+      extraUren: dpDagen ? extraUren / dpDagen : null,
+      verzuim: (gewerkt + gemist) && (ziek.length || dpDagen) ? gemist / (gewerkt + gemist) * 100 : null,
+      onder: metStd ? onder / metStd * 100 : null,
+      achter: dagenVs ? achter / dagenVs : null
+    };
+  }
+
+  // Waarden voor een maand (eventueel t/m een dag); valt terug op het bewaarde maandoverzicht
+  function maandWaarden(src, j, m, totDag){
+    var eindDag = Math.min(totDag || 99, dagenInMaand(j, m));
+    var w = bereken(src, iso(j, m, 1), iso(j, m, eindDag));
+    if (w.dagen || w.dpDagen) { w.bron = 'data'; w.totDag = totDag && totDag < dagenInMaand(j, m) ? eindDag : null; return w; }
+    var snap = (src.snaps || {})[j + '_' + String(m + 1).padStart(2, '0')];
+    if (snap && snap.sc) { var s = JSON.parse(JSON.stringify(snap.sc)); s.bron = 'overzicht'; return s; }
+    if (snap && snap.totaal) { // ouder overzicht zonder scorekaart: wat er wel in staat
+      var t = snap.totaal, p = snap.personeel || {};
+      return { bron: 'overzicht', dagen: snap.dagen, unitsDag: snap.dagen ? (t.gelost + t.geladen) / snap.dagen : null,
+        verzuim: snap.verzuim ? snap.verzuim.pct : null, onder: (snap.verzuim && snap.verzuim.dagenMetStd) ? snap.verzuim.onderDagen / snap.verzuim.dagenMetStd * 100 : null,
+        opTijd: null, handling: null, unitsUur: null, extraUren: null, achter: null };
+    }
+    return null;
+  }
+
+  function vergelijk(kpi, nu, toen){
+    if (nu === null || nu === undefined || toen === null || toen === undefined) return null;
+    var d = nu - toen, drempel = kpi.pct ? 1 : Math.max(Math.abs(toen) * 0.02, Math.pow(10, -kpi.dec));
+    var status = Math.abs(d) < drempel ? 'gelijk' : ((d > 0) === kpi.hoger ? 'beter' : 'slechter');
+    return { d: d, status: status };
+  }
+
+  function render(el, src, opts){
+    if (!el) return;
+    var en = !!opts.en, T = function(nl, e){ return en ? e : nl; }, MND = en ? MND_EN : MND_NL;
+    var nu = new Date(), j = src.jaar, m = src.maand;
+    var lopend = j === nu.getFullYear() && m === nu.getMonth();
+    var totDag = lopend ? nu.getDate() : null;
+    var cur = maandWaarden(src, j, m, totDag);
+    var pm = m === 0 ? 11 : m - 1, pj = m === 0 ? j - 1 : j;
+    var vor = maandWaarden(src, pj, pm, totDag), jr = maandWaarden(src, j - 1, m, totDag);
+    if (!cur || (!cur.dagen && !cur.dpDagen)) { el.innerHTML = '<div style="color:#5a7090;font-size:13px;padding:6px 2px;">' + T('Nog geen gegevens voor ', 'No data yet for ') + MND[m] + ' ' + j + '.</div>'; return; }
+    var kl = { beter: '#1a7a40', slechter: '#c0392b', gelijk: '#7a8a9c' };
+    var telV = { beter: 0, slechter: 0, gelijk: 0 }, telJ = { beter: 0, slechter: 0, gelijk: 0 };
+    var regel = function(kpi, waarde, ref, label, tel){
+      if (!ref) return '<div style="font-size:11.5px;color:#9aa9bb;margin-top:3px;">' + label + ': ' + T('nog geen data', 'no data yet') + '</div>';
+      var v = vergelijk(kpi, waarde, ref[kpi.key]);
+      if (!v) return '<div style="font-size:11.5px;color:#9aa9bb;margin-top:3px;">' + label + ': —</div>';
+      tel[v.status]++;
+      var teken = v.d > 0 ? '+' : (v.d < 0 ? '−' : '');
+      return '<div style="font-size:12px;margin-top:3px;color:' + kl[v.status] + ';font-weight:700;" title="' + label + ': ' + hel(ref[kpi.key], kpi.dec) + kpi.eh + '">' +
+        (v.status === 'gelijk' ? '●' : (v.d > 0 ? '▲' : '▼')) + ' ' + teken + hel(Math.abs(v.d), kpi.dec) + kpi.eh + ' <span style="color:#5a7090;font-weight:400;">' + label + '</span></div>';
+    };
+    var lblV = T('t.o.v. ', 'vs ') + MND[pm].slice(0, 3) + (vor && vor.bron === 'overzicht' && totDag ? T(' (hele mnd)', ' (full month)') : '');
+    var lblJ = T('t.o.v. ', 'vs ') + MND[m].slice(0, 3) + ' ' + (j - 1) + (jr && jr.bron === 'overzicht' && totDag ? T(' (hele mnd)', ' (full month)') : '');
+    var tegels = KPIS.map(function(k){
+      var w = cur[k.key];
+      var a = regel(k, w, vor, lblV, telV), b = regel(k, w, jr, lblJ, telJ);
+      return '<div style="background:#fff;border:1px solid #dde6f0;border-radius:10px;padding:12px 14px;min-width:0;">' +
+        '<div style="font-size:11px;color:#5a7090;text-transform:uppercase;letter-spacing:.4px;font-weight:700;" title="' + (en ? k.en : k.nl) + '">' + k.icoon + ' ' + (en ? k.en : k.nl) + '</div>' +
+        '<div style="font-size:26px;font-weight:800;color:#003366;margin:2px 0 2px;">' + (w === null || w === undefined ? '—' : hel(w, k.dec) + k.eh) + '</div>' + a + b + '</div>';
+    }).join('');
+    var samen = function(tel, naam){ var n = tel.beter + tel.slechter + tel.gelijk; if (!n) return ''; return '<span style="margin-right:16px;"><b style="color:#1a7a40;">' + tel.beter + ' ' + T('beter', 'better') + '</b>, <b style="color:#c0392b;">' + tel.slechter + ' ' + T('slechter', 'worse') + '</b>' + (tel.gelijk ? ', ' + tel.gelijk + ' ' + T('gelijk', 'same') : '') + ' ' + naam + '</span>'; };
+    var kop = '<div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;margin-bottom:10px;">' +
+      '<span style="font-size:13px;color:#1a2a4a;">' + (totDag ? T('1 t/m ' + totDag + ' ' + MND[m] + ' (lopende maand), vergeleken met dezelfde dagen.', '1–' + totDag + ' ' + MND[m] + ' (month to date), compared with the same days.') : MND[m] + ' ' + j + '.') + '</span>' +
+      '<span style="font-size:13px;">' + samen(telV, T('dan vorige maand', 'than last month')) + samen(telJ, T('dan vorig jaar', 'than last year')) + '</span></div>';
+    el.innerHTML = kop + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:10px;">' + tegels + '</div>' +
+      '<div style="font-size:11px;color:#8795a8;margin-top:8px;">' + T('▲ omhoog / ▼ omlaag; groen = beter, rood = slechter, grijs ● = ongeveer gelijk. Beweeg over een vergelijking voor de waarde van toen. Vorig jaar vult zich vanzelf zodra er maandoverzichten van vorig jaar zijn.', '▲ up / ▼ down; green = better, red = worse, grey ● = about the same. Hover a comparison for the earlier value. Last year fills itself once monthly overviews from last year exist.') + '</div>';
+  }
+  return { bereken: bereken, render: render, iso: iso, dagenInMaand: dagenInMaand };
+})();
+if (typeof window !== 'undefined') window.SC = SC;
+
+// ═════════════════════════════════════════════════════════════════
 // OPGESLAGEN MAANDOVERZICHTEN (gedeelde kern — identiek in index.html en kpi-mt.html)
 // Elke afgesloten maand wordt als compacte samenvatting bewaard in <terminal>_kpi_snapshot_JJJJ_MM
 // (gaat mee in de cloud-sync). Zo blijven de cijfers bewaard, ook als de ruwe dagdata later wordt
@@ -27081,9 +27228,11 @@ var KPISNAP = (function(){
       pers.dagen++; pers.O += o.length; pers.A += a.length;
       o.concat(a).forEach(function(e){ var t = (e.type || ''); if (t.toUpperCase().indexOf('EX') >= 0) pers.extra++; else if (t.toLowerCase().indexOf('inhuur') >= 0) pers.inhuur++; pers.uren += parseFloat(e.uren) || 0; });
     });
+    var sc = null;
+    if (typeof window !== 'undefined' && window.SC) { try { sc = window.SC.bereken({ vs: vs, dagplans: dagplans, normen: normen, routes: routes, std: (extra && extra.std) || {}, ziek: (extra && extra.ziek) || [], werkdagen: extra && extra.werkdagen, shutout: (extra && extra.shutout) || {} }, window.SC.iso(jaar, maand, 1), window.SC.iso(jaar, maand, window.SC.dagenInMaand(jaar, maand))); } catch(e){} }
     var verzuim = null;
     if (extra && extra.ziek && typeof window !== 'undefined' && window.VZ) { try { verzuim = window.VZ.maandKort({ werkdagen: extra.werkdagen, ziek: extra.ziek, dagplans: dagplans, std: extra.std || {}, vs: vs, normen: normen, routes: routes }, jaar, maand); } catch(e){} }
-    return { v: 2, jaar: jaar, maand: maand, label: (en ? MND_EN : MND_NL)[maand] + ' ' + jaar, dagen: entries.length, routes: rs, totaal: tot, personeel: pers, verzuim: verzuim, opgeslagenOp: new Date().toISOString() };
+    return { v: 2, jaar: jaar, maand: maand, label: (en ? MND_EN : MND_NL)[maand] + ' ' + jaar, dagen: entries.length, routes: rs, totaal: tot, personeel: pers, verzuim: verzuim, sc: sc, opgeslagenOp: new Date().toISOString() };
   }
 
   // Vergelijk zonder tijdstempel (om onnodig opslaan/synchroniseren te voorkomen)
@@ -27110,7 +27259,7 @@ var KPISNAP = (function(){
     });
     maandenMetData(o.vs).forEach(function(m){
       if (m.jaar * 12 + m.maand >= dezeMaand) return; // lopende maand nog niet
-      var sd = sleutelDeel(m.jaar, m.maand), nieuw = maak(o.vs, o.dagplans, o.routes, o.normen, m.jaar, m.maand, o.en, { ziek: o.ziek, std: o.std, werkdagen: o.werkdagen });
+      var sd = sleutelDeel(m.jaar, m.maand), nieuw = maak(o.vs, o.dagplans, o.routes, o.normen, m.jaar, m.maand, o.en, { ziek: o.ziek, std: o.std, werkdagen: o.werkdagen, shutout: o.shutout });
       if (nieuw && (!res[sd] || nieuw.dagen >= res[sd].dagen)) { if (res[sd] && zelfde(res[sd], nieuw)) return; nieuw._nieuw = true; res[sd] = nieuw; }
     });
     return Object.keys(res).sort().reverse().map(function(k){ return res[k]; });
@@ -27176,7 +27325,7 @@ if (typeof window !== 'undefined') window.KPISNAP = KPISNAP;
 function kpiSnapBron(){
   var sl = []; for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k) sl.push(k); }
   return { routes: owRoutes(), vs: owLeesJson(tk('vs_data_v1'), {}) || {}, dagplans: owDagplans(), normen: owLeesJson('kpi_normen_v1', {}) || {},
-    werkdagen: (owRuw() || {}).werkdagen, ziek: owLeesJson(tk('werkoverdracht_ziekmeldingen_v1'), []) || [], std: owLeesJson(tk('std_bezetting_v1'), null) || owLeesJson('std_bezetting_v1', {}) || {},
+    shutout: (owRuw() || {}).shutout || {}, werkdagen: (owRuw() || {}).werkdagen, ziek: owLeesJson(tk('werkoverdracht_ziekmeldingen_v1'), []) || [], std: owLeesJson(tk('std_bezetting_v1'), null) || owLeesJson('std_bezetting_v1', {}) || {},
     en: owEn(), prefix: getTerminalPrefix(), sleutels: sl, lees: function(k){ return owLeesJson(k, null); } };
 }
 // Bewaart elke afgesloten maand die nog niet (of met minder dagen) is opgeslagen. Wacht tot de clouddata
@@ -27198,6 +27347,16 @@ function kpiSnapRender(){
   catch(e) { el.innerHTML = '<p style="color:#c0392b;font-size:12px;">Maandoverzichten konden niet worden geladen: ' + OW.esc(e.message) + '</p>'; }
 }
 window.kpiSnapAuto = kpiSnapAuto; window.kpiSnapRender = kpiSnapRender;
+// ── Scorekaart (hoofdapp) ──
+function scRenderKpi(){
+  var el = document.getElementById('sc-body'); if (!el) return;
+  try {
+    var b = kpiSnapBron(), snaps = {}, pfx = getTerminalPrefix() + 'kpi_snapshot_';
+    b.sleutels.forEach(function(k){ if (k.indexOf(pfx) === 0) { var v = owLeesJson(k, null); if (v) snaps[k.slice(pfx.length)] = v; } });
+    SC.render(el, { vs: b.vs, dagplans: b.dagplans, normen: b.normen, routes: b.routes, std: b.std, ziek: b.ziek, werkdagen: b.werkdagen, shutout: b.shutout, snaps: snaps, jaar: _owJaar, maand: _owMaand }, { en: owEn() });
+  } catch(e) { el.innerHTML = '<div style="color:#c0392b;font-size:12px;">Scorekaart kon niet worden berekend: ' + OW.esc(e.message) + '</div>'; }
+}
+window.scRenderKpi = scRenderKpi;
 // ── Verzuim & bezetting (hoofdapp) ──
 var _vzPeriode = 'maand';
 function vzBron(){
