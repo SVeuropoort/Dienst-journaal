@@ -25461,7 +25461,14 @@ function openTolynxKadeModal(){
   _tolynxWerkData = { import: laatste ? JSON.parse(JSON.stringify(laatste.import)) : tolynxKadeLeeg(), export: laatste ? JSON.parse(JSON.stringify(laatste.export)) : tolynxKadeLeeg() };
   renderTolynxKadeModalInputs();
   var maxInput = document.getElementById('tolynx-max-input');
-  if (maxInput) maxInput.value = getTolynxMax() || '';
+  if (maxInput) {
+    maxInput.value = getTolynxMax() || '';
+    // Aantallen bijwerken mag iedereen; het maximum is een instelling (alleen met 'Mag instellingen aanpassen')
+    var _magMax = window._djMagInst === true;
+    maxInput.disabled = !_magMax;
+    maxInput.title = _magMax ? '' : 'Alleen aan te passen met het recht "Mag instellingen aanpassen"';
+    maxInput.style.background = _magMax ? '' : '#f0f2f5';
+  }
   var modal = document.getElementById('tolynx-kade-modal');
   if (modal) modal.style.display = 'flex';
   TOLYNX_INSTANTIES.forEach(function(inst){
@@ -25526,7 +25533,7 @@ function renderTolynxKadeModalInputs(){
 }
 function tolynxKadeOpslaan(){
   var maxInput = document.getElementById('tolynx-max-input');
-  if (maxInput) {
+  if (maxInput && !maxInput.disabled) {
     var maxVal = parseInt(maxInput.value, 10);
     saveTolynxMax((maxVal > 0) ? maxVal : null);
   }
@@ -28577,7 +28584,8 @@ function djIsGear(el){
   if (el.id === 'dj-admin-gear') return false;
   var tag = el.tagName; if (tag !== 'BUTTON' && tag !== 'SPAN' && tag !== 'A' && !el.getAttribute('onclick')) return false;
   var oc = el.getAttribute('onclick') || '';
-  if (/djAdminOpenen/.test(oc)) return false;
+  // Uitzonderingen: Beheer-tandwiel en 'Kade capaciteit bijwerken' (dagelijkse invoer door iedereen)
+  if (/djAdminOpenen|openTolynxKadeModal/.test(oc)) return false;
   if (el.closest && el.closest('#dj-admin-modal')) return false;
   var t = (el.textContent || '').replace(/[\s️]/g, '');
   return t === '⚙';
