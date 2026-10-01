@@ -2831,7 +2831,7 @@ document.addEventListener('contextmenu', function(e) {
 </div>
 <!-- Beheerpaneel wachtwoorden: alleen bereikbaar via het tandwiel + code, vanaf de inlogpagina -->
 <div id="dj-admin-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:100000;align-items:center;justify-content:center;">
-  <div style="background:#0d1f38;border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:28px 32px;width:400px;max-width:92vw;max-height:85vh;overflow-y:auto;font-family:Arial,sans-serif;">
+  <div style="background:#0d1f38;border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:28px 32px;width:600px;max-width:94vw;max-height:92vh;overflow-y:auto;font-family:Arial,sans-serif;">
     <div style="color:#fff;font-size:16px;font-weight:800;letter-spacing:.5px;margin-bottom:4px;">&#x2699;&#xFE0F; Wachtwoordbeheer</div>
     <div style="color:rgba(255,255,255,0.5);font-size:11px;margin-bottom:18px;">Wijzigingen gelden direct, ook op andere apparaten (na een paginaverversing daar).</div>
     <div style="border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:12px;margin-bottom:16px;">
@@ -2847,6 +2847,11 @@ document.addEventListener('contextmenu', function(e) {
         <button id="dj-toegang-opruimen" onclick="djToegangOpruimen()" style="display:none;padding:8px 10px;background:#8b1e1e;border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;">Opruimen</button>
       </div>
       <div id="dj-toegang-sync-status" style="color:rgba(255,255,255,0.6);font-size:11px;margin-bottom:8px;"></div>
+      <div style="position:relative;margin-bottom:4px;">
+        <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;opacity:.7;">&#x1F50D;</span>
+        <input id="dj-toegang-zoek" type="search" autocomplete="off" placeholder="Zoek op naam of e-mailadres&hellip;" oninput="djToegangRender()" style="width:100%;box-sizing:border-box;padding:9px 10px 9px 32px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.25);border-radius:6px;color:#fff;font-size:13px;outline:none;">
+      </div>
+      <div id="dj-toegang-zoek-info" style="color:rgba(255,255,255,0.55);font-size:11px;min-height:14px;margin-bottom:2px;"></div>
       <div id="dj-toegang-lijst" style="margin-bottom:10px;overflow-x:auto;"></div>
       <div style="display:flex;gap:6px;">
         <input type="text" id="dj-toegang-nieuw" placeholder="naam@stenaline.com" style="flex:1;padding:8px;border:1px solid rgba(255,255,255,0.2);border-radius:6px;background:rgba(255,255,255,0.1);color:#fff;font-size:12.5px;box-sizing:border-box;">
@@ -3837,10 +3842,10 @@ function djToegangRender(){
   var _opr = document.getElementById('dj-toegang-opruimen');
   var _nWeg = lijst.filter(function(a){ return a.nietInGroep; }).length;
   if (_opr) { _opr.style.display = _nWeg ? '' : 'none'; _opr.textContent = 'Opruimen (' + _nWeg + ')'; }
-  container.innerHTML = lijst.map(function(entry, idx){
-    var open = !!_djToegangOpen[idx];
+  var rij = function(entry, idx, sleutel){
+    var open = !!_djToegangOpen[sleutel];
     var aantalAan = DJ_TOEGANG_OMGEVINGEN.filter(function(o){ return entry.permissies && entry.permissies[o.key]; }).length;
-    var header = '<div onclick="djToegangToggleOpen(' + idx + ')" style="display:flex;align-items:center;gap:8px;padding:10px 6px;cursor:pointer;">' +
+    var header = '<div onclick="djToegangToggleOpen(\'' + sleutel + '\')" style="display:flex;align-items:center;gap:8px;padding:10px 6px;cursor:pointer;">' +
       '<span style="color:rgba(255,255,255,0.5);font-size:10px;width:12px;flex-shrink:0;">' + (open ? '&#9660;' : '&#9654;') + '</span>' +
       '<span style="color:#fff;font-size:12.5px;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;' + (entry.nietInGroep ? 'text-decoration:line-through;opacity:.6;' : '') + '" title="' + (entry.naam ? String(entry.naam).replace(/[<>"]/g, '') + ' \u2014 ' : '') + entry.email.replace(/[<>"]/g, '') + '">' + entry.email.replace(/[<>]/g, '') + '</span>' +
       (entry.nieuw ? '<span title="Nieuw lid van de SharePoint-groep — nog geen rechten toegekend" style="background:#e8a020;color:#001830;font-size:9px;font-weight:800;padding:1px 5px;border-radius:8px;flex-shrink:0;">NIEUW</span>' : '') +
@@ -3866,11 +3871,40 @@ function djToegangRender(){
       }).join('') + '</div>';
     }
     return '<div style="border-bottom:1px solid rgba(255,255,255,0.1);">' + header + body + '</div>';
+  };
+  // Indeling per locatie; binnen een locatie de mensen met de meeste rechten bovenaan.
+  // Iemand met meerdere locaties staat bij elke locatie (wijzigen kan overal, het is hetzelfde account).
+  var aantal = function(e){ return DJ_TOEGANG_OMGEVINGEN.filter(function(o){ return e.permissies && e.permissies[o.key]; }).length; };
+  var items = lijst.map(function(e, i){ return { e: e, i: i, n: aantal(e) }; });
+  // Namenzoeker: filtert op e-mailadres en naam (punten, streepjes en hoofdletters maken niet uit)
+  var _zEl = document.getElementById('dj-toegang-zoek'), _zInfo = document.getElementById('dj-toegang-zoek-info');
+  var _norm = function(t){ return String(t || '').toLowerCase().replace(/[.\-_\s]+/g, ''); };
+  var _z = _norm(_zEl ? _zEl.value : '');
+  if (_z) {
+    items = items.filter(function(x){ return _norm(x.e.email).indexOf(_z) >= 0 || _norm(x.e.naam).indexOf(_z) >= 0; });
+    if (_zInfo) _zInfo.textContent = items.length ? (items.length + ' van ' + lijst.length + ' accounts gevonden') : 'Niemand gevonden met \u201C' + _zEl.value.trim() + '\u201D';
+  } else if (_zInfo) _zInfo.textContent = lijst.length + ' accounts';
+  items.sort(function(a, b){
+    if (b.n !== a.n) return b.n - a.n;
+    var ba = !!(a.e.permissies && a.e.permissies.beheer), bb = !!(b.e.permissies && b.e.permissies.beheer);
+    if (ba !== bb) return ba ? -1 : 1;
+    return String(a.e.email).localeCompare(String(b.e.email));
+  });
+  var LOCATIES = [{ key: 'EP', titel: 'Europoort' }, { key: 'HVH', titel: 'Hoek van Holland' }, { key: 'IMM', titel: 'Immingham' }];
+  var secties = LOCATIES.map(function(l){ return { titel: l.titel, key: l.key, leden: items.filter(function(x){ return x.e.permissies && x.e.permissies[l.key]; }) }; });
+  secties.push({ titel: 'Nog geen locatie', key: 'geen', leden: items.filter(function(x){ return !LOCATIES.some(function(l){ return x.e.permissies && x.e.permissies[l.key]; }); }) });
+  container.innerHTML = secties.filter(function(sec){ return sec.leden.length; }).map(function(sec){
+    return '<div style="margin:14px 0 4px;">' +
+      '<div style="display:flex;align-items:center;gap:8px;background:rgba(232,160,32,0.12);border-left:3px solid #e8a020;border-radius:4px;padding:6px 10px;">' +
+      '<span style="color:#e8a020;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;flex:1;">&#x1F4CD; ' + sec.titel + '</span>' +
+      '<span style="color:rgba(255,255,255,0.5);font-size:10.5px;">' + sec.leden.length + ' ' + (sec.leden.length === 1 ? 'persoon' : 'personen') + '</span></div>' +
+      sec.leden.map(function(x){ return rij(x.e, x.i, sec.key + '_' + x.i); }).join('') + '</div>';
   }).join('');
 }
 function djToegangVakjeWijzig(idx, omgevingKey, aan){
   var lijst = djToegangGet();
   if (!lijst[idx]) return;
+  var _herteken = ['EP', 'HVH', 'IMM'].indexOf(omgevingKey) >= 0; // locatie gewijzigd: indeling bijwerken
   if (!lijst[idx].permissies) lijst[idx].permissies = {};
   lijst[idx].permissies[omgevingKey] = aan;
   delete lijst[idx].nieuw; // rechten bekeken/toegekend: niet langer "nieuw"
@@ -3878,6 +3912,7 @@ function djToegangVakjeWijzig(idx, omgevingKey, aan){
   // Zorgt dat een net ingetrokken (of toegevoegde) toestemming meteen zichtbaar wordt in het
   // eigen scherm, zonder dat de pagina herladen hoeft te worden.
   if (typeof djVerbergTabsVoorTerminal === 'function') djVerbergTabsVoorTerminal();
+  if (_herteken) { if (aan) _djToegangOpen[omgevingKey + '_' + idx] = true; djToegangRender(); }
 }
 function djToegangToevoegen(){
   var input = document.getElementById('dj-toegang-nieuw');
