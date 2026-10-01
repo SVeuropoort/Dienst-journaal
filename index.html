@@ -2865,6 +2865,9 @@ document.addEventListener('contextmenu', function(e) {
       <button onclick="djHerstelVerjaardagen()" style="width:100%;padding:10px;background:#7a2020;border:none;border-radius:8px;color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;margin-bottom:8px;">&#x1F489; Verjaardagen herstellen (deze terminal)</button>
       <button onclick="djHerstelCertificaten()" style="width:100%;padding:10px;background:#7a2020;border:none;border-radius:8px;color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;margin-bottom:8px;">&#x1F4DC; Certificeringen herstellen (deze terminal)</button>
       <button onclick="djHerstelVaarschema()" style="width:100%;padding:10px;background:#7a2020;border:none;border-radius:8px;color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;">&#x1F553; Vaarschema-tijden herstellen (alleen Europoort)</button>
+      <input type="file" id="dj-import-dagplan-bestand" accept=".json,application/json" style="display:none" onchange="djImportOudeDagplanningen(this.files[0]);this.value='';">
+      <button onclick="document.getElementById('dj-import-dagplan-bestand').click()" style="width:100%;padding:10px;background:#0f6cbd;border:none;border-radius:8px;color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;margin-top:8px;">&#x1F4E5; Oude dagplanningen importeren (backup)</button>
+      <div id="dj-import-dagplan-status" style="color:rgba(255,255,255,0.65);font-size:11px;margin-top:6px;"></div>
     </div>
     <div id="dj-admin-msg" style="color:#4ade80;font-size:12px;margin-bottom:10px;display:none;">&#10003; Opgeslagen.</div>
     <div style="display:flex;gap:8px;">
@@ -7221,6 +7224,13 @@ window.addEventListener('resize', () => {
         onchange="handleMorgenFile(this.files[0])">
       &#x1F4C2; Excel laden
     </label>
+    <label title="Oude dagplanningen (backup-bestand) toevoegen aan lege datums" style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;
+      background:#fff;border:1px solid #c8d7e8;border-radius:6px;padding:5px 12px;margin-left:6px;
+      font-size:11px;color:#1a2a4a;font-weight:600;position:relative;">
+      <input type="file" accept=".json" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;"
+        onchange="dpImportOudePlanningen(this.files[0]); this.value='';">
+      &#x1F4E5; Oude planningen
+    </label>
     <span id="morgenStatus" style="display:none;font-size:11px;color:#555;"></span>
   </div>
 
@@ -7975,6 +7985,70 @@ function updateKadeTab(dateStr) {
     if (ochBtn) ochBtn.click();
   }
 }
+
+
+// ── Oude dagplanningen importeren (eenmalig, uit de oude Excel-weekplanning-backups) ──
+// Het importbestand (JSON) bevat per datum de complete dagplanning in het formaat van de app.
+// VEILIG: alleen datums waarvoor in de app nog GEEN planning bestaat worden ingevuld; bestaande
+// planningen worden nooit overschreven. Eerst een overzicht, pas na bevestiging wordt er iets
+// opgeslagen. Daarna gaat alles via de normale cloud-opslag naar SharePoint.
+function dpImportOudePlanningen(bestand){
+  if (!bestand) return;
+  var terminal = sessionStorage.getItem('dj_terminal') || 'EP';
+  if (sessionStorage.getItem('_cloudGeladen') !== '1') {
+    alert('Wacht even tot de nieuwste data van SharePoint is opgehaald (of klik op Ophalen) en probeer het dan opnieuw.');
+    return;
+  }
+  var rd = new FileReader();
+  rd.onload = function(){
+    var data;
+    try { data = JSON.parse(rd.result); } catch(e) { alert('Dit is geen geldig importbestand.'); return; }
+    if (!data || data.soort !== 'dienstjournaal-oude-dagplanningen' || !data.dagen) { alert('Dit is geen importbestand met oude dagplanningen.'); return; }
+    if (data.terminal && data.terminal !== terminal) {
+      alert('Dit bestand hoort bij terminal ' + data.terminal + '. Wissel eerst naar die terminal en probeer het opnieuw.');
+      return;
+    }
+    var heeftPlanning = function(datum){
+      try {
+        var snap = JSON.parse(localStorage.getItem(tk('dagplan_' + datum)) || 'null');
+        if (snap && ((snap.ochEmps && snap.ochEmps.length) || (snap.avondEmps && snap.avondEmps.length))) return true;
+      } catch(e) {}
+      try {
+        var st = JSON.parse(localStorage.getItem(STATE_KEY) || 'null');
+        if (st && st.planDate === datum && ((st.ochEmps && st.ochEmps.length) || (st.avondEmps && st.avondEmps.length))) return true;
+      } catch(e) {}
+      return false;
+    };
+    var datums = Object.keys(data.dagen).sort();
+    var nieuw = datums.filter(function(d){ return !heeftPlanning(d); });
+    var bestaand = datums.length - nieuw.length;
+    var nl = function(iso){ var p = iso.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; };
+    if (!nieuw.length) { alert('Alle ' + datums.length + ' datums uit dit bestand staan al in de app. Er is niets geïmporteerd.'); return; }
+    if (!confirm('Oude dagplanningen importeren (' + terminal + ')\n\n' +
+      datums.length + ' dagen gevonden (' + nl(datums[0]) + ' t/m ' + nl(datums[datums.length-1]) + ')\n' +
+      '\u2022 ' + nieuw.length + ' nieuw \u2014 worden toegevoegd\n' +
+      '\u2022 ' + bestaand + ' overgeslagen \u2014 daar staat al een planning (blijft ongewijzigd)\n\nDoorgaan?')) return;
+    var gelukt = 0, fout = null;
+    for (var i = 0; i < nieuw.length; i++) {
+      var d = nieuw[i], dag = data.dagen[d];
+      if (heeftPlanning(d)) continue; // extra zekerheid
+      var snap = { planDate: d, allEmps: [], ochEmps: dag.ochEmps || [], avondEmps: dag.avondEmps || [],
+                   pos: dag.pos || {}, texts: dag.texts || {}, geimporteerd: new Date().toISOString() };
+      try { localStorage.setItem(tk('dagplan_' + d), JSON.stringify(snap)); gelukt++; }
+      catch(e) { fout = e; break; }
+    }
+    if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+    if (fout) {
+      alert(gelukt + ' dagen geïmporteerd, daarna was de opslag van de browser vol (' + (fout.name || fout.message) + ').\n' +
+        'De rest is niet geïmporteerd. De al geïmporteerde dagen worden naar SharePoint opgeslagen.');
+    } else {
+      alert('\u2714 ' + gelukt + ' oude dagplanningen toegevoegd' + (bestaand ? ' (' + bestaand + ' bestaande overgeslagen)' : '') + '.\n\n' +
+        'Kies een datum in de Dagplanning om ze te bekijken. Ze worden nu ook naar SharePoint opgeslagen.');
+    }
+  };
+  rd.readAsText(bestand);
+}
+window.dpImportOudePlanningen = dpImportOudePlanningen;
 
 function laadDagPlanning() {
   var inp = document.getElementById('dagPlanDatum');
@@ -24251,6 +24325,7 @@ var DJ_VERTAAL_WOORDENBOEK = {
   "Volgende ▶": "Next ▶",
   "Excel laden": "Load Excel",
   "📂 Excel laden": "📂 Load Excel",
+  "📥 Oude planningen": "📥 Old schedules",
   "🌅 OCHTEND": "🌅 MORNING",
   "🌆 AVOND": "🌆 EVENING",
   "🚢 KADE CHECK": "🚢 QUAY CHECK",
@@ -26052,6 +26127,55 @@ function nieuwToonTab(tab){
   if (typeof djVertaalPaginaEngels === 'function') setTimeout(djVertaalPaginaEngels, 60);
 }
 
+
+// ── Eenmalige import van oude Dagplanningen (uit de wekelijkse Excel-backups, omgezet naar
+// "dagplanningen_import_EP.json"). Vult ALLEEN datums aan waarvoor nog geen planning bestaat —
+// lokaal én in de cloud wordt eerst gecontroleerd — en overschrijft nooit iets.
+async function djImportOudeDagplanningen(bestand){
+  var st = document.getElementById('dj-import-dagplan-status');
+  var meld = function(t, kleur){ if (st) { st.textContent = t; st.style.color = kleur || 'rgba(255,255,255,0.65)'; } };
+  if (!bestand) return;
+  var inhoud;
+  try { inhoud = JSON.parse(await bestand.text()); } catch(e) { meld('Geen geldig importbestand.', '#ff8080'); return; }
+  if (!inhoud || inhoud.soort !== 'dagplanning-backup-import' || !inhoud.dagen) { meld('Dit is geen dagplanning-importbestand.', '#ff8080'); return; }
+  var terminal = sessionStorage.getItem('dj_terminal') || 'EP';
+  if (inhoud.terminal && inhoud.terminal !== terminal) { meld('Dit bestand is voor terminal ' + inhoud.terminal + '. Wissel eerst naar die terminal.', '#ff8080'); return; }
+  if (typeof spIngelogd !== 'function' || !spIngelogd()) { meld('Log eerst in met Microsoft (SharePoint), zodat ook de cloud gecontroleerd kan worden.', '#ff8080'); return; }
+  meld('Cloud controleren…');
+  var cloud = {};
+  try {
+    var res = await spOphalenBestand((sessionStorage.getItem('dj_terminal') || 'EP') + '_main.json');
+    cloud = (res && res.data) || {};
+  } catch(e) { meld('Kon de cloud niet controleren — import gestopt (er is niets gewijzigd).', '#ff8080'); return; }
+  var heeftInhoud = function(snap){
+    if (!snap) return false;
+    if (typeof snap === 'string') { try { snap = JSON.parse(snap); } catch(e) { return true; } }
+    var p = snap.pos || {};
+    return Object.keys(p).some(function(k){ return p[k]; }) || (snap.ochEmps||[]).length > 0 || (snap.avondEmps||[]).length > 0;
+  };
+  var nieuw = [], bestaat = [];
+  Object.keys(inhoud.dagen).sort().forEach(function(datum){
+    var key = tk('dagplan_' + datum);
+    var lokaal = null; try { lokaal = JSON.parse(localStorage.getItem(key) || 'null'); } catch(e) { lokaal = 'x'; }
+    if (heeftInhoud(lokaal) || heeftInhoud(cloud[key])) bestaat.push(datum); else nieuw.push(datum);
+  });
+  var nl = function(d){ var p = d.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; };
+  if (!nieuw.length) { meld('Niets te importeren: alle ' + bestaat.length + ' dagen bestaan al.', '#3fb950'); return; }
+  if (!confirm('Oude dagplanningen importeren (' + terminal + ')\n\n' +
+      nieuw.length + ' dag(en) worden toegevoegd (' + nl(nieuw[0]) + ' t/m ' + nl(nieuw[nieuw.length-1]) + ').\n' +
+      bestaat.length + ' dag(en) worden overgeslagen omdat daar al een planning staat.\n\nBestaande planningen worden niet gewijzigd. Doorgaan?')) { meld('Import geannuleerd.'); return; }
+  var emp = function(naam, sectie){ return { type: 'Import', name: naam, dienst: '', pauze: '', uren: 0, section: sectie, comment: 'Uit backup' }; };
+  nieuw.forEach(function(datum){
+    var d = inhoud.dagen[datum];
+    var och = (d.och || []).map(function(n){ return emp(n, 'Ochtend'); });
+    var av  = (d.av  || []).map(function(n){ return emp(n, 'Middag'); });
+    var snap = { allEmps: och.concat(av), ochEmps: och, avondEmps: av, planDate: datum, pos: d.pos || {}, texts: {}, geimporteerd: true };
+    localStorage.setItem(tk('dagplan_' + datum), JSON.stringify(snap));
+  });
+  if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+  meld('\u2713 ' + nieuw.length + ' dagen geïmporteerd, ' + bestaat.length + ' overgeslagen (bestonden al). Wordt nu naar de cloud gesynchroniseerd.', '#3fb950');
+}
+window.djImportOudeDagplanningen = djImportOudeDagplanningen;
 // Tabbladen in Werkorder: het werkorder-formulier en Abnormal loads.
 function woTabToon(tab){
   var form = document.getElementById('werkorder-view'), abn = document.getElementById('nieuw-tab-abnormal');
