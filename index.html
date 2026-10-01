@@ -9722,7 +9722,11 @@ function printTab(){
   var styles = '';
   Array.from(document.styleSheets).forEach(function(ss){
     try {
-      Array.from(ss.cssRules || []).forEach(function(rule){ styles += rule.cssText + '\n'; });
+      Array.from(ss.cssRules || []).forEach(function(rule){
+        // Losse @page-regels van andere onderdelen (A4 e.d.) NIET meenemen: die overschreven het A3-formaat.
+        if (rule.type === 6 /* CSSRule.PAGE_RULE */) return;
+        styles += rule.cssText + '\n';
+      });
     } catch(e){}
   });
 
@@ -9751,6 +9755,10 @@ function printTab(){
     + '.card-header h2 { font-size:9pt !important; margin:0 !important; }'
     + '.card-header .icon { font-size:14px !important; }'
     + '@media print { body { margin:0; padding:0; } }'
+    // Papierformaat ALTIJD A3 liggend — als laatste regel, zodat geen enkele andere @page-regel
+    // (bijv. A4 uit Werkorder of Schade, binnen @media print) dit nog kan overschrijven.
+    + '@page { size: A3 landscape; margin: 5mm; }'
+    + '@media print { @page { size: A3 landscape; margin: 5mm; } }'
     + '</style></head><body>'
     + panelHtml
     + extraHtml
