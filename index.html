@@ -3319,6 +3319,7 @@ function djWachtwoordOrtIntern(){ return djWwGet('ort_intern'); }
 // opgeslagen in SharePoint (toegang_accounts.json), zodat de lijst overal geldt. ──
 var DJ_TOEGANG_OMGEVINGEN = [
   { key: 'beheer', label: 'Beheer' },
+  { key: 'instellingen', label: 'Mag instellingen aanpassen (\u2699\uFE0F)' },
   { key: 'EP', label: 'Europoort' },
   { key: 'HVH', label: 'Hoek van Holland' },
   { key: 'IMM', label: 'Immingham' },
@@ -3333,7 +3334,7 @@ var DJ_TOEGANG_OMGEVINGEN = [
   { key: 'werkoverdracht', label: 'Werkoverdracht' }
 ];
 var DJ_TOEGANG_STANDAARD = [
-  { email: 'sebastian.vander.meer@stenaline.com', permissies: { beheer: true, EP: true, HVH: true, IMM: true, kpi: true, materieel: true, bluevi: true, vandenijssel: true, certificeringen: true, maandafsluiting: true, salaris: true, ort: true, werkoverdracht: true } }
+  { email: 'sebastian.vander.meer@stenaline.com', permissies: { beheer: true, instellingen: true, EP: true, HVH: true, IMM: true, kpi: true, materieel: true, bluevi: true, vandenijssel: true, certificeringen: true, maandafsluiting: true, salaris: true, ort: true, werkoverdracht: true } }
 ];
 function djToegangGet(){
   try {
@@ -3717,7 +3718,7 @@ function djAanwezigGesprekkenRender(){
 // Permissies gegroepeerd per categorie, zodat het overzicht per account leesbaar blijft
 // (volledige labels, geen priegelige verticale tekst meer).
 var DJ_TOEGANG_GROEPEN = [
-  { titel: 'Terminals & Beheer', keys: ['beheer', 'EP', 'HVH', 'IMM'] },
+  { titel: 'Terminals & Beheer', keys: ['beheer', 'instellingen', 'EP', 'HVH', 'IMM'] },
   { titel: 'Dashboards', keys: ['kpi', 'materieel', 'bluevi', 'vandenijssel'] },
   { titel: 'Modules', keys: ['certificeringen', 'maandafsluiting', 'salaris', 'ort', 'werkoverdracht'] }
 ];
@@ -3884,7 +3885,7 @@ function djToegangToevoegen(){
   if (!email || email.indexOf('@') === -1) { alert('Vul een geldig e-mailadres in.'); return; }
   var lijst = djToegangGet();
   if (lijst.map(function(a){return a.email.toLowerCase();}).indexOf(email) !== -1) { alert('Dit account staat er al in.'); return; }
-  lijst.push({ email: email, permissies: { beheer: false, EP: false, HVH: false, IMM: false, kpi: false, materieel: false, certificeringen: false, maandafsluiting: false, salaris: false, ort: false, werkoverdracht: false } });
+  lijst.push({ email: email, permissies: { beheer: false, instellingen: false, EP: false, HVH: false, IMM: false, kpi: false, materieel: false, certificeringen: false, maandafsluiting: false, salaris: false, ort: false, werkoverdracht: false } });
   djToegangSet(lijst);
   if (input) input.value = '';
   djToegangRender();
@@ -23931,6 +23932,7 @@ function djVerbergTabsVoorTerminal(){
   if (vandenijsselTegel) vandenijsselTegel.style.display = (t === 'IMM') ? 'none' : '';
   djVerbergNavItemsZonderToegang();
   djVerbergTerminalsZonderToegang();
+  if (typeof djInstRechtBijwerken === 'function') djInstRechtBijwerken();
 }
 // Verbergt op het inlogscherm de terminals in de keuzelijst waarvoor het laatst gebruikte
 // account (herkend via het lokaal onthouden e-mailadres) geen toestemming heeft, zodat
@@ -28559,5 +28561,63 @@ function pdZoek(query){
   }
 </style>
 <div id="toolbox-print-overlay"></div>
+
+<style>body.dj-geen-inst .dj-gear{display:none !important;}</style>
+<script>
+// ══════════════════════════════════════════════════════════════════
+// Instellingen (tandwieltjes) alleen voor wie in Toegangsbeheer "Mag instellingen aanpassen" heeft
+// (of Beheer). Elk tandwiel-knopje in de app wordt automatisch herkend — ook knopjes die later
+// pas op het scherm verschijnen — en verborgen voor wie geen recht heeft. Klikt iemand er toch op,
+// dan wordt het geblokkeerd met een melding.
+// Uitzondering: het Beheer-tandwiel op het inlogscherm (nodig om in te loggen en voor beheerders).
+// ══════════════════════════════════════════════════════════════════
+window._djMagInst = null; // null = nog onbekend
+function djIsGear(el){
+  if (!el || el.nodeType !== 1 || !el.getAttribute) return false;
+  var oc = el.getAttribute('onclick'); if (!oc) return false;
+  if (/djAdminOpenen/.test(oc)) return false;
+  var t = (el.textContent || '').replace(/[\s️]/g, '');
+  return t === '⚙';
+}
+function djGearsMarkeren(root){
+  var els = (root || document).querySelectorAll('[onclick]');
+  Array.prototype.forEach.call(els, function(el){ if (!el.classList.contains('dj-gear') && djIsGear(el)) el.classList.add('dj-gear'); });
+}
+function djGearsToepassen(){
+  djGearsMarkeren(document);
+  document.body.classList.toggle('dj-geen-inst', window._djMagInst !== true);
+}
+async function djInstRechtBijwerken(){
+  try {
+    var email = (typeof djHuidigEmail === 'function') ? await djHuidigEmail() : null;
+    window._djMagInst = !!email && (djToegangHeeft(email, 'instellingen') || djToegangHeeft(email, 'beheer'));
+  } catch(e) { window._djMagInst = false; }
+  djGearsToepassen();
+}
+window.djInstRechtBijwerken = djInstRechtBijwerken;
+(function(){
+  var t = null;
+  function plan(){ if (t) return; t = setTimeout(function(){ t = null; djGearsMarkeren(document); }, 150); }
+  function start(){
+    djGearsToepassen();
+    if (window.MutationObserver) new MutationObserver(plan).observe(document.body, { childList: true, subtree: true });
+    djInstRechtBijwerken();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+  function melding(){
+    var en = (sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM';
+    alert(en ? 'You are not allowed to change settings. Ask Sebastiaan to enable "Change settings" in Access management.'
+             : 'Je mag geen instellingen aanpassen. Vraag Sebastiaan om "Mag instellingen aanpassen" aan te zetten in Toegangsbeheer.');
+  }
+  // Vangnet: klik op een tandwiel zonder recht blokkeren
+  document.addEventListener('click', function(ev){
+    var el = ev.target && ev.target.closest ? ev.target.closest('[onclick]') : null;
+    if (!el || !djIsGear(el) || window._djMagInst === true) return;
+    ev.preventDefault(); ev.stopImmediatePropagation();
+    if (window._djMagInst === null) { djInstRechtBijwerken().then(function(){ if (window._djMagInst === true) el.click(); else melding(); }); return; }
+    melding();
+  }, true);
+})();
+</script>
 </body>
 </html>
