@@ -28574,13 +28574,16 @@ function pdZoek(query){
 window._djMagInst = null; // null = nog onbekend
 function djIsGear(el){
   if (!el || el.nodeType !== 1 || !el.getAttribute) return false;
-  var oc = el.getAttribute('onclick'); if (!oc) return false;
+  if (el.id === 'dj-admin-gear') return false;
+  var tag = el.tagName; if (tag !== 'BUTTON' && tag !== 'SPAN' && tag !== 'A' && !el.getAttribute('onclick')) return false;
+  var oc = el.getAttribute('onclick') || '';
   if (/djAdminOpenen/.test(oc)) return false;
+  if (el.closest && el.closest('#dj-admin-modal')) return false;
   var t = (el.textContent || '').replace(/[\s️]/g, '');
   return t === '⚙';
 }
 function djGearsMarkeren(root){
-  var els = (root || document).querySelectorAll('[onclick]');
+  var els = (root || document).querySelectorAll('[onclick], button, span, a');
   Array.prototype.forEach.call(els, function(el){ if (!el.classList.contains('dj-gear') && djIsGear(el)) el.classList.add('dj-gear'); });
 }
 function djGearsToepassen(){
@@ -28590,7 +28593,8 @@ function djGearsToepassen(){
 async function djInstRechtBijwerken(){
   try {
     var email = (typeof djHuidigEmail === 'function') ? await djHuidigEmail() : null;
-    window._djMagInst = !!email && (djToegangHeeft(email, 'instellingen') || djToegangHeeft(email, 'beheer'));
+    // Alleen het vinkje 'Mag instellingen aanpassen' telt (ook beheerders moeten het zelf aanzetten)
+    window._djMagInst = !!email && djToegangHeeft(email, 'instellingen');
   } catch(e) { window._djMagInst = false; }
   djGearsToepassen();
 }
@@ -28611,7 +28615,8 @@ window.djInstRechtBijwerken = djInstRechtBijwerken;
   }
   // Vangnet: klik op een tandwiel zonder recht blokkeren
   document.addEventListener('click', function(ev){
-    var el = ev.target && ev.target.closest ? ev.target.closest('[onclick]') : null;
+    var el = ev.target && ev.target.closest ? ev.target.closest('[onclick], button, span, a') : null;
+    while (el && !djIsGear(el) && el.parentElement && el.parentElement.closest) { var up = el.parentElement.closest('[onclick], button'); if (!up || up === el) break; el = up; }
     if (!el || !djIsGear(el) || window._djMagInst === true) return;
     ev.preventDefault(); ev.stopImmediatePropagation();
     if (window._djMagInst === null) { djInstRechtBijwerken().then(function(){ if (window._djMagInst === true) el.click(); else melding(); }); return; }
