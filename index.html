@@ -8235,7 +8235,7 @@ function buildStats(){
     <div style="display:flex;align-items:center;gap:6px;background:#e8f0fb;border:2px solid #1a4a8a;border-radius:7px;padding:4px 10px;">
       <span style="font-size:11px;font-weight:800;color:#1a4a8a;text-transform:uppercase;letter-spacing:1px;margin-right:4px;">🌅 OCHTEND</span>
       <div class="si"><span class="dot" style="background:#4a8ed6"></span><span class="lbl">Totaal:</span><span class="val">${fteO+inhO+stO+exO}</span></div>
-      <div class="si"><span class="dot" style="background:#4a8ed6"></span><span class="lbl">FTE:</span><span class="val">${fteO}</span></div>
+      <div class="si"><span class="dot" style="background:#4a8ed6"></span><span class="lbl">PSO:</span><span class="val">${fteO}</span></div>
       <div class="si"><span class="dot" style="background:#ffd700"></span><span class="lbl">Inhuur:</span><span class="val">${inhO}</span></div>
       <div class="si"><span class="dot" style="background:#90c36a"></span><span class="lbl">Stage:</span><span class="val">${stO}</span></div>
       ${exO>0?'<div class="si"><span class="dot" style="background:#a855f7"></span><span class="lbl">Extra:</span><span class="val">'+exO+'</span></div>':''}
@@ -8245,7 +8245,7 @@ function buildStats(){
     <div style="display:flex;align-items:center;gap:6px;background:#fff3e8;border:2px solid #c05a10;border-radius:7px;padding:4px 10px;">
       <span style="font-size:11px;font-weight:800;color:#c05a10;text-transform:uppercase;letter-spacing:1px;margin-right:4px;">🌆 AVOND</span>
       <div class="si"><span class="dot" style="background:#f4a460"></span><span class="lbl">Totaal:</span><span class="val">${fteA+inhA+stA+exA}</span></div>
-      <div class="si"><span class="dot" style="background:#f4a460"></span><span class="lbl">FTE:</span><span class="val">${fteA}</span></div>
+      <div class="si"><span class="dot" style="background:#f4a460"></span><span class="lbl">PSO:</span><span class="val">${fteA}</span></div>
       <div class="si"><span class="dot" style="background:#ffa040"></span><span class="lbl">Inhuur:</span><span class="val">${inhA}</span></div>
       <div class="si"><span class="dot" style="background:#a8d08d"></span><span class="lbl">Stage:</span><span class="val">${stA}</span></div>
       ${exA>0?'<div class="si"><span class="dot" style="background:#9333ea"></span><span class="lbl">Extra:</span><span class="val">'+exA+'</span></div>':''}
@@ -10427,10 +10427,10 @@ document.getElementById('archOverlay').addEventListener('click',function(e){
                     <th style="padding:8px 10px;text-align:left;">Datum</th>
                     <th style="padding:6px 8px;text-align:center;background:#3a5a7a;font-size:10px;">Std Och</th>
                     <th style="padding:6px 8px;text-align:center;background:#5a4a3a;font-size:10px;">Std Av</th>
-                    <th style="padding:8px 10px;text-align:center;background:#4a8ed6;">Ochtend FTE</th>
+                    <th style="padding:8px 10px;text-align:center;background:#4a8ed6;">Ochtend PSO</th>
                     <th style="padding:8px 10px;text-align:center;background:#e6b800;color:#333;">Inhuur och.</th>
                     <th style="padding:8px 10px;text-align:center;background:#6aaa3a;">Stage och.</th>
-                    <th style="padding:8px 10px;text-align:center;background:#e08030;">Avond FTE</th>
+                    <th style="padding:8px 10px;text-align:center;background:#e08030;">Avond PSO</th>
                     <th style="padding:8px 10px;text-align:center;background:#e07010;color:#fff;">Inhuur av.</th>
                     <th style="padding:8px 10px;text-align:center;background:#7aaa5a;">Stage av.</th>
                     <th style="padding:8px 10px;text-align:center;background:#a855f7;color:#fff;">Extra och.</th>
@@ -10472,7 +10472,7 @@ document.getElementById('archOverlay').addEventListener('click',function(e){
         </div><div class="card" id="vz-card" style="margin-bottom:20px;">
           <div class="card-header"><div class="icon">&#x1F912;</div><h2>Verzuim &amp; bezetting</h2></div>
           <div id="vz-body" style="padding:16px;"></div>
-        </div><div class="card" style="margin-bottom:20px;"><div class="card-header"><div class="icon">&#x1F550;</div><h2>Gemiddelde Vaarschema Tijden <span onclick="openKpiNormen()" style="cursor:pointer;font-size:16px;margin-left:8px;">&#x2699;&#xFE0F;</span></h2></div><div style="overflow-x:auto;padding:16px;"><table style="width:100%;border-collapse:collapse;min-width:700px;"><thead><tr id="kpi-tijden-hdr"></tr></thead><tbody id="kpi-tijden-body"></tbody></table></div></div><div class="card" style="margin-bottom:20px;"><div class="card-header"><div class="icon">&#x1F4E6;</div><h2>Totaal Geladen &amp; Gelost per Route</h2></div><div style="overflow-x:auto;padding:16px;"><table style="width:100%;border-collapse:collapse;"><thead><tr id="kpi-units-hdr"></tr></thead><tbody id="kpi-units-body"></tbody></table></div></div><div class="card" style="margin-bottom:20px;"><div class="card-header" onclick="toggleDagenoverzicht()" style="cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;"><div style="display:flex;align-items:center;gap:8px;"><div class="icon">&#x1F4C5;</div><h2>Dagenoverzicht</h2></div><span id="dag-arrow" style="font-size:18px;color:var(--navy);transition:transform 0.25s;">&#9660;</span></div><div id="dagenoverzicht-body" style="display:none;"><div style="overflow-x:auto;padding:16px;"><table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:var(--navy);color:#fff;"><th style="padding:8px 10px;text-align:left;">Datum</th><th style="padding:8px 10px;text-align:center;">Lossen</th><th style="padding:8px 10px;text-align:center;">Laden</th><th style="padding:8px 10px;text-align:center;">Tijden</th></tr></thead><tbody id="kpi-dag-body"></tbody></table></div></div></div><div class="card" id="kpi-normen-card" style="display:none;margin-top:20px;"><div class="card-header" onclick="toggleNormen()" style="cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;"><div style="display:flex;align-items:center;gap:8px;"><div class="icon">&#x1F6A8;</div><h2>Dagen buiten de normen</h2><span id="normen-count-badge" style="background:#c0392b;color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:4px;"></span></div><span id="normen-arrow" style="font-size:18px;color:#c0392b;transition:transform 0.25s;">&#9660;</span></div><div id="normen-body-wrap" style="display:none;"><div style="overflow-x:auto;padding:16px;"><table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:#c0392b;color:#fff;"><th style="padding:8px 10px;text-align:left;">Datum</th><th style="padding:8px 10px;text-align:left;">Route</th><th style="padding:8px 10px;text-align:left;">Kolom</th><th style="padding:8px 10px;text-align:center;">Werkelijk</th><th style="padding:8px 10px;text-align:center;">Norm</th><th style="padding:8px 10px;text-align:center;">Afwijking</th><th style="padding:8px 10px;text-align:left;">Opmerking</th></tr></thead><tbody id="kpi-normen-body-tbl"></tbody></table></div></div></div><div id="kpi-chart-card" style="display:none;margin-top:20px;"><div class="card-header" style="padding:16px 20px;"><div class="icon">&#x1F3AF;</div><h2>KPI Tijden &#x2013; Maandoverzicht</h2></div><div id="kpi-charts-wrap" style="padding:16px;display:flex;flex-wrap:wrap;gap:24px;"></div></div>
+        </div><div class="card" style="margin-bottom:20px;"><div class="card-header"><div class="icon">&#x1F550;</div><h2>Gemiddelde Vaarschema Tijden <span onclick="openKpiNormen()" style="cursor:pointer;font-size:16px;margin-left:8px;">&#x2699;&#xFE0F;</span></h2></div><div style="overflow-x:auto;padding:16px;"><table style="width:100%;border-collapse:collapse;min-width:700px;"><thead><tr id="kpi-tijden-hdr"></tr></thead><tbody id="kpi-tijden-body"></tbody></table></div></div><div class="card" style="margin-bottom:20px;"><div class="card-header"><div class="icon">&#x1F4E6;</div><h2>Totaal Geladen &amp; Gelost per Route</h2></div><div style="overflow-x:auto;padding:16px;"><table style="width:100%;border-collapse:collapse;"><thead><tr id="kpi-units-hdr"></tr></thead><tbody id="kpi-units-body"></tbody></table></div></div><div class="card" style="margin-bottom:20px;"><div class="card-header" onclick="toggleDagenoverzicht()" style="cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;"><div style="display:flex;align-items:center;gap:8px;"><div class="icon">&#x1F4C5;</div><h2>Dagenoverzicht</h2></div><span id="dag-arrow" style="font-size:18px;color:var(--navy);transition:transform 0.25s;">&#9660;</span></div><div id="dagenoverzicht-body" style="display:none;"><div style="overflow-x:auto;padding:16px;"><table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:var(--navy);color:#fff;"><th style="padding:8px 10px;text-align:left;">Datum</th><th style="padding:8px 10px;text-align:center;">Lossen</th><th style="padding:8px 10px;text-align:center;">Laden</th><th style="padding:8px 10px;text-align:center;">Tijden</th></tr></thead><tbody id="kpi-dag-body"></tbody></table></div></div></div><div class="card" id="kpi-normen-card" style="display:none;margin-top:20px;"><div class="card-header" onclick="toggleNormen()" style="cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;"><div style="display:flex;align-items:center;gap:8px;"><div class="icon">&#x1F6A8;</div><h2>Dagen buiten de normen</h2><span id="normen-count-badge" style="background:#c0392b;color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:4px;"></span></div><span id="normen-arrow" style="font-size:18px;color:#c0392b;transition:transform 0.25s;">&#9660;</span></div><div id="normen-body-wrap" style="display:none;"><div style="overflow-x:auto;padding:16px;"><table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:#c0392b;color:#fff;"><th style="padding:8px 10px;text-align:left;">Datum</th><th style="padding:8px 10px;text-align:left;">Route</th><th style="padding:8px 10px;text-align:left;">Kolom</th><th style="padding:8px 10px;text-align:center;">Werkelijk</th><th style="padding:8px 10px;text-align:center;">Norm</th><th style="padding:8px 10px;text-align:center;">Afwijking</th><th style="padding:8px 10px;text-align:left;">Opmerking</th></tr></thead><tbody id="kpi-normen-body-tbl"></tbody></table></div></div></div><div id="kpi-chart-card" style="display:none;margin-top:20px;"><div class="card-header" style="padding:16px 20px;"><div class="icon">&#x1F3AF;</div><h2>Punctualiteit per meetpunt</h2></div><div id="kpi-charts-wrap" style="padding:16px;display:flex;flex-wrap:wrap;gap:24px;"></div></div>
 
         <!-- MAAND SNAPSHOTS -->
         <div class="card" style="margin-top:20px;">
@@ -21066,6 +21066,8 @@ function wisselPunctualityDatum(dateStr) {
   var _RT=((sessionStorage.getItem('dj_terminal')||'EP')==='IMM') ? ['To Hoek van Holland','To Europoort'] : ['Harwich Ochtend','Harwich Middag','Immingham'];
   function getKpiNormen(){try{var s=JSON.parse(localStorage.getItem('kpi_normen_v1'));if(s)return s;}catch(e){}return{};}
   function kpiOpruimen() {
+    // Eerst alle afgesloten maanden als maandoverzicht bewaren, zodat hun cijfers niet verloren gaan
+    try { if (typeof window.kpiSnapAuto === 'function') window.kpiSnapAuto(true); } catch(e) {}
     var cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - 60);
     var cutoffStr = cutoff.toISOString().slice(0,10);
@@ -21540,7 +21542,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
           var d = r.datum.split('-'); var datumFmt = d[2]+'-'+d[1]+'-'+d[0];
           return (function(r,bg,datumFmt){
             var _sb=typeof getStdBezetting==='function'?getStdBezetting():{};
-            var _dn=['','Ma','Di','Wo','Do','Vr','Za','Zo'];
+            var _dn=['Zo','Ma','Di','Wo','Do','Vr','Za']; // getDay(): 0 = zondag
             var _std=_sb[_dn[new Date(r.datum).getDay()]]||{};
             var _sO=_std.och_totaal||0,_sA=_std.av_totaal||0;
             var _tO=r.fteO+r.inhO+r.stO+(r.exO||0),_tA=r.fteA+r.inhA+r.stA+(r.exA||0);
@@ -21663,13 +21665,13 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 
       var _immLegend = (sessionStorage.getItem('dj_terminal')||'EP')==='IMM';
       drawPie('pie-ochtend','legend-ochtend',[
-        {label:'FTE',    v:totFteO, c:'#4a8ed6'},
+        {label:'PSO',    v:totFteO, c:'#4a8ed6'},
         {label:(_immLegend?'Temp':'Inhuur'), v:totInhO, c:'#ffd700'},
         {label:'Stage',  v:totStO,  c:'#90c36a'},
         {label:'Extra',  v:totExO,  c:'#a855f7'}
       ]);
       drawPie('pie-avond','legend-avond',[
-        {label:'FTE',    v:totFteA, c:'#4a8ed6'},
+        {label:'PSO',    v:totFteA, c:'#4a8ed6'},
         {label:(_immLegend?'Temp':'Inhuur'), v:totInhA, c:'#ffd700'},
         {label:'Stage',  v:totStA,  c:'#90c36a'},
         {label:'Extra',  v:totExA,  c:'#a855f7'}
@@ -24775,10 +24777,10 @@ var DJ_VERTAAL_WOORDENBOEK = {
   "Personeelsbezetting per dag": "Staffing per day",
   "Std Och": "Std Morn",
   "Std Av": "Std Eve",
-  "Ochtend FTE": "Morning FTE",
+  "Ochtend PSO": "Morning PSO",
   "Inhuur och.": "Temp morn.",
   "Stage och.": "Intern morn.",
-  "Avond FTE": "Evening FTE",
+  "Avond PSO": "Evening PSO",
   "Inhuur av.": "Temp eve.",
   "Stage av.": "Intern eve.",
   "Extra och.": "Extra morn.",
@@ -26433,7 +26435,7 @@ var OW = (function(){
           koppen: b.koppen, extra: b.extra, inhuur: b.inhuur, uren: b.uren, exUren: b.exUren, inhUren: b.inhUren, geschat: b.geschat,
           std: std, tovStd: std ? b.koppen - std : null,
           units: units, upm: b.uren ? units / b.uren : null,
-          handling: gem(handling), vertrekAfw: gem(vertrekAfw), opTijd: opTijd.length ? (opTijd.every(function(x){ return x; }) ? 1 : 0) : null,
+          handling: gem(handling), vertrekAfw: gem(vertrekAfw), opTijd: opTijd.length ? (opTijd.every(function(x){ return x; }) ? 1 : 0) : null, opBin: som(opTijd), opTot: opTijd.length,
           shutout: shut.length ? som(shut) : null, routeIdx: rIdx
         });
       });
@@ -26443,13 +26445,14 @@ var OW = (function(){
 
   function groep(rs){
     var u = som(rs.map(function(r){ return r.units; })), h = som(rs.map(function(r){ return r.uren; }));
-    var ot = rs.filter(function(r){ return r.opTijd !== null; });
+    // op tijd = aandeel afvaarten dat op tijd vertrok (zelfde telling als Scorekaart en Verzuim)
+    var opB = som(rs.map(function(r){ return r.opBin || 0; })), opT = som(rs.map(function(r){ return r.opTot || 0; }));
     var so = rs.filter(function(r){ return r.shutout !== null; });
     return {
       n: rs.length, koppen: gem(rs.map(function(r){ return r.koppen; })), uren: gem(rs.map(function(r){ return r.uren; })),
       units: gem(rs.map(function(r){ return r.units; })), upm: h ? u / h : null,
       handling: gem(rs.map(function(r){ return r.handling; })), nHandling: rs.filter(function(r){ return r.handling !== null; }).length,
-      opTijd: ot.length ? som(ot.map(function(r){ return r.opTijd; })) / ot.length : null, nOpTijd: ot.length,
+      opTijd: opT ? opB / opT : null, nOpTijd: opT,
       vertrekAfw: gem(rs.map(function(r){ return r.vertrekAfw; })),
       shutout: so.length ? gem(so.map(function(r){ return r.shutout; })) : null, nShut: so.length,
       exUren: som(rs.map(function(r){ return r.exUren; })), exKoppen: gem(rs.map(function(r){ return r.extra; })), inhUren: som(rs.map(function(r){ return r.inhUren; }))
@@ -27071,6 +27074,7 @@ var SC = (function(){
       Object.keys(pos).forEach(function(k){ var v = pos[k]; if (!v) return; if (k.indexOf('a_') === 0 || k.indexOf('av_') === 0) sA[v] = 1; else sO[v] = 1; });
       var o = (dp.ochEmps || []).filter(function(e){ return sO[e.name]; }), a = (dp.avondEmps || []).filter(function(e){ return sA[e.name]; });
       if (!o.length && !a.length) return;
+      if (o.length + a.length < 3) return; // Dagplanning duidelijk onvolledig (zelfde regel als Overwerk & productiviteit)
       dpDagen++;
       var alle = o.concat(a), uren = 0;
       alle.forEach(function(e){ var u = parseFloat(e.uren) || 8, t = (e.type || ''); uren += u; if (t.toUpperCase().indexOf('EX') >= 0 || t.toLowerCase().indexOf('inhuur') >= 0) extraUren += u; });
@@ -27083,7 +27087,7 @@ var SC = (function(){
     var gemist = zieken * werkdagen / 7;
     return {
       dagen: dagenVs, dpDagen: dpDagen,
-      opTijd: tot ? bin / tot * 100 : null,
+      opTijd: tot ? bin / tot * 100 : null, vertrekTot: tot, vertrekLaat: tot - bin,
       handling: hand.length ? hand.reduce(function(s, x){ return s + x; }, 0) / hand.length : null,
       unitsDag: dagenVs ? units / dagenVs : null,
       unitsUur: urenMetUnits ? unitsMetUren / urenMetUnits : null,
@@ -27274,17 +27278,20 @@ var KPISNAP = (function(){
     var h = '<div style="font-size:12px;color:#5a7090;margin-bottom:10px;">' + T('Elke afgesloten maand wordt automatisch bewaard. Deze cijfers blijven staan, ook als de dagdata later wordt opgeruimd. Klik op een maand voor de details.', 'Every completed month is saved automatically. These figures stay, even if the daily data is cleaned up later. Click a month for details.') + '</div>' +
       '<div style="overflow-x:auto;"><div style="min-width:640px;">' +
       '<div style="display:grid;grid-template-columns:1.4fr .6fr .8fr .8fr .8fr .7fr .8fr 1fr;background:#003366;color:#fff;border-radius:6px 6px 0 0;font-weight:700;">' +
-      [T('Maand', 'Month'), T('Dagen', 'Days'), T('Gelost', 'Unloaded'), T('Geladen', 'Loaded'), T('Op tijd', 'On time'), T('Te laat', 'Late'), T('Verzuim', 'Absence'), T('Gem. bezetting', 'Avg staffing')].map(function(t, i){ return '<div style="' + th + (i === 0 ? 'text-align:left;' : '') + '">' + t + '</div>'; }).join('') + '</div>';
+      [T('Maand', 'Month'), T('Dagen', 'Days'), T('Gelost', 'Unloaded'), T('Geladen', 'Loaded'), T('Op tijd vertr.', 'Left on time'), T('Te laat vertr.', 'Left late'), T('Verzuim', 'Absence'), T('Gem. bezetting', 'Avg staffing')].map(function(t, i){ return '<div style="' + th + (i === 0 ? 'text-align:left;' : '') + '">' + t + '</div>'; }).join('') + '</div>';
     overzichten.forEach(function(s, i){
       var t = s.totaal || {}, p = s.personeel || {};
-      var kl = t.meetpunten ? (t.opTijd / t.meetpunten >= 0.8 ? '#1a7a40' : (t.opTijd / t.meetpunten >= 0.6 ? '#b06f00' : '#c0392b')) : '#5a7090';
+      // Op tijd / te laat = VERTREK (zelfde als Scorekaart). Oudere overzichten zonder scorekaart: alle meetpunten.
+      var opP = (s.sc && s.sc.opTijd !== null && s.sc.opTijd !== undefined) ? s.sc.opTijd / 100 : (t.meetpunten ? t.opTijd / t.meetpunten : null);
+      var laat = (s.sc && s.sc.vertrekLaat !== undefined) ? s.sc.vertrekLaat : (t.meetpunten ? t.buitenNorm : null);
+      var kl = opP !== null ? (opP >= 0.8 ? '#1a7a40' : (opP >= 0.6 ? '#b06f00' : '#c0392b')) : '#5a7090';
       var bez = p.dagen ? (Math.round(p.O / p.dagen * 10) / 10 + ' / ' + Math.round(p.A / p.dagen * 10) / 10).replace(/\./g, ',') : '—';
       var td = 'padding:8px 9px;text-align:center;font-size:12.5px;';
       h += '<details style="border:1px solid #dde6f0;border-top:none;background:' + (i % 2 ? '#f6f9fc' : '#fff') + ';">' +
         '<summary style="list-style:none;cursor:pointer;display:grid;grid-template-columns:1.4fr .6fr .8fr .8fr .8fr .7fr .8fr 1fr;align-items:center;">' +
         '<div style="' + td + 'text-align:left;font-weight:700;color:#003366;">&#x25B8; ' + esc((en ? MND_EN : MND_NL)[s.maand] + ' ' + s.jaar) + (s._nieuw ? ' <span style="font-size:10px;color:#8795a8;font-weight:400;">' + T('(uit dagdata)', '(from daily data)') + '</span>' : '') + '</div>' +
         '<div style="' + td + '">' + s.dagen + '</div><div style="' + td + 'color:#1a5c9a;font-weight:700;">' + (t.gelost || 0) + '</div><div style="' + td + 'color:#1a7a40;font-weight:700;">' + (t.geladen || 0) + '</div>' +
-        '<div style="' + td + 'color:' + kl + ';font-weight:800;">' + pct(t.opTijd, t.meetpunten) + '</div><div style="' + td + 'color:' + (t.buitenNorm ? '#c0392b' : '#5a7090') + ';">' + (t.meetpunten ? t.buitenNorm : '—') + '</div>' +
+        '<div style="' + td + 'color:' + kl + ';font-weight:800;">' + (opP === null ? '—' : Math.round(opP * 100) + '%') + '</div><div style="' + td + 'color:' + (laat ? '#c0392b' : '#5a7090') + ';">' + (laat === null ? '—' : laat) + '</div>' +
         '<div style="' + td + '">' + (s.verzuim && s.verzuim.pct !== null ? String(s.verzuim.pct).replace('.', ',') + '%' : '\u2014') + '</div>' +
         '<div style="' + td + '" title="' + T('ochtend / avond', 'morning / evening') + '">' + bez + '</div></summary>' +
         '<div style="padding:10px 12px 14px;border-top:1px dashed #dde6f0;">' + detail(s, en) + '</div></details>';
@@ -27347,6 +27354,38 @@ function kpiSnapRender(){
   catch(e) { el.innerHTML = '<p style="color:#c0392b;font-size:12px;">Maandoverzichten konden niet worden geladen: ' + OW.esc(e.message) + '</p>'; }
 }
 window.kpiSnapAuto = kpiSnapAuto; window.kpiSnapRender = kpiSnapRender;
+// ── Vaste, logische volgorde van de KPI-kaarten (zelfde in Dienst Journaal en KPI-MT) ──
+// Overzicht → Punctualiteit → Volume → Personeel → Archief, met een tussenkopje per blok.
+function kpiOrden(ouder, buiten){
+  if (!ouder || ouder.getAttribute('data-geordend')) return;
+  var zoek = function(tekst, id){
+    var el = id ? document.getElementById(id) : null;
+    if (!el) { var h = Array.prototype.filter.call((buiten || ouder).querySelectorAll('h2'), function(x){ return x.textContent.replace(/\s+/g, ' ').indexOf(tekst) >= 0; })[0]; el = h || null; }
+    if (!el) return null;
+    if (ouder.contains(el)) { while (el.parentElement && el.parentElement !== ouder) el = el.parentElement; return el.parentElement === ouder ? el : null; }
+    return el.closest('.card') || el; // kaart buiten de container (bijv. Kade capaciteit): erbij halen
+  };
+  var kop = function(tekst){ var d = document.createElement('div'); d.className = 'kpi-blokkop';
+    d.style.cssText = 'margin:26px 0 10px;padding:0 4px 6px;border-bottom:2px solid #003366;color:#003366;font-weight:800;font-size:13px;letter-spacing:1.2px;text-transform:uppercase;font-family:inherit;';
+    d.textContent = tekst; return d; };
+  var en = (sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM' || (typeof mtTerminal !== 'undefined' && mtTerminal === 'IMM');
+  var plan = [
+    [en ? 'Punctuality' : 'Punctualiteit', [['Punctualiteit per meetpunt', 'kpi-chart-card'], ['Dagen buiten de normen', 'kpi-normen-card'], ['Gemiddelde Vaarschema Tijden']]],
+    [en ? 'Volume' : 'Volume', [['Totaal Geladen'], ['Dagenoverzicht'], ['Gemiddeld Trucks per Dienst'], ['Kade capaciteit']]],
+    [en ? 'Staff' : 'Personeel', [['Personeelsbezetting per dag'], ['Personeelsverdeling', 'bez-chart-titel'], ['Verzuim', 'vz-card'], ['Overwerk, inhuur', 'ow-card']]],
+    [en ? 'Archive' : 'Archief', [['Opgeslagen maandoverzichten']]]
+  ];
+  plan.forEach(function(blok){
+    var els = blok[1].map(function(f){ return zoek(f[0], f[1]); }).filter(function(x, i, a){ return x && a.indexOf(x) === i; });
+    if (!els.length) return;
+    ouder.appendChild(kop(blok[0]));
+    els.forEach(function(el){ ouder.appendChild(el); });
+  });
+  ouder.setAttribute('data-geordend', '1');
+}
+
+(function(){ function go(){ try { kpiOrden(document.querySelector('#arch-kpi > div'), document.getElementById('view-archief')); } catch(e) {} }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go(); })();
 // ── Scorekaart (hoofdapp) ──
 function scRenderKpi(){
   var el = document.getElementById('sc-body'); if (!el) return;
