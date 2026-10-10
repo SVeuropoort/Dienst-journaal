@@ -11915,7 +11915,7 @@ document.getElementById('archOverlay').addEventListener('click',function(e){
       <div class=&quot;info-box&quot;>
         📋 <strong data-i18n=&quot;info_title&quot;>Incidenten formulier MI002 en MI003</strong><span data-i18n=&quot;info_isps&quot;> conform ISPS plan.</span><br>
         <span data-i18n=&quot;info_body&quot;>Indien er een incident heeft plaatsgevonden waarbij eigendommen van Stena Line BV beschadigd zijn geraakt, dient de dienstdoende Supervisor stevedoring, dienstdoende beveiliger of OTS/OFS medewerker een Schaderapport Stena Line eigendommen (formulier MI002/MI003) op te maken.</span><br><br>
-        <span data-i18n=&quot;info_pdf&quot;>Na het invullen van alle stappen kan het formulier als </span><strong data-i18n=&quot;info_pdf_bold&quot;>PDF worden gedownload</strong><span data-i18n=&quot;info_pdf_end&quot;> via de knop op de laatste pagina.</span>
+        <span data-i18n=&quot;info_pdf&quot;>Na het invullen van alle stappen wordt het formulier met de knop op de laatste pagina </span><strong data-i18n=&quot;info_pdf_bold&quot;>automatisch als PDF verstuurd</strong><span data-i18n=&quot;info_pdf_end&quot;> naar de afdeling die het afhandelt.</span>
       </div>
 
       <div class=&quot;nav-row&quot;>
@@ -12245,7 +12245,7 @@ document.getElementById('archOverlay').addEventListener('click',function(e){
         <button class=&quot;btn-prev&quot; onclick=&quot;goStep(2)&quot; data-i18n=&quot;btn_prev&quot;>← Vorige</button>
         <button class=&quot;btn-next&quot; style=&quot;background:#1a7a3c;display:flex;align-items:center;gap:8px;&quot; onclick=&quot;generatePDF()&quot; id=&quot;pdfBtn&quot;>
           <svg width=&quot;16&quot; height=&quot;16&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot;><path d=&quot;M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z&quot;/><polyline points=&quot;14 2 14 8 20 8&quot;/><line x1=&quot;12&quot; y1=&quot;12&quot; x2=&quot;12&quot; y2=&quot;18&quot;/><line x1=&quot;9&quot; y1=&quot;15&quot; x2=&quot;15&quot; y2=&quot;15&quot;/></svg>
-          <span data-i18n=&quot;btn_pdf&quot;>PDF downloaden</span>
+          <span data-i18n=&quot;btn_pdf&quot;>Versturen</span>
         </button>
       </div>
 
@@ -12337,11 +12337,11 @@ const translations = {
     info_title: 'Incidenten formulier MI002 en MI003',
     info_isps: ' conform ISPS plan.',
     info_body: 'Indien er een incident heeft plaatsgevonden waarbij eigendommen van Stena Line BV beschadigd zijn geraakt, dient de dienstdoende Supervisor stevedoring, dienstdoende beveiliger of OTS/OFS medewerker een Schaderapport Stena Line eigendommen (formulier MI002/MI003) op te maken.',
-    info_pdf: 'Na het invullen van alle stappen kan het formulier als ',
-    info_pdf_bold: 'PDF worden gedownload',
-    info_pdf_end: ' via de knop op de laatste pagina.',
+    info_pdf: 'Na het invullen van alle stappen wordt het formulier met de knop op de laatste pagina ',
+    info_pdf_bold: 'automatisch als PDF verstuurd',
+    info_pdf_end: ' naar de afdeling die het afhandelt.',
     btn_next: 'Volgende →', btn_prev: '← Vorige',
-    btn_wissen: 'Wissen', btn_pdf: 'PDF downloaden',
+    btn_wissen: 'Wissen', btn_pdf: 'Versturen',
     sec_rapport: 'Rapport opgemaakt door',
     sec_extern: 'Externe betrokken partij',
     sec_getuigen: 'Ooggetuigen',
@@ -12425,11 +12425,11 @@ const translations = {
     info_title: 'Incident form MI002 and MI003',
     info_isps: ' in accordance with the ISPS plan.',
     info_body: 'If an incident has occurred in which Stena Line BV property has been damaged, the on-duty Stevedoring Supervisor, on-duty security officer or OTS/OFS employee must complete a Damage Report Stena Line Property (form MI002/MI003).',
-    info_pdf: 'After completing all steps, the form can be ',
-    info_pdf_bold: 'downloaded as a PDF',
-    info_pdf_end: ' using the button on the last page.',
+    info_pdf: 'After completing all steps, the button on the last page ',
+    info_pdf_bold: 'automatically sends the form as a PDF',
+    info_pdf_end: ' to the department that handles it.',
     btn_next: 'Next →', btn_prev: '← Previous',
-    btn_wissen: 'Clear', btn_pdf: 'Download PDF',
+    btn_wissen: 'Clear', btn_pdf: 'Send',
     sec_rapport: 'Report completed by',
     sec_extern: 'External party involved',
     sec_getuigen: 'Eyewitnesses',
@@ -13028,7 +13028,7 @@ function generatePDF() {
       const dateStr = document.getElementById('incidentDate').value || new Date().toISOString().split('T')[0];
       const filename = `${t.pdf_bestandsnaam_prefix}_${dateStr}_${reporter}.pdf`;
 
-      doc.save(filename);
+      if (!(window.parent &amp;&amp; window.parent.djSchadeHeeftOntvanger &amp;&amp; window.parent.djSchadeHeeftOntvanger(1))) doc.save(filename); // automatisch versturen? dan geen kopie in Downloads
       try { window.parent.postMessage({ type: 'schade-pdf', formulier: 1, naam: filename, blob: doc.output('blob') }, '*'); } catch(e) {}
 
     } catch(err) {
@@ -13457,7 +13457,7 @@ window.addEventListener('resize', () => {
     <button class=&quot;lang-btn-eu&quot; onclick=&quot;setLangEU('en',this)&quot; style=&quot;background:transparent;border:1.5px solid rgba(255,255,255,0.4);color:white;padding:6px 14px;border-radius:20px;cursor:pointer;font-size:0.8rem;&quot;>EN</button>
     <button class=&quot;btn-print&quot; onclick=&quot;if (window.parent.djSchadeFormulier2Versturen) window.parent.djSchadeFormulier2Versturen(this)&quot; style=&quot;background:#1a7a40;&quot;>✉️ Versturen</button>
     <button class=&quot;btn-print&quot; onclick=&quot;window.print()&quot;>
-      🖨️ <span data-i18n=&quot;btn_print&quot;>Afdrukken / Opslaan als PDF</span>
+      🖨️ <span data-i18n=&quot;btn_print&quot;>Afdrukken</span>
     </button>
   </div>
 </div>
@@ -14009,7 +14009,7 @@ document.querySelectorAll('input[type=&quot;checkbox&quot;]').forEach(cb => cb.a
 const translationsEU = {
   nl: {
     doc_title: 'Europees Schadeformulier',
-    btn_print: 'Afdrukken / Opslaan als PDF',
+    btn_print: 'Afdrukken',
     header_sub: 'Verklaring van Verkeersongeval — te gebruiken als bewijs van het voorval. Geen erkenning van aansprakelijkheid.',
     eu_label: 'Europees<br>formulier',
     lbl_datum_ongeval: 'Datum van het ongeval',
@@ -14079,7 +14079,7 @@ const translationsEU = {
   },
   en: {
     doc_title: 'European Accident Statement',
-    btn_print: 'Print / Save as PDF',
+    btn_print: 'Print',
     header_sub: 'Motor Vehicle Accident Statement — to be used as evidence of the event. Not an admission of liability.',
     eu_label: 'European<br>form',
     lbl_datum_ongeval: 'Date of accident',
@@ -14474,13 +14474,13 @@ window.addEventListener('resize', () => { initSketch(); initSig('sigA'); initSig
 
   </form>
 
-  <div class=&quot;hint&quot; id=&quot;hintText&quot; data-i18n=&quot;hint_text&quot;>Klik op &quot;PDF genereren &amp;amp; bijvoegen&quot; — het formulier wordt gedownload als kleuren-PDF en Outlook opent daarna automatisch. Voeg de zojuist gedownloade PDF toe als bijlage voordat je verzendt.</div>
+  <div class=&quot;hint&quot; id=&quot;hintText&quot; data-i18n=&quot;hint_text&quot;>Klik op &quot;Versturen&quot; — het formulier wordt als PDF automatisch naar de afdeling gestuurd die het afhandelt.</div>
 
   <div class=&quot;actions&quot;>
     <button type=&quot;button&quot; id=&quot;resetBtn&quot; data-i18n=&quot;btn_reset&quot;>Formulier wissen</button>
     <button type=&quot;button&quot; id=&quot;pdfMailBtn&quot;>
       <svg viewBox=&quot;0 0 24 24&quot;><path d=&quot;M2 5.5C2 4.67 2.67 4 3.5 4h17c.83 0 1.5.67 1.5 1.5v13c0 .83-.67 1.5-1.5 1.5h-17A1.5 1.5 0 0 1 2 18.5v-13Zm2.2.5 7.3 5.9a1 1 0 0 0 1 0L19.8 6H4.2ZM4 8.1V18h16V8.1l-6.9 5.55a3 3 0 0 1-3.2 0L4 8.1Z&quot;/></svg>
-      <span id=&quot;pdfMailBtnLabel&quot; data-i18n=&quot;btn_pdf_mail&quot;>PDF genereren &amp;amp; bijvoegen in Outlook</span>
+      <span id=&quot;pdfMailBtnLabel&quot; data-i18n=&quot;btn_pdf_mail&quot;>Versturen</span>
     </button>
   </div>
 
@@ -14580,7 +14580,7 @@ document.getElementById(&quot;pdfMailBtn&quot;).addEventListener(&quot;click&quo
       heightLeft -= pageHeight;
     }
 
-    pdf.save(bestandsnaam);
+    if (!(window.parent &amp;&amp; window.parent.djSchadeHeeftOntvanger &amp;&amp; window.parent.djSchadeHeeftOntvanger(3))) pdf.save(bestandsnaam); // automatisch versturen? dan geen kopie in Downloads
     try { window.parent.postMessage({ type: 'schade-pdf', formulier: 3, naam: bestandsnaam, blob: pdf.output('blob') }, '*'); } catch(e) {}
   } catch(err){
     alert(t.pdf_fout + err.message);
@@ -14643,9 +14643,9 @@ const translationsIR = {
     lbl_letsel: 'Letsel tijdens incident', lbl_escalatie: 'Escalatie (J/N)',
     lbl_verantwoordelijk: 'Wie is verantwoordelijk voor het incident/de schade',
     opt_kies: '— kies —', opt_nee: 'Nee', opt_ja: 'Ja', opt_n: 'N', opt_j: 'J',
-    hint_text: 'Klik op &quot;PDF genereren &amp; bijvoegen&quot; — het formulier wordt gedownload als kleuren-PDF en Outlook opent daarna automatisch. Voeg de zojuist gedownloade PDF toe als bijlage voordat je verzendt.',
+    hint_text: 'Klik op &quot;Versturen&quot; — het formulier wordt als PDF automatisch naar de afdeling gestuurd die het afhandelt.',
     btn_reset: 'Formulier wissen',
-    btn_pdf_mail: 'PDF genereren &amp; bijvoegen in Outlook',
+    btn_pdf_mail: 'Versturen',
     pdf_bezig: 'PDF wordt gegenereerd…',
     pdf_fout: 'PDF genereren is niet gelukt: ',
     bestandsnaam_prefix: 'Incidentrapport',
@@ -14681,9 +14681,9 @@ const translationsIR = {
     lbl_letsel: 'Injury during incident', lbl_escalatie: 'Escalation (Y/N)',
     lbl_verantwoordelijk: 'Who is responsible for the incident/damage',
     opt_kies: '— select —', opt_nee: 'No', opt_ja: 'Yes', opt_n: 'N', opt_j: 'Y',
-    hint_text: 'Click &quot;Generate PDF &amp; attach&quot; — the form will be downloaded as a colour PDF and Outlook will then open automatically. Attach the just-downloaded PDF before sending.',
+    hint_text: 'Click &quot;Send&quot; — the form is sent automatically as a PDF to the department that handles it.',
     btn_reset: 'Clear form',
-    btn_pdf_mail: 'Generate PDF &amp; attach in Outlook',
+    btn_pdf_mail: 'Send',
     pdf_bezig: 'Generating PDF…',
     pdf_fout: 'Failed to generate PDF: ',
     bestandsnaam_prefix: 'IncidentReport',
@@ -23352,7 +23352,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.50';
+var DJ_BUILD = '2026-10-06.52';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -30514,9 +30514,35 @@ function djSchadeToast(tekst, kleur){
   el.style.background = kleur || '#1a7a40'; el.textContent = tekst; el.style.display = 'block';
   clearTimeout(el._t); el._t = setTimeout(function(){ el.style.display = 'none'; }, 7000);
 }
+// Vóór het versturen: eigen toelichting voor in de mail (los van het officiële formulier)
+function djSchadeToelichtingVragen(n){
+  return new Promise(function(klaar){
+    var en = djSchadeEn(), inst = djSchadeMailGet()[n];
+    var oud = document.getElementById('dj-schade-toel'); if (oud) oud.remove();
+    var o = document.createElement('div'); o.id = 'dj-schade-toel';
+    o.style.cssText = 'position:fixed;inset:0;background:rgba(0,20,40,.45);z-index:100004;display:flex;align-items:center;justify-content:center;padding:16px;';
+    o.innerHTML = '<div style="background:#fff;border-radius:12px;width:480px;max-width:100%;padding:18px;box-shadow:0 16px 40px rgba(0,0,0,.35);">' +
+      '<div style="font-weight:800;font-size:15px;color:#003366;">&#x2709;&#xFE0F; ' + djSchadeNaam(n) + (en ? ' – send' : ' – versturen') + '</div>' +
+      '<div style="font-size:12px;color:#5a6b80;margin-top:4px;">' + (en ? 'To: ' : 'Aan: ') + woEsc(inst.aan) + (inst.cc ? ' &nbsp;·&nbsp; CC: ' + woEsc(inst.cc) : '') + '</div>' +
+      '<label style="display:block;font-size:11px;font-weight:700;color:#5a6b80;text-transform:uppercase;letter-spacing:.4px;margin:12px 0 4px;">' + (en ? 'Explanation in the e-mail (optional)' : 'Toelichting in de mail (optioneel)') + '</label>' +
+      '<textarea id="dj-schade-toel-tekst" rows="6" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #c8d7e8;border-radius:6px;font-size:13px;font-family:inherit;resize:vertical;" placeholder="' +
+        (en ? 'E.g. what happened, who was involved, what still needs to be done…' : 'Bijv. wat er is gebeurd, wie erbij betrokken was, wat er nog moet gebeuren…') + '"></textarea>' +
+      '<div style="font-size:11px;color:#8795a8;margin-top:4px;">' + (en ? 'This text goes in the e-mail only, not in the official form.' : 'Deze tekst komt alleen in de mail, niet in het officiële formulier.') + '</div>' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">' +
+        '<button type="button" id="dj-schade-toel-annuleer" style="background:#fff;border:1px solid #c8d7e8;color:#003366;border-radius:6px;padding:8px 14px;cursor:pointer;font-weight:700;">' + (en ? 'Cancel' : 'Annuleren') + '</button>' +
+        '<button type="button" id="dj-schade-toel-ok" style="background:#1a7a40;color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-weight:700;">&#x2709;&#xFE0F; ' + (en ? 'Send' : 'Versturen') + '</button>' +
+      '</div></div>';
+    document.body.appendChild(o);
+    var ta = document.getElementById('dj-schade-toel-tekst'); setTimeout(function(){ ta.focus(); }, 50);
+    document.getElementById('dj-schade-toel-annuleer').onclick = function(){ o.remove(); klaar(null); };
+    document.getElementById('dj-schade-toel-ok').onclick = function(){ var t = ta.value.trim(); o.remove(); klaar(t); };
+  });
+}
 async function djSchadeVersturen(n, naam, blob){
   var en = djSchadeEn(), inst = djSchadeMailGet()[n];
   if (!inst.aan || !inst.van) { djSchadeToast((en ? 'No recipient set for ' : 'Geen ontvanger ingesteld voor ') + djSchadeNaam(n) + (en ? ' (✉️ Recipients). Please e-mail the PDF yourself.' : ' (✉️ Ontvangers). Mail de PDF deze keer zelf.'), '#b8860b'); return false; }
+  var toelichting = await djSchadeToelichtingVragen(n);
+  if (toelichting === null) { djSchadeToast(en ? 'Not sent. Press Send again when ready.' : 'Niet verstuurd. Klik opnieuw op Versturen als je zover bent.', '#5a6b80'); return false; }
   try {
     if (typeof spIngelogdAsync === 'function' && !(await spIngelogdAsync())) throw new Error(en ? 'not signed in' : 'niet ingelogd');
     djSchadeToast((en ? 'Sending ' : 'Versturen: ') + djSchadeNaam(n) + '…', '#0f6cbd');
@@ -30533,9 +30559,10 @@ async function djSchadeVersturen(n, naam, blob){
     if (!pdfPad) pdfPad = '/Shared Documents/Bijlagen/' + pad;
     var tNaam = { EP: 'Europoort', HVH: 'Hoek van Holland', IMM: 'Immingham' }[t] || t;
     var datum = nu.toLocaleDateString('nl-NL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    var toelHtml = toelichting ? '<p><b>' + (en ? 'Explanation:' : 'Toelichting:') + '</b><br>' + woEsc(toelichting).replace(/\n/g, '<br>') + '</p>' : '';
     var tekst = en
-      ? '<p>Hello,</p><p>Attached is a new <b>' + djSchadeNaam(n) + '</b> from Stena Line ' + tNaam + ' (' + datum + ').</p><p>Kind regards,<br>Supervisors ' + tNaam + '</p><p style="color:#888;font-size:11px;">Sent automatically from Dienst Journaal.</p>'
-      : '<p>Beste,</p><p>Bijgevoegd een nieuw <b>' + djSchadeNaam(n) + '</b> van Stena Line ' + tNaam + ' (' + datum + ').</p><p>Met vriendelijke groet,<br>Supervisors ' + tNaam + '</p><p style="color:#888;font-size:11px;">Deze e-mail is automatisch verstuurd vanuit Dienst Journaal.</p>';
+      ? '<p>Hello,</p><p>Attached is a new <b>' + djSchadeNaam(n) + '</b> from Stena Line ' + tNaam + ' (' + datum + ').</p>' + toelHtml + '<p>Kind regards,<br>Supervisors ' + tNaam + '</p><p style="color:#888;font-size:11px;">Sent automatically from Dienst Journaal.</p>'
+      : '<p>Beste,</p><p>Bijgevoegd een nieuw <b>' + djSchadeNaam(n) + '</b> van Stena Line ' + tNaam + ' (' + datum + ').</p>' + toelHtml + '<p>Met vriendelijke groet,<br>Supervisors ' + tNaam + '</p><p style="color:#888;font-size:11px;">Deze e-mail is automatisch verstuurd vanuit Dienst Journaal.</p>';
     await spOpslaanBestand('schade_' + t + '_' + stempel + '.json', {
       soort: 'schade', formulier: djSchadeNaam(n), terminal: t,
       van: inst.van.trim(), aan: inst.aan.trim(), cc: String(inst.cc || '').split(/[;,\s]+/).filter(Boolean).join(';'),
