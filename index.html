@@ -23366,7 +23366,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.53';
+var DJ_BUILD = '2026-10-06.55';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -29675,7 +29675,10 @@ function pdRenderDetail(){
   var el = document.getElementById('pd-detail');
   if (!el || !_pdGeselecteerd) return;
   var data = pdData();
-  var entries = (data[_pdGeselecteerd] || []).slice().sort(function(a,b){ return pdDatumSorteerKey(b.datum).localeCompare(pdDatumSorteerKey(a.datum)); });
+  var _alle = (data[_pdGeselecteerd] || []).slice().sort(function(a,b){ return pdDatumSorteerKey(b.datum).localeCompare(pdDatumSorteerKey(a.datum)); });
+  // Ontwikkelgesprekken apart tonen, boven de gewone registraties
+  var gesprekken = _alle.filter(function(e){ return e.soort === 'ontwikkelgesprek'; });
+  var entries = _alle.filter(function(e){ return e.soort !== 'ontwikkelgesprek'; });
   var isGroepslid = pdGroepVanNaam(_pdGeselecteerd) && PD_GROEPEN.indexOf(_pdGeselecteerd) === -1;
   var verjData = (typeof getVerjaardagen === 'function') ? getVerjaardagen() : {};
   var verjEntry = verjData[_pdGeselecteerd] || { dag: '', maand: '' };
@@ -29694,6 +29697,20 @@ function pdRenderDetail(){
     '<input type="number" min="1900" max="2100" placeholder="Jaar" value="' + pdEsc(verjEntry.jaar || '') + '" id="pd-verj-jaar" onchange="pdSlaVerjaardagOp()" title="Geboortejaar (voor AOW/SFR-berekening)" style="width:70px;padding:5px 6px;border:1px solid #ccb87a;border-radius:4px;font-size:12px;text-align:center;">' +
     '<span id="pd-verj-opgeslagen" style="font-size:11px;color:#166534;opacity:0;transition:opacity 0.4s;">&#10003; Opgeslagen</span>' +
     '</div>';
+  if (gesprekken.length) {
+    html += '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:14px;font-weight:800;color:#1a7a40;letter-spacing:.5px;text-transform:uppercase;margin:4px 0 6px;">&#x1F4AC; Ontwikkelgesprekken (' + gesprekken.length + ')</div>' +
+      '<div style="border:1px solid #bfe3cb;border-radius:8px;overflow:hidden;margin-bottom:16px;">';
+    gesprekken.forEach(function(e, i){
+      html += '<div style="padding:10px 14px;' + (i>0?'border-top:1px solid #e3f2e8;':'') + 'display:flex;gap:12px;align-items:flex-start;background:' + (i%2?'#f4fbf6':'#fff') + ';">' +
+        '<div style="flex:0 0 90px;font-size:12px;font-weight:700;color:#1a7a40;white-space:nowrap;">' + pdEsc(e.datum || '&#8211;') + '</div>' +
+        '<div style="flex:1;font-size:13px;color:#333;line-height:1.4;">' + pdEsc(String(e.tekst || '').replace(/^Ontwikkelgesprek\s*/, '')) +
+          (e.gesprekPad ? ' <button onclick="djOgBekijk(\'' + pdEsc(e.gesprekPad).replace(/'/g, "\\'") + '\')" style="margin-left:6px;background:#e8f6ed;color:#1a7a40;border:1px solid #bfe3cb;border-radius:5px;padding:2px 8px;cursor:pointer;font-size:11.5px;font-weight:700;">&#x1F4C4; Bekijken</button>' : '') + '</div>' +
+        '<button onclick="pdVerwijder(' + e.id + ')" title="Verwijderen" style="background:none;border:none;color:#c0392b;cursor:pointer;font-size:13px;flex-shrink:0;">&#x2715;</button>' +
+        '</div>';
+    });
+    html += '</div>';
+    html += '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:14px;font-weight:800;color:var(--navy);letter-spacing:.5px;text-transform:uppercase;margin:4px 0 6px;">&#x1F4C1; Registraties (' + entries.length + ')</div>';
+  }
   if (!entries.length) {
     html += '<div style="color:var(--muted);font-size:13px;padding:14px 0;">Nog geen registraties voor deze medewerker.</div>';
   } else {
@@ -29741,7 +29758,11 @@ function pdSlaVerjaardagOp(){
 function djOgMedewerkers(){
   var data = (typeof pdData === 'function') ? pdData() : {};
   var groepen = (typeof PD_GROEPEN !== 'undefined' && Array.isArray(PD_GROEPEN)) ? PD_GROEPEN : [];
-  return Object.keys(data).filter(function(n){ return n && groepen.indexOf(n) === -1; })
+  // Alleen vaste medewerkers: geen groepen (inhuur, stagiaires, …) en niemand die uit dienst is
+  return Object.keys(data).filter(function(n){
+    if (!n || groepen.indexOf(n) !== -1) return false;
+    return (typeof pdCategorieVan === 'function') ? pdCategorieVan(n) === 'actief' : true;
+  })
     .sort(function(a, b){ return a.localeCompare(b, 'nl'); });
 }
 function djOgMijnNaam(){
