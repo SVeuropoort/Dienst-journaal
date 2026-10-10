@@ -1,0 +1,2406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KPI Dashboard — MT | Dienst Journaal</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: Arial, sans-serif; background:#f4f7fb; color:#1a2a4a; }
+  :root { --navy:#003366; --muted:#5a7090; --surface: rgba(255,255,255,0.88); --surface2: rgba(220,232,246,0.85); --border: #c8d7e8; }
+
+  /* ── Login scherm ── */
+  #mt-login{position:fixed;inset:0;background:#001830;z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px;}
+  #mt-login .box{background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:32px 40px;width:300px;}
+  #mt-login input{width:100%;padding:12px;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:rgba(255,255,255,0.1);color:#fff;font-size:15px;outline:none;box-sizing:border-box;margin-bottom:10px;}
+  #mt-login button{width:100%;padding:12px;background:#e8a020;border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;}
+  #mt-login .lbl{color:rgba(255,255,255,0.7);font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;}
+  #mt-err{color:#ff6b6b;font-size:12px;margin-bottom:8px;display:none;}
+
+  /* ── App shell ── */
+  #mt-app{display:none;}
+  header.mt-top{background:var(--navy);color:#fff;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+  header.mt-top h1{font-size:18px;margin:0;font-weight:800;letter-spacing:.5px;}
+  header.mt-top .sub{font-size:11px;color:rgba(255,255,255,0.6);margin-top:2px;}
+  .terminal-switch{display:flex;gap:6px;background:rgba(255,255,255,0.08);padding:4px;border-radius:8px;}
+  .terminal-switch button{background:transparent;border:none;color:rgba(255,255,255,0.7);padding:8px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;letter-spacing:.5px;}
+  .terminal-switch button.active{background:#e8a020;color:#fff;}
+  .mt-status{font-size:11px;color:rgba(255,255,255,0.6);display:flex;align-items:center;gap:8px;}
+  .mt-status button{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:11px;}
+  main{padding:24px;max-width:1200px;margin:0 auto;}
+  .card{background:#fff;border-radius:10px;border:1px solid #dde6f0;margin-bottom:20px;overflow:hidden;}
+  .card-header{padding:14px 20px;border-bottom:1px solid #eef2f7;display:flex;align-items:center;gap:8px;}
+  .card-header h2{font-size:15px;margin:0;color:var(--navy);}
+  #kpi-placeholder{color:var(--muted);font-size:13px;padding:40px;text-align:center;}
+  #kpi-content{transition:opacity 0.25s ease;}
+  .card.mt-dicht > :not(.mt-kop){display:none !important;}
+  .card.mt-dicht > .mt-kop{margin-bottom:0 !important;}
+  footer.mt-foot{max-width:1200px;margin:0 auto;padding:0 24px 32px;color:var(--muted);font-size:11px;text-align:center;}
+</style>
+</head>
+<body>
+
+<!-- ══════════════ LOGIN ══════════════ -->
+<div id="mt-login">
+  <div style="text-align:center;">
+    <div style="font-size:44px;">&#x1F4CA;</div>
+    <div style="color:#fff;font-size:24px;font-weight:800;letter-spacing:1px;margin-top:6px;">KPI DASHBOARD</div>
+    <div style="color:rgba(255,255,255,0.5);font-size:12px;letter-spacing:2px;margin-top:2px;">MT &mdash; STENA LINE</div>
+  </div>
+  <div class="box">
+    <button id="mtMsBtn" onclick="mtMsLoginKlik()" style="width:100%;padding:12px;background:#0f6cbd;border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">&#x1F310; Sign in with Microsoft</button>
+    <div id="mtMsStatus" style="color:rgba(255,255,255,0.55);font-size:12px;margin-top:10px;min-height:14px;text-align:center;"></div>
+    <div id="mt-ww-backup" style="display:none;margin-top:18px;padding-top:18px;border-top:1px solid rgba(255,255,255,0.15);">
+      <div class="lbl">Password</div>
+      <input type="password" id="mt-ww" placeholder="Password..." onkeydown="if(event.key==='Enter')mtLogin()">
+      <div id="mt-err">Incorrect password.</div>
+      <button onclick="mtLogin()">SIGN IN</button>
+    </div>
+  </div>
+  <div style="display:flex;gap:18px;margin-top:18px;">
+    <a href="index.html" style="color:rgba(255,255,255,0.55);font-size:12px;text-decoration:none;display:flex;align-items:center;gap:5px;">&#x1F6A2; Dienst Journaal (main app)</a>
+    <a href="materieel-garage.html" style="color:rgba(255,255,255,0.55);font-size:12px;text-decoration:none;display:flex;align-items:center;gap:5px;">&#x1F697; Equipment garage</a>
+    <a href="freightcheck.html" style="color:rgba(255,255,255,0.55);font-size:12px;text-decoration:none;display:flex;align-items:center;gap:5px;">&#x1F69B; Freightcheck</a>
+  </div>
+  <!-- "Andere manier van inloggen" (wachtwoord) is verwijderd: alleen nog Stena Microsoft-login. -->
+</div>
+
+<!-- ══════════════ APP ══════════════ -->
+<div id="mt-app">
+  <header class="mt-top">
+    <div>
+      <h1>&#x1F4CA; KPI Dashboard &mdash; MT</h1>
+      <div class="sub" id="mt-terminal-naam">Europoort</div>
+    </div>
+    <div class="terminal-switch" id="mt-terminal-switch">
+      <button onclick="mtWisselTerminal('EP')" data-terminal="EP">EUROPOORT</button>
+      <button onclick="mtWisselTerminal('HVH')" data-terminal="HVH">HOOK OF HOLLAND</button>
+      <button onclick="mtWisselTerminal('IMM')" data-terminal="IMM">IMMINGHAM</button>
+    </div>
+    <div class="mt-status">
+      <span id="mt-laatst-bijgewerkt">&#8212;</span>
+      <button onclick="mtVerversNu()">&#x21BB; Refresh</button>
+      <button onclick="appUitloggen(false)" title="Sign out">&#x23FB; Sign out</button>
+    </div>
+  </header>
+  <main>
+    <div id="kpi-content">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap;">
+        <button onclick="mtKpiStapMaand(-1)" style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:16px;">&#8592;</button>
+        <div style="font-size:22px;font-weight:700;color:var(--navy);min-width:160px;text-align:center;" id="kpi-maand-label">&#x2014;</div>
+        <button onclick="mtKpiStapMaand(1)" style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:16px;">&#8594;</button>
+        <span id="kpi-dagen-label" style="font-size:12px;color:var(--muted);margin-left:8px;"></span>
+      </div>
+      <div class="card">
+        <div class="card-header"><div>&#x1F4C8;</div><h2>Scorecard &mdash; better or worse?</h2></div>
+        <div id="sc-body" style="padding:16px;"></div>
+      </div>
+      <div id="kpi-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:20px;"></div>
+
+      <div class="card">
+        <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:8px;"><div>&#x1F465;</div><h2>Staffing per day</h2></div>
+          <button id="kpi-personeel-toggle" onclick="mtToggleLegeDagen()" style="font-size:11px;padding:5px 10px;border:1px solid #ccd6e5;border-radius:6px;background:#eef3fa;color:var(--navy);cursor:pointer;font-weight:600;"></button>
+        </div>
+        <div style="overflow-x:auto;padding:16px;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead>
+              <tr style="background:var(--navy);color:#fff;">
+                <th style="padding:8px 10px;text-align:left;">Date</th>
+                <th style="padding:6px 8px;text-align:center;background:#3a5a7a;font-size:10px;">Std Morn</th>
+                <th style="padding:6px 8px;text-align:center;background:#5a4a3a;font-size:10px;">Std Eve</th>
+                <th style="padding:8px 10px;text-align:center;background:#4a8ed6;">Morning PSO</th>
+                <th style="padding:8px 10px;text-align:center;background:#e6b800;color:#333;">Agency morn.</th>
+                <th style="padding:8px 10px;text-align:center;background:#6aaa3a;">Interns morn.</th>
+                <th style="padding:8px 10px;text-align:center;background:#e08030;">Evening PSO</th>
+                <th style="padding:8px 10px;text-align:center;background:#e07010;color:#fff;">Agency eve.</th>
+                <th style="padding:8px 10px;text-align:center;background:#7aaa5a;">Interns eve.</th>
+                <th style="padding:8px 10px;text-align:center;background:#a855f7;color:#fff;">Overtime morn.</th>
+                <th style="padding:8px 10px;text-align:center;background:#9333ea;color:#fff;">Overtime eve.</th>
+                <th style="padding:8px 10px;text-align:center;">Total hours</th>
+              </tr>
+            </thead>
+            <tbody id="kpi-personeel-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div>&#x1F550;</div><h2>Average Sailing Schedule Times</h2></div>
+        <div style="overflow-x:auto;padding:16px;">
+          <table style="width:100%;border-collapse:collapse;min-width:700px;"><thead><tr id="kpi-tijden-hdr"></tr></thead><tbody id="kpi-tijden-body"></tbody></table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div>&#x1F4E6;</div><h2>Total Loaded &amp; Unloaded per Route</h2></div>
+        <div style="overflow-x:auto;padding:16px;">
+          <table style="width:100%;border-collapse:collapse;"><thead><tr id="kpi-units-hdr"></tr></thead><tbody id="kpi-units-body"></tbody></table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div>&#x1F4C5;</div><h2>Daily overview</h2></div>
+        <div style="overflow-x:auto;padding:16px;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead><tr style="background:var(--navy);color:#fff;"><th style="padding:8px 10px;text-align:left;">Date</th><th style="padding:8px 10px;text-align:center;">Unloaded</th><th style="padding:8px 10px;text-align:center;">Loaded</th><th style="padding:8px 10px;text-align:center;">Times</th></tr></thead>
+            <tbody id="kpi-dag-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" id="kpi-normen-card" style="display:none;">
+        <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:8px;"><div>&#x1F6A8;</div><h2>Days outside the norms</h2><span id="normen-count-badge" style="background:#c0392b;color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:4px;"></span></div>
+        </div>
+        <div style="overflow-x:auto;padding:16px;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead><tr style="background:#c0392b;color:#fff;"><th style="padding:8px 10px;text-align:left;">Date</th><th style="padding:8px 10px;text-align:left;">Route</th><th style="padding:8px 10px;text-align:left;">Column</th><th style="padding:8px 10px;text-align:center;">Actual</th><th style="padding:8px 10px;text-align:center;">Norm</th><th style="padding:8px 10px;text-align:center;">Deviation</th><th style="padding:8px 10px;text-align:left;">Remark</th></tr></thead>
+            <tbody id="kpi-normen-body-tbl"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" id="kpi-chart-card" style="display:none;">
+        <div class="card-header"><div>&#x25D5;</div><h2>Punctuality per measuring point</h2></div>
+        <div id="kpi-charts-wrap" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;padding:16px;"></div>
+      </div>
+
+      <div class="card" style="padding:20px 24px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+          <div style="width:32px;height:32px;background:#1a2a4a;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;">&#x1F69A;</div>
+          <h2 style="margin:0;font-size:16px;font-weight:700;color:#1a2a4a;">Average Trucks per Shift</h2>
+          <span id="truckChartSubtitle" style="font-size:11px;color:#888;margin-left:8px;"></span>
+          <button onclick="mtRenderTruckChart(_kpiM,_kpiY)" style="font-size:11px;padding:4px 10px;border:1px solid #1a4a8a;border-radius:4px;background:#e8f0fb;color:#1a4a8a;cursor:pointer;margin-left:8px;font-weight:600;">&#8635; Herbereken</button>
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:200px;background:#e8f0fb;border:2px solid #1a4a8a;border-radius:8px;padding:16px 20px;">
+            <div style="font-size:12px;font-weight:800;color:#1a4a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;">&#x1F305; Morning</div>
+            <div style="display:flex;gap:24px;flex-wrap:wrap;">
+              <div style="text-align:center;"><div id="kpi-och-trucks" style="font-size:36px;font-weight:800;color:#1a4a8a;">&#8211;</div><div style="font-size:11px;color:#555;margin-top:2px;">&#x1F69A; avg. trucks</div></div>
+              <div style="text-align:center;"><div id="kpi-och-cf" style="font-size:36px;font-weight:800;color:#e74c3c;">&#8211;</div><div style="font-size:11px;color:#555;margin-top:2px;">&#x25CF; CF loading</div></div>
+            </div>
+          </div>
+          <div style="flex:1;min-width:200px;background:#fff3e8;border:2px solid #c05a10;border-radius:8px;padding:16px 20px;">
+            <div style="font-size:12px;font-weight:800;color:#c05a10;text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;">&#x1F306; Evening</div>
+            <div style="display:flex;gap:24px;flex-wrap:wrap;">
+              <div style="text-align:center;"><div id="kpi-av-trucks" style="font-size:36px;font-weight:800;color:#c05a10;">&#8211;</div><div style="font-size:11px;color:#555;margin-top:2px;">&#x1F69A; avg. trucks</div></div>
+              <div style="text-align:center;"><div id="kpi-av-cf" style="font-size:36px;font-weight:800;color:#e74c3c;">&#8211;</div><div style="font-size:11px;color:#555;margin-top:2px;">&#x25CF; CF loading</div></div>
+            </div>
+          </div>
+        </div>
+        <div id="truckChartNoData" style="display:none;color:#aaa;font-size:13px;padding:12px 0 0;">No truck data for this month.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div>&#x1F967;</div><h2 id="bez-chart-titel">Staff distribution month</h2></div>
+        <div style="padding:16px;">
+          <div style="display:flex;gap:32px;flex-wrap:wrap;justify-content:center;align-items:flex-start;">
+            <div style="text-align:center;">
+              <div style="font-weight:700;color:var(--navy);margin-bottom:8px;font-size:14px;">&#x1F305; MORNING</div>
+              <canvas id="pie-ochtend" width="200" height="200"></canvas>
+              <div id="legend-ochtend" style="margin-top:10px;font-size:12px;text-align:left;"></div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-weight:700;color:var(--navy);margin-bottom:8px;font-size:14px;">&#x1F306; EVENING</div>
+              <canvas id="pie-avond" width="200" height="200"></canvas>
+              <div id="legend-avond" style="margin-top:10px;font-size:12px;text-align:left;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div>&#x23F1;&#xFE0F;</div><h2>Overtime, agency &amp; productivity</h2></div>
+        <div id="ow-body" style="padding:16px;"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div>&#x1F912;</div><h2>Absence &amp; staffing</h2></div>
+        <div id="vz-body" style="padding:16px;"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div>&#x1F69B;</div><h2>Quay capacity (rePort)</h2></div>
+        <div id="tolynx-kade-body" style="padding:16px;"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div>&#x1F4F8;</div><h2>Saved monthly overviews</h2></div>
+        <div id="kpi-snapshots-lijst" style="padding:16px;"></div>
+      </div>
+    </div>
+  </main>
+  <footer class="mt-foot">Read-only view &mdash; changes are made in Dienst Journaal itself. Refreshes automatically every 60 seconds.</footer>
+</div>
+
+<script>
+// KPI-MT wordt gedeeld met het MT in heel Europa: altijd volledig Engels.
+var MT_ENGELS = true;
+
+// ══════════════════════════════════════════════════════════════════
+// Verwarde opslag voor het MT-wachtwoord (zelfde techniek als het
+// beheerpaneel in de hoofdapp, maar bewust een HELEMAAL LOS wachtwoord —
+// dit dashboard deelt geen wachtwoorden met Dienst Journaal zelf).
+// ══════════════════════════════════════════════════════════════════
+function mtObf(t){ try { return btoa(unescape(encodeURIComponent(t))).split('').reverse().join(''); } catch(e){ return ''; } }
+function mtDeobf(v){ try { return decodeURIComponent(escape(atob(v.split('').reverse().join('')))); } catch(e){ return ''; } }
+var MT_WW_STANDAARD = ''; // wachtwoord-login is uitgeschakeld (alleen Microsoft-login); geen standaardwachtwoord meer in de code
+// Gedeelde opslagsleutel met het Wachtwoordbeheer-paneel in de hoofdapp (index.html), zodat dit
+// wachtwoord daar ook beheerd kan worden. "kpi_mt_ww_v1" is de oude, aparte sleutel van vóór die
+// koppeling — als iemand het wachtwoord destijds al via het tandwiel hier had gewijzigd, wordt
+// die waarde hieronder nog als fallback gelezen (en meteen naar de nieuwe sleutel gemigreerd),
+// zodat niemand per ongeluk buitengesloten raakt.
+function mtWwGet(){
+  var nieuw = localStorage.getItem('dj_ww_kpi_mt');
+  if (nieuw) return mtDeobf(nieuw);
+  var oud = localStorage.getItem('kpi_mt_ww_v1');
+  if (oud) { localStorage.setItem('dj_ww_kpi_mt', oud); return mtDeobf(oud); }
+  return mtDeobf(MT_WW_STANDAARD);
+}
+function mtWwSet(w){ localStorage.setItem('dj_ww_kpi_mt', mtObf(w)); mtWwCloudPush(); }
+// Wachtwoorden delen hetzelfde SharePoint-bestand ("wachtwoorden.json") als in de hoofdapp
+// (index.html), zodat een wachtwoordwijziging hier of daar altijd overal doorwerkt.
+
+// ══════════════════════════════════════════════════════════════════
+// SharePoint/Entra ID fundament (vervangt Supabase) — zelfde opzet als index.html
+// ══════════════════════════════════════════════════════════════════
+var SP_CLIENT_ID = '620757bf-f871-4a8b-a267-8442506f5314';
+var SP_TENANT_ID = '5d0501ba-8bc1-464e-b3ad-9e2c8779c55c';
+var SP_REDIRECT_URI = location.origin + location.pathname.replace(/[^\/]*$/, '');
+var SP_SITE_HOSTNAME = 'stena.sharepoint.com';
+var SP_SITE_PATH = '/sites/DienstJournaal';
+var SP_SCOPES = ['Sites.ReadWrite.All'];
+var SP_MSAL_CDNS = [
+  'https://cdnjs.cloudflare.com/ajax/libs/msal-browser/3.7.1/msal-browser.min.js',
+  'https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.7.1/lib/msal-browser.min.js',
+  'https://alcdn.msauth.net/browser/3.7.1/js/msal-browser.min.js'
+];
+var _spMsalInstance = null;
+var _spSiteId = null;
+var _spInitPromise = null;
+function _spLaadScriptMetFallback(idx){
+  return new Promise(function(resolve, reject){
+    if (idx >= SP_MSAL_CDNS.length) { reject(new Error('Could not load the sign-in library (MSAL) from any source.')); return; }
+    var script = document.createElement('script');
+    script.src = SP_MSAL_CDNS[idx];
+    script.onload = function(){ resolve(); };
+    script.onerror = function(){ _spLaadScriptMetFallback(idx + 1).then(resolve).catch(reject); };
+    document.head.appendChild(script);
+  });
+}
+async function _spMaakInstance(){
+  _spMsalInstance = new msal.PublicClientApplication({
+    auth: { clientId: SP_CLIENT_ID, authority: 'https://login.microsoftonline.com/' + SP_TENANT_ID, redirectUri: SP_REDIRECT_URI },
+    cache: { cacheLocation: 'localStorage' }
+  });
+  await _spMsalInstance.initialize();
+  return _spMsalInstance;
+}
+function spInit(){
+  if (_spInitPromise) return _spInitPromise;
+  _spInitPromise = (typeof msal !== 'undefined' ? Promise.resolve() : _spLaadScriptMetFallback(0))
+    .then(function(){ return _spMaakInstance(); })
+    .catch(function(e){ _spInitPromise = null; throw e; });
+  return _spInitPromise;
+}
+async function spLogin(){
+  await spInit();
+  var _req = { scopes: SP_SCOPES };
+  if (typeof appGedeeldePc === 'function' && appGedeeldePc()) _req.prompt = 'login'; // altijd wachtwoord vragen
+  var result = await _spMsalInstance.loginPopup(_req);
+  localStorage.setItem('dj_sp_account_username', result.account.username);
+  return result.account;
+}
+async function spGetToken(){
+  await spInit();
+  var accounts = _spMsalInstance.getAllAccounts();
+  var voorkeurUsername = localStorage.getItem('dj_sp_account_username');
+  var account = null;
+  if (accounts.length) {
+    account = voorkeurUsername ? accounts.find(function(a){ return a.username === voorkeurUsername; }) : null;
+    if (!account) account = accounts[0];
+  }
+  if (!account) { account = await spLogin(); }
+  localStorage.setItem('dj_sp_account_username', account.username);
+  try {
+    var result = await _spMsalInstance.acquireTokenSilent({ scopes: SP_SCOPES, account: account });
+    return result.accessToken;
+  } catch (e) {
+    var result2 = await _spMsalInstance.acquireTokenPopup({ scopes: SP_SCOPES });
+    localStorage.setItem('dj_sp_account_username', result2.account.username);
+    return result2.accessToken;
+  }
+}
+function spIngelogd(){
+  if (!_spMsalInstance) return false;
+  return _spMsalInstance.getAllAccounts().length > 0;
+}
+async function spIngelogdAsync(){
+  try { await spInit(); } catch(e) { return false; }
+  return spIngelogd();
+}
+async function spGetSiteId(){
+  if (_spSiteId) return _spSiteId;
+  var token = await spGetToken();
+  var resp = await fetch('https://graph.microsoft.com/v1.0/sites/' + SP_SITE_HOSTNAME + ':' + SP_SITE_PATH, { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!resp.ok) throw new Error('Could not find the SharePoint site (status ' + resp.status + ')');
+  var data = await resp.json();
+  _spSiteId = data.id;
+  return _spSiteId;
+}
+async function spVerifieerToegang(){
+  var token = await spGetToken();
+  var siteId = await spGetSiteId();
+  var resp = await fetch('https://graph.microsoft.com/v1.0/sites/' + siteId + '/drive/root:/Data', { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!resp.ok) throw new Error('No access to the "Data" folder on SharePoint (status ' + resp.status + ')');
+  return true;
+}
+async function spOpslaanBestand(bestandsnaam, dataObj){
+  var token = await spGetToken();
+  var siteId = await spGetSiteId();
+  var url = 'https://graph.microsoft.com/v1.0/sites/' + siteId + '/drive/root:/Data/' + String(bestandsnaam).split('/').map(encodeURIComponent).join('/') + ':/content';
+  var resp = await fetch(url, { method: 'PUT', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify(dataObj) });
+  if (!resp.ok) throw new Error('Saving to SharePoint failed (status ' + resp.status + ')');
+  return true;
+}
+async function spOphalenBestand(bestandsnaam){
+  var token = await spGetToken();
+  var siteId = await spGetSiteId();
+  var url = 'https://graph.microsoft.com/v1.0/sites/' + siteId + '/drive/root:/Data/' + String(bestandsnaam).split('/').map(encodeURIComponent).join('/') + ':/content';
+  var resp = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token }, cache: 'no-store' });
+  if (resp.status === 404) return null;
+  if (!resp.ok) throw new Error('Loading from SharePoint failed (status ' + resp.status + ')');
+  return await resp.json();
+}
+// ══════════════════════════════════════════════════════════════════
+
+function mtWwCloudPush(){ /* wachtwoorden worden niet meer gebruikt (alleen Microsoft-login) */ }
+async function mtWwCloudPull(){ /* wachtwoorden worden niet meer gebruikt (alleen Microsoft-login) */ }
+
+// ── Toegangsbeheer (zelfde lijst als de hoofdapp, via toegang_accounts.json) ──
+var DJ_TOEGANG_STANDAARD = [
+  { email: 'sebastian.vander.meer@stenaline.com', permissies: { beheer: true, EP: true, HVH: true, IMM: true, kpi: true, materieel: true } }
+];
+function djToegangGet(){
+  try {
+    var lijst = JSON.parse(localStorage.getItem('dj_toegang_accounts') || 'null');
+    return (Array.isArray(lijst) && lijst.length) ? lijst : DJ_TOEGANG_STANDAARD.slice();
+  } catch(e) { return DJ_TOEGANG_STANDAARD.slice(); }
+}
+async function djToegangCloudPull(){
+  try {
+    // Toegangslijst staat sinds okt 2026 in Data/Beheer/ (alleen eigenaren mogen wijzigen); oude plek als terugval
+    var result = await spOphalenBestand('Beheer/toegang_accounts.json');
+    if (!result) result = await spOphalenBestand('toegang_accounts.json');
+    if (result && Array.isArray(result.data) && result.data.length) {
+      localStorage.setItem('dj_toegang_accounts', JSON.stringify(result.data));
+    }
+  } catch(e) { console.error('SharePoint ophalen toegang-accounts mislukt:', e); }
+}
+function djToegangHeeft(email, omgevingKey){
+  if (!email) return false;
+  var lijst = djToegangGet();
+  var entry = lijst.find(function(a){ return a.email.toLowerCase() === email.toLowerCase(); });
+  return !!(entry && entry.permissies && entry.permissies[omgevingKey]);
+}
+function mtToonWwBackup(){
+  var backup = document.getElementById('mt-ww-backup');
+  var link = document.getElementById('mt-ww-backup-link');
+  if (backup) backup.style.display = 'block';
+  if (link) link.style.display = 'none';
+  var ww = document.getElementById('mt-ww');
+  if (ww) ww.focus();
+}
+async function mtMsLoginKlik(){
+  var btn = document.getElementById('mtMsBtn');
+  var status = document.getElementById('mtMsStatus');
+  if (btn) btn.innerHTML = '&#8987; Signing in…';
+  if (status) { status.textContent = ''; status.style.color = 'rgba(255,255,255,0.55)'; }
+  try {
+    await spLogin();
+    if (status) status.textContent = 'Toegang controleren…';
+    try {
+      await spVerifieerToegang();
+    } catch (siteErr) {
+      if (status) { status.textContent = 'This account has no access to the SharePoint site.'; status.style.color = '#ff8080'; }
+      if (btn) btn.innerHTML = '&#x1F310; Sign in with Microsoft';
+      return;
+    }
+    try { await djToegangCloudPull(); } catch(e) {}
+    var accounts = _spMsalInstance.getAllAccounts();
+    var voorkeurUsername = localStorage.getItem('dj_sp_account_username');
+    var actief = (voorkeurUsername && accounts.find(function(a){ return a.username === voorkeurUsername; })) || accounts[0];
+    var huidigEmail = actief ? actief.username : null;
+    if (!huidigEmail || !djToegangHeeft(huidigEmail, 'kpi')) {
+      if (status) { status.textContent = 'This account has no permission for the KPI Dashboard.'; status.style.color = '#ff8080'; }
+      if (btn) btn.innerHTML = '&#x1F310; Sign in with Microsoft';
+      return;
+    }
+    sessionStorage.setItem('kpi_mt_auth', '1');
+    document.getElementById('mt-login').style.display = 'none';
+    document.getElementById('mt-app').style.display = 'block';
+    mtInit();
+  } catch (e) {
+    console.error('Microsoft-login mislukt:', e);
+    var detail = (e && (e.errorMessage || e.message)) || 'unknown error';
+    if (status) { status.textContent = 'Sign-in failed: ' + detail; status.style.color = '#ff8080'; }
+    if (btn) btn.innerHTML = '&#x1F310; Sign in with Microsoft';
+  }
+}
+function mtLogin(){
+  // Wachtwoord-login uitgeschakeld: alleen nog met een Stena Microsoft-account met KPI-toegang.
+  var err = document.getElementById('mt-err');
+  if (err) { err.textContent = 'You can only sign in with your Stena Microsoft account.'; err.style.display = 'block'; }
+  return;
+  var ingevoerd = document.getElementById('mt-ww').value;
+  if (ingevoerd === mtWwGet()) {
+    sessionStorage.setItem('kpi_mt_auth', '1');
+    document.getElementById('mt-login').style.display = 'none';
+    document.getElementById('mt-app').style.display = 'block';
+    mtInit();
+  } else {
+    document.getElementById('mt-err').style.display = 'block';
+    document.getElementById('mt-ww').value = '';
+  }
+}
+function mtWachtwoordWijzigen(){
+  var huidig = prompt('Current password to confirm:');
+  if (huidig === null) return;
+  if (huidig !== mtWwGet()) { alert('Incorrect current password.'); return; }
+  var nieuw = prompt('New password:');
+  if (nieuw === null || !nieuw.trim()) return;
+  var nieuw2 = prompt('Repeat new password:');
+  if (nieuw !== nieuw2) { alert('The two passwords do not match. Nothing changed.'); return; }
+  mtWwSet(nieuw.trim());
+  alert('Password changed.');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// Databron: SharePoint (zelfde bestanden als de hoofdapp, hier alleen-lezen gebruikt)
+// ══════════════════════════════════════════════════════════════════
+// meteen bij laden de nieuwste wachtwoorden ophalen — maar alleen als er al een SharePoint-sessie is
+if (typeof spInit === 'function') {
+  spInit().then(function(){
+    if (spIngelogd()) mtWwCloudPull();
+  }).catch(function(){});
+}
+
+var mtTerminal = sessionStorage.getItem('kpi_mt_terminal') || 'EP';
+// Gesimuleerd "localStorage" gevuld vanuit de cloud-data van de gekozen terminal. De
+// KPI-renderfuncties (toegevoegd in latere fases) lezen via LS.getItem(...) in plaats van
+// het echte localStorage, zodat we altijd de data van de GESELECTEERDE terminal tonen, ook al
+// staat dit dashboard los van de hoofdapp (die zijn eigen, actieve terminal in sessionStorage
+// heeft staan).
+var CLOUD_DATA = {};
+var LS = {
+  getItem: function(key){
+    if (!(key in CLOUD_DATA)) return null;
+    var v = CLOUD_DATA[key];
+    return (typeof v === 'string') ? v : JSON.stringify(v);
+  },
+  setItem: function(){ /* alleen-lezen dashboard: bewust een no-op */ }
+};
+function mtTerminalPrefix(){ return mtTerminal + '_'; }
+function mtTk(key){ return mtTerminalPrefix() + key; }
+
+function mtTerminalNaam(t){
+  return t === 'HVH' ? 'Hoek van Holland' : (t === 'IMM' ? 'Immingham' : 'Europoort');
+}
+
+async function mtLaadTerminalData(terminal){
+  var content = document.getElementById('kpi-content');
+  content.style.opacity = '0.45';
+  document.getElementById('mt-laatst-bijgewerkt').textContent = 'Loading\u2026';
+  try {
+    if (!(await spIngelogdAsync())) {
+      document.getElementById('mt-laatst-bijgewerkt').textContent = 'Not signed in to SharePoint';
+      content.innerHTML = '<div id="kpi-placeholder">Please sign in with Microsoft first to load the KPI data.<br><button onclick="spLogin().then(function(){ mtLaadTerminalData(mtTerminal); }).catch(function(e){ alert(\'Sign-in failed: \' + e.message); })" style="margin-top:12px;padding:10px 20px;background:#0f6cbd;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;">🌐 Sign in with Microsoft</button></div>';
+      content.style.opacity = '1';
+      return;
+    }
+    var rowId = terminal + '_main';
+    var result = await spOphalenBestand(rowId + '.json');
+    CLOUD_DATA = (result && result.data) ? result.data : {};
+    var bijgewerkt = (result && result.updated_at) ? new Date(result.updated_at) : null;
+    document.getElementById('mt-laatst-bijgewerkt').textContent = bijgewerkt
+      ? ('Updated: ' + bijgewerkt.toLocaleDateString('en-GB') + ' ' + bijgewerkt.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'}))
+      : 'No data found';
+    if (typeof mtRenderKpi === 'function') {
+      mtRenderKpi();
+    } else {
+      content.innerHTML = '<div id="kpi-placeholder">Basis werkt. Cloud-data voor ' + mtTerminalNaam(terminal) + ' geladen (' + Object.keys(CLOUD_DATA).length + ' sleutels). De KPI-inhoud zelf volgt in de volgende fase.</div>';
+    }
+    content.style.opacity = '1';
+  } catch (e) {
+    content.style.opacity = '1';
+    document.getElementById('mt-laatst-bijgewerkt').textContent = 'Error while loading';
+    content.innerHTML = '<div id="kpi-placeholder" style="color:#c0392b;">Could not load data: ' + (e && e.message ? e.message : e) + '</div>';
+  }
+}
+
+function mtWisselTerminal(t){
+  mtTerminal = t;
+  sessionStorage.setItem('kpi_mt_terminal', t);
+  _mtTolynxIdx = null; // begin bij de meest recente tolynx-snapshot van de nieuwe terminal
+  document.querySelectorAll('#mt-terminal-switch button').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('data-terminal') === t);
+  });
+  document.getElementById('mt-terminal-naam').textContent = mtTerminalNaam(t);
+  mtLaadTerminalData(t);
+}
+
+function mtVerversNu(){ mtLaadTerminalData(mtTerminal); }
+// Klik op een regel bij "Dagen buiten de normen": opent die dag in Punctuality van de hoofdapp
+// (zelfde tabblad). De hoofdapp toont daar een "Terug naar KPI-MT"-knop die hier weer terugkomt.
+function mtNaarPunctualiteit(datumSlash){
+  var d = String(datumSlash || '').split('/');
+  if (d.length !== 3) return;
+  var iso = d[2] + '-' + d[1] + '-' + d[0]; // dd/mm/yyyy -> yyyy-mm-dd
+  location.href = 'index.html?van=kpi-mt&punctuality=' +
+    encodeURIComponent(iso) + '&terminal=' + encodeURIComponent(mtTerminal);
+}
+
+
+// ── Inklapbare kaarten: klik op de kop van een kaart om hem open/dicht te vouwen ──
+// Dagenoverzicht en Dagen buiten de normen staan standaard dicht. De keuze wordt per apparaat onthouden.
+function mtKaartenInklapbaar(){
+  var standaardDicht = ['Daily overview', 'Days outside the norms'];
+  var bewaard = {}; try { bewaard = JSON.parse(localStorage.getItem('kpi_mt_ingeklapt_v1') || '{}') || {}; } catch(e){}
+  Array.prototype.forEach.call(document.querySelectorAll('#kpi-content .card'), function(card){
+    var hdr = card.querySelector(':scope > .card-header') || card.firstElementChild; if (!hdr || hdr.getAttribute('data-inklap')) return;
+    hdr.classList.add('mt-kop');
+    var h2 = hdr.querySelector('h2'); var naam = h2 ? h2.textContent.replace(/\s+/g, ' ').trim() : ''; if (!naam) return;
+    naam = naam.replace(/\s*\d+\s*(regel|regels|row|rows)$/i, '');
+    hdr.setAttribute('data-inklap', naam);
+    hdr.style.cursor = 'pointer'; hdr.style.userSelect = 'none';
+    if (getComputedStyle(hdr).display !== 'flex') hdr.style.display = 'flex';
+    var pijl = document.createElement('span');
+    pijl.style.cssText = 'margin-left:auto;font-size:16px;color:var(--navy);transition:transform .2s;padding-left:10px;';
+    pijl.textContent = '▼';
+    hdr.appendChild(pijl);
+    var zet = function(dicht){
+      card.classList.toggle('mt-dicht', dicht);
+      pijl.style.transform = dicht ? 'rotate(-90deg)' : 'none';
+      hdr.style.borderBottom = dicht ? 'none' : '';
+      hdr.title = dicht ? 'Click to expand' : 'Click to collapse';
+    };
+    var dicht = (naam in bewaard) ? !!bewaard[naam] : standaardDicht.indexOf(naam) >= 0;
+    zet(dicht);
+    hdr.addEventListener('click', function(ev){
+      if (ev.target.closest('button')) return; // knoppen in de kop blijven gewoon werken
+      dicht = !dicht; zet(dicht);
+      bewaard[naam] = dicht; try { localStorage.setItem('kpi_mt_ingeklapt_v1', JSON.stringify(bewaard)); } catch(e){}
+    });
+  });
+}
+function mtInit(){
+  try { kpiOrden(document.getElementById('kpi-content')); } catch(e) {}
+  try { mtKaartenInklapbaar(); } catch(e) {}
+  mtWisselTerminal(mtTerminal);
+  // Automatisch verversen elke 60 seconden, zoals bij de materieel-garage-pagina.
+  setInterval(function(){ mtLaadTerminalData(mtTerminal); }, 60000);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// FASE 2 — kerncijfers. Geport vanuit renderKPI() in de hoofdapp; leest via de
+// LS-shim (gevuld met clouddata van de geselecteerde terminal) in plaats van
+// het echte localStorage, en gebruikt mtTerminal in plaats van de sessionStorage
+// van de hoofdapp.
+// ══════════════════════════════════════════════════════════════════
+var _kpiM = new Date().getMonth(), _kpiY = new Date().getFullYear();
+var mtToonLegeDagen = false; // lege dagen (alles op nul) staan standaard ingeklapt
+var _TC = ['Eerste lijn','Klep neer','Aanvang lossen','Schip leeg','Eerste eigen rijder','Laden compleet','Ramp op','Vertrek'];
+function mt_ML(){ return MT_ENGELS ? ['January','February','March','April','May','June','July','August','September','October','November','December'] : ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December']; }
+function mt_RT(){ return mtTerminal==='IMM' ? ['To Hoek van Holland','To Europoort'] : ['Harwich Ochtend','Harwich Middag','Immingham']; }
+// ── KPI-normen: "Schip leeg" is geen kloktijd maar een aantal minuten NA "Klep neer" (zelfde dag, zelfde route) ──
+var KPINORM = (function(){
+  var KOLOM = 3, KLEP = 1; // _TC[3] = 'Schip leeg', _TC[1] = 'Klep neer'
+  function t2m(t){ if (!t) return null; var p = String(t).split(':'); if (p.length !== 2) return null; var h = parseInt(p[0], 10), m = parseInt(p[1], 10); return (isNaN(h) || isNaN(m)) ? null : h * 60 + m; }
+  function isNaKlep(nv){ return !!nv && nv.naKlep !== undefined && nv.naKlep !== null && nv.naKlep !== '' && !isNaN(parseInt(nv.naKlep, 10)); }
+  function heeft(nv, ti){ if (ti === KOLOM) return isNaKlep(nv); return !!nv && (isNaKlep(nv) || !!nv.tijd); }
+  function marge(nv){ return nv && nv.marge ? parseInt(nv.marge, 10) || 0 : 0; }
+  function tekst(nv, en){ if (isNaKlep(nv)) return (en ? 'ramp +' : 'klep +') + parseInt(nv.naKlep, 10) + 'm'; return nv && nv.tijd ? nv.tijd : ''; }
+  function duur(rij, ti){ var k = t2m(((rij && rij.tijden) || [])[KLEP]), t = t2m(((rij && rij.tijden) || [])[ti]); if (k === null || t === null) return null; var d = t - k; if (d < 0) d += 1440; return d; }
+  // Eén meting toetsen. Geeft { afw, marge, extra } of null (geen norm / niet te bepalen).
+  function check(nv, rij, ti, t){
+    if (!heeft(nv, ti)) return null;
+    if (isNaKlep(nv)) { var d = duur(rij, ti); if (d === null) return null; var n = parseInt(nv.naKlep, 10); return { afw: d - n, marge: marge(nv), extra: ' (' + d + ' min)' }; }
+    var nm = t2m(nv.tijd), tm = t2m(t); if (nm === null || tm === null) return null;
+    return { afw: tm - nm, marge: marge(nv), extra: '' };
+  }
+  // Gemiddelde van een maand toetsen (tabel "Gemiddelde Vaarschema Tijden").
+  function gem(nv, entries, ri, ti, gemMin){
+    if (!heeft(nv, ti)) return null;
+    if (isNaKlep(nv)) {
+      var ds = []; (entries || []).forEach(function(e){ var d = duur((e.tijden || [])[ri], ti); if (d !== null) ds.push(d); });
+      if (!ds.length) return null;
+      var g = ds.reduce(function(s, x){ return s + x; }, 0) / ds.length;
+      return { afw: g - parseInt(nv.naKlep, 10), marge: marge(nv), duur: g };
+    }
+    var nm = t2m(nv.tijd); if (nm === null) return null;
+    return { afw: gemMin - nm, marge: marge(nv) };
+  }
+  return { KOLOM: KOLOM, heeft: heeft, isNaKlep: isNaKlep, tekst: tekst, check: check, gem: gem };
+})();
+if (typeof window !== 'undefined') window.KPINORM = KPINORM;
+
+// ── Punctualiteit per meetpunt: kaarten gegroepeerd in blokken per afvaart ──
+function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
+  var volgorde = routes.slice();
+  // Europoort: in de volgorde van de dag — Harwich ochtend, Immingham, Harwich middag
+  if (volgorde.indexOf('Harwich Ochtend') >= 0 && volgorde.indexOf('Immingham') >= 0 && volgorde.indexOf('Harwich Middag') >= 0)
+    volgorde = ['Harwich Ochtend', 'Immingham', 'Harwich Middag'];
+  var blok = function(titel, sub, inhoud, rand){
+    return '<div style="margin-bottom:18px;">' +
+      '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;background:#e8f0fb;border-left:5px solid ' + (rand || '#003366') + ';padding:8px 12px;border-radius:6px;margin-bottom:10px;">' +
+      '<span style="font-size:14px;font-weight:800;color:#003366;letter-spacing:.3px;">' + titel + '</span>' +
+      (sub ? '<span style="font-size:11.5px;color:#5a7090;font-weight:600;">' + sub + '</span>' : '') + '</div>' +
+      '<div style="' + rijStijl + '">' + inhoud + '</div></div>';
+  };
+  var html = volgorde.map(function(route){
+    var eigen = colStats.filter(function(s){ return s.route === route && s.bin + s.buit > 0; });
+    if (!eigen.length) return '';
+    var ok = eigen.filter(function(s){ var ing = s.bin + s.buit; return !s.hasN || (ing > 0 && s.bin / ing * 100 >= 80); }).length;
+    var sub = eigen.length + (en ? ' measuring points' : ' meetpunten') + ' · ' + ok + (en ? ' KPI OK' : ' KPI OK') + (ok < eigen.length ? ' · ' + (eigen.length - ok) + (en ? ' need attention' : ' aandacht') : '');
+    return blok('&#x26F4;&#xFE0F; ' + route, sub, eigen.map(kaart).join(''), ok < eigen.length ? '#c0392b' : '#1a7a40');
+  }).join('');
+  // Routes die (nog) niet in de vaste volgorde staan
+  var rest = colStats.filter(function(s){ return volgorde.indexOf(s.route) < 0 && s.bin + s.buit > 0; });
+  if (rest.length) html += blok(en ? 'Other' : 'Overig', '', rest.map(kaart).join(''));
+  if (tolynxHtml) html += blok('&#x1F69B; ' + (en ? 'Quay capacity' : 'Kade capaciteit'), '', tolynxHtml);
+  return html;
+}
+
+function mt_t2m(t){ if(!t) return null; var p=t.split(':'); if(p.length!==2) return null; return parseInt(p[0])*60+parseInt(p[1]); }
+function mt_m2t(m){ if(m===null||isNaN(m)) return '\u2014'; return String(Math.floor(m/60)%24).padStart(2,'0')+':'+String(Math.round(m%60)).padStart(2,'0'); }
+function mtGetKpiNormen(){ try{ var s=JSON.parse(LS.getItem('kpi_normen_v1')); if(s) return s; }catch(e){} return {}; }
+function mtGetStdBezetting(){ try{ return JSON.parse(LS.getItem(mtTk('std_bezetting_v1')) || LS.getItem('std_bezetting_v1') || '{}'); }catch(e){ return {}; } }
+function mt_vsGet(){ try{ return JSON.parse(LS.getItem(mtTk('vs_data_v1'))||'{}'); }catch(e){ return {}; } }
+
+function mtToggleLegeDagen(){
+  mtToonLegeDagen = !mtToonLegeDagen;
+  mtRenderKpi();
+}
+function mtKpiStapMaand(d){
+  _kpiM += d;
+  if (_kpiM > 11) { _kpiM = 0; _kpiY++; }
+  if (_kpiM < 0) { _kpiM = 11; _kpiY--; }
+  mtRenderKpi();
+}
+
+function mtRenderKpi(){
+  try { kpiOrden(document.getElementById('kpi-content')); } catch(e) {}
+  mtRenderTolynxKade();
+  try { owMtRender(); } catch(e) {}
+  try { vzMtRender(); } catch(e) {}
+  try { scMtRender(); } catch(e) {}
+  try { mtSnapRender(); } catch(e) {}
+  var _ML = mt_ML(), _RT = mt_RT();
+  var isImm = MT_ENGELS; // KPI-MT is altijd volledig Engels (gedeeld met het MT in heel Europa)
+  var lbl = document.getElementById('kpi-maand-label');
+  if (lbl) lbl.textContent = _ML[_kpiM] + ' ' + _kpiY;
+
+  var all = mt_vsGet();
+  var entries = Object.values(all).filter(function(e){
+    if (!e.datum) return false;
+    var p = e.datum.split('/');
+    return p.length === 3 && parseInt(p[1]) === _kpiM+1 && parseInt(p[2]) === _kpiY;
+  });
+  var dl = document.getElementById('kpi-dagen-label');
+  if (dl) dl.textContent = isImm ? (entries.length+' day'+(entries.length!==1?'s':'')+' with data') : (entries.length+' dag'+(entries.length!==1?'en':'')+' met data');
+
+  // KPI-kaarten
+  var totL=0, totLd=0, totT=0, fields=['trailers','eigen','containers','trade'];
+  entries.forEach(function(e){
+    fields.forEach(function(f){ [1,2,3].forEach(function(n){ totL += parseInt((e.units||{})['in-'+f+'-'+n]||0); totLd += parseInt((e.units||{})['out-'+f+'-'+n]||0); }); });
+    _RT.forEach(function(r,ri){ ((e.tijden||[])[ri]||{tijden:[]}).tijden.forEach(function(t){ if(t) totT++; }); });
+  });
+  var cards = document.getElementById('kpi-cards');
+  if (cards) cards.innerHTML = (isImm
+    ? [{l:'Days with data',v:entries.length,i:'&#x1F4C5;',c:'#003366'},{l:'Total unloaded',v:totL,i:'&#x2B07;&#xFE0F;',c:'#1a5c9a'},{l:'Total loaded',v:totLd,i:'&#x2B06;&#xFE0F;',c:'#1a7a40'},{l:'Times filled in',v:totT,i:'&#x1F550;',c:'#8b4513'}]
+    : [{l:'Dagen met data',v:entries.length,i:'&#x1F4C5;',c:'#003366'},{l:'Totaal gelost',v:totL,i:'&#x2B07;&#xFE0F;',c:'#1a5c9a'},{l:'Totaal geladen',v:totLd,i:'&#x2B06;&#xFE0F;',c:'#1a7a40'},{l:'Tijden ingevuld',v:totT,i:'&#x1F550;',c:'#8b4513'}]
+  ).map(function(k){ return '<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:20px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:28px;margin-bottom:6px;">'+k.i+'</div><div style="font-size:32px;font-weight:700;color:'+k.c+';">'+k.v+'</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:4px;">'+k.l+'</div></div>'; }).join('');
+
+  // === PERSONEELSBEZETTING ===
+  var pBody = document.getElementById('kpi-personeel-body');
+  var dagRows = [];
+  if (pBody) {
+    var _allDagSources = {};
+    var _pfxDag = mtTerminalPrefix() + 'dagplan_';
+    Object.keys(CLOUD_DATA).forEach(function(_sk){
+      if (!_sk.startsWith(_pfxDag)) return;
+      var _sv = CLOUD_DATA[_sk];
+      if (_sv) _allDagSources[_sk.replace(_pfxDag,'')] = _sv;
+    });
+    try {
+      var _st = JSON.parse(LS.getItem(mtTk('dagPlanning_v2_state'))||'null');
+      if (_st && _st.planDate && ((_st.ochEmps&&_st.ochEmps.length>0) || (_st.avondEmps&&_st.avondEmps.length>0))) {
+        var _ex = _allDagSources[_st.planDate];
+        var _exOch = (_ex&&_ex.ochEmps&&_ex.ochEmps.length) || 0;
+        var _stOch = (_st.ochEmps&&_st.ochEmps.length) || 0;
+        if (!_ex || _exOch === 0 || _stOch > _exOch) {
+          _allDagSources[_st.planDate] = { allEmps:_st.allEmps||[], ochEmps:_st.ochEmps||[], avondEmps:_st.avondEmps||[], pos:_st.pos||{}, texts:_st.texts||{} };
+        }
+      }
+    } catch(e) {}
+
+    var _dagSourceKeys = Object.keys(_allDagSources).map(function(dt){ return 'dagplan_'+dt; });
+    for (var i = 0; i < _dagSourceKeys.length; i++) {
+      var key = _dagSourceKeys[i];
+      var dateStr = key.replace('dagplan_', '');
+      var parts = dateStr.split('-');
+      if (parts.length !== 3) continue;
+      if (parseInt(parts[1]) !== _kpiM+1 || parseInt(parts[0]) !== _kpiY) continue;
+      try {
+        var dp = _allDagSources[dateStr];
+        if (!dp) continue;
+        var oeAll = dp.ochEmps || [], aeAll = dp.avondEmps || [], dpPos = dp.pos || {};
+        var selOch2 = new Set(), selAvond2 = new Set();
+        Object.keys(dpPos).forEach(function(k){ var v=dpPos[k]; if(!v) return; if(k.startsWith('a_')||k.startsWith('av_')) selAvond2.add(v); else selOch2.add(v); });
+        var oe = oeAll.filter(function(e){ return selOch2.has(e.name); });
+        var ae = aeAll.filter(function(e){ return selAvond2.has(e.name); });
+        var _isEx = function(e){ return (e.type||'').toUpperCase().includes('EX'); };
+        var exO = oe.filter(_isEx).length, exA = ae.filter(_isEx).length;
+        var inhO = oe.filter(function(e){ return !_isEx(e) && (e.type||'').toLowerCase().includes('inhuur'); }).length;
+        var stO  = oe.filter(function(e){ return !_isEx(e) && ((e.section||'').toLowerCase().includes('stage')||(e.type||'').toLowerCase().includes('stage')); }).length;
+        var inhA = ae.filter(function(e){ return !_isEx(e) && (e.type||'').toLowerCase().includes('inhuur'); }).length;
+        var stA  = ae.filter(function(e){ return !_isEx(e) && ((e.section||'').toLowerCase().includes('stage')||(e.type||'').toLowerCase().includes('stage')); }).length;
+        var hO = oe.reduce(function(s,e){ return s+(e.uren||0); },0);
+        var hA = ae.reduce(function(s,e){ return s+(e.uren||0); },0);
+        var fteO = oe.length - exO - inhO - stO;
+        var fteA = ae.length - exA - inhA - stA;
+        dagRows.push({ datum:dateStr, fteO:fteO, inhO:inhO, stO:stO, exO:exO||0, fteA:fteA, inhA:inhA, stA:stA, exA:exA||0, uren:(hO+hA).toFixed(1) });
+      } catch(e) {}
+    }
+
+    if (!dagRows.length) {
+      pBody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:20px;color:var(--muted);">' + (isImm ? 'No staffing data for this month' : 'Geen personeelsdata voor deze maand') + '</td></tr>';
+      var _tgBtn0 = document.getElementById('kpi-personeel-toggle'); if (_tgBtn0) _tgBtn0.style.display = 'none';
+    } else {
+      dagRows.sort(function(a,b){ return a.datum.localeCompare(b.datum); });
+      var _isLeg = function(r){ return !(r.fteO||r.inhO||r.stO||r.exO||r.fteA||r.inhA||r.stA||r.exA||parseFloat(r.uren)); };
+      var _legeAantal = dagRows.filter(_isLeg).length;
+      var _tgBtn = document.getElementById('kpi-personeel-toggle');
+      if (_tgBtn) {
+        if (_legeAantal === 0) { _tgBtn.style.display = 'none'; }
+        else {
+          _tgBtn.style.display = 'inline-block';
+          _tgBtn.textContent = mtToonLegeDagen
+            ? (isImm ? 'Hide '+_legeAantal+' empty day'+(_legeAantal===1?'':'s') : _legeAantal+' lege dag'+(_legeAantal===1?'':'en')+' verbergen')
+            : (isImm ? 'Show '+_legeAantal+' empty day'+(_legeAantal===1?'':'s') : _legeAantal+' lege dag'+(_legeAantal===1?'':'en')+' tonen');
+        }
+      }
+      var dagRowsZichtbaar = mtToonLegeDagen ? dagRows : dagRows.filter(function(r){ return !_isLeg(r); });
+      pBody.innerHTML = dagRowsZichtbaar.map(function(r, i) {
+        var bg = i%2===0 ? 'var(--surface)' : 'var(--surface2)';
+        var d = r.datum.split('-'); var datumFmt = d[2]+'-'+d[1]+'-'+d[0];
+        var _sb = mtGetStdBezetting();
+        var _dn = ['Zo','Ma','Di','Wo','Do','Vr','Za']; // getDay(): 0 = zondag
+        var _std = _sb[_dn[new Date(r.datum).getDay()]] || {};
+        var _sO = _std.och_totaal||0, _sA = _std.av_totaal||0;
+        var _tO = r.fteO+r.inhO+r.stO+(r.exO||0), _tA = r.fteA+r.inhA+r.stA+(r.exA||0);
+        var _cO = _sO>0 ? (_tO>=_sO?'color:#1a7a40;font-weight:700;':'color:#c0392b;font-weight:700;') : 'color:#aaa;';
+        var _cA = _sA>0 ? (_tA>=_sA?'color:#1a7a40;font-weight:700;':'color:#c0392b;font-weight:700;') : 'color:#aaa;';
+        return '<tr style="background:'+bg+'"><td style="padding:7px 10px;border:1px solid var(--border);font-weight:600;color:var(--navy);">'+datumFmt+'</td>'+
+          '<td style="text-align:center;padding:7px;border:1px solid var(--border);'+_cO+'">'+(_sO||'&#x2014;')+'</td>'+
+          '<td style="text-align:center;padding:7px;border:1px solid var(--border);'+_cA+'">'+(_sA||'&#x2014;')+'</td>'+
+          '<td style="text-align:center;padding:7px;border:1px solid var(--border);color:#4a8ed6;font-weight:700;">'+r.fteO+'</td>'+
+          '<td style="text-align:center;padding:7px;border:1px solid var(--border);color:#b8960a;font-weight:600;">'+r.inhO+'</td>'+
+          '<td style="text-align:center;padding:7px;border:1px solid var(--border);color:#5a9a2a;font-weight:600;">'+r.stO+'</td>'+
+          '<td style="text-align:center;padding:7px;border:1px solid var(--border);color:#e08030;font-weight:700;">'+r.fteA+'</td>'+
+          '<td style="text-align:center;padding:7px;border:1px solid var(--border);color:#c06010;font-weight:600;">'+r.inhA+'</td>'+
+          '<td style="text-align:center;padding:7px;border:1px solid var(--border);color:#5a9a2a;font-weight:600;">'+r.stA+'</td>'+
+          '<td style="text-align:center;padding:7px;border:1px solid var(--border);color:#a855f7;font-weight:600;">'+(r.exO||0)+'</td>'+
+          '<td style="text-align:center;padding:7px;border:1px solid var(--border);color:#9333ea;font-weight:600;">'+(r.exA||0)+'</td>'+
+          '<td style="text-align:center;padding:7px;border:1px solid var(--border);color:var(--navy);">'+r.uren+'</td></tr>';
+      }).join('');
+    }
+  }
+
+  // === CIRKELDIAGRAM MAANDOVERZICHT ===
+  (function() {
+    var totFteO=0, totInhO=0, totStO=0, totExO=0;
+    var totFteA=0, totInhA=0, totStA=0, totExA=0;
+    dagRows.forEach(function(r) {
+      totFteO += r.fteO||0; totInhO += r.inhO||0; totStO += r.stO||0; totExO += r.exO||0;
+      totFteA += r.fteA||0; totInhA += r.inhA||0; totStA += r.stA||0; totExA += r.exA||0;
+    });
+    var maandNaam = (_ML[_kpiM]||'') + ' ' + _kpiY;
+    var aantalDagen = dagRows.length;
+    var titel = document.getElementById('bez-chart-titel');
+    if (titel) titel.textContent = isImm ? ('Staff distribution ' + maandNaam + ' \u2014 ' + aantalDagen + ' day' + (aantalDagen!==1?'s':'') + ' filled in') : ('Personeelsverdeling ' + maandNaam + ' \u2014 ' + aantalDagen + ' dag' + (aantalDagen!==1?'en':'') + ' ingevuld');
+
+    function drawPie(canvasId, legendId, data) {
+      var canvas = document.getElementById(canvasId);
+      var legend = document.getElementById(legendId);
+      if (!canvas || !legend) return;
+      var ctx = canvas.getContext('2d');
+      var total = data.reduce(function(s,d){ return s+d.v; }, 0);
+      ctx.clearRect(0,0,200,200);
+      if (total === 0) {
+        ctx.fillStyle = '#e2e8f0'; ctx.beginPath(); ctx.arc(100,100,90,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#94a3b8'; ctx.font = '13px Arial'; ctx.textAlign = 'center';
+        ctx.fillText(isImm ? 'No data' : 'Geen data', 100, 105);
+        legend.innerHTML = ''; return;
+      }
+      var startAngle = -Math.PI/2;
+      data.forEach(function(d) {
+        if (d.v === 0) return;
+        var slice = (d.v / total) * Math.PI * 2;
+        ctx.beginPath(); ctx.moveTo(100,100); ctx.arc(100,100,90,startAngle,startAngle+slice); ctx.closePath();
+        ctx.fillStyle = d.c; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+        var midAngle = startAngle + slice/2;
+        var pct = Math.round(d.v/total*100);
+        if (pct >= 8) {
+          ctx.fillStyle = '#fff'; ctx.font = 'bold 13px Arial'; ctx.textAlign = 'center';
+          ctx.fillText(pct+'%', 100+Math.cos(midAngle)*55, 105+Math.sin(midAngle)*55);
+        }
+        startAngle += slice;
+      });
+      legend.innerHTML = data.filter(function(d){ return d.v>0; }).map(function(d) {
+        var pct = Math.round(d.v/total*100);
+        return '<div style="display:flex;align-items:center;gap:6px;margin:3px 0;"><span style="width:14px;height:14px;border-radius:3px;background:'+d.c+';display:inline-block;flex-shrink:0"></span><span style="color:#334155;"><b>'+d.label+':</b> '+d.v+' ('+pct+'%)</span></div>';
+      }).join('');
+    }
+
+    drawPie('pie-ochtend','legend-ochtend',[
+      {label:'PSO', v:totFteO, c:'#4a8ed6'},
+      {label:'Agency', v:totInhO, c:'#ffd700'},
+      {label:'Interns', v:totStO, c:'#90c36a'},
+      {label:'Overtime', v:totExO, c:'#a855f7'}
+    ]);
+    drawPie('pie-avond','legend-avond',[
+      {label:'PSO', v:totFteA, c:'#4a8ed6'},
+      {label:'Agency', v:totInhA, c:'#ffd700'},
+      {label:'Interns', v:totStA, c:'#90c36a'},
+      {label:'Overtime', v:totExA, c:'#a855f7'}
+    ]);
+  })();
+
+  // Tijden tabel
+  var tH = document.getElementById('kpi-tijden-hdr'), tB = document.getElementById('kpi-tijden-body');
+  var nm = mtGetKpiNormen();
+  if (tH && tB) {
+    tH.innerHTML = '<th style="background:var(--navy);color:#fff;padding:8px 10px;text-align:left;font-size:11px;">Route</th>' + _TC.map(function(h,hi){ var nv=nm[_RT[0]+'_'+hi]; var ns=KPINORM.heeft(nv,hi)?'<br><small style="color:#a8c4e8;font-weight:400;">'+KPINORM.tekst(nv,isImm)+(nv.marge?'&#177;'+nv.marge+'m':'')+'</small>':''; return '<th style="background:var(--navy);color:#fff;padding:8px 6px;font-size:10px;text-align:center;white-space:nowrap;">'+h+ns+'</th>'; }).join('');
+    tB.innerHTML = _RT.map(function(route,ri){
+      var sums=new Array(8).fill(0), cnts=new Array(8).fill(0);
+      entries.forEach(function(e){ var rij=(e.tijden||[])[ri]; if(!rij) return; (rij.tijden||[]).forEach(function(t,ti){ var m=mt_t2m(t); if(m!==null){ sums[ti]+=m; cnts[ti]++; } }); });
+      var bg = ri%2===0 ? 'var(--surface)' : 'var(--surface2)';
+      return '<tr><td style="padding:8px 10px;font-weight:600;color:var(--navy);background:var(--surface2);border:1px solid var(--border);white-space:nowrap;">'+route+'</td>'+sums.map(function(s,i){
+        var avg = cnts[i]>0 ? mt_m2t(s/cnts[i]) : '&#x2014;';
+        var sub = cnts[i]>0 ? '<br><small style="color:var(--muted);font-weight:400;">'+cnts[i]+(isImm?(cnts[i]===1?' day':' days'):(cnts[i]===1?' dag':' dagen'))+'</small>' : '';
+        var cb=bg, cc=cnts[i]>0?'var(--navy)':'var(--muted)', cbr='1px solid var(--border)';
+        if (cnts[i]>0) { var nv=nm[route+'_'+i]; var _ev=KPINORM.gem(nv,entries,ri,i,s/cnts[i]); if (_ev) { if (_ev.duur!==undefined) sub+='<br><small style="color:var(--muted);font-weight:400;">'+Math.round(_ev.duur)+' min</small>'; if (true) { if (_ev.afw<=_ev.marge) { cb='#d4f5e2'; cc='#1a7a40'; cbr='2px solid #1a7a40'; } else { cb='#fde8e8'; cc='#c0392b'; cbr='2px solid #c0392b'; } } } }
+        return '<td style="text-align:center;padding:7px 6px;border:'+cbr+';background:'+cb+';font-weight:'+(cnts[i]>0?'700':'400')+';color:'+cc+';">'+avg+sub+'</td>';
+      }).join('') + '</tr>';
+    }).join('');
+  }
+
+  // Units tabel (geladen/gelost per route)
+  var uH = document.getElementById('kpi-units-hdr'), uB = document.getElementById('kpi-units-body');
+  if (uH && uB) {
+    uH.innerHTML = '<th style="background:var(--navy);color:#fff;padding:8px 10px;text-align:left;font-size:11px;">Route</th>' + (isImm?['Trailers','Units with a driver','Containers','Trade']:['Trailers','Eigenrijder','Containers','Trade']).map(function(h){ return '<th style="background:#1a5c9a;color:#fff;padding:8px 8px;font-size:10px;text-align:center;">'+h+'<br><small>'+(isImm?'unloading':'lossen')+'</small></th>'; }).join('') + (isImm?['Trailers','Units with a driver','Containers','Trade']:['Trailers','Eigenrijder','Containers','Trade']).map(function(h){ return '<th style="background:#1a7a40;color:#fff;padding:8px 8px;font-size:10px;text-align:center;">'+h+'<br><small>'+(isImm?'loading':'laden')+'</small></th>'; }).join('') + '<th style="background:#444;color:#fff;padding:8px;font-size:10px;text-align:center;">'+(isImm?'Total<br><small>in</small>':'Tot<br><small>los</small>')+'</th><th style="background:#222;color:#fff;padding:8px;font-size:10px;text-align:center;">'+(isImm?'Total<br><small>out</small>':'Tot<br><small>lad</small>')+'</th>';
+    uB.innerHTML = _RT.map(function(route,ri){
+      var bg = ri%2===0?'var(--surface)':'var(--surface2)', iT=0, oT=0;
+      var iC = fields.map(function(f){ var s=entries.reduce(function(a,e){ return a+(parseInt((e.units||{})['in-'+f+'-'+(ri+1)])||0); },0); iT+=s; return s; });
+      var oC = fields.map(function(f){ var s=entries.reduce(function(a,e){ return a+(parseInt((e.units||{})['out-'+f+'-'+(ri+1)])||0); },0); oT+=s; return s; });
+      return '<tr><td style="padding:8px 10px;font-weight:600;color:var(--navy);background:var(--surface2);border:1px solid var(--border);white-space:nowrap;">'+route+'</td>'+iC.map(function(v){ return '<td style="text-align:center;padding:7px 8px;border:1px solid var(--border);background:'+bg+';color:#1a5c9a;font-weight:600;">'+(v||0)+'</td>'; }).join('')+oC.map(function(v){ return '<td style="text-align:center;padding:7px 8px;border:1px solid var(--border);background:'+bg+';color:#1a7a40;font-weight:600;">'+(v||0)+'</td>'; }).join('')+'<td style="text-align:center;padding:7px 8px;border:1px solid var(--border);background:'+bg+';font-weight:700;color:#1a5c9a;">'+iT+'</td><td style="text-align:center;padding:7px 8px;border:1px solid var(--border);background:'+bg+';font-weight:700;color:#1a7a40;">'+oT+'</td></tr>';
+    }).join('');
+  }
+
+  // Dagenoverzicht
+  var dB = document.getElementById('kpi-dag-body');
+  if (dB) {
+    if (!entries.length) { dB.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--muted);">'+(isImm?'No data for this month':'Geen data voor deze maand')+'</td></tr>'; }
+    else {
+      var sorted = entries.slice().sort(function(a,b){ return a.datum.split('/').reverse().join('-').localeCompare(b.datum.split('/').reverse().join('-')); });
+      dB.innerHTML = sorted.map(function(e,i){
+        var bg=i%2===0?'var(--surface)':'var(--surface2)', l=0, ld=0, t=0;
+        fields.forEach(function(f){ [1,2,3].forEach(function(n){ l+=parseInt((e.units||{})['in-'+f+'-'+n]||0); ld+=parseInt((e.units||{})['out-'+f+'-'+n]||0); }); });
+        _RT.forEach(function(r,ri){ ((e.tijden||[])[ri]||{tijden:[]}).tijden.forEach(function(v){ if(v) t++; }); });
+        return '<tr style="background:'+bg+';"><td style="padding:7px 10px;border:1px solid var(--border);font-weight:600;color:var(--navy);">'+e.datum+'</td><td style="text-align:center;padding:7px;border:1px solid var(--border);color:#1a5c9a;font-weight:600;">'+l+'</td><td style="text-align:center;padding:7px;border:1px solid var(--border);color:#1a7a40;font-weight:600;">'+ld+'</td><td style="text-align:center;padding:7px;border:1px solid var(--border);">'+t+'</td></tr>';
+      }).join('');
+    }
+  }
+
+  // Dagen buiten de normen
+  var nT = document.getElementById('kpi-normen-body-tbl'), nC = document.getElementById('kpi-normen-card');
+  if (nT && nC) {
+    var normen = mtGetKpiNormen(), bRows = [];
+    entries.forEach(function(e){ _RT.forEach(function(route,ri){ var rij=(e.tijden||[])[ri]; if(!rij) return; (rij.tijden||[]).forEach(function(t,ti){ if(!t) return; var _d=e.datum?e.datum.split('/'):[], _isWE=false; if(_d.length===3){ var _wd=new Date(parseInt(_d[2]),parseInt(_d[1])-1,parseInt(_d[0])); _isWE=_wd.getDay()===0||_wd.getDay()===6; } var _nk=route+'_'+ti+(_isWE&&KPINORM.heeft(normen[route+'_'+ti+'_we'],ti)?'_we':''); var nv=normen[_nk]; var _ev=KPINORM.check(nv,rij,ti,t); if(!_ev) return; var mg=_ev.marge, afw=_ev.afw; if(afw>mg) bRows.push({datum:e.datum, route:route, kolom:_TC[ti], werkelijk:t+_ev.extra, norm:KPINORM.tekst(nv,isImm), marge:mg, afwijking:afw, isWE:_isWE, opm:[(e.sjor&&(e.sjor.opm||e.sjor['opm']))||(e.units&&e.units['opmerking-lossing'])||(e.units&&e.units['opmerking-lading'])].filter(Boolean).join(' | ')}); }); }); });
+    if (!bRows.length) { nC.style.display = 'none'; }
+    else {
+      nC.style.display = 'block';
+      var _nb = document.getElementById('normen-count-badge');
+      if (_nb) _nb.textContent = isImm ? (bRows.length+' row'+(bRows.length===1?'':'s')) : (bRows.length+' regel'+(bRows.length===1?'':'s'));
+      nT.innerHTML = bRows.map(function(r,i){
+        var bg = r.isWE ? (i%2===0?'#fff3cd':'#ffeaa7') : (i%2===0?'#fff5f5':'#fde8e8');
+        var aw = (r.afwijking>0?'+':'')+r.afwijking+' min';
+        var weBadge = r.isWE ? '<span style="background:#e67e22;color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:5px;vertical-align:middle;">WE</span>' : '';
+        return '<tr onclick="mtNaarPunctualiteit(\''+r.datum+'\')" title="'+(isImm?'Click to open this day in Punctuality':'Klik om deze dag in Punctuality te openen')+'" style="background:'+bg+';cursor:pointer;" onmouseover="this.style.filter=\'brightness(0.95)\'" onmouseout="this.style.filter=\'\'"><td style="padding:7px 10px;border:1px solid #f5b7b1;font-weight:700;color:var(--navy);">'+r.datum+weBadge+'</td><td style="padding:7px 10px;border:1px solid #f5b7b1;">'+r.route+'</td><td style="padding:7px 10px;border:1px solid #f5b7b1;">'+r.kolom+'</td><td style="text-align:center;padding:7px 10px;border:1px solid #f5b7b1;font-weight:700;color:#c0392b;">'+r.werkelijk+'</td><td style="text-align:center;padding:7px 10px;border:1px solid #f5b7b1;color:#555;">'+r.norm+'&#177;'+r.marge+'m</td><td style="text-align:center;padding:7px 10px;border:1px solid #f5b7b1;font-weight:700;color:#c0392b;">'+aw+'</td><td style="padding:7px 10px;border:1px solid #f5b7b1;color:'+(r.opm?'var(--navy)':'#aaa')+';font-style:'+(r.opm?'normal':'italic')+';">'+(r.opm||'&#x2014;')+'</td></tr>';
+      }).join('');
+    }
+  }
+
+  // === PUNCTUALITEIT PER MEETPUNT (donut-grid) ===
+  (function(){
+    var cC = document.getElementById('kpi-chart-card'), cW = document.getElementById('kpi-charts-wrap');
+    if (!cC || !cW) return;
+    var normen2 = mtGetKpiNormen();
+    var colStats = [];
+    _TC.forEach(function(kolom, ci){
+      _RT.forEach(function(route, ri){
+        var bin=0, buit=0, gn=0, leeg=0, normT=null, normM=0, hasN=false;
+        var nv = normen2[route+'_'+ci];
+        if (KPINORM.heeft(nv,ci)) { normT = KPINORM.tekst(nv,isImm); normM = nv.marge?parseInt(nv.marge):0; hasN = true; }
+        entries.forEach(function(e){
+          var _d = e.datum?e.datum.split('/'):[], _isWE = false;
+          if (_d.length===3) { var _wd = new Date(parseInt(_d[2]), parseInt(_d[1])-1, parseInt(_d[0])); _isWE = _wd.getDay()===0||_wd.getDay()===6; }
+          var rij = (e.tijden||[])[ri];
+          if (!rij) { leeg++; return; }
+          var t = (rij.tijden||[])[ci];
+          if (!t) { leeg++; return; }
+          var tM = mt_t2m(t);
+          if (tM===null) { leeg++; return; }
+          // gebruik weekend-norm indien beschikbaar (en die daadwerkelijk een tijd heeft ingevuld —
+          // anders valt terug op de basisnorm, ook al bestaat er wel een leeg weekend-object)
+          var _nk = route+'_'+ci+(_isWE && normen2[route+'_'+ci+'_we'] ? '_we' : '');
+          var nv2 = KPINORM.heeft(normen2[_nk],ci) ? normen2[_nk] : normen2[route+'_'+ci];
+          var _ev2 = KPINORM.check(nv2, rij, ci, t);
+          if (!_ev2) { gn++; }
+          else { if (_ev2.afw <= _ev2.marge) bin++; else buit++; }
+        });
+        if (bin+buit+gn+leeg>0) colStats.push({kolom:kolom, route:route, bin:bin, buit:buit, gn:gn, leeg:leeg, normT:normT, normM:normM, hasN:hasN});
+      });
+    });
+    colStats = colStats.filter(function(s){ return s.hasN; });
+    var tolynxKaartHtml = mtTolynxMaandDonutKaartHtml();
+    if (!colStats.length && !tolynxKaartHtml) { cC.style.display = 'none'; return; }
+    cC.style.display = 'block';
+    cW.style.display = 'block';
+    var _pieKaart = function(s){
+      var tot = s.bin+s.buit; // alleen afvaarten die er echt waren: niet ingevulde tijden tellen niet mee
+      var ingevuld = s.bin+s.buit;
+      var pct = s.hasN ? (ingevuld>0 ? Math.round(s.bin/ingevuld*100) : 0) : null;
+      var ok = !s.hasN || pct>=80;
+      var kc = !s.hasN ? '#3498db' : pct>=80 ? '#1a7a40' : pct>=60 ? '#e67e22' : '#c0392b';
+      var segs = s.hasN
+        ? [s.bin>0?{l:(isImm?'On time':'Op tijd'),v:s.bin,c:'#27ae60'}:null,
+           s.buit>0?{l:(isImm?'Late':'Te laat'),v:s.buit,c:'#e74c3c'}:null,
+           ].filter(Boolean)
+        : [s.gn>0?{l:(isImm?'Filled in':'Ingevuld'),v:s.gn,c:'#3498db'}:null, s.leeg>0?{l:(isImm?'Not filled in':'Niet ingevuld'),v:s.leeg,c:'#cccccc'}:null].filter(Boolean);
+      var R=60,cx=100,cy=90,W=200,H=210,cum=-90,paths='',lbls='',totDeg=0;
+      segs.forEach(function(seg,si){
+        var sw = si===segs.length-1 ? (360-totDeg) : Math.round(seg.v/tot*3600)/10;
+        totDeg += sw;
+        var r1=cum*Math.PI/180, r2=(cum+sw)*Math.PI/180;
+        var x1=cx+R*Math.cos(r1), y1=cy+R*Math.sin(r1), x2=cx+R*Math.cos(r2), y2=cy+R*Math.sin(r2);
+        if (sw>=359.9) paths += '<circle cx="'+cx+'" cy="'+cy+'" r="'+R+'" fill="'+seg.c+'"/>';
+        else paths += '<path d="M'+cx+','+cy+' L'+x1.toFixed(1)+','+y1.toFixed(1)+' A'+R+','+R+' 0 '+(sw>180?1:0)+',1 '+x2.toFixed(1)+','+y2.toFixed(1)+' Z" fill="'+seg.c+'" stroke="#fff" stroke-width="2"/>';
+        var mr=(cum+sw/2)*Math.PI/180, lx=cx+(R+26)*Math.cos(mr), ly=cy+(R+26)*Math.sin(mr), anch=lx>cx?'start':'end', sp=Math.round(seg.v/tot*100);
+        lbls += '<line x1="'+(cx+R*Math.cos(mr)).toFixed(1)+'" y1="'+(cy+R*Math.sin(mr)).toFixed(1)+'" x2="'+(cx+(R+18)*Math.cos(mr)).toFixed(1)+'" y2="'+(cy+(R+18)*Math.sin(mr)).toFixed(1)+'" stroke="#666" stroke-width="1.2"/><text x="'+lx.toFixed(1)+'" y="'+(ly-4).toFixed(1)+'" text-anchor="'+anch+'" font-size="8" font-weight="700" fill="'+seg.c+'">'+sp+'%</text><text x="'+lx.toFixed(1)+'" y="'+(ly+7).toFixed(1)+'" text-anchor="'+anch+'" font-size="7" fill="#555">'+seg.l+'</text>';
+        cum += sw;
+      });
+      var cp = pct!==null ? pct+'%' : ingevuld+'x';
+      var cl = !s.hasN ? (isImm?'No norm':'Geen norm') : (ok ? '&#x2713; KPI OK' : (isImm?'&#x2717; ATTENTION':'&#x2717; AANDACHT'));
+      var donut = '<circle cx="'+cx+'" cy="'+cy+'" r="'+(R-24)+'" fill="#fff" stroke="#eee" stroke-width="1"/><text x="'+cx+'" y="'+(cy-7)+'" text-anchor="middle" font-size="15" font-weight="800" fill="'+kc+'">'+cp+'</text><text x="'+cx+'" y="'+(cy+8)+'" text-anchor="middle" font-size="8" font-weight="600" fill="'+kc+'">'+cl+'</text>';
+      var leg = segs.map(function(seg){ return '<span style="font-size:9px;color:'+seg.c+';font-weight:700;"><svg width="12" height="12" style="vertical-align:middle;margin-right:3px;"><circle cx="6" cy="6" r="5" fill="'+seg.c+'"/></svg>'+seg.l+' ('+seg.v+')</span>'; }).join(' &nbsp;');
+      return '<div style="background:#fff;border:2px solid '+(ok?'#1a7a40':'#c0392b')+';border-radius:10px;padding:8px 6px 8px;box-shadow:0 3px 12px rgba(0,0,0,0.1);display:flex;flex-direction:column;align-items:center;">'+
+        '<div style="font-size:10px;font-weight:700;color:#003366;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:1px;text-align:center;">'+s.kolom+'</div>'+
+        '<div style="font-size:9px;color:#888;font-weight:600;margin-bottom:2px;">'+s.route+'</div>'+
+        '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">'+paths+donut+lbls+'</svg>'+
+        '<div style="font-size:9px;color:#999;margin-top:1px;">'+(s.hasN?'norm '+s.normT+(s.normM?'&#177;'+s.normM+'m':'')+'  &#x2022;  ':'')+tot+(isImm?' data points':' meetpunten')+'</div>'+
+        '<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;justify-content:center;">'+leg+'</div></div>';
+    };
+    cW.innerHTML = kpiPieBlokken(colStats, _pieKaart, tolynxKaartHtml, _RT, isImm, 'display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;');
+  })();
+
+  setTimeout(function(){ mtRenderTruckChart(_kpiM, _kpiY); }, 200);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// FASE 3 — Truckproductiviteit. Geport vanuit renderTruckChart() in de
+// hoofdapp.
+// ══════════════════════════════════════════════════════════════════
+function mtRenderTruckChart(maand, jaar){
+  var ochCFKeys  = ['o_tr_cf_td1','o_tr_cf_td2','o_tr_cf_td3','o_tr_cf_md1','o_tr_cf_md2','o_tr_cf_md3','o_tr_cf_pit1','o_tr_cf_pit2','o_tr_cf_pit3'];
+  var ochALKeys  = ['o_tr_al_td1','o_tr_al_td2','o_tr_al_td3','o_tr_al_md1','o_tr_al_md2','o_tr_al_md3','o_tr_al_pit1','o_tr_al_pit2','o_tr_al_pit3'];
+  var ochIMMKeys = ['o_tr_imm_cf1a','o_tr_imm_cf1b','o_tr_imm_cf2a','o_tr_imm_cf2b','o_tr_imm_md1a','o_tr_imm_md1b','o_tr_imm_tw0a','o_tr_imm_tw0b','o_tr_imm_tw1a','o_tr_imm_tw1b','o_tr_imm_pit0a','o_tr_imm_pit0b','o_tr_imm_pit2a','o_tr_imm_pit2b','o_tr_imm_pit3a','o_tr_imm_pit3b'];
+  var avCFKeys   = ['a_tr_cf_td1','a_tr_cf_td2','a_tr_cf_td3','a_tr_cf_md1','a_tr_cf_md2','a_tr_cf_md3','a_tr_cf_pit1','a_tr_cf_pit2','a_tr_cf_pit3','a_tr_imm_cf1a','a_tr_imm_cf1b','a_tr_imm_cf2a','a_tr_imm_cf2b'];
+  var avALKeys   = ['a_tr_al_td1','a_tr_al_td2','a_tr_al_td3','a_tr_al_md1','a_tr_al_md2','a_tr_al_md3','a_tr_al_pit1','a_tr_al_pit2','a_tr_al_pit3'];
+  var avOthKeys  = ['a_tr_imm_md1a','a_tr_imm_md1b','a_tr_imm_tw1a','a_tr_imm_tw1b','a_tr_imm_pit0a','a_tr_imm_pit0b','a_tr_imm_pit1a','a_tr_imm_pit1b','a_tr_imm_pit2a','a_tr_imm_pit2b','a_tr_imm_pit3a','a_tr_imm_pit3b'];
+  var allOch = ochCFKeys.concat(ochALKeys).concat(ochIMMKeys);
+  var allAv  = avCFKeys.concat(avALKeys).concat(avOthKeys);
+  var isImm = MT_ENGELS; // KPI-MT is altijd volledig Engels (gedeeld met het MT in heel Europa)
+
+  function countUniq(keys, p) {
+    var seen = {}, n = 0;
+    for (var i=0;i<keys.length;i++){ var v=p[keys[i]]; if(v&&!seen[v]){ seen[v]=1; n++; } }
+    return n;
+  }
+
+  var nd  = document.getElementById('truckChartNoData');
+  var elOT = document.getElementById('kpi-och-trucks');
+  var elOC = document.getElementById('kpi-och-cf');
+  var elAT = document.getElementById('kpi-av-trucks');
+  var elAC = document.getElementById('kpi-av-cf');
+  var elSub= document.getElementById('truckChartSubtitle');
+  if (nd) nd.style.display = 'none';
+
+  var maandStr = String(maand+1).padStart(2,'0');
+  var prefix   = jaar+'-'+maandStr+'-';
+  var posPerDag = {};
+  var _pfxDag = mtTerminalPrefix() + 'dagplan_';
+
+  Object.keys(CLOUD_DATA).forEach(function(k){
+    // Bron 1: <terminal>_dagplan_YYYY-MM-DD
+    if (k.startsWith(_pfxDag)) {
+      var dt = k.slice(_pfxDag.length);
+      if (dt.startsWith(prefix)) {
+        try { var e = CLOUD_DATA[k]; if (e && e.pos) posPerDag[dt] = e.pos; } catch(ex) {}
+      }
+    }
+    // Bron 2: ls_TERMINAL_pos_YYYY-MM-DD_d0 (fallback als geen dagplan_), alleen van de
+    // HUIDIGE terminal — anders telt data van een andere terminal (die toevallig ook in deze
+    // cloud-rij is meegesynced) hier per ongeluk mee.
+    if (k.startsWith('ls_') && (k.indexOf('_pos_') !== -1)) {
+      var kStrip = k.slice(3);
+      if (kStrip.startsWith(mtTerminalPrefix())) kStrip = kStrip.slice(mtTerminalPrefix().length);
+      else return;
+      if (kStrip.startsWith('pos_')) {
+        var rest = kStrip.slice(4);
+        var dt2 = rest.indexOf('_d') > -1 ? rest.slice(0, rest.lastIndexOf('_d')) : rest;
+        if (dt2.startsWith(prefix) && !posPerDag[dt2]) {
+          try { var p2 = CLOUD_DATA[k]; if (p2 && typeof p2 === 'object') posPerDag[dt2] = p2; } catch(ex) {}
+        }
+      }
+    }
+  });
+
+  var datums = Object.keys(posPerDag);
+  if (!datums.length) {
+    if (nd) nd.style.display = 'block';
+    if (elOT) elOT.textContent = '\u2013'; if (elOC) elOC.textContent = '\u2013';
+    if (elAT) elAT.textContent = '\u2013'; if (elAC) elAC.textContent = '\u2013';
+    if (elSub) elSub.textContent = isImm ? 'no data for this month' : 'geen data voor deze maand';
+    return;
+  }
+
+  var days=0, totOchTrucks=0, totOchCF=0, totAvTrucks=0, totAvCF=0;
+  datums.forEach(function(dt){
+    var p = posPerDag[dt];
+    var ochT = new Set(allOch.map(function(k){ return p[k]; }).filter(Boolean)).size;
+    var avT  = new Set(allAv.map(function(k){ return p[k]; }).filter(Boolean)).size;
+    if (ochT===0 && avT===0) return;
+    days++;
+    totOchTrucks += ochT;
+    totOchCF     += countUniq(ochCFKeys, p);
+    totAvTrucks  += avT;
+    totAvCF      += countUniq(avCFKeys, p);
+  });
+
+  if (!days) {
+    if (nd) nd.style.display = 'block';
+    if (elSub) elSub.textContent = isImm ? 'no truck data for this month' : 'geen truckdata voor deze maand';
+    return;
+  }
+
+  function avg(n){ return Math.round(n/days*10)/10; }
+  if (elOT) elOT.textContent = avg(totOchTrucks);
+  if (elOC) elOC.textContent = avg(totOchCF);
+  if (elAT) elAT.textContent = avg(totAvTrucks);
+  if (elAC) elAC.textContent = avg(totAvCF);
+  if (elSub) elSub.textContent = isImm ? ('average over '+days+' day'+(days===1?'':'s')) : ('gemiddelde over '+days+' dag'+(days===1?'':'en'));
+}
+
+// ══════════════════════════════════════════════════════════════════
+// FASE 4 (vervolg) — Kade bezetting (rePort/tolynx). Geport vanuit
+// renderTolynxKade() en omgeving. Toont dezelfde cijfers en geschiedenis-
+// navigatie als de hoofdapp; de aangepaste icoontjes zijn vervangen door
+// tekstlabels om het bestand niet nodeloos groot te maken.
+// ══════════════════════════════════════════════════════════════════
+var TOLYNX_RIJ_LABELS = ['Total', 'Tractor unit', 'Driver', 'Trailer/Reachstacker', 'Tugmaster', 'Forklift'];
+var _mtTolynxIdx = null;
+function mtTolynxKadeKey(){ return mtTk('kpi_tolynx_kade_v1'); }
+function mtTolynxMaxKey(){ return mtTk('kpi_tolynx_max_v1'); }
+function mtGetTolynxKadeHistorie(){
+  try {
+    var d = JSON.parse(LS.getItem(mtTolynxKadeKey()) || 'null');
+    if (d && Array.isArray(d.historie)) return d.historie;
+    if (d && d.import && d.export) return [{ tijdstip: d.bijgewerkt || '(unknown time)', import: d.import, export: d.export }];
+  } catch(e) {}
+  return [];
+}
+function mtGetTolynxMax(){
+  try { var v = JSON.parse(LS.getItem(mtTolynxMaxKey()) || 'null'); if (typeof v === 'number' && v > 0) return v; } catch(e) {}
+  return null;
+}
+function mtOplEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function mtTolynxTabelHtml(titel, rijen){
+  var html = '<div style="flex:1;min-width:260px;"><div style="text-align:center;font-weight:700;color:var(--navy);margin-bottom:8px;">'+titel+'</div><table style="width:100%;border-collapse:collapse;font-size:12.5px;">';
+  rijen.forEach(function(rij, rIdx){
+    html += '<tr style="border-top:1px solid #eee;"><td style="padding:7px 8px;color:var(--muted);white-space:nowrap;">'+TOLYNX_RIJ_LABELS[rIdx]+'</td>'+
+      rij.map(function(v){ return '<td style="text-align:center;padding:7px 4px;font-weight:'+(rIdx===0?'800':'500')+';color:'+(rIdx===0?'var(--navy)':'#333')+';">'+v+'</td>'; }).join('') + '</tr>';
+  });
+  html += '</table></div>';
+  return html;
+}
+function mtTolynxTotaalHtml(snapshot){
+  var totaal = (snapshot.import[0][0] || 0) + (snapshot.export[0][0] || 0);
+  var max = mtGetTolynxMax();
+  var overschreden = max !== null && totaal > max;
+  var kleurBg = overschreden ? '#c0392b' : '#eef3fa';
+  var kleurTxt = overschreden ? '#fff' : 'var(--navy)';
+  var html = '<div style="display:flex;justify-content:center;margin-bottom:16px;"><div style="background:'+kleurBg+';border-radius:10px;padding:12px 28px;text-align:center;min-width:220px;'+(overschreden?'box-shadow:0 0 0 2px #c0392b;':'border:1px solid #ccd6e5;')+'">';
+  html += '<div style="font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:'+(overschreden?'#fdd':'var(--muted)')+';font-weight:700;">Total on quay</div>';
+  html += '<div style="font-size:32px;font-weight:800;color:'+kleurTxt+';line-height:1.2;">'+totaal+'</div>';
+  if (max !== null) html += '<div style="font-size:10.5px;color:'+(overschreden?'#fee':'var(--muted)')+';">'+(overschreden?'&#9888; above maximum of '+max:'max. '+max)+'</div>';
+  html += '</div></div>';
+  return html;
+}
+function mtRenderTolynxKade(){
+  var el = document.getElementById('tolynx-kade-body');
+  if (!el) return;
+  var historie = mtGetTolynxKadeHistorie();
+  if (!historie.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:13px;">No data entered for this terminal yet.</div>';
+    return;
+  }
+  if (_mtTolynxIdx === null || _mtTolynxIdx >= historie.length) _mtTolynxIdx = historie.length - 1;
+  var snapshot = historie[_mtTolynxIdx];
+  var isLaatste = _mtTolynxIdx === historie.length - 1;
+  var html = '<div style="display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:10px;">'+
+    '<button onclick="mtTolynxNavigeer(-1)" '+(_mtTolynxIdx===0?'disabled style="opacity:.3;"':'')+' style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:14px;">&#8592;</button>'+
+    '<div style="text-align:center;"><div style="font-weight:700;color:var(--navy);font-size:14px;">'+mtOplEsc(snapshot.tijdstip)+'</div>'+
+    '<div style="font-size:11px;color:var(--muted);">'+(_mtTolynxIdx+1)+' of '+historie.length+(isLaatste?' &middot; most recent':'')+'</div></div>'+
+    '<button onclick="mtTolynxNavigeer(1)" '+(isLaatste?'disabled style="opacity:.3;"':'')+' style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:14px;">&#8594;</button></div>';
+  html += mtTolynxTotaalHtml(snapshot);
+  html += '<div style="display:flex;gap:24px;flex-wrap:wrap;">'+mtTolynxTabelHtml('&#9664;&#9664; Import', snapshot.import)+mtTolynxTabelHtml('Export &#9654;&#9654;', snapshot.export)+'</div>';
+  if (!isLaatste) html += '<div style="margin-top:10px;text-align:center;"><button onclick="_mtTolynxIdx=null;mtRenderTolynxKade();" style="background:none;border:1px solid #ccd6e5;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:11.5px;color:var(--navy);">&#8635; Go to most recent</button></div>';
+  el.innerHTML = html;
+}
+function mtTolynxNavigeer(richting){
+  var historie = mtGetTolynxKadeHistorie();
+  if (_mtTolynxIdx === null) _mtTolynxIdx = historie.length - 1;
+  var nieuw = _mtTolynxIdx + richting;
+  if (nieuw < 0 || nieuw >= historie.length) return;
+  _mtTolynxIdx = nieuw;
+  mtRenderTolynxKade();
+}
+function mtTolynxMaandTijdstipMatch(tijdstip, maand, jaar){
+  var m = /^(\d{2})-(\d{2})-(\d{4})/.exec(tijdstip || '');
+  if (!m) return false;
+  return (parseInt(m[2], 10) - 1) === maand && parseInt(m[3], 10) === jaar;
+}
+function mtTolynxMaandDonutKaartHtml(){
+  var historie = mtGetTolynxKadeHistorie();
+  var max = mtGetTolynxMax();
+  var maandEntries = historie.filter(function(h){ return mtTolynxMaandTijdstipMatch(h.tijdstip, _kpiM, _kpiY); });
+  var tot = maandEntries.length;
+  var binnen = 0, boven = 0;
+  maandEntries.forEach(function(e){
+    var totaalKade = (e.import[0][0] || 0) + (e.export[0][0] || 0);
+    if (max !== null && totaalKade > max) boven++; else binnen++;
+  });
+  var isImm = MT_ENGELS; // KPI-MT is altijd volledig Engels (gedeeld met het MT in heel Europa)
+  var segs;
+  if (tot === 0) segs = [{ l: (isImm?'No data':'Geen data'), v: 1, c: '#e0e0e0' }];
+  else if (max !== null) segs = [binnen>0?{l:(isImm?'Within maximum':'Binnen maximum'),v:binnen,c:'#27ae60'}:null, boven>0?{l:(isImm?'Above maximum':'Boven maximum'),v:boven,c:'#c0392b'}:null].filter(Boolean);
+  else segs = [{ l: (isImm?'Entered':'Ingevoerd'), v: tot, c: '#3498db' }];
+
+  var R=60,cx=100,cy=90,W=200,H=210,cum=-90,paths='',lbls='',totDeg=0;
+  var som = segs.reduce(function(a,s){ return a+s.v; }, 0);
+  segs.forEach(function(seg,si){
+    var sw = si===segs.length-1 ? (360-totDeg) : Math.round(seg.v/som*3600)/10;
+    totDeg += sw;
+    var r1=cum*Math.PI/180, r2=(cum+sw)*Math.PI/180;
+    var x1=cx+R*Math.cos(r1), y1=cy+R*Math.sin(r1), x2=cx+R*Math.cos(r2), y2=cy+R*Math.sin(r2);
+    if (sw>=359.9) paths += '<circle cx="'+cx+'" cy="'+cy+'" r="'+R+'" fill="'+seg.c+'"/>';
+    else paths += '<path d="M'+cx+','+cy+' L'+x1.toFixed(1)+','+y1.toFixed(1)+' A'+R+','+R+' 0 '+(sw>180?1:0)+',1 '+x2.toFixed(1)+','+y2.toFixed(1)+' Z" fill="'+seg.c+'" stroke="#fff" stroke-width="2"/>';
+    if (tot>0) {
+      var mr=(cum+sw/2)*Math.PI/180, lx=cx+(R+26)*Math.cos(mr), ly=cy+(R+26)*Math.sin(mr), anch=lx>cx?'start':'end', sp=Math.round(seg.v/som*100);
+      lbls += '<line x1="'+(cx+R*Math.cos(mr)).toFixed(1)+'" y1="'+(cy+R*Math.sin(mr)).toFixed(1)+'" x2="'+(cx+(R+18)*Math.cos(mr)).toFixed(1)+'" y2="'+(cy+(R+18)*Math.sin(mr)).toFixed(1)+'" stroke="#666" stroke-width="1.2"/><text x="'+lx.toFixed(1)+'" y="'+(ly-4).toFixed(1)+'" text-anchor="'+anch+'" font-size="8" font-weight="700" fill="'+seg.c+'">'+sp+'%</text><text x="'+lx.toFixed(1)+'" y="'+(ly+7).toFixed(1)+'" text-anchor="'+anch+'" font-size="7" fill="#555">'+seg.l+'</text>';
+    }
+    cum += sw;
+  });
+  var pct = (max!==null && tot>0) ? Math.round(binnen/tot*100) : null;
+  var kc = tot===0 ? '#999' : (max===null ? '#3498db' : (boven===0 ? '#1a7a40' : (pct>=80?'#1a7a40':pct>=60?'#e67e22':'#c0392b')));
+  var cp = tot===0 ? '&#8211;' : (pct!==null ? pct+'%' : tot+'x');
+  var cl = tot===0 ? (isImm?'No data':'Geen data') : (max===null ? (isImm?'No maximum':'Geen maximum') : (boven===0 ? '&#x2713; KPI OK' : (isImm?'&#x2717; ATTENTION':'&#x2717; AANDACHT')));
+  var donut = '<circle cx="'+cx+'" cy="'+cy+'" r="'+(R-24)+'" fill="#fff" stroke="#eee" stroke-width="1"/><text x="'+cx+'" y="'+(cy-7)+'" text-anchor="middle" font-size="15" font-weight="800" fill="'+kc+'">'+cp+'</text><text x="'+cx+'" y="'+(cy+8)+'" text-anchor="middle" font-size="8" font-weight="600" fill="'+kc+'">'+cl+'</text>';
+  var leg = segs.map(function(seg){ return '<span style="font-size:9px;color:'+seg.c+';font-weight:700;"><svg width="12" height="12" style="vertical-align:middle;margin-right:3px;"><circle cx="6" cy="6" r="5" fill="'+seg.c+'"/></svg>'+seg.l+' ('+seg.v+')</span>'; }).join(' &nbsp;');
+  var ok = tot===0 || max===null || boven===0;
+  return '<div style="background:#fff;border:2px solid '+(ok?'#1a7a40':'#c0392b')+';border-radius:10px;padding:8px 6px 8px;box-shadow:0 3px 12px rgba(0,0,0,0.1);display:flex;flex-direction:column;align-items:center;">'+
+    '<div style="font-size:10px;font-weight:700;color:#003366;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:1px;text-align:center;">Quay occupancy</div>'+
+    '<div style="font-size:9px;color:#888;font-weight:600;margin-bottom:2px;">'+mt_ML()[_kpiM]+' '+_kpiY+'</div>'+
+    '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">'+paths+donut+lbls+'</svg>'+
+    '<div style="font-size:9px;color:#999;margin-top:1px;">'+(max!==null?'max. '+max+'  &#x2022;  ':'')+tot+' screenshot'+(tot===1?'':'s')+' ingevoerd</div>'+
+    '<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;justify-content:center;">'+leg+'</div></div>';
+}
+
+// Direct inloggen als deze sessie al eerder is ontgrendeld.
+(function(){
+  if (sessionStorage.getItem('kpi_mt_auth') === '1') {
+    document.getElementById('mt-login').style.display = 'none';
+    document.getElementById('mt-app').style.display = 'block';
+    mtInit();
+  } else {
+    setTimeout(function(){ document.getElementById('mt-ww').focus(); }, 100);
+  }
+})();
+
+// ═════════════════════════════════════════════════════════════════
+// OVERWERK & PRODUCTIVITEIT (gedeelde kern — staat identiek in index.html en kpi-mt.html)
+// Koppelt per dienst (ochtend/avond) de bezetting uit de Dagplanning aan de units en tijden
+// uit Punctuality. Vergelijkt diensten MET "Extra" (overwerk) met diensten ZONDER, en diensten
+// onder/op/boven de standaardbezetting. Instellingen (tarieven, route→dienst) en de ingevulde
+// achtergelaten units staan in <terminal>_kpi_overwerk_v1 en gaan mee in de cloud-sync, zodat
+// het MT-dashboard exact hetzelfde rekent.
+// ═════════════════════════════════════════════════════════════════
+var OW = (function(){
+  var TC_KLEP = 1, TC_LADEN = 5, TC_VERTREK = 7;
+  var KL = { zonder: '#2f6db5', met: '#9333ea' };
+  function num(v){ if (v === null || v === undefined || v === '') return null; var n = parseFloat(String(v).replace(',', '.')); return isNaN(n) ? null : n; }
+  function t2m(t){ if (!t) return null; var p = String(t).split(':'); if (p.length !== 2) return null; var h = parseInt(p[0], 10), m = parseInt(p[1], 10); return (isNaN(h) || isNaN(m)) ? null : h * 60 + m; }
+  function esc(t){ return String(t == null ? '' : t).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function fmt(n, dec){ if (n === null || n === undefined || isNaN(n)) return '—'; var r = Math.round(n * Math.pow(10, dec || 0)) / Math.pow(10, dec || 0); return String(r).replace('.', ','); }
+  function gem(arr){ var a = arr.filter(function(x){ return x !== null && x !== undefined && !isNaN(x); }); return a.length ? a.reduce(function(s, x){ return s + x; }, 0) / a.length : null; }
+  function som(arr){ return arr.reduce(function(s, x){ return s + (x || 0); }, 0); }
+  function isoNaarSlash(iso){ var p = iso.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+
+  function standaardConfig(routes){
+    var dienst = {};
+    routes.forEach(function(r, i){ dienst[i] = i === 0 ? 'O' : 'A'; });
+    return { tarieven: { extra: null, inhuur: null }, dienst: dienst, shutout: {} };
+  }
+  function config(ruw, routes){
+    var c = standaardConfig(routes);
+    if (ruw && typeof ruw === 'object') {
+      if (ruw.tarieven) { c.tarieven.extra = num(ruw.tarieven.extra); c.tarieven.inhuur = num(ruw.tarieven.inhuur); }
+      if (ruw.dienst) Object.keys(ruw.dienst).forEach(function(k){ if (ruw.dienst[k] === 'O' || ruw.dienst[k] === 'A' || ruw.dienst[k] === '-') c.dienst[k] = ruw.dienst[k]; });
+      if (ruw.shutout && typeof ruw.shutout === 'object') c.shutout = ruw.shutout;
+      if (num(ruw.werkdagen)) c.werkdagen = num(ruw.werkdagen);
+    }
+    return c;
+  }
+
+  // Per dienst de ingezette medewerkers (zelfde selectie als de tabel "Personeelsbezetting per dag":
+  // alleen wie een positie heeft gekregen in de Dagplanning).
+  function bezetting(dp){
+    var pos = dp.pos || {}, selO = {}, selA = {};
+    Object.keys(pos).forEach(function(k){ var v = pos[k]; if (!v) return; if (k.indexOf('a_') === 0 || k.indexOf('av_') === 0) selA[v] = 1; else selO[v] = 1; });
+    function tel(lijst, sel){
+      var ems = (lijst || []).filter(function(e){ return sel[e.name]; });
+      var isEx = function(e){ return (e.type || '').toUpperCase().indexOf('EX') >= 0; };
+      var isInh = function(e){ return !isEx(e) && (e.type || '').toLowerCase().indexOf('inhuur') >= 0; };
+      var uren = som(ems.map(function(e){ return num(e.uren); }));
+      var geschat = false;
+      if (!uren && ems.length) { uren = ems.length * 8; geschat = true; }
+      var exUren = som(ems.filter(isEx).map(function(e){ return num(e.uren) || 8; }));
+      var inhUren = som(ems.filter(isInh).map(function(e){ return num(e.uren) || 8; }));
+      return { koppen: ems.length, extra: ems.filter(isEx).length, inhuur: ems.filter(isInh).length, uren: uren, exUren: ems.some(isEx) ? exUren : 0, inhUren: ems.some(isInh) ? inhUren : 0, geschat: geschat };
+    }
+    return { O: tel(dp.ochEmps, selO), A: tel(dp.avondEmps, selA) };
+  }
+
+  function periodeDatums(jaar, maand, periode){
+    var n = periode === '6m' ? 6 : (periode === '3m' ? 3 : 1), res = {};
+    for (var i = 0; i < n; i++) { var d = new Date(jaar, maand - i, 1); res[d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')] = 1; }
+    return res;
+  }
+
+  // Bouwt één record per dienst-dag met zowel bezetting als units.
+  function records(src, periode){
+    var cfg = config(src.cfg, src.routes), maanden = periodeDatums(src.jaar, src.maand, periode);
+    var dn = ['Zo','Ma','Di','Wo','Do','Vr','Za'];
+    var uit = [], overgeslagen = 0, onvolledig = 0;
+    Object.keys(src.dagplans).sort().forEach(function(iso){
+      if (!maanden[iso.slice(0, 7)]) return;
+      var dp = src.dagplans[iso]; if (!dp) return;
+      var slash = isoNaarSlash(iso), vs = src.vs[slash] || null;
+      var bez = bezetting(dp);
+      var p = iso.split('-'), datum = new Date(+p[0], +p[1] - 1, +p[2]), wd = datum.getDay(), we = wd === 0 || wd === 6;
+      ['O','A'].forEach(function(dienst){
+        var b = bez[dienst];
+        var rIdx = src.routes.map(function(r, i){ return i; }).filter(function(i){ return cfg.dienst[i] === dienst; });
+        if (!rIdx.length) return;
+        var units = 0, handling = [], vertrekAfw = [], opTijd = [], shut = [], heeftUnits = false;
+        rIdx.forEach(function(ri){
+          var n = ri + 1, u = (vs && vs.units) || {};
+          ['trailers','eigen','containers','trade'].forEach(function(f){
+            ['in','out'].forEach(function(dir){ var v = parseInt(u[dir + '-' + f + '-' + n], 10); if (!isNaN(v)) { units += v; if (v > 0) heeftUnits = true; } });
+          });
+          var tij = ((vs && vs.tijden) || [])[ri], t = (tij && tij.tijden) || [];
+          var k = t2m(t[TC_KLEP]), l = t2m(t[TC_LADEN]);
+          if (k !== null && l !== null) { var h = l - k; if (h < 0) h += 1440; if (h > 0 && h < 720) handling.push(h); }
+          var v = t2m(t[TC_VERTREK]), rn = src.routes[ri];
+          var nk = rn + '_' + TC_VERTREK, nv = (we && src.normen[nk + '_we'] && src.normen[nk + '_we'].tijd) ? src.normen[nk + '_we'] : src.normen[nk];
+          if (v !== null && nv && nv.tijd) {
+            var nm = t2m(nv.tijd), mg = parseInt(nv.marge, 10) || 0;
+            if (nm !== null) { var a = v - nm; if (a < -720) a += 1440; if (a > 720) a -= 1440; vertrekAfw.push(a); opTijd.push(a <= mg ? 1 : 0); }
+          }
+          var so = ((cfg.shutout[slash] || {})[n]);
+          if (so && num(so.achter) !== null) shut.push(num(so.achter));
+        });
+        if (!b.koppen || !heeftUnits) { if (b.koppen || heeftUnits) overgeslagen++; return; }
+        var std = (src.std[dn[wd]] || {})[dienst === 'O' ? 'och_totaal' : 'av_totaal'] || null;
+        // Dagplanning duidelijk niet volledig ingevuld (bijv. 1 persoon op een dienst met honderden units): niet meetellen.
+        if (b.koppen < 3 || (std && b.koppen < std * 0.4)) { onvolledig++; return; }
+        uit.push({
+          iso: iso, datum: slash, dag: dn[wd], we: we, dienst: dienst, routes: rIdx.map(function(i){ return src.routes[i]; }),
+          koppen: b.koppen, extra: b.extra, inhuur: b.inhuur, uren: b.uren, exUren: b.exUren, inhUren: b.inhUren, geschat: b.geschat,
+          std: std, tovStd: std ? b.koppen - std : null,
+          units: units, upm: b.uren ? units / b.uren : null,
+          handling: gem(handling), vertrekAfw: gem(vertrekAfw), opTijd: opTijd.length ? (opTijd.every(function(x){ return x; }) ? 1 : 0) : null, opBin: som(opTijd), opTot: opTijd.length,
+          shutout: shut.length ? som(shut) : null, routeIdx: rIdx
+        });
+      });
+    });
+    return { rec: uit, overgeslagen: overgeslagen, onvolledig: onvolledig, cfg: cfg };
+  }
+
+  function groep(rs){
+    var u = som(rs.map(function(r){ return r.units; })), h = som(rs.map(function(r){ return r.uren; }));
+    // op tijd = aandeel afvaarten dat op tijd vertrok (zelfde telling als Scorekaart en Verzuim)
+    var opB = som(rs.map(function(r){ return r.opBin || 0; })), opT = som(rs.map(function(r){ return r.opTot || 0; }));
+    var so = rs.filter(function(r){ return r.shutout !== null; });
+    return {
+      n: rs.length, koppen: gem(rs.map(function(r){ return r.koppen; })), uren: gem(rs.map(function(r){ return r.uren; })),
+      units: gem(rs.map(function(r){ return r.units; })), upm: h ? u / h : null,
+      handling: gem(rs.map(function(r){ return r.handling; })), nHandling: rs.filter(function(r){ return r.handling !== null; }).length,
+      opTijd: opT ? opB / opT : null, nOpTijd: opT,
+      vertrekAfw: gem(rs.map(function(r){ return r.vertrekAfw; })),
+      shutout: so.length ? gem(so.map(function(r){ return r.shutout; })) : null, nShut: so.length,
+      exUren: som(rs.map(function(r){ return r.exUren; })), exKoppen: gem(rs.map(function(r){ return r.extra; })), inhUren: som(rs.map(function(r){ return r.inhUren; }))
+    };
+  }
+
+  // soort: 'beide' (overwerk en/of inhuur), 'overwerk' of 'inhuur' — bepaalt wat 'extra inzet' is
+  function isExtraInzet(x, soort){ return soort === 'overwerk' ? x.extra > 0 : (soort === 'inhuur' ? x.inhuur > 0 : (x.extra > 0 || x.inhuur > 0)); }
+  function analyse(src, periode, dienstFilter, soort){
+    var r = records(src, periode);
+    var rs = r.rec.filter(function(x){ return !dienstFilter || dienstFilter === 'alle' || x.dienst === dienstFilter; });
+    rs.forEach(function(x){ x._met = isExtraInzet(x, soort || 'beide'); });
+    var met = rs.filter(function(x){ return x._met; }), zonder = rs.filter(function(x){ return !x._met; });
+    return {
+      rec: rs, cfg: r.cfg, overgeslagen: r.overgeslagen, onvolledig: r.onvolledig,
+      met: groep(met), zonder: groep(zonder), alle: groep(rs),
+      onder: groep(rs.filter(function(x){ return x.tovStd !== null && x.tovStd < 0; })),
+      op: groep(rs.filter(function(x){ return x.tovStd === 0; })),
+      boven: groep(rs.filter(function(x){ return x.tovStd !== null && x.tovStd > 0; })),
+      geschat: rs.some(function(x){ return x.geschat; })
+    };
+  }
+
+  // ── Weergave ──────────────────────────────────────────────────
+  function tegel(titel, waarde, sub, kleur){
+    return '<div style="flex:1;min-width:160px;background:#fff;border:1px solid #dde6f0;border-radius:10px;padding:12px 14px;">' +
+      '<div style="font-size:11px;color:#5a7090;text-transform:uppercase;letter-spacing:.5px;font-weight:700;">' + titel + '</div>' +
+      '<div style="font-size:24px;font-weight:800;color:' + (kleur || '#003366') + ';margin-top:2px;">' + waarde + '</div>' +
+      '<div style="font-size:11.5px;color:#5a7090;margin-top:2px;">' + sub + '</div></div>';
+  }
+  function verschil(a, b, dec, eh, lagerBeter){
+    if (a === null || b === null) return '<span style="color:#8795a8;">—</span>';
+    var d = a - b, goed = lagerBeter ? d < 0 : d > 0, kl = Math.abs(d) < Math.pow(10, -(dec || 0)) ? '#5a7090' : (goed ? '#1a7a40' : '#c0392b');
+    return '<b style="color:' + kl + ';">' + (d > 0 ? '+' : '') + fmt(d, dec) + (eh || '') + '</b>';
+  }
+
+  function vergelijkTabel(rijen, kolommen, en){
+    var th = 'padding:7px 9px;text-align:center;font-size:11px;';
+    var td = 'padding:7px 9px;text-align:center;border-bottom:1px solid #e3e9f1;';
+    return '<table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:640px;"><thead><tr style="background:#003366;color:#fff;">' +
+      '<th style="' + th + 'text-align:left;">' + (en ? 'Group' : 'Groep') + '</th>' + kolommen.map(function(k){ return '<th style="' + th + '">' + k.t + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      rijen.map(function(r){ return '<tr><td style="' + td + 'text-align:left;font-weight:700;color:#003366;">' + r.naam + '</td>' + kolommen.map(function(k){ return '<td style="' + td + '">' + k.f(r.g) + '</td>'; }).join('') + '</tr>'; }).join('') +
+      '</tbody></table>';
+  }
+
+  function spreiding(rs, en, L){
+    var W = 640, H = 300, L = 48, R = 16, T = 14, B = 40;
+    if (!rs.length) return '';
+    var xs = rs.map(function(r){ return r.uren; }), ys = rs.map(function(r){ return r.units; });
+    var xmax = Math.max.apply(null, xs) * 1.08 || 1, ymax = Math.max.apply(null, ys) * 1.08 || 1;
+    function stap(m){ var s = Math.pow(10, Math.floor(Math.log10(m / 4))); [1,2,5,10].some(function(f){ if (m / (s * f) <= 5) { s *= f; return true; } return false; }); return s; }
+    var xmin0 = Math.min.apply(null, xs) * 0.9, sx = stap(Math.max(xmax - xmin0, 1)), sy = stap(ymax);
+    var xmin = Math.max(0, Math.floor(xmin0 / sx) * sx);
+    var X = function(v){ return L + (v - xmin) / (xmax - xmin || 1) * (W - L - R); }, Y = function(v){ return H - B - v / ymax * (H - T - B); };
+    var g = '';
+    for (var v = 0; v <= ymax; v += sy) g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(v) + '" y2="' + Y(v) + '" stroke="#e6ecf3"/><text x="' + (L - 6) + '" y="' + (Y(v) + 4) + '" text-anchor="end" font-size="10.5" fill="#5a7090">' + v + '</text>';
+    for (var u = xmin; u <= xmax; u += sx) g += '<text x="' + X(u) + '" y="' + (H - B + 15) + '" text-anchor="middle" font-size="10.5" fill="#5a7090">' + u + '</text>';
+    g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + (H - B) + '" y2="' + (H - B) + '" stroke="#9aa9bb"/>';
+    g += '<text x="' + ((L + W - R) / 2) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="11" fill="#5a7090">' + (en ? 'Hours worked in the shift' : 'Gewerkte uren in de dienst') + '</text>';
+    g += '<text transform="translate(12,' + ((T + H - B) / 2) + ') rotate(-90)" text-anchor="middle" font-size="11" fill="#5a7090">' + (en ? 'Units handled' : 'Units gelost + geladen') + '</text>';
+    var pts = rs.map(function(r, i){
+      var x = X(r.uren), y = Y(r.units), kl = r._met ? KL.met : KL.zonder;
+      var tip = r.datum + ' ' + (r.dienst === 'O' ? (en ? 'morning' : 'ochtend') : (en ? 'evening' : 'avond')) + ' — ' + r.koppen + (en ? ' staff' : ' pers.') + (r.extra ? ' (' + r.extra + (en ? ' overtime' : ' overwerk') + ')' : '') + (r.inhuur ? ' (' + r.inhuur + (en ? ' agency' : ' inhuur') + ')' : '') + ', ' + fmt(r.uren, 1) + (en ? ' h, ' : ' u, ') + r.units + ' units' + (r.handling !== null ? ', ' + (en ? 'handling ' : 'handling ') + fmt(r.handling, 0) + ' min' : '');
+      var vorm = r._met
+        ? '<path d="M' + x + ',' + (y - 6) + ' L' + (x + 6) + ',' + y + ' L' + x + ',' + (y + 6) + ' L' + (x - 6) + ',' + y + ' Z" fill="' + kl + '" stroke="#fff" stroke-width="2"/>'
+        : '<circle cx="' + x + '" cy="' + y + '" r="5" fill="' + kl + '" stroke="#fff" stroke-width="2"/>';
+      return '<g class="ow-pt" data-tip="' + esc(tip) + '"><circle cx="' + x + '" cy="' + y + '" r="12" fill="transparent"/>' + vorm + '</g>';
+    }).join('');
+    var leg = '<div style="display:flex;gap:16px;font-size:12px;color:#1a2a4a;margin:0 0 6px 4px;">' +
+      '<span><svg width="12" height="12"><circle cx="6" cy="6" r="5" fill="' + KL.zonder + '"/></svg> ' + (en ? '' + L.Zonder + '' : '' + L.Zonder + '') + '</span>' +
+      '<span><svg width="12" height="12"><path d="M6,0 L12,6 L6,12 L0,6 Z" fill="' + KL.met + '"/></svg> ' + (en ? '' + L.Met + '' : '' + L.Met + '') + '</span></div>';
+    return leg + '<div style="position:relative;overflow-x:auto;"><svg class="ow-svg" viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="max-width:760px;min-width:420px;display:block;font-family:inherit;">' + g + pts + '</svg>' +
+      '<div class="ow-tip" style="position:absolute;display:none;pointer-events:none;background:#1a2a3a;color:#fff;font-size:11.5px;padding:6px 9px;border-radius:6px;max-width:260px;z-index:5;"></div></div>';
+  }
+
+  function csv(rs, en){
+    var kop = en ? ['Date','Day','Shift','Routes','Staff','Overtime','Agency','Standard','Man-hours','Overtime hours','Units','Units per man-hour','Handling min (ramp down-loading complete)','Departure vs norm (min)','On time','Left behind']
+                 : ['Datum','Dag','Dienst','Routes','Personeel','Extra','Inhuur','Standaard','Manuren','Extra uren','Units','Units per manuur','Handling min (klep neer-laden compleet)','Vertrek t.o.v. norm (min)','Op tijd','Achtergelaten'];
+    var rijen = rs.map(function(r){ return [r.datum, r.dag, r.dienst === 'O' ? (en ? 'Morning' : 'Ochtend') : (en ? 'Evening' : 'Avond'), r.routes.join(' + '), r.koppen, r.extra, r.inhuur, r.std === null ? '' : r.std, fmt(r.uren, 1), fmt(r.exUren, 1), r.units, fmt(r.upm, 2), r.handling === null ? '' : fmt(r.handling, 0), r.vertrekAfw === null ? '' : fmt(r.vertrekAfw, 0), r.opTijd === null ? '' : (r.opTijd ? (en ? 'yes' : 'ja') : (en ? 'no' : 'nee')), r.shutout === null ? '' : r.shutout]; });
+    return [kop].concat(rijen).map(function(r){ return r.map(function(c){ c = String(c); return /[;"\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }).join(';'); }).join('\r\n');
+  }
+
+  // ── Eenvoudige weergave: eerst in gewone woorden, details daaronder ──
+  function hel(n, dec){ if (n === null || n === undefined || isNaN(n)) return '—'; return Number(n).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: dec || 0 }); }
+  function zin(icoon, tekst, kleur){
+    return '<div style="display:flex;gap:12px;align-items:flex-start;padding:9px 0;border-bottom:1px solid #eef2f7;">' +
+      '<div style="font-size:22px;line-height:1;width:30px;text-align:center;flex:0 0 30px;">' + icoon + '</div>' +
+      '<div style="font-size:15px;line-height:1.45;color:#1a2a4a;flex:1;">' + tekst + '</div>' +
+      (kleur ? '<div title="" style="flex:0 0 12px;width:12px;height:12px;border-radius:50%;background:' + kleur + ';margin-top:5px;"></div>' : '') + '</div>';
+  }
+  function balkRij(label, uitleg, met, zonder, dec, eh, en, L){
+    var max = Math.max(met || 0, zonder || 0) || 1;
+    var balk = function(v, kl, naam){ var w = v === null ? 0 : Math.max(2, v / max * 100);
+      return '<div style="display:flex;align-items:center;gap:8px;margin:3px 0;"><div style="width:58px;font-size:12px;color:#5a7090;flex:0 0 58px;">' + naam + '</div>' +
+        '<div style="flex:1;background:#eef2f7;border-radius:4px;height:18px;"><div style="width:' + w + '%;background:' + kl + ';height:18px;border-radius:4px;"></div></div>' +
+        '<div style="width:74px;text-align:right;font-weight:700;font-size:14px;color:#1a2a4a;flex:0 0 74px;">' + (v === null ? '—' : hel(v, dec) + eh) + '</div></div>'; };
+    return '<div style="margin-bottom:14px;"><div style="font-weight:700;color:#003366;font-size:13.5px;">' + label + '</div>' +
+      (uitleg ? '<div style="font-size:11.5px;color:#8795a8;margin-bottom:3px;">' + uitleg + '</div>' : '') +
+      balk(met, KL.met, (en ? 'With' : 'Met')) + balk(zonder, KL.zonder, (en ? 'Without' : 'Zonder')) + '</div>';
+  }
+
+  // opts: { en, periode, dienst, bewerkbaar, id }
+  function render(el, src, opts){
+    if (!el) return;
+    var en = !!opts.en, soort = opts.soort || 'beide', a = analyse(src, opts.periode, opts.dienst, soort), id = opts.id || 'ow';
+    var T = function(nl, eng){ return en ? eng : nl; };
+    var wat = { beide: T('overwerk of inhuur', 'overtime or agency staff'), overwerk: T('overwerk', 'overtime'), inhuur: T('inhuur', 'agency staff') }[soort];
+    var L = { met: T('met ', 'with ') + wat, zonder: T('zonder ', 'without ') + wat, Met: T('Met ', 'With ') + wat, Zonder: T('Zonder ', 'Without ') + wat,
+      Onderwerp: { beide: T('Extra inzet (overwerk of inhuur)', 'Additional staffing (overtime or agency)'), overwerk: T('Overwerk', 'Overtime'), inhuur: T('Inhuur', 'Agency staff') }[soort],
+      onderwerp: { beide: T('extra inzet (overwerk of inhuur)', 'additional staffing (overtime or agency)'), overwerk: T('overwerk', 'overtime'), inhuur: T('inhuur', 'agency staff') }[soort] };
+    var tar = a.cfg.tarieven, m = a.met, z = a.zonder;
+    var periodeTxt = { maand: T('deze maand', 'this month'), '3m': T('de laatste 3 maanden', 'the last 3 months'), '6m': T('de laatste 6 maanden', 'the last 6 months') }[opts.periode] || '';
+    var knop = function(waarde, huidig, tekst, fn){ return '<button type="button" onclick="' + fn + '(\'' + waarde + '\')" style="padding:6px 12px;border:1px solid ' + (waarde === huidig ? '#003366' : '#c8d7e8') + ';background:' + (waarde === huidig ? '#003366' : '#fff') + ';color:' + (waarde === huidig ? '#fff' : '#003366') + ';border-radius:6px;cursor:pointer;font-size:12.5px;font-weight:600;">' + tekst + '</button>'; };
+    var GROEN = '#1a7a40', ROOD = '#c0392b';
+    // ── Kop: alleen de periode (de rest staat onder "Meer details") ──
+    var h = '<div style="font-size:14px;color:#1a2a4a;line-height:1.5;margin-bottom:12px;">' +
+      T('<b>Wat is dit?</b> We vergelijken diensten <b>met extra mensen</b> (overwerk of inhuur) met diensten <b>zonder extra mensen</b>. Zo zie je of extra inzet ook iets oplevert: meer werk verzet, sneller klaar of vaker op tijd.',
+        '<b>What is this?</b> We compare shifts <b>with additional staff</b> (overtime or agency) to shifts <b>without additional staff</b>, to see whether additional staffing pays off: more work done, finished faster or more often on time.') + '</div>' +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">' +
+      '<span style="font-size:12px;color:#5a7090;margin-right:2px;">' + T('Periode:', 'Period:') + '</span>' +
+      knop('maand', opts.periode, T('Deze maand', 'This month'), id + 'Periode') + knop('3m', opts.periode, T('3 maanden', '3 months'), id + 'Periode') + knop('6m', opts.periode, T('6 maanden', '6 months'), id + 'Periode') +
+      '<span style="flex:1;"></span>' +
+      (a.rec.length ? '<button type="button" onclick="' + id + 'Csv()" style="padding:6px 12px;border:1px solid #c8d7e8;background:#fff;color:#003366;border-radius:6px;cursor:pointer;font-size:12.5px;font-weight:600;">&#x2B07;&#xFE0F; ' + T('Naar Excel', 'To Excel') + '</button>' : '') +
+      '</div>';
+    if (!a.rec.length) {
+      el.innerHTML = h + '<div style="color:#5a7090;font-size:14px;padding:18px;text-align:center;">' + T('Nog geen diensten waarvan zowel de Dagplanning als Punctuality is ingevuld voor ', 'No shifts yet with both the Day planning and Punctuality filled in for ') + periodeTxt + '.</div>';
+      return;
+    }
+    var genoeg = m.n >= 3 && z.n >= 3;
+    // ── 1. Het antwoord in één zin ──
+    var punten = [], minpunten = [];
+    if (genoeg) {
+      var dU = (m.units !== null && z.units) ? (m.units - z.units) / z.units : 0;
+      if (dU >= 0.05) punten.push(T('er gaat <b>' + hel(dU * 100, 0) + '% meer werk</b> over de kade', '<b>' + hel(dU * 100, 0) + '% more work</b> is handled'));
+      if (dU <= -0.05) minpunten.push(T('er gaat <b>minder werk</b> over de kade', '<b>less work</b> is handled'));
+      if (m.handling !== null && z.handling !== null) {
+        var dH = m.handling - z.handling;
+        if (dH <= -5) punten.push(T('het schip is <b>' + hel(-dH, 0) + ' minuten eerder klaar</b>', 'the ship is <b>done ' + hel(-dH, 0) + ' minutes sooner</b>'));
+        if (dH >= 5) minpunten.push(T('het schip is <b>' + hel(dH, 0) + ' minuten later klaar</b>', 'the ship is <b>done ' + hel(dH, 0) + ' minutes later</b>'));
+      }
+      if (m.opTijd !== null && z.opTijd !== null) {
+        var dO = (m.opTijd - z.opTijd) * 100;
+        if (dO >= 3) punten.push(T('de boot vertrekt <b>vaker op tijd</b> (' + hel(m.opTijd * 100, 0) + '% tegen ' + hel(z.opTijd * 100, 0) + '%)', 'the ship <b>leaves on time more often</b> (' + hel(m.opTijd * 100, 0) + '% vs ' + hel(z.opTijd * 100, 0) + '%)'));
+        if (dO <= -3) minpunten.push(T('de boot vertrekt <b>minder vaak op tijd</b>', 'the ship <b>leaves on time less often</b>'));
+      }
+    }
+    var zin1, icoon, kleur;
+    if (!genoeg) { icoon = '&#x23F3;'; kleur = '#5a7090';
+      zin1 = T('Nog te weinig diensten om te vergelijken: <b>' + m.n + '</b> met en <b>' + z.n + '</b> zonder extra mensen in ' + periodeTxt + '. Kies hierboven een langere periode.',
+               'Not enough shifts to compare yet: <b>' + m.n + '</b> with and <b>' + z.n + '</b> without additional staff in ' + periodeTxt + '. Choose a longer period above.'); }
+    else if (punten.length) { icoon = '&#x2705;'; kleur = GROEN;
+      zin1 = T('Extra mensen helpen: ', 'Additional staff helps: ') + punten.join(T(' en ', ' and ')) + '.' + (minpunten.length ? ' ' + T('Maar ', 'But ') + minpunten.join(T(' en ', ' and ')) + '.' : ''); }
+    else if (minpunten.length) { icoon = '&#x26A0;&#xFE0F;'; kleur = ROOD;
+      zin1 = T('Extra mensen leveren hier niets op: ', 'Additional staff does not pay off here: ') + minpunten.join(T(' en ', ' and ')) + '.'; }
+    else { icoon = '&#x2796;'; kleur = '#5a7090';
+      zin1 = T('Met of zonder extra mensen: <b>geen duidelijk verschil</b> in werk, snelheid of stiptheid.', 'With or without additional staff: <b>no clear difference</b> in work, speed or punctuality.'); }
+    h += '<div style="display:flex;gap:14px;align-items:flex-start;background:#003366;color:#fff;border-radius:12px;padding:16px 18px;margin-bottom:16px;">' +
+      '<div style="font-size:30px;line-height:1;">' + icoon + '</div><div style="font-size:16.5px;line-height:1.5;">' + zin1.replace(/<b>/g, '<b style="color:#ffd27a;">') + '</div></div>';
+    // ── 2. Naast elkaar: twee kolommen ──
+    var kolom = function(titel, sub, kl, g, ander, isMet){
+      // ✔ alleen bij een duidelijk verschil (zelfde drempels als de samenvatting hierboven)
+      var rij = function(label, waarde, hoger, eh, dec, verg, drempel){
+        var beter = (verg !== null && verg !== undefined && waarde !== null && waarde !== undefined && Math.abs(waarde - verg) >= (drempel || 0.5)) ? ((waarde > verg) === hoger) : false;
+        return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:9px 0;border-bottom:1px solid #eef2f7;">' +
+          '<span style="font-size:13.5px;color:#3a4a5e;">' + label + '</span>' +
+          '<span style="font-size:20px;font-weight:800;color:#003366;white-space:nowrap;">' + (waarde === null || waarde === undefined ? '—' : hel(waarde, dec) + eh) + (beter ? ' <span style="color:' + GROEN + ';font-size:15px;" title="' + T('beter', 'better') + '">&#x2714;</span>' : '') + '</span></div>';
+      };
+      return '<div style="flex:1;min-width:250px;background:#fff;border:2px solid ' + kl + ';border-radius:12px;overflow:hidden;">' +
+        '<div style="background:' + kl + ';color:#fff;padding:10px 14px;"><div style="font-weight:800;font-size:15px;">' + titel + '</div><div style="font-size:12px;opacity:.85;">' + sub + '</div></div>' +
+        '<div style="padding:4px 14px 8px;">' +
+        rij(T('Mensen op de dienst', 'People on the shift'), g.koppen, true, '', 0, null) +
+        rij(T('Units gelost + geladen', 'Units unloaded + loaded'), g.units, true, '', 0, ander.units, ander.units ? ander.units * 0.05 : 1) +
+        rij(T('Minuten laden en lossen', 'Minutes loading/unloading'), g.handling, false, ' min', 0, ander.handling, 5) +
+        rij(T('Op tijd vertrokken', 'Left on time'), g.opTijd === null ? null : g.opTijd * 100, true, '%', 0, ander.opTijd === null ? null : ander.opTijd * 100, 3) +
+        (g.shutout !== null || ander.shutout !== null ? rij(T('Achtergelaten units', 'Units left behind'), g.shutout, false, '', 1, ander.shutout) : '') +
+        '</div></div>';
+    };
+    h += '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:6px;">' +
+      kolom(T('&#x2795; MET extra mensen', '&#x2795; WITH additional staff'), m.n + T(' diensten met ', ' shifts with ') + wat, KL.met, m, z, true) +
+      kolom(T('ZONDER extra mensen', 'WITHOUT additional staff'), z.n + T(' diensten zonder ', ' shifts without ') + wat, KL.zonder, z, m, false) + '</div>' +
+      '<div style="font-size:11.5px;color:#8795a8;margin-bottom:14px;">' + T('Gemiddelde per dienst. &#x2714; = beter dan de andere kolom.', 'Average per shift. &#x2714; = better than the other column.') + '</div>';
+    // ── 3. Kosten ──
+    var kOw = tar.extra !== null ? a.alle.exUren * tar.extra : null, kInh = tar.inhuur !== null ? a.alle.inhUren * tar.inhuur : null;
+    h += '<div style="display:flex;gap:12px;align-items:center;background:#f4f7fb;border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:14px;color:#1a2a4a;">' +
+      '<span style="font-size:22px;">&#x1F4B6;</span><span>' +
+      T('Ingezet ' + periodeTxt + ': <b>' + hel(a.alle.exUren, 0) + ' uur overwerk</b>' + (kOw !== null ? ' (≈ € ' + hel(kOw, 0) + ')' : '') + ' en <b>' + hel(a.alle.inhUren, 0) + ' uur inhuur</b>' + (kInh !== null ? ' (≈ € ' + hel(kInh, 0) + ')' : '') + '.',
+        'Used ' + periodeTxt + ': <b>' + hel(a.alle.exUren, 0) + ' hours overtime</b>' + (kOw !== null ? ' (≈ € ' + hel(kOw, 0) + ')' : '') + ' and <b>' + hel(a.alle.inhUren, 0) + ' hours agency</b>' + (kInh !== null ? ' (≈ € ' + hel(kInh, 0) + ')' : '') + '.') +
+      ((kOw === null || kInh === null) ? ' <span style="color:#8795a8;">' + T('Vul bij ⚙️ de uurtarieven in om de kosten te zien.', 'Enter the hourly rates via ⚙️ to see the cost.') + '</span>' : '') + '</span></div>';
+    var detailKnoppen = '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:4px 0 12px;">' +
+      '<span style="font-size:12px;color:#5a7090;margin-right:2px;">' + T('Dienst:', 'Shift:') + '</span>' +
+      knop('alle', opts.dienst, T('Allebei', 'Both'), id + 'Dienst') + knop('O', opts.dienst, T('Ochtend', 'Morning'), id + 'Dienst') + knop('A', opts.dienst, T('Avond', 'Evening'), id + 'Dienst') +
+      '<span style="width:10px;"></span><span style="font-size:12px;color:#5a7090;margin-right:2px;">' + T('Extra mensen =', 'Additional staff =') + '</span>' +
+      knop('beide', soort, T('Overwerk + inhuur', 'Overtime + agency'), id + 'Soort') + knop('overwerk', soort, T('Alleen overwerk', 'Overtime only'), id + 'Soort') + knop('inhuur', soort, T('Alleen inhuur', 'Agency only'), id + 'Soort') + '</div>';
+    // ── 3. Details ──
+    var kol = [
+      { t: T('Diensten', 'Shifts'), f: function(g){ return g.n; } },
+      { t: T('Mensen', 'People'), f: function(g){ return fmt(g.koppen, 1); } },
+      { t: T('Gewerkte uren', 'Hours worked'), f: function(g){ return fmt(g.uren, 1); } },
+      { t: 'Units', f: function(g){ return fmt(g.units, 0); } },
+      { t: T('Units per gewerkt uur', 'Units per hour worked'), f: function(g){ return fmt(g.upm, 2); } },
+      { t: T('Minuten laden/lossen', 'Minutes handling'), f: function(g){ return fmt(g.handling, 0); } },
+      { t: T('Op tijd', 'On time'), f: function(g){ return g.opTijd === null ? '—' : fmt(g.opTijd * 100, 0) + '%'; } },
+      { t: T('Achtergelaten', 'Left behind'), f: function(g){ return g.shutout === null ? '—' : fmt(g.shutout, 1); } }
+    ];
+    var inp = 'width:52px;padding:3px 5px;border:1px solid #c8d7e8;border-radius:5px;font-size:12px;text-align:center;';
+    h += '<details style="margin-top:8px;border-top:1px solid #e3e9f1;padding-top:10px;"><summary style="cursor:pointer;font-weight:700;color:#003366;font-size:13px;">' + T('Meer details (tabellen, grafiek en alle diensten)', 'More details (tables, chart and all shifts)') + '</summary><div style="margin-top:12px;">' + detailKnoppen +
+      '<div style="font-weight:700;color:#003366;font-size:12px;margin:6px 0;">' + T('Met en ' + L.zonder + '', 'With and ' + L.zonder + '') + '</div><div style="overflow-x:auto;">' +
+      vergelijkTabel([{ naam: T('' + L.Met + '', '' + L.Met + ''), g: m }, { naam: T('' + L.Zonder + '', '' + L.Zonder + ''), g: z }], kol, en) + '</div>';
+    if (a.onder.n + a.op.n + a.boven.n > 0) {
+      h += '<div style="font-weight:700;color:#003366;font-size:12px;margin:14px 0 6px;">' + T('Minder, precies genoeg of meer mensen dan de standaardbezetting', 'Fewer, exactly enough or more people than standard staffing') + '</div><div style="overflow-x:auto;">' +
+        vergelijkTabel([{ naam: T('Minder dan standaard', 'Below standard'), g: a.onder }, { naam: T('Precies standaard', 'At standard'), g: a.op }, { naam: T('Meer dan standaard', 'Above standard'), g: a.boven }], kol, en) + '</div>';
+    }
+    h += '<div style="font-weight:700;color:#003366;font-size:12px;margin:14px 0 6px;">' + T('Elke stip is één dienst: hoeveel uur er gewerkt is en hoeveel units er gingen', 'Each dot is one shift: hours worked and units handled') + '</div>' + spreiding(a.rec, en, L);
+    h += '<div style="font-weight:700;color:#003366;font-size:12px;margin:14px 0 6px;">' + T('Alle diensten', 'All shifts') + (opts.bewerkbaar ? ' <span style="font-weight:400;color:#8795a8;">' + T('(achtergelaten units kun je hier ook invullen)', '(you can also enter units left behind here)') + '</span>' : '') + '</div>' +
+      '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:820px;"><thead><tr style="background:#003366;color:#fff;">' +
+      [T('Datum', 'Date'), T('Dienst', 'Shift'), T('Mensen', 'People'), T('Overwerk', 'Overtime'), T('Inhuur', 'Agency'), T('Standaard', 'Standard'), T('Uren', 'Hours'), 'Units', T('Units/uur', 'Units/hour'), T('Laden/lossen', 'Handling'), T('Vertrek', 'Departure'), T('Achtergel.', 'Left behind')].map(function(t){ return '<th style="padding:6px 8px;text-align:center;">' + t + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      a.rec.map(function(r, i){
+        var bg = i % 2 ? '#f4f7fb' : '#fff';
+        var so = opts.bewerkbaar ? r.routeIdx.map(function(ri){ var v = ((a.cfg.shutout[r.datum] || {})[ri + 1] || {}).achter; return '<input style="' + inp + '" title="' + esc(src.routes[ri]) + '" value="' + (v == null ? '' : esc(v)) + '" placeholder="' + esc(src.routes[ri].split(' ')[0].slice(0, 3)) + '" onchange="' + id + 'Shutout(\'' + r.datum + '\',' + (ri + 1) + ',this.value)">'; }).join(' ') : (r.shutout === null ? '—' : r.shutout);
+        return '<tr style="background:' + bg + ';"><td style="padding:5px 8px;font-weight:600;color:#003366;white-space:nowrap;">' + r.dag + ' ' + r.datum + '</td>' +
+          '<td style="text-align:center;">' + (r.dienst === 'O' ? T('Ochtend', 'Morning') : T('Avond', 'Evening')) + '</td>' +
+          '<td style="text-align:center;font-weight:700;">' + r.koppen + '</td><td style="text-align:center;color:' + KL.met + ';font-weight:700;">' + (r.extra || '') + '</td><td style="text-align:center;color:#b8960a;font-weight:700;">' + (r.inhuur || '') + '</td>' +
+          '<td style="text-align:center;color:#5a7090;">' + (r.std === null ? '—' : r.std) + '</td><td style="text-align:center;">' + fmt(r.uren, 1) + (r.geschat ? '*' : '') + '</td>' +
+          '<td style="text-align:center;font-weight:700;">' + r.units + '</td><td style="text-align:center;">' + fmt(r.upm, 2) + '</td>' +
+          '<td style="text-align:center;">' + (r.handling === null ? '—' : fmt(r.handling, 0) + ' min') + '</td>' +
+          '<td style="text-align:center;color:' + (r.opTijd === null ? '#8795a8' : (r.opTijd ? '#1a7a40' : '#c0392b')) + ';font-weight:600;">' + (r.opTijd === null ? '—' : (r.opTijd ? T('op tijd', 'on time') : T('te laat', 'late')) + ' (' + (r.vertrekAfw > 0 ? '+' : '') + fmt(r.vertrekAfw, 0) + ')') + '</td>' +
+          '<td style="text-align:center;white-space:nowrap;">' + so + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+    h += '<div style="font-size:11.5px;color:#8795a8;margin-top:12px;line-height:1.6;">' +
+      T('<b>Hoe tellen we?</b> Mensen = iedereen met een positie in de Dagplanning. Overwerk = medewerkers met type EX ("Extra"), inhuur = medewerkers met type inhuur. Units = gelost + geladen van de afvaarten die bij de dienst horen (',
+        '<b>How do we count?</b> People = everyone with a position in the Day planning. Overtime = staff type EX, agency = agency staff. Units = unloaded + loaded of the sailings for that shift (') +
+      src.routes.map(function(r, i){ return esc(r) + ' → ' + (a.cfg.dienst[i] === 'O' ? T('ochtend', 'morning') : (a.cfg.dienst[i] === 'A' ? T('avond', 'evening') : T('niet meegeteld', 'not counted'))); }).join(', ') + '). ' +
+      T('Op tijd = vertrokken binnen de norm plus marge. ', 'On time = departed within norm plus margin. ') +
+      (a.geschat ? T('* Geen uren ingevuld: gerekend met 8 uur per persoon. ', '* No hours filled in: counted as 8 hours per person. ') : '') +
+      (a.onvolledig ? T(a.onvolledig + ' dienst(en) niet meegeteld omdat de Dagplanning onvolledig lijkt (minder dan 3 mensen of minder dan 40% van de standaard). ', a.onvolledig + ' shift(s) left out because the Day planning looks incomplete (fewer than 3 people or under 40% of standard). ') : '') +
+      (a.overgeslagen ? T(a.overgeslagen + ' dienst(en) niet meegeteld omdat de Dagplanning of Punctuality ontbrak. ', a.overgeslagen + ' shift(s) left out because the Day planning or Punctuality was missing. ') : '') +
+      T('Drukke dagen krijgen vaak extra mensen; vergelijk daarom ook per route en weekdag.', 'Busy days often get additional staff, so also compare per route and weekday.') + '</div>';
+    h += '</div></details>';
+    el.innerHTML = h;
+    var svg = el.querySelector('.ow-svg'), tip = el.querySelector('.ow-tip');
+    if (svg && tip) {
+      Array.prototype.forEach.call(svg.querySelectorAll('.ow-pt'), function(p){
+        p.addEventListener('mouseenter', function(){ tip.textContent = p.getAttribute('data-tip'); tip.style.display = 'block'; });
+        p.addEventListener('mousemove', function(ev){ var bx = tip.parentNode.getBoundingClientRect(); tip.style.left = Math.min(ev.clientX - bx.left + 12, bx.width - 270) + 'px'; tip.style.top = (ev.clientY - bx.top + 12) + 'px'; });
+        p.addEventListener('mouseleave', function(){ tip.style.display = 'none'; });
+      });
+    }
+  }
+
+  function download(naam, tekst){
+    var blob = new Blob(['﻿' + tekst], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = naam;
+    document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+
+  return { analyse: analyse, render: render, csv: csv, download: download, config: config, num: num, esc: esc };
+})();
+
+// ── Overwerk & productiviteit: koppeling met het MT-dashboard (alleen-lezen, leest de clouddata) ──
+var _owPeriode = '3m', _owDienst = 'alle', _owSoort = 'beide';
+function owMtJson(k, def){ try { var v = JSON.parse(LS.getItem(k) || 'null'); return v == null ? def : v; } catch(e){ return def; } }
+function owMtBron(){
+  var dagplans = {}, pfx = mtTerminalPrefix() + 'dagplan_';
+  Object.keys(CLOUD_DATA).forEach(function(k){ if (k.indexOf(pfx) === 0 && CLOUD_DATA[k]) dagplans[k.slice(pfx.length)] = (typeof CLOUD_DATA[k] === 'string') ? owMtJson(k, null) : CLOUD_DATA[k]; });
+  var st = owMtJson(mtTk('dagPlanning_v2_state'), null);
+  if (st && st.planDate && ((st.ochEmps || []).length || (st.avondEmps || []).length)) {
+    var ex = dagplans[st.planDate];
+    if (!ex || !(ex.ochEmps || []).length || (st.ochEmps || []).length > (ex.ochEmps || []).length) dagplans[st.planDate] = st;
+  }
+  return { routes: mt_RT(), vs: mt_vsGet(), dagplans: dagplans, normen: mtGetKpiNormen() || {}, std: mtGetStdBezetting() || {},
+    cfg: owMtJson(mtTk('kpi_overwerk_v1'), null), jaar: _kpiY, maand: _kpiM };
+}
+function owMtRender(){
+  var el = document.getElementById('ow-body'); if (!el) return;
+  try { OW.render(el, owMtBron(), { en: MT_ENGELS, periode: _owPeriode, dienst: _owDienst, soort: _owSoort, bewerkbaar: false, id: 'owMt' }); }
+  catch(e) { el.innerHTML = '<div style="color:#c0392b;font-size:12px;">Overtime analysis could not be calculated: ' + OW.esc(e.message) + '</div>'; }
+}
+function owMtPeriode(p){ _owPeriode = p; owMtRender(); }
+function owMtDienst(d){ _owDienst = d; owMtRender(); }
+function owMtSoort(x){ _owSoort = x; owMtRender(); }
+function owMtCsv(){ var a = OW.analyse(owMtBron(), _owPeriode, _owDienst, _owSoort); OW.download('overtime-productivity_' + mtTerminal + '_' + _kpiY + '-' + String(_kpiM + 1).padStart(2, '0') + '.csv', OW.csv(a.rec, MT_ENGELS)); }
+
+
+// ═════════════════════════════════════════════════════════════════
+// VERZUIM & BEZETTING (gedeelde kern — identiek in index.html en kpi-mt.html)
+// Koppelt de ziekmeldingen (Werkoverdracht) aan de Dagplanning, de standaardbezetting en de
+// vertrektijden uit Punctuality. Toont ALLEEN tellingen: geen namen of bijzonderheden (privacy/AVG).
+// ═════════════════════════════════════════════════════════════════
+var VZ = (function(){
+  var MND_NL = ['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'];
+  var MND_EN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var DN = ['Zo','Ma','Di','Wo','Do','Vr','Za'];
+  function hel(n, dec){ if (n === null || n === undefined || isNaN(n)) return '—'; return Number(n).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: dec || 0 }); }
+  function iso(d){ return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function slash(i){ var p = i.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+  function dagenTussen(a, b){ return Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 86400000); }
+  function maandSleutel(j, m){ return j + '-' + String(m + 1).padStart(2, '0'); }
+  function periodeMaanden(jaar, maand, n){ var r = []; for (var i = n - 1; i >= 0; i--) { var d = new Date(jaar, maand - i, 1); r.push({ jaar: d.getFullYear(), maand: d.getMonth(), key: maandSleutel(d.getFullYear(), d.getMonth()) }); } return r; }
+
+  function bezetting(dp){
+    var pos = dp.pos || {}, sO = {}, sA = {};
+    Object.keys(pos).forEach(function(k){ var v = pos[k]; if (!v) return; if (k.indexOf('a_') === 0 || k.indexOf('av_') === 0) sA[v] = 1; else sO[v] = 1; });
+    var tel = function(l, s){ var ems = (l || []).filter(function(e){ return s[e.name]; });
+      return { n: ems.length, exUren: ems.filter(function(e){ return (e.type || '').toUpperCase().indexOf('EX') >= 0; }).reduce(function(t, e){ return t + (parseFloat(e.uren) || 8); }, 0) }; };
+    return { O: tel(dp.ochEmps, sO), A: tel(dp.avondEmps, sA) };
+  }
+
+  // Eén record per dag met een ingevulde Dagplanning
+  function dagen(src, maandenSet){
+    var N = (typeof window !== 'undefined' && window.KPINORM) ? window.KPINORM : null;
+    var ziek = (src.ziek || []).filter(function(z){ return z && z.gemeldOp; });
+    var res = [];
+    Object.keys(src.dagplans || {}).sort().forEach(function(d){
+      if (!maandenSet[d.slice(0, 7)]) return;
+      var dp = src.dagplans[d]; if (!dp) return;
+      var b = bezetting(dp); if (!b.O.n && !b.A.n) return;
+      var wd = new Date(d + 'T12:00:00').getDay(), we = wd === 0 || wd === 6;
+      var std = src.std[DN[wd]] || {}, sO = std.och_totaal || null, sA = std.av_totaal || null;
+      var tekortO = sO ? Math.max(0, sO - b.O.n) : 0, tekortA = sA ? Math.max(0, sA - b.A.n) : 0;
+      var zieken = ziek.filter(function(z){ return z.gemeldOp <= d && (!z.beterOp || d < z.beterOp); }).length;
+      var bin = 0, tot = 0, e = (src.vs || {})[slash(d)];
+      if (e && N) (src.routes || []).forEach(function(r, ri){
+        var rij = (e.tijden || [])[ri], t = ((rij && rij.tijden) || [])[7]; if (!t) return;
+        var nk = r + '_7', nv = (we && N.heeft(src.normen[nk + '_we'], 7)) ? src.normen[nk + '_we'] : src.normen[nk];
+        var ev = N.check(nv, rij, 7, t); if (ev) { tot++; if (ev.afw <= ev.marge) bin++; }
+      });
+      res.push({ iso: d, dag: DN[wd], zieken: zieken, O: b.O.n, A: b.A.n, stdO: sO, stdA: sA, tekort: tekortO + tekortA,
+        onder: tekortO > 0 || tekortA > 0, heeftStd: !!(sO || sA), exUren: b.O.exUren + b.A.exUren, bin: bin, tot: tot });
+    });
+    return res;
+  }
+
+  function samenvatting(src, maanden){
+    var set = {}; maanden.forEach(function(m){ set[m.key] = 1; });
+    var ds = dagen(src, set);
+    var start = maanden[0].key + '-01', eind = iso(new Date(maanden[maanden.length - 1].jaar, maanden[maanden.length - 1].maand + 1, 0));
+    var ziek = (src.ziek || []).filter(function(z){ return z && z.gemeldOp; });
+    var nieuw = ziek.filter(function(z){ return z.gemeldOp >= start && z.gemeldOp <= eind; }).length;
+    var afgerond = ziek.filter(function(z){ return z.beterOp && z.beterOp >= start && z.beterOp <= eind; });
+    var duur = afgerond.length ? afgerond.reduce(function(s, z){ return s + Math.max(1, dagenTussen(z.gemeldOp, z.beterOp)); }, 0) / afgerond.length : null;
+    var nogZiek = ziek.filter(function(z){ return z.gemeldOp <= eind && (!z.beterOp || z.beterOp > eind); }).length;
+    // Een zieke staat 7 dagen per week ziek gemeld, maar zou gemiddeld maar op X van die dagen werken
+    // (standaard 5). Daarom tellen we zieke kalenderdagen om naar gemiste WERKdagen: × X/7.
+    var werkdagen = parseFloat(src.werkdagen) > 0 ? Math.min(7, parseFloat(src.werkdagen)) : 5;
+    var ziekeKalenderdagen = ds.reduce(function(s, d){ return s + d.zieken; }, 0);
+    var ziektedagen = ziekeKalenderdagen * werkdagen / 7;
+    var gewerkt = ds.reduce(function(s, d){ return s + d.O + d.A; }, 0);
+    var pct = (gewerkt + ziektedagen) ? ziektedagen / (gewerkt + ziektedagen) * 100 : null;
+    var metStd = ds.filter(function(d){ return d.heeftStd; }), onder = metStd.filter(function(d){ return d.onder; }), vol = metStd.filter(function(d){ return !d.onder; });
+    var groep = function(l){ var b = l.reduce(function(s, d){ return s + d.bin; }, 0), t = l.reduce(function(s, d){ return s + d.tot; }, 0);
+      return { n: l.length, opTijd: t ? b / t * 100 : null, afvaarten: t, exUren: l.length ? l.reduce(function(s, d){ return s + d.exUren; }, 0) / l.length : null, tekort: l.length ? l.reduce(function(s, d){ return s + d.tekort; }, 0) / l.length : null }; };
+    return { dagen: ds, nieuw: nieuw, afgerond: afgerond.length, duur: duur, nogZiek: nogZiek, ziektedagen: ziektedagen, ziekeKalenderdagen: ziekeKalenderdagen, werkdagen: werkdagen, gewerkt: gewerkt, pct: pct,
+      metStd: metStd.length, onder: groep(onder), vol: groep(vol),
+      z0: groep(ds.filter(function(d){ return d.zieken === 0; })), z1: groep(ds.filter(function(d){ return d.zieken === 1; })), z2: groep(ds.filter(function(d){ return d.zieken >= 2; })) };
+  }
+
+  // Compacte versie voor de maandoverzichten
+  function maandKort(src, jaar, maand){
+    var s = samenvatting(src, [{ jaar: jaar, maand: maand, key: maandSleutel(jaar, maand) }]);
+    if (!s.dagen.length && !s.nieuw) return null;
+    return { meldingen: s.nieuw, ziektedagen: Math.round(s.ziektedagen), pct: s.pct === null ? null : Math.round(s.pct * 10) / 10, onderDagen: s.onder.n, dagenMetStd: s.metStd };
+  }
+
+  function zin(icoon, tekst, kleur){
+    return '<div style="display:flex;gap:12px;align-items:flex-start;padding:9px 0;border-bottom:1px solid #eef2f7;">' +
+      '<div style="font-size:22px;line-height:1;width:30px;text-align:center;flex:0 0 30px;">' + icoon + '</div>' +
+      '<div style="font-size:15px;line-height:1.45;color:#1a2a4a;flex:1;">' + tekst + '</div>' +
+      (kleur ? '<div style="flex:0 0 12px;width:12px;height:12px;border-radius:50%;background:' + kleur + ';margin-top:5px;"></div>' : '') + '</div>';
+  }
+  function tegel(titel, waarde, sub){
+    return '<div style="flex:1;min-width:150px;background:#fff;border:1px solid #dde6f0;border-radius:10px;padding:12px 14px;">' +
+      '<div style="font-size:11px;color:#5a7090;text-transform:uppercase;letter-spacing:.5px;font-weight:700;">' + titel + '</div>' +
+      '<div style="font-size:26px;font-weight:800;color:#003366;margin-top:2px;">' + waarde + '</div>' +
+      '<div style="font-size:11.5px;color:#5a7090;margin-top:2px;">' + sub + '</div></div>';
+  }
+  function trend(src, jaar, maand, en){
+    var ms = periodeMaanden(jaar, maand, 6);
+    var w = ms.map(function(m){ var s = samenvatting(src, [m]); return { m: m, pct: s.dagen.length ? s.pct : null, nieuw: s.nieuw }; });
+    var max = Math.max.apply(null, w.map(function(x){ return x.pct || 0; }).concat([5]));
+    var W = 560, H = 170, L = 10, B = 28, T = 22, bw = (W - L * 2) / 6;
+    var g = '<line x1="' + L + '" x2="' + (W - L) + '" y1="' + (H - B) + '" y2="' + (H - B) + '" stroke="#9aa9bb"/>';
+    w.forEach(function(x, i){
+      var cx = L + bw * i + bw / 2, h = x.pct === null ? 0 : x.pct / max * (H - B - T), y = H - B - h, huidig = i === w.length - 1;
+      var tip = (en ? MND_EN : MND_NL)[x.m.maand] + ' ' + x.m.jaar + ': ' + (x.pct === null ? (en ? 'no data' : 'geen data') : hel(x.pct, 1) + '% ' + (en ? 'absence, ' : 'verzuim, ') + x.nieuw + (en ? ' new reports' : ' nieuwe meldingen'));
+      g += '<g><title>' + tip + '</title>' +
+        (x.pct === null ? '<text x="' + cx + '" y="' + (H - B - 6) + '" text-anchor="middle" font-size="11" fill="#9aa9bb">—</text>'
+          : '<path d="M' + (cx - 18) + ',' + (H - B) + ' L' + (cx - 18) + ',' + (y + 4) + ' Q' + (cx - 18) + ',' + y + ' ' + (cx - 14) + ',' + y + ' L' + (cx + 14) + ',' + y + ' Q' + (cx + 18) + ',' + y + ' ' + (cx + 18) + ',' + (y + 4) + ' L' + (cx + 18) + ',' + (H - B) + ' Z" fill="' + (huidig ? '#003366' : '#7f9cc0') + '"/>' +
+            '<text x="' + cx + '" y="' + (y - 6) + '" text-anchor="middle" font-size="12" font-weight="700" fill="#1a2a4a">' + hel(x.pct, 1) + '%</text>') +
+        '<text x="' + cx + '" y="' + (H - 9) + '" text-anchor="middle" font-size="11" fill="#5a7090"' + (huidig ? ' font-weight="700"' : '') + '>' + (en ? MND_EN : MND_NL)[x.m.maand].slice(0, 3) + '</text></g>';
+    });
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="max-width:620px;display:block;font-family:inherit;">' + g + '</svg>';
+  }
+
+  // opts: { en, periode: 'maand'|'3m'|'6m', id }
+  function render(el, src, opts){
+    if (!el) return;
+    var en = !!opts.en, T = function(nl, e){ return en ? e : nl; }, id = opts.id || 'vz';
+    var n = opts.periode === '6m' ? 6 : (opts.periode === '3m' ? 3 : 1);
+    var ms = periodeMaanden(src.jaar, src.maand, n), s = samenvatting(src, ms);
+    var periodeTxt = n === 1 ? T('in ' + MND_NL[src.maand] + ' ' + src.jaar, 'in ' + MND_EN[src.maand] + ' ' + src.jaar) : T('de laatste ' + n + ' maanden', 'the last ' + n + ' months');
+    var knop = function(w, tekst){ var on = w === opts.periode; return '<button type="button" onclick="' + id + 'Periode(\'' + w + '\')" style="padding:6px 12px;border:1px solid ' + (on ? '#003366' : '#c8d7e8') + ';background:' + (on ? '#003366' : '#fff') + ';color:' + (on ? '#fff' : '#003366') + ';border-radius:6px;cursor:pointer;font-size:12.5px;font-weight:600;">' + tekst + '</button>'; };
+    var h = '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px;"><span style="font-size:12px;color:#5a7090;margin-right:2px;">' + T('Periode:', 'Period:') + '</span>' +
+      knop('maand', T('Deze maand', 'This month')) + knop('3m', T('3 maanden', '3 months')) + knop('6m', T('6 maanden', '6 months')) +
+      '<span style="flex:1;"></span><span style="font-size:11.5px;color:#8795a8;">&#x1F512; ' + T('Alleen aantallen, geen namen', 'Counts only, no names') + '</span></div>';
+    if (!s.dagen.length && !s.nieuw) {
+      el.innerHTML = h + '<div style="color:#5a7090;font-size:14px;padding:18px;text-align:center;">' + T('Nog geen Dagplanning of ziekmeldingen ', 'No Day planning or sick reports yet ') + periodeTxt + '.</div>';
+      return;
+    }
+    var GROEN = '#1a7a40', ROOD = '#c0392b', GRIJS = '#9aa9bb';
+    // Kerncijfers
+    h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">' +
+      tegel(T('Verzuim', 'Absence'), s.pct === null ? '—' : hel(s.pct, 1) + '%', T('van de geplande mensdagen', 'of planned person-days')) +
+      tegel(T('Nieuwe ziekmeldingen', 'New sick reports'), s.nieuw, s.nogZiek + T(' nu nog ziek', ' still sick')) +
+      tegel(T('Gemiste werkdagen', 'Missed work days'), hel(s.ziektedagen, 0), hel(s.ziekeKalenderdagen, 0) + T(' ziek gemelde dagen × ', ' reported sick days × ') + hel(s.werkdagen, 1) + '/7') +
+      tegel(T('Gem. duur melding', 'Avg duration'), s.duur === null ? '—' : hel(s.duur, 1) + T(' dagen', ' days'), s.afgerond + T(' beter gemeld', ' reported fit')) +
+      '</div>';
+    // In gewone woorden
+    var zinnen = '';
+    if (s.metStd) {
+      zinnen += zin('&#x1F465;', T('Op <b>' + s.onder.n + ' van de ' + s.metStd + ' dagen</b> stonden er minder mensen dan de standaardbezetting' + (s.onder.n ? ', gemiddeld <b>' + hel(s.onder.tekort, 1) + ' ' + (s.onder.tekort === 1 ? 'persoon' : 'mensen') + ' te weinig</b>.' : '.'),
+        'On <b>' + s.onder.n + ' of ' + s.metStd + ' days</b> staffing was below standard' + (s.onder.n ? ', on average <b>' + hel(s.onder.tekort, 1) + ' people short</b>.' : '.')), s.onder.n ? (s.onder.n / s.metStd > 0.25 ? ROOD : GRIJS) : GROEN);
+    }
+    var conclusie = [];
+    if (s.onder.opTijd !== null && s.vol.opTijd !== null && s.onder.n && s.vol.n) {
+      var dO = s.vol.opTijd - s.onder.opTijd;
+      zinnen += zin('&#x1F6A2;', T('Op dagen met onderbezetting vertrok de boot in <b>' + hel(s.onder.opTijd, 0) + '%</b> van de afvaarten op tijd, op volle dagen in <b>' + hel(s.vol.opTijd, 0) + '%</b>.',
+        'On understaffed days <b>' + hel(s.onder.opTijd, 0) + '%</b> of sailings left on time, on fully staffed days <b>' + hel(s.vol.opTijd, 0) + '%</b>.'), Math.abs(dO) < 3 ? GRIJS : (dO > 0 ? ROOD : GROEN));
+      if (dO >= 3) conclusie.push(T('onderbezetting kost stiptheid: <b>' + hel(dO, 0) + '% minder</b> afvaarten op tijd', 'understaffing costs punctuality: <b>' + hel(dO, 0) + '% fewer</b> sailings on time'));
+    }
+    if (s.z2.n && s.z0.n && s.z2.exUren !== null && s.z0.exUren !== null) {
+      var dX = s.z2.exUren - s.z0.exUren;
+      zinnen += zin('&#x23F1;&#xFE0F;', T('Op dagen met <b>2 of meer zieken</b> werd er gemiddeld <b>' + hel(s.z2.exUren, 0) + ' uur</b> overwerk ingezet, op dagen zonder zieken <b>' + hel(s.z0.exUren, 0) + ' uur</b>.',
+        'On days with <b>2 or more sick</b> staff, on average <b>' + hel(s.z2.exUren, 0) + ' hours</b> of overtime were used, on days without sickness <b>' + hel(s.z0.exUren, 0) + ' hours</b>.'), Math.abs(dX) < 2 ? GRIJS : (dX > 0 ? ROOD : GROEN));
+      if (dX >= 2) conclusie.push(T('verzuim wordt opgevangen met overwerk: <b>+' + hel(dX, 0) + ' uur</b> per dag bij 2+ zieken', 'absence is covered with overtime: <b>+' + hel(dX, 0) + ' hours</b> per day with 2+ sick'));
+    } else if (s.z1.n && s.z0.n && s.z1.exUren !== null) {
+      zinnen += zin('&#x23F1;&#xFE0F;', T('Op dagen met een zieke werd er gemiddeld <b>' + hel(s.z1.exUren, 0) + ' uur</b> overwerk ingezet, op dagen zonder zieken <b>' + hel(s.z0.exUren, 0) + ' uur</b>.',
+        'On days with one sick employee <b>' + hel(s.z1.exUren, 0) + ' hours</b> of overtime were used on average, on days without sickness <b>' + hel(s.z0.exUren, 0) + ' hours</b>.'), null);
+    }
+    var tekst = conclusie.length ? T('In het kort: ', 'In short: ') + conclusie.join(T(' en ', ' and ')) + '.'
+      : (s.pct === null ? T('Nog te weinig gegevens om een verband te zien.', 'Not enough data yet to see a link.') : T('In deze periode zien we <b>geen duidelijk effect</b> van verzuim op stiptheid of overwerk.', 'In this period there is <b>no clear effect</b> of absence on punctuality or overtime.'));
+    if (zinnen) h += '<div style="background:#f4f7fb;border-radius:12px;padding:6px 16px 4px;margin-bottom:12px;"><div style="font-weight:800;color:#003366;font-size:13px;text-transform:uppercase;letter-spacing:.5px;padding:8px 0 2px;">' + T('Wat zien we?', 'What do we see?') + '</div>' + zinnen + '</div>';
+    h += '<div style="background:#003366;color:#fff;border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:15.5px;line-height:1.5;"><div style="font-size:11.5px;text-transform:uppercase;letter-spacing:.8px;opacity:.75;font-weight:700;margin-bottom:3px;">' + T('In het kort', 'In short') + '</div>' +
+      tekst.replace(/^(In het kort: |In short: )/, '').replace(/<b>/g, '<b style="color:#ffd27a;">').replace(/^./, function(c){ return c.toUpperCase(); }) + '</div>';
+    // Trend
+    h += '<div style="font-weight:800;color:#003366;font-size:13px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">' + T('Verzuim per maand (laatste 6 maanden)', 'Absence per month (last 6 months)') + '</div>' + trend(src, src.jaar, src.maand, en);
+    // Details
+    var th = 'padding:6px 8px;text-align:center;font-size:11px;';
+    h += '<details style="margin-top:12px;border-top:1px solid #e3e9f1;padding-top:10px;"><summary style="cursor:pointer;font-weight:700;color:#003366;font-size:13px;">' + T('Meer details (per dag)', 'More details (per day)') + '</summary>' +
+      '<div style="overflow-x:auto;margin-top:10px;"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:620px;"><thead><tr style="background:#003366;color:#fff;">' +
+      [T('Datum', 'Date'), T('Zieken', 'Sick'), T('Ochtend', 'Morning'), T('Avond', 'Evening'), T('Tekort', 'Short'), T('Overwerk-uren', 'Overtime h'), T('Op tijd vertrokken', 'Left on time')].map(function(t, i){ return '<th style="' + th + (i === 0 ? 'text-align:left;' : '') + '">' + t + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      s.dagen.map(function(d, i){
+        var cel = function(n, std){ return '<b style="color:' + (std && n < std ? ROOD : '#1a2a4a') + ';">' + n + '</b>' + (std ? '<span style="color:#8795a8;"> / ' + std + '</span>' : ''); };
+        return '<tr style="background:' + (i % 2 ? '#f4f7fb' : '#fff') + ';"><td style="padding:5px 8px;font-weight:600;color:#003366;white-space:nowrap;">' + d.dag + ' ' + slash(d.iso) + '</td>' +
+          '<td style="text-align:center;font-weight:700;color:' + (d.zieken ? ROOD : '#8795a8') + ';">' + (d.zieken || '—') + '</td>' +
+          '<td style="text-align:center;">' + cel(d.O, d.stdO) + '</td><td style="text-align:center;">' + cel(d.A, d.stdA) + '</td>' +
+          '<td style="text-align:center;color:' + (d.tekort ? ROOD : '#8795a8') + ';">' + (d.tekort || '—') + '</td>' +
+          '<td style="text-align:center;">' + (d.exUren ? hel(d.exUren, 1) : '—') + '</td>' +
+          '<td style="text-align:center;">' + (d.tot ? d.bin + ' / ' + d.tot : '—') + '</td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<div style="font-size:11.5px;color:#8795a8;margin-top:10px;line-height:1.6;">' +
+      T('<b>Hoe tellen we?</b> Zieken = medewerkers die op die dag ziek gemeld stonden in Werkoverdracht. Iemand staat 7 dagen per week ziek gemeld, maar werkt gemiddeld ' + hel(s.werkdagen, 1) + ' dagen per week; daarom tellen we zieke dagen om naar gemiste werkdagen (× ' + hel(s.werkdagen, 1) + '/7). Verzuim = gemiste werkdagen gedeeld door (gewerkte mensdagen + gemiste werkdagen), alleen op dagen met een Dagplanning. Het aantal werkdagen per week stel je in bij \u2699\uFE0F van Overwerk & productiviteit. Tekort = mensen minder dan de standaardbezetting (ochtend + avond). Op tijd = vertrek binnen norm + marge. Een ziekmelding zegt niet in welke dienst iemand zou werken; daarom tellen we per dag. Er worden bewust geen namen getoond.',
+        '<b>How do we count?</b> Sick = employees reported sick in Shift handover on that day. Someone is reported sick 7 days a week but works ' + hel(s.werkdagen, 1) + ' days a week on average, so sick days are converted to missed work days (× ' + hel(s.werkdagen, 1) + '/7). Absence = missed work days divided by (worked person-days + missed work days), only on days with a Day planning. Short = fewer people than standard staffing (morning + evening). On time = departure within norm + margin. A sick report does not say which shift someone would have worked, so we count per day. Names are deliberately not shown.') +
+      '</div></details>';
+    el.innerHTML = h;
+  }
+  return { render: render, maandKort: maandKort, samenvatting: samenvatting };
+})();
+if (typeof window !== 'undefined') window.VZ = VZ;
+
+// ═════════════════════════════════════════════════════════════════
+// SCORECARD — beter of slechter dan vorige maand / vorig jaar (identiek in index.html en kpi-mt.html)
+// 8 KPI's uit de bestaande data. Een lopende maand wordt eerlijk vergeleken: 1 t/m vandaag tegen
+// 1 t/m dezelfde dag van de vergelijkingsmaand. Zijn de dagdata van een vergelijkingsmaand er niet
+// meer, dan wordt het bewaarde maandoverzicht gebruikt (altijd de hele maand).
+// ═════════════════════════════════════════════════════════════════
+var SC = (function(){
+  var MND_NL = ['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'];
+  var MND_EN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var DN = ['Zo','Ma','Di','Wo','Do','Vr','Za'];
+  var VELDEN = ['trailers','eigen','containers','trade'];
+  // hoger = beter? dec = decimalen, eh = eenheid
+  var KPIS = [
+    { key: 'opTijd',     nl: 'Op tijd vertrokken',            en: 'Departed on time',        hoger: true,  dec: 0, eh: '%',  pct: true, icoon: '&#x1F6A2;' },
+    { key: 'handling',   nl: 'Klep neer → laden klaar', en: 'Ramp down → loaded', hoger: false, dec: 0, eh: ' min', icoon: '&#x23F1;&#xFE0F;' },
+    { key: 'unitsDag',   nl: 'Units per dag',                 en: 'Units per day',           hoger: true,  dec: 0, eh: '',   icoon: '&#x1F4E6;' },
+    // Alleen de TREND (geen absoluut getal) en alleen de uren van wie in een CF- of IMM-vak staat.
+    { key: 'unitsUurCF', nl: 'Units per uur (CF + IMM)', en: 'Units per hour (CF + IMM)', hoger: true, dec: 2, eh: '', trend: true, icoon: '&#x2699;&#xFE0F;' },
+    { key: 'extraUren',  nl: 'Overwerk + inhuur / dag',   en: 'Overtime + agency / day', hoger: false, dec: 1, eh: (MT_ENGELS ? ' h' : ' u'), icoon: '&#x1F552;' },
+    { key: 'verzuim',    nl: 'Verzuim',                       en: 'Absence',                 hoger: false, dec: 1, eh: '%',  pct: true, icoon: '&#x1F912;' },
+    { key: 'onder',      nl: 'Dagen onderbezet', en: 'Days understaffed', hoger: false, dec: 0, eh: '%', pct: true, icoon: '&#x1F465;' },
+    { key: 'achter',     nl: 'Achtergelaten / dag', en: 'Left behind / day', hoger: false, dec: 1, eh: '', icoon: '&#x1F6A7;' }
+  ];
+  function t2m(t){ if (!t) return null; var p = String(t).split(':'); if (p.length !== 2) return null; var h = parseInt(p[0], 10), m = parseInt(p[1], 10); return (isNaN(h) || isNaN(m)) ? null : h * 60 + m; }
+  function iso(j, m, d){ return j + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0'); }
+  function slashNaarIso(s){ var p = String(s || '').split('/'); return p.length === 3 ? p[2] + '-' + p[1].padStart(2, '0') + '-' + p[0].padStart(2, '0') : null; }
+  function dagenInMaand(j, m){ return new Date(j, m + 1, 0).getDate(); }
+  function hel(n, dec){ if (n === null || n === undefined || isNaN(n)) return '—'; return Number(n).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: dec || 0 }); }
+  function N(){ return (typeof window !== 'undefined' && window.KPINORM) ? window.KPINORM : null; }
+
+  // De 8 KPI's berekenen over [start, eind] (ISO-datums, inclusief)
+  function bereken(src, start, eind){
+    var K = N(), normen = src.normen || {}, routes = src.routes || [];
+    var dagenVs = 0, units = 0, bin = 0, tot = 0, hand = [], handR = routes.map(function(){ return []; }), achter = 0, unitsPerDag = {};
+    var cfgShut = (src.shutout || {});
+    Object.keys(src.vs || {}).forEach(function(k){
+      var e = src.vs[k]; var d = slashNaarIso((e && e.datum) || k); if (!d || d < start || d > eind) return;
+      var u = e.units || {}, du = 0;
+      routes.forEach(function(r, ri){ VELDEN.forEach(function(f){ du += (parseInt(u['in-' + f + '-' + (ri + 1)], 10) || 0) + (parseInt(u['out-' + f + '-' + (ri + 1)], 10) || 0); }); });
+      if (du > 0) { dagenVs++; units += du; unitsPerDag[d] = du; }
+      var wd = new Date(d + 'T12:00:00').getDay(), we = wd === 0 || wd === 6;
+      routes.forEach(function(r, ri){
+        var rij = (e.tijden || [])[ri], t = (rij && rij.tijden) || [];
+        var kl = t2m(t[1]), lc = t2m(t[5]); if (kl !== null && lc !== null) { var h = lc - kl; if (h < 0) h += 1440; if (h > 0 && h < 720) { hand.push(h); handR[ri].push(h); } }
+        if (K && t[7]) { var nk = r + '_7', nv = (we && K.heeft(normen[nk + '_we'], 7)) ? normen[nk + '_we'] : normen[nk]; var ev = K.check(nv, rij, 7, t[7]); if (ev) { tot++; if (ev.afw <= ev.marge) bin++; } }
+      });
+      var so = cfgShut[(e && e.datum) || k] || {};
+      Object.keys(so).forEach(function(n){ achter += parseFloat(so[n] && so[n].achter) || 0; });
+    });
+    // Bezetting, uren, verzuim
+    var werkdagen = parseFloat(src.werkdagen) > 0 ? Math.min(7, parseFloat(src.werkdagen)) : 5;
+    var ziek = (src.ziek || []).filter(function(z){ return z && z.gemeldOp; });
+    var dpDagen = 0, extraUren = 0, gewerkt = 0, zieken = 0, onder = 0, metStd = 0, urenMetUnits = 0, unitsMetUren = 0, urenCF = 0, unitsMetCF = 0;
+    Object.keys(src.dagplans || {}).forEach(function(d){
+      if (d < start || d > eind) return;
+      var dp = src.dagplans[d]; if (!dp) return;
+      var pos = dp.pos || {}, sO = {}, sA = {};
+      Object.keys(pos).forEach(function(k){ var v = pos[k]; if (!v) return; if (k.indexOf('a_') === 0 || k.indexOf('av_') === 0) sA[v] = 1; else sO[v] = 1; });
+      var o = (dp.ochEmps || []).filter(function(e){ return sO[e.name]; }), a = (dp.avondEmps || []).filter(function(e){ return sA[e.name]; });
+      if (!o.length && !a.length) return;
+      if (o.length + a.length < 3) return; // Dagplanning duidelijk onvolledig (zelfde regel als Overwerk & productiviteit)
+      dpDagen++;
+      var alle = o.concat(a), uren = 0;
+      alle.forEach(function(e){ var u = parseFloat(e.uren) || 8, t = (e.type || ''); uren += u; if (t.toUpperCase().indexOf('EX') >= 0 || t.toLowerCase().indexOf('inhuur') >= 0) extraUren += u; });
+      if (unitsPerDag[d]) { urenMetUnits += uren; unitsMetUren += unitsPerDag[d]; }
+      // Alleen wie in een CF- of IMM-vak staat (boven- en onderdeel van de Dagplanning)
+      var cfO = {}, cfA = {};
+      Object.keys(pos).forEach(function(k){ var v = pos[k]; if (!v || !/^(o_|a_|on_|av_)(cf_|imm_)/.test(k)) return; if (k.indexOf('a_') === 0 || k.indexOf('av_') === 0) cfA[v] = 1; else cfO[v] = 1; });
+      var urenD = 0;
+      o.forEach(function(e){ if (cfO[e.name]) urenD += parseFloat(e.uren) || 8; });
+      a.forEach(function(e){ if (cfA[e.name]) urenD += parseFloat(e.uren) || 8; });
+      if (unitsPerDag[d] && urenD > 0) { urenCF += urenD; unitsMetCF += unitsPerDag[d]; }
+      gewerkt += alle.length;
+      zieken += ziek.filter(function(z){ return z.gemeldOp <= d && (!z.beterOp || d < z.beterOp); }).length;
+      var std = (src.std || {})[DN[new Date(d + 'T12:00:00').getDay()]] || {};
+      if (std.och_totaal || std.av_totaal) { metStd++; if ((std.och_totaal && o.length < std.och_totaal) || (std.av_totaal && a.length < std.av_totaal)) onder++; }
+    });
+    var gemist = zieken * werkdagen / 7;
+    var gemR = function(a){ return a.length ? a.reduce(function(s, x){ return s + x; }, 0) / a.length : null; };
+    var perRoute = {}; routes.forEach(function(r, ri){ perRoute['handling_' + ri] = gemR(handR[ri]); });
+    return Object.assign(perRoute, {
+      dagen: dagenVs, dpDagen: dpDagen,
+      opTijd: tot ? bin / tot * 100 : null, vertrekTot: tot, vertrekLaat: tot - bin,
+      handling: hand.length ? hand.reduce(function(s, x){ return s + x; }, 0) / hand.length : null,
+      unitsDag: dagenVs ? units / dagenVs : null,
+      unitsUur: urenMetUnits ? unitsMetUren / urenMetUnits : null,
+      unitsUurCF: urenCF ? unitsMetCF / urenCF : null,
+      extraUren: dpDagen ? extraUren / dpDagen : null,
+      verzuim: (gewerkt + gemist) && (ziek.length || dpDagen) ? gemist / (gewerkt + gemist) * 100 : null,
+      onder: metStd ? onder / metStd * 100 : null,
+      achter: dagenVs ? achter / dagenVs : null
+    });
+  }
+  // "Klep neer → laden klaar" per afvaart in plaats van één gemiddelde over alle afvaarten.
+  // Europoort in de volgorde van de dag: Immingham, Harwich ochtend, Harwich middag.
+  function kpiLijst(routes){
+    routes = routes || [];
+    var volg = routes.map(function(r, ri){ return ri; });
+    var iI = routes.indexOf('Immingham'), iO = routes.indexOf('Harwich Ochtend'), iM = routes.indexOf('Harwich Middag');
+    if (iI >= 0 && iO >= 0 && iM >= 0) volg = [iI, iO, iM].concat(volg.filter(function(x){ return x !== iI && x !== iO && x !== iM; }));
+    var basis = KPIS.filter(function(k){ return k.key === 'handling'; })[0];
+    var lijst = [];
+    KPIS.forEach(function(k){
+      if (k.key !== 'handling' || !routes.length) { lijst.push(k); return; }
+      volg.forEach(function(ri){
+        var naam = ({ 'Harwich Ochtend': 'Harwich morning', 'Harwich Middag': 'Harwich evening' })[routes[ri]] || routes[ri];
+        lijst.push(Object.assign({}, basis, { key: 'handling_' + ri, nl: 'Turnaround time ' + naam, en: 'Turnaround time ' + naam }));
+      });
+    });
+    return lijst;
+  }
+
+  // Waarden voor een maand (eventueel t/m een dag); valt terug op het bewaarde maandoverzicht
+  function maandWaarden(src, j, m, totDag){
+    var eindDag = Math.min(totDag || 99, dagenInMaand(j, m));
+    var w = bereken(src, iso(j, m, 1), iso(j, m, eindDag));
+    if (w.dagen || w.dpDagen) { w.bron = 'data'; w.totDag = totDag && totDag < dagenInMaand(j, m) ? eindDag : null; return w; }
+    var snap = (src.snaps || {})[j + '_' + String(m + 1).padStart(2, '0')];
+    if (snap && snap.sc) { var s = JSON.parse(JSON.stringify(snap.sc)); s.bron = 'overzicht'; return s; }
+    if (snap && snap.totaal) { // ouder overzicht zonder scorekaart: wat er wel in staat
+      var t = snap.totaal, p = snap.personeel || {};
+      return { bron: 'overzicht', dagen: snap.dagen, unitsDag: snap.dagen ? (t.gelost + t.geladen) / snap.dagen : null,
+        verzuim: snap.verzuim ? snap.verzuim.pct : null, onder: (snap.verzuim && snap.verzuim.dagenMetStd) ? snap.verzuim.onderDagen / snap.verzuim.dagenMetStd * 100 : null,
+        opTijd: null, handling: null, unitsUur: null, extraUren: null, achter: null };
+    }
+    return null;
+  }
+
+  function vergelijk(kpi, nu, toen){
+    if (nu === null || nu === undefined || toen === null || toen === undefined) return null;
+    var d = nu - toen, drempel = kpi.pct ? 1 : Math.max(Math.abs(toen) * 0.02, Math.pow(10, -kpi.dec));
+    var status = Math.abs(d) < drempel ? 'gelijk' : ((d > 0) === kpi.hoger ? 'beter' : 'slechter');
+    return { d: d, status: status };
+  }
+
+  function render(el, src, opts){
+    if (!el) return;
+    var en = !!opts.en, T = function(nl, e){ return en ? e : nl; }, MND = en ? MND_EN : MND_NL;
+    var nu = new Date(), j = src.jaar, m = src.maand;
+    var lopend = j === nu.getFullYear() && m === nu.getMonth();
+    var totDag = lopend ? nu.getDate() : null;
+    var cur = maandWaarden(src, j, m, totDag);
+    var pm = m === 0 ? 11 : m - 1, pj = m === 0 ? j - 1 : j;
+    var vor = maandWaarden(src, pj, pm, totDag), jr = maandWaarden(src, j - 1, m, totDag);
+    if (!cur || (!cur.dagen && !cur.dpDagen)) { el.innerHTML = '<div style="color:#5a7090;font-size:13px;padding:6px 2px;">' + T('Nog geen gegevens voor ', 'No data yet for ') + MND[m] + ' ' + j + '.</div>'; return; }
+    var kl = { beter: '#1a7a40', slechter: '#c0392b', gelijk: '#7a8a9c' };
+    var telV = { beter: 0, slechter: 0, gelijk: 0 }, telJ = { beter: 0, slechter: 0, gelijk: 0 };
+    var regel = function(kpi, waarde, ref, label, tel){
+      if (!ref) return '<div style="font-size:11.5px;color:#9aa9bb;margin-top:3px;">' + label + ': ' + T('nog geen data', 'no data yet') + '</div>';
+      var v = vergelijk(kpi, waarde, ref[kpi.key]);
+      if (!v) return '<div style="font-size:11.5px;color:#9aa9bb;margin-top:3px;">' + label + ': —</div>';
+      tel[v.status]++;
+      var teken = v.d > 0 ? '+' : (v.d < 0 ? '−' : '');
+      return '<div style="font-size:12px;margin-top:3px;color:' + kl[v.status] + ';font-weight:700;" title="' + label + ': ' + hel(ref[kpi.key], kpi.dec) + kpi.eh + '">' +
+        (v.status === 'gelijk' ? '●' : (v.d > 0 ? '▲' : '▼')) + ' ' + teken + hel(Math.abs(v.d), kpi.dec) + kpi.eh + ' <span style="color:#5a7090;font-weight:400;">' + label + '</span></div>';
+    };
+    var lblV = T('t.o.v. ', 'vs ') + MND[pm].slice(0, 3) + (vor && vor.bron === 'overzicht' && totDag ? T(' (hele mnd)', ' (full month)') : '');
+    var lblJ = T('t.o.v. ', 'vs ') + MND[m].slice(0, 3) + ' ' + (j - 1) + (jr && jr.bron === 'overzicht' && totDag ? T(' (hele mnd)', ' (full month)') : '');
+    // Trend-tegel: alleen de procentuele verandering, geen absoluut getal.
+    var trendRegel = function(kpi, waarde, ref, label, tel){
+      var oud = ref ? ref[kpi.key] : null;
+      if (oud === null || oud === undefined || !oud || waarde === null || waarde === undefined) return '<div style="font-size:11.5px;color:#9aa9bb;margin-top:3px;">' + label + ': ' + T('nog geen data', 'no data yet') + '</div>';
+      var pct = (waarde - oud) / oud * 100, st = Math.abs(pct) < 2 ? 'gelijk' : ((pct > 0) === kpi.hoger ? 'beter' : 'slechter');
+      tel[st]++;
+      return '<div style="font-size:12px;margin-top:3px;color:' + kl[st] + ';font-weight:700;">' + (st === 'gelijk' ? '●' : (pct > 0 ? '▲' : '▼')) + ' ' + (pct > 0 ? '+' : (pct < 0 ? '−' : '')) + hel(Math.abs(pct), 0) + '% <span style="color:#5a7090;font-weight:400;">' + label + '</span></div>';
+    };
+    var trendGroot = function(kpi, waarde, ref){
+      var oud = ref ? ref[kpi.key] : null;
+      if (oud === null || oud === undefined || !oud || waarde === null || waarde === undefined) return '<span style="color:#9aa9bb;">—</span>';
+      var pct = (waarde - oud) / oud * 100, st = Math.abs(pct) < 2 ? 'gelijk' : ((pct > 0) === kpi.hoger ? 'beter' : 'slechter');
+      return '<span style="color:' + kl[st] + ';">' + (st === 'gelijk' ? '● ' : (pct > 0 ? '▲ ' : '▼ ')) + (pct > 0 ? '+' : (pct < 0 ? '−' : '')) + hel(Math.abs(pct), 0) + '%</span>';
+    };
+    var tegels = kpiLijst(src.routes).map(function(k){
+      var w = cur[k.key];
+      if (k.trend) {
+        var ta = trendRegel(k, w, vor, lblV, telV), tb = trendRegel(k, w, jr, lblJ, telJ);
+        return '<div style="background:#fff;border:1px solid #dde6f0;border-radius:10px;padding:12px 14px;min-width:0;" title="' + T('Alleen de verandering wordt getoond, geen absoluut getal. Telt alleen de uren van wie in een CF- of IMM-vak staat.', 'Only the change is shown, not an absolute figure. Counts only the hours of staff in CF or IMM positions.') + '">' +
+          '<div style="font-size:11px;color:#5a7090;text-transform:uppercase;letter-spacing:.4px;font-weight:700;">' + k.icoon + ' ' + (en ? k.en : k.nl) + '</div>' +
+          '<div style="font-size:26px;font-weight:800;margin:2px 0 2px;">' + trendGroot(k, w, vor) + '</div>' + ta + tb + '</div>';
+      }
+      var a = regel(k, w, vor, lblV, telV), b = regel(k, w, jr, lblJ, telJ);
+      return '<div style="background:#fff;border:1px solid #dde6f0;border-radius:10px;padding:12px 14px;min-width:0;">' +
+        '<div style="font-size:11px;color:#5a7090;text-transform:uppercase;letter-spacing:.4px;font-weight:700;" title="' + (en ? k.en : k.nl) + '">' + k.icoon + ' ' + (en ? k.en : k.nl) + '</div>' +
+        '<div style="font-size:26px;font-weight:800;color:#003366;margin:2px 0 2px;">' + (w === null || w === undefined ? '—' : hel(w, k.dec) + k.eh) + '</div>' + a + b + '</div>';
+    }).join('');
+    var samen = function(tel, naam){ var n = tel.beter + tel.slechter + tel.gelijk; if (!n) return ''; return '<span style="margin-right:16px;"><b style="color:#1a7a40;">' + tel.beter + ' ' + T('beter', 'better') + '</b>, <b style="color:#c0392b;">' + tel.slechter + ' ' + T('slechter', 'worse') + '</b>' + (tel.gelijk ? ', ' + tel.gelijk + ' ' + T('gelijk', 'same') : '') + ' ' + naam + '</span>'; };
+    var kop = '<div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;margin-bottom:10px;">' +
+      '<span style="font-size:13px;color:#1a2a4a;">' + (totDag ? T('1 t/m ' + totDag + ' ' + MND[m] + ' (lopende maand), vergeleken met dezelfde dagen.', '1–' + totDag + ' ' + MND[m] + ' (month to date), compared with the same days.') : MND[m] + ' ' + j + '.') + '</span>' +
+      '<span style="font-size:13px;">' + samen(telV, T('dan vorige maand', 'than last month')) + samen(telJ, T('dan vorig jaar', 'than last year')) + '</span></div>';
+    el.innerHTML = kop + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:10px;">' + tegels + '</div>' +
+      '<div style="font-size:11px;color:#8795a8;margin-top:8px;">' + T('▲ omhoog / ▼ omlaag; groen = beter, rood = slechter, grijs ● = ongeveer gelijk. Beweeg over een vergelijking voor de waarde van toen. Vorig jaar vult zich vanzelf zodra er maandoverzichten van vorig jaar zijn.', '▲ up / ▼ down; green = better, red = worse, grey ● = about the same. Hover a comparison for the earlier value. Last year fills itself once monthly overviews from last year exist.') + '</div>';
+  }
+  return { bereken: bereken, render: render, iso: iso, dagenInMaand: dagenInMaand };
+})();
+if (typeof window !== 'undefined') window.SC = SC;
+
+// ═════════════════════════════════════════════════════════════════
+// OPGESLAGEN MAANDOVERZICHTEN (gedeelde kern — identiek in index.html en kpi-mt.html)
+// Elke afgesloten maand wordt als compacte samenvatting bewaard in <terminal>_kpi_snapshot_JJJJ_MM
+// (gaat mee in de cloud-sync). Zo blijven de cijfers bewaard, ook als de ruwe dagdata later wordt
+// opgeruimd. Een bestaand overzicht wordt alleen vervangen door een versie met minstens evenveel dagen.
+// ═════════════════════════════════════════════════════════════════
+var KPISNAP = (function(){
+  var TC = ['Eerste lijn','Klep neer','Aanvang lossen','Schip leeg','Eerste eigen rijder','Laden compleet','Ramp op','Vertrek'];
+  var VELDEN = ['trailers','eigen','containers','trade'];
+  var MND_NL = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December'];
+  var MND_EN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  function t2m(t){ if (!t) return null; var p = String(t).split(':'); if (p.length !== 2) return null; var h = parseInt(p[0], 10), m = parseInt(p[1], 10); return (isNaN(h) || isNaN(m)) ? null : h * 60 + m; }
+  function m2t(m){ if (m === null || m === undefined || isNaN(m)) return '—'; m = Math.round(m); return String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); }
+  function esc(t){ return String(t == null ? '' : t).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function sleutelDeel(jaar, maand){ return jaar + '_' + String(maand + 1).padStart(2, '0'); }
+  function inMaand(datum, jaar, maand){ var p = String(datum || '').split('/'); return p.length === 3 && parseInt(p[1], 10) === maand + 1 && parseInt(p[2], 10) === jaar; }
+  function isWeekend(datum){ var p = String(datum).split('/'); if (p.length !== 3) return false; var d = new Date(+p[2], +p[1] - 1, +p[0]).getDay(); return d === 0 || d === 6; }
+  function NORM(){ return (typeof window !== 'undefined' && window.KPINORM) ? window.KPINORM : null; }
+
+  // Maanden (jaar/maand) waarvoor ruwe Punctuality-data bestaat
+  function maandenMetData(vs){
+    var m = {};
+    Object.keys(vs || {}).forEach(function(k){ var e = vs[k]; var p = String((e && e.datum) || k).split('/'); if (p.length === 3) m[p[2] + '_' + p[1].padStart(2, '0')] = { jaar: +p[2], maand: +p[1] - 1 }; });
+    return Object.keys(m).sort().map(function(k){ return m[k]; });
+  }
+
+  // Samenvatting van één maand maken uit de ruwe data
+  function maak(vs, dagplans, routes, normen, jaar, maand, en, extra){
+    var entries = Object.keys(vs || {}).map(function(k){ return vs[k]; }).filter(function(e){ return e && inMaand(e.datum, jaar, maand); });
+    if (!entries.length) return null;
+    var N = NORM(), tot = { gelost: 0, geladen: 0, buitenNorm: 0, meetpunten: 0, opTijd: 0 };
+    var rs = routes.map(function(naam, ri){
+      var r = { naam: naam, gelost: 0, geladen: 0, tijden: [], stipt: [], schipLeegDuur: null };
+      entries.forEach(function(e){ var u = e.units || {}; VELDEN.forEach(function(f){ r.gelost += parseInt(u['in-' + f + '-' + (ri + 1)], 10) || 0; r.geladen += parseInt(u['out-' + f + '-' + (ri + 1)], 10) || 0; }); });
+      var duren = [];
+      TC.forEach(function(kol, ti){
+        var som = 0, n = 0, bin = 0, buit = 0, heeftNorm = false;
+        entries.forEach(function(e){
+          var rij = (e.tijden || [])[ri], t = ((rij && rij.tijden) || [])[ti], m = t2m(t);
+          if (m === null) return;
+          som += m; n++;
+          if (N) {
+            var nk = naam + '_' + ti, we = isWeekend(e.datum);
+            var nv = (we && N.heeft(normen[nk + '_we'], ti)) ? normen[nk + '_we'] : normen[nk];
+            if (N.heeft(nv, ti)) heeftNorm = true;
+            var ev = N.check(nv, rij, ti, t);
+            if (ev) { if (ev.afw <= ev.marge) bin++; else buit++; }
+          }
+          if (ti === 3) { var k = t2m(((rij && rij.tijden) || [])[1]); if (k !== null) { var d = m - k; if (d < 0) d += 1440; duren.push(d); } }
+        });
+        r.tijden.push({ gem: n ? som / n : null, n: n });
+        r.stipt.push(heeftNorm && (bin + buit) ? { bin: bin, buit: buit } : null);
+        if (heeftNorm) { tot.meetpunten += bin + buit; tot.opTijd += bin; tot.buitenNorm += buit; }
+      });
+      if (duren.length) r.schipLeegDuur = { gem: duren.reduce(function(s, x){ return s + x; }, 0) / duren.length, n: duren.length };
+      tot.gelost += r.gelost; tot.geladen += r.geladen;
+      return r;
+    });
+    // Bezetting uit de Dagplanning (zelfde selectie als "Personeelsbezetting per dag")
+    var pers = { dagen: 0, O: 0, A: 0, extra: 0, inhuur: 0, uren: 0 };
+    Object.keys(dagplans || {}).forEach(function(iso){
+      var p = iso.split('-'); if (p.length !== 3 || +p[0] !== jaar || +p[1] !== maand + 1) return;
+      var dp = dagplans[iso]; if (!dp) return;
+      var pos = dp.pos || {}, sO = {}, sA = {};
+      Object.keys(pos).forEach(function(k){ var v = pos[k]; if (!v) return; if (k.indexOf('a_') === 0 || k.indexOf('av_') === 0) sA[v] = 1; else sO[v] = 1; });
+      var o = (dp.ochEmps || []).filter(function(e){ return sO[e.name]; }), a = (dp.avondEmps || []).filter(function(e){ return sA[e.name]; });
+      if (!o.length && !a.length) return;
+      pers.dagen++; pers.O += o.length; pers.A += a.length;
+      o.concat(a).forEach(function(e){ var t = (e.type || ''); if (t.toUpperCase().indexOf('EX') >= 0) pers.extra++; else if (t.toLowerCase().indexOf('inhuur') >= 0) pers.inhuur++; pers.uren += parseFloat(e.uren) || 0; });
+    });
+    var sc = null;
+    if (typeof window !== 'undefined' && window.SC) { try { sc = window.SC.bereken({ vs: vs, dagplans: dagplans, normen: normen, routes: routes, std: (extra && extra.std) || {}, ziek: (extra && extra.ziek) || [], werkdagen: extra && extra.werkdagen, shutout: (extra && extra.shutout) || {} }, window.SC.iso(jaar, maand, 1), window.SC.iso(jaar, maand, window.SC.dagenInMaand(jaar, maand))); } catch(e){} }
+    var verzuim = null;
+    if (extra && extra.ziek && typeof window !== 'undefined' && window.VZ) { try { verzuim = window.VZ.maandKort({ werkdagen: extra.werkdagen, ziek: extra.ziek, dagplans: dagplans, std: extra.std || {}, vs: vs, normen: normen, routes: routes }, jaar, maand); } catch(e){} }
+    return { v: 2, jaar: jaar, maand: maand, label: (en ? MND_EN : MND_NL)[maand] + ' ' + jaar, dagen: entries.length, routes: rs, totaal: tot, personeel: pers, verzuim: verzuim, sc: sc, opgeslagenOp: new Date().toISOString() };
+  }
+
+  // Vergelijk zonder tijdstempel (om onnodig opslaan/synchroniseren te voorkomen)
+  function zelfde(a, b){ if (!a || !b) return false; var x = JSON.parse(JSON.stringify(a)), y = JSON.parse(JSON.stringify(b)); delete x.opgeslagenOp; delete y.opgeslagenOp; delete x.label; delete y.label; return JSON.stringify(x) === JSON.stringify(y); }
+
+  // Oud formaat (met ruwe entries) omzetten naar een samenvatting
+  function normaliseer(s, routes, normen, en){
+    if (!s) return null;
+    if (s.v === 2) return s;
+    if (Array.isArray(s.entries) && s.jaar !== undefined && s.maand !== undefined) {
+      var vs = {}; s.entries.forEach(function(e){ if (e && e.datum) vs[e.datum] = e; });
+      var n = maak(vs, {}, routes, normen, s.jaar, s.maand, en); if (n) n.opgeslagenOp = s.opgeslagenOp || n.opgeslagenOp; return n;
+    }
+    return null;
+  }
+
+  // Alle overzichten verzamelen: opgeslagen + (nog niet opgeslagen) afgesloten maanden uit ruwe data
+  // lees(key) → object|null. prefix = 'EP_' enz.
+  function lijst(o){
+    var res = {}, nu = new Date(), dezeMaand = nu.getFullYear() * 12 + nu.getMonth();
+    o.sleutels.forEach(function(k){
+      if (k.indexOf(o.prefix + 'kpi_snapshot_') !== 0) return;
+      var s = normaliseer(o.lees(k), o.routes, o.normen, o.en); if (s) res[sleutelDeel(s.jaar, s.maand)] = s;
+    });
+    maandenMetData(o.vs).forEach(function(m){
+      if (m.jaar * 12 + m.maand >= dezeMaand) return; // lopende maand nog niet
+      var sd = sleutelDeel(m.jaar, m.maand), nieuw = maak(o.vs, o.dagplans, o.routes, o.normen, m.jaar, m.maand, o.en, { ziek: o.ziek, std: o.std, werkdagen: o.werkdagen, shutout: o.shutout });
+      if (nieuw && (!res[sd] || nieuw.dagen >= res[sd].dagen)) { if (res[sd] && zelfde(res[sd], nieuw)) return; nieuw._nieuw = true; res[sd] = nieuw; }
+    });
+    return Object.keys(res).sort().reverse().map(function(k){ return res[k]; });
+  }
+
+  function pct(a, b){ return b ? Math.round(a / b * 100) + '%' : '—'; }
+  function render(el, overzichten, en){
+    if (!el) return;
+    var T = function(nl, e){ return en ? e : nl; };
+    if (!overzichten.length) { el.innerHTML = '<p style="color:#5a7090;font-size:13px;margin:0;">' + T('Nog geen afgesloten maanden. Een maand wordt automatisch bewaard zodra hij voorbij is.', 'No completed months yet. A month is saved automatically once it has ended.') + '</p>'; return; }
+    var th = 'padding:7px 9px;font-size:11px;text-align:center;';
+    var h = '<div style="font-size:12px;color:#5a7090;margin-bottom:10px;">' + T('Elke afgesloten maand wordt automatisch bewaard. Deze cijfers blijven staan, ook als de dagdata later wordt opgeruimd. Klik op een maand voor de details.', 'Every completed month is saved automatically. These figures stay, even if the daily data is cleaned up later. Click a month for details.') + '</div>' +
+      '<div style="overflow-x:auto;"><div style="min-width:640px;">' +
+      '<div style="display:grid;grid-template-columns:1.4fr .6fr .8fr .8fr .8fr .7fr .8fr 1fr;background:#003366;color:#fff;border-radius:6px 6px 0 0;font-weight:700;">' +
+      [T('Maand', 'Month'), T('Dagen', 'Days'), T('Gelost', 'Unloaded'), T('Geladen', 'Loaded'), T('Op tijd vertr.', 'Left on time'), T('Te laat vertr.', 'Left late'), T('Verzuim', 'Absence'), T('Gem. bezetting', 'Avg staffing')].map(function(t, i){ return '<div style="' + th + (i === 0 ? 'text-align:left;' : '') + '">' + t + '</div>'; }).join('') + '</div>';
+    overzichten.forEach(function(s, i){
+      var t = s.totaal || {}, p = s.personeel || {};
+      // Op tijd / te laat = VERTREK (zelfde als Scorekaart). Oudere overzichten zonder scorekaart: alle meetpunten.
+      var opP = (s.sc && s.sc.opTijd !== null && s.sc.opTijd !== undefined) ? s.sc.opTijd / 100 : (t.meetpunten ? t.opTijd / t.meetpunten : null);
+      var laat = (s.sc && s.sc.vertrekLaat !== undefined) ? s.sc.vertrekLaat : (t.meetpunten ? t.buitenNorm : null);
+      var kl = opP !== null ? (opP >= 0.8 ? '#1a7a40' : (opP >= 0.6 ? '#b06f00' : '#c0392b')) : '#5a7090';
+      var bez = p.dagen ? (Math.round(p.O / p.dagen * 10) / 10 + ' / ' + Math.round(p.A / p.dagen * 10) / 10).replace(/\./g, ',') : '—';
+      var td = 'padding:8px 9px;text-align:center;font-size:12.5px;';
+      h += '<details style="border:1px solid #dde6f0;border-top:none;background:' + (i % 2 ? '#f6f9fc' : '#fff') + ';">' +
+        '<summary style="list-style:none;cursor:pointer;display:grid;grid-template-columns:1.4fr .6fr .8fr .8fr .8fr .7fr .8fr 1fr;align-items:center;">' +
+        '<div style="' + td + 'text-align:left;font-weight:700;color:#003366;">&#x25B8; ' + esc((en ? MND_EN : MND_NL)[s.maand] + ' ' + s.jaar) + (s._nieuw ? ' <span style="font-size:10px;color:#8795a8;font-weight:400;">' + T('(uit dagdata)', '(from daily data)') + '</span>' : '') + '</div>' +
+        '<div style="' + td + '">' + s.dagen + '</div><div style="' + td + 'color:#1a5c9a;font-weight:700;">' + (t.gelost || 0) + '</div><div style="' + td + 'color:#1a7a40;font-weight:700;">' + (t.geladen || 0) + '</div>' +
+        '<div style="' + td + 'color:' + kl + ';font-weight:800;">' + (opP === null ? '—' : Math.round(opP * 100) + '%') + '</div><div style="' + td + 'color:' + (laat ? '#c0392b' : '#5a7090') + ';">' + (laat === null ? '—' : laat) + '</div>' +
+        '<div style="' + td + '">' + (s.verzuim && s.verzuim.pct !== null ? String(s.verzuim.pct).replace('.', ',') + '%' : '\u2014') + '</div>' +
+        '<div style="' + td + '" title="' + T('ochtend / avond', 'morning / evening') + '">' + bez + '</div></summary>' +
+        '<div style="padding:10px 12px 14px;border-top:1px dashed #dde6f0;">' + detail(s, en) + '</div></details>';
+    });
+    h += '</div></div>';
+    el.innerHTML = h;
+  }
+  function detail(s, en){
+    var T = function(nl, e){ return en ? e : nl; };
+    var kol = [1, 3, 5, 7]; // Klep neer, Schip leeg, Laden compleet, Vertrek
+    var th = 'padding:6px 8px;font-size:11px;text-align:center;background:#e8f0fb;color:#003366;';
+    var h = '<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr><th style="' + th + 'text-align:left;">Route</th><th style="' + th + '">' + T('Gelost', 'Unloaded') + '</th><th style="' + th + '">' + T('Geladen', 'Loaded') + '</th>' +
+      kol.map(function(ti){ return '<th style="' + th + '">' + TC[ti] + '</th>'; }).join('') + '</tr></thead><tbody>';
+    (s.routes || []).forEach(function(r){
+      h += '<tr><td style="padding:6px 8px;font-weight:700;color:#003366;border-bottom:1px solid #eef2f7;">' + esc(r.naam) + '</td>' +
+        '<td style="text-align:center;border-bottom:1px solid #eef2f7;">' + r.gelost + '</td><td style="text-align:center;border-bottom:1px solid #eef2f7;">' + r.geladen + '</td>' +
+        kol.map(function(ti){
+          var tj = (r.tijden || [])[ti] || {}, st = (r.stipt || [])[ti];
+          var waarde = ti === 3 && r.schipLeegDuur ? Math.round(r.schipLeegDuur.gem) + ' min' : m2t(tj.gem);
+          var sub = st ? '<div style="font-size:10.5px;font-weight:700;color:' + (st.bin / (st.bin + st.buit) >= 0.8 ? '#1a7a40' : '#c0392b') + ';">' + pct(st.bin, st.bin + st.buit) + T(' op tijd', ' on time') + '</div>' : '';
+          return '<td style="text-align:center;padding:5px 6px;border-bottom:1px solid #eef2f7;"><b>' + waarde + '</b>' + sub + '</td>';
+        }).join('') + '</tr>';
+    });
+    h += '</tbody></table>';
+    var p = s.personeel || {};
+    h += '<div style="font-size:11.5px;color:#5a7090;margin-top:8px;">' +
+      (p.dagen ? T('Bezetting: ', 'Staffing: ') + p.dagen + T(' dagen gepland · gemiddeld ', ' days planned · average ') + String(Math.round(p.O / p.dagen * 10) / 10).replace('.', ',') + T(' ochtend en ', ' morning and ') + String(Math.round(p.A / p.dagen * 10) / 10).replace('.', ',') + T(' avond · ', ' evening · ') + p.extra + T(' keer overwerk · ', ' overtime shifts · ') + p.inhuur + T(' keer inhuur', ' agency shifts') + ' · ' : '') +
+      (s.verzuim ? T('Verzuim: ', 'Absence: ') + s.verzuim.meldingen + T(' nieuwe ziekmeldingen, ', ' new sick reports, ') + s.verzuim.ziektedagen + T(' ziektedagen, ', ' sick days, ') + s.verzuim.onderDagen + T(' dagen onder de standaardbezetting · ', ' days below standard staffing · ') : '') +
+      T('Schip leeg = gemiddelde duur na klep neer. ', 'Ship empty = average duration after ramp down. ') +
+      (s.opgeslagenOp && !s._nieuw ? T('Bewaard op ', 'Saved on ') + new Date(s.opgeslagenOp).toLocaleDateString('en-GB') + '.' : '') + '</div>';
+    return h;
+  }
+  return { maak: maak, lijst: lijst, render: render, zelfde: zelfde, sleutelDeel: sleutelDeel, maandenMetData: maandenMetData };
+})();
+if (typeof window !== 'undefined') window.KPISNAP = KPISNAP;
+
+// ── Opgeslagen maandoverzichten (alleen-lezen, uit de clouddata) ──
+function mtSnapRender(){
+  var el = document.getElementById('kpi-snapshots-lijst'); if (!el) return;
+  var en = MT_ENGELS;
+  try {
+    KPISNAP.render(el, KPISNAP.lijst({ routes: mt_RT(), vs: mt_vsGet(), dagplans: owMtBron().dagplans, normen: mtGetKpiNormen() || {}, en: en,
+      shutout: (owMtJson(mtTk('kpi_overwerk_v1'), null) || {}).shutout || {}, werkdagen: (owMtJson(mtTk('kpi_overwerk_v1'), null) || {}).werkdagen, ziek: (owMtJson(mtTk('werkoverdracht_ziek_anoniem_v1'), null) || owMtJson(mtTk('werkoverdracht_ziekmeldingen_v1'), [])) || [], std: mtGetStdBezetting() || {},
+      prefix: mtTerminalPrefix(), sleutels: Object.keys(CLOUD_DATA), lees: function(k){ try { return JSON.parse(LS.getItem(k)); } catch(e){ return null; } } }), en);
+  } catch(e) { el.innerHTML = '<p style="color:#c0392b;font-size:12px;">Monthly overviews could not be loaded: ' + e.message + '</p>'; }
+}
+
+
+// ── Verzuim & bezetting (MT, alleen-lezen) ──
+var _vzMtPeriode = 'maand';
+function vzMtRender(){
+  var el = document.getElementById('vz-body'); if (!el) return;
+  try { VZ.render(el, { werkdagen: (owMtJson(mtTk('kpi_overwerk_v1'), null) || {}).werkdagen, ziek: (owMtJson(mtTk('werkoverdracht_ziek_anoniem_v1'), null) || owMtJson(mtTk('werkoverdracht_ziekmeldingen_v1'), [])) || [], dagplans: owMtBron().dagplans, std: mtGetStdBezetting() || {}, vs: mt_vsGet(), normen: mtGetKpiNormen() || {}, routes: mt_RT(), jaar: _kpiY, maand: _kpiM },
+    { en: MT_ENGELS, periode: _vzMtPeriode, id: 'vzMt' }); }
+  catch(e) { el.innerHTML = '<div style="color:#c0392b;font-size:12px;">Absence could not be calculated: ' + e.message + '</div>'; }
+}
+function vzMtPeriode(p){ _vzMtPeriode = p; vzMtRender(); }
+
+// ── Scorekaart (MT, alleen-lezen) ──
+function scMtRender(){
+  var el = document.getElementById('sc-body'); if (!el) return;
+  try {
+    var cfg = owMtJson(mtTk('kpi_overwerk_v1'), null) || {}, snaps = {}, pfx = mtTerminalPrefix() + 'kpi_snapshot_';
+    Object.keys(CLOUD_DATA).forEach(function(k){ if (k.indexOf(pfx) === 0) { var v = owMtJson(k, null); if (v) snaps[k.slice(pfx.length)] = v; } });
+    SC.render(el, { vs: mt_vsGet(), dagplans: owMtBron().dagplans, normen: mtGetKpiNormen() || {}, routes: mt_RT(), std: mtGetStdBezetting() || {},
+      ziek: (owMtJson(mtTk('werkoverdracht_ziek_anoniem_v1'), null) || owMtJson(mtTk('werkoverdracht_ziekmeldingen_v1'), [])) || [], werkdagen: cfg.werkdagen, shutout: cfg.shutout || {}, snaps: snaps, jaar: _kpiY, maand: _kpiM }, { en: MT_ENGELS });
+  } catch(e) { el.innerHTML = '<div style="color:#c0392b;font-size:12px;">Scorecard could not be calculated: ' + e.message + '</div>'; }
+}
+
+// ── Vaste, logische volgorde van de KPI-kaarten (zelfde in Dienst Journaal en KPI-MT) ──
+// Overzicht → Punctualiteit → Volume → Personeel → Archief, met een tussenkopje per blok.
+function kpiOrden(ouder, buiten){
+  if (!ouder || ouder.getAttribute('data-geordend')) return;
+  var zoek = function(tekst, id){
+    var el = id ? document.getElementById(id) : null;
+    if (!el) { var h = Array.prototype.filter.call((buiten || ouder).querySelectorAll('h2'), function(x){ return x.textContent.replace(/\s+/g, ' ').indexOf(tekst) >= 0; })[0]; el = h || null; }
+    if (!el) return null;
+    if (ouder.contains(el)) { while (el.parentElement && el.parentElement !== ouder) el = el.parentElement; return el.parentElement === ouder ? el : null; }
+    return el.closest('.card') || el; // kaart buiten de container (bijv. Kade capaciteit): erbij halen
+  };
+  var kop = function(tekst){ var d = document.createElement('div'); d.className = 'kpi-blokkop';
+    d.style.cssText = 'margin:26px 0 10px;padding:0 4px 6px;border-bottom:2px solid #003366;color:#003366;font-weight:800;font-size:13px;letter-spacing:1.2px;text-transform:uppercase;font-family:inherit;';
+    d.textContent = tekst; return d; };
+  var en = MT_ENGELS;
+  var plan = [
+    [en ? 'Punctuality' : 'Punctualiteit', [['Punctuality per measuring point', 'kpi-chart-card'], ['Days outside the norms', 'kpi-normen-card'], ['Average Sailing Schedule Times']]],
+    [en ? 'Volume' : 'Volume', [['Total Loaded'], ['Daily overview'], ['Average Trucks per Shift'], ['Quay capacity']]],
+    [en ? 'Staff' : 'Personeel', [['Staffing per day'], ['Staff distribution', 'bez-chart-titel'], ['Absence', 'vz-card'], ['Overtime, agency', 'ow-card']]],
+    [en ? 'Archive' : 'Archief', [['Saved monthly overviews']]]
+  ];
+  plan.forEach(function(blok){
+    var els = blok[1].map(function(f){ return zoek(f[0], f[1]); }).filter(function(x, i, a){ return x && a.indexOf(x) === i; });
+    if (!els.length) return;
+    ouder.appendChild(kop(blok[0]));
+    els.forEach(function(el){ ouder.appendChild(el); });
+  });
+  ouder.setAttribute('data-geordend', '1');
+}
+
+</script>
+
+<script>
+// ── Weergave altijd Engels: interne sleutels (routenamen en tijdkolommen uit Punctuality) zijn
+// Nederlands en moeten dat blijven (de normen zijn erop opgeslagen). Daarom worden ze alleen bij
+// het TONEN vertaald: elke tekst op de pagina die zo'n term bevat, wordt omgezet naar het Engels.
+(function(){
+  var TERMEN = [
+    ['Harwich Ochtend', 'Harwich Morning'], ['Harwich Middag', 'Harwich Afternoon'],
+    ['Eerste eigen rijder', 'First own driver'], ['Eerste lijn', 'First line'], ['Aanvang lossen', 'Start unloading'],
+    ['Laden compleet', 'Loading complete'], ['Schip leeg', 'Vessel empty'], ['Klep neer', 'Ramp down'],
+    ['Ramp op', 'Ramp up'], ['Vertrek', 'Departure'], ['Kade bezetting', 'Quay occupancy'],
+    ['agency = staff type inhuur', 'agency = agency staff'], ['staff type inhuur', 'staff type agency'], ['Hoek van Holland', 'Hook of Holland']
+  ].map(function(p){ return [new RegExp('\\b' + p[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'g'), p[1]]; });
+  function vertaal(t){
+    if (!t || !/[A-Za-z]/.test(t)) return t;
+    var u = t; TERMEN.forEach(function(p){ u = u.replace(p[0], p[1]); }); return u;
+  }
+  function loop(root){
+    if (!root) return;
+    if (root.nodeType === 3) { var v = vertaal(root.nodeValue); if (v !== root.nodeValue) root.nodeValue = v; return; }
+    if (root.nodeType !== 1 || root.tagName === 'SCRIPT' || root.tagName === 'STYLE') return;
+    ['title', 'placeholder', 'aria-label'].forEach(function(a){ if (root.hasAttribute && root.hasAttribute(a)) { var v = vertaal(root.getAttribute(a)); if (v !== root.getAttribute(a)) root.setAttribute(a, v); } });
+    var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT), n;
+    while ((n = w.nextNode())) {
+      if (n.nodeType === 3) { if (n.parentElement && /^(SCRIPT|STYLE)$/.test(n.parentElement.tagName)) continue; var v2 = vertaal(n.nodeValue); if (v2 !== n.nodeValue) n.nodeValue = v2; }
+      else ['title', 'placeholder', 'aria-label'].forEach(function(a){ if (n.hasAttribute(a)) { var v3 = vertaal(n.getAttribute(a)); if (v3 !== n.getAttribute(a)) n.setAttribute(a, v3); } });
+    }
+  }
+  loop(document.body);
+  new MutationObserver(function(muts){
+    muts.forEach(function(m){
+      if (m.type === 'characterData') loop(m.target);
+      else if (m.type === 'attributes') loop(m.target);
+      else m.addedNodes.forEach(loop);
+    });
+  }).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['title', 'placeholder', 'aria-label'] });
+  // Ook de grafieken (canvas) en tooltips gebruiken deze namen: vertaalfunctie beschikbaar maken.
+  window.mtToonEngels = vertaal;
+})();
+</script>
+<script>
+// ══════════════════════════════════════════════════════════════════
+// Beveiliging — zelfde opzet als index.html (Dienst Journaal):
+//  - knop Uitloggen; standaard automatisch uitloggen na 30 min zonder gebruik en bij inloggen
+//    altijd wachtwoord vragen, tenzij op deze pc "Niet automatisch uitloggen" is aangevinkt
+//    (die instelling is gedeeld met Dienst Journaal zelf: zelfde vinkje, zelfde pc);
+//  - automatisch bijwerken naar de nieuwste versie, alleen als niemand bezig is.
+// ══════════════════════════════════════════════════════════════════
+var APP_BUILD = '2026-10-09.4';
+var APP_AUTH_KEY = 'kpi_mt_auth';
+var APP_EN = true;
+function appGedeeldePc(){ return localStorage.getItem('dj_niet_uitloggen') !== '1'; }
+function appTxt(nl, en){ return APP_EN ? en : nl; }
+async function appUitloggen(automatisch){
+  if (!automatisch && !confirm(appTxt('Uitloggen op deze pc?', 'Sign out on this PC?'))) return;
+  try { if (typeof appVoorUitloggen === 'function') await Promise.race([appVoorUitloggen(), new Promise(function(r){ setTimeout(r, 5000); })]); } catch(e) {}
+  try { if (_spMsalInstance && typeof _spMsalInstance.clearCache === 'function') await _spMsalInstance.clearCache(); } catch(e) {}
+  try {
+    Object.keys(localStorage).filter(function(k){ return /login\.windows\.net|login\.microsoftonline|msal/i.test(k) || k.indexOf(SP_CLIENT_ID) >= 0; })
+      .forEach(function(k){ localStorage.removeItem(k); });
+    localStorage.removeItem('dj_sp_account_username');
+  } catch(e) {}
+  try { sessionStorage.removeItem(APP_AUTH_KEY); if (automatisch) sessionStorage.setItem('app_uitgelogd_reden', 'inactief'); } catch(e) {}
+  location.replace(location.pathname);
+}
+(function(){
+  var laatst = Date.now();
+  ['mousemove','mousedown','keydown','touchstart','wheel','scroll'].forEach(function(ev){
+    window.addEventListener(ev, function(){ laatst = Date.now(); }, { passive: true, capture: true });
+  });
+  // Automatisch uitloggen
+  setInterval(function(){
+    if (!appGedeeldePc() || sessionStorage.getItem(APP_AUTH_KEY) !== '1') return;
+    if (Date.now() - laatst >= 30 * 60 * 1000) appUitloggen(true);
+  }, 60 * 1000);
+  // Automatisch bijwerken
+  function nr(b){ var m = /^(\d{4}-\d{2}-\d{2})\.(\d+)$/.exec(String(b || '')); return m ? [m[1], +m[2]] : [String(b || ''), 0]; }
+  function nieuwer(a, b){ var x = nr(a), y = nr(b); return x[0] > y[0] || (x[0] === y[0] && x[1] > y[1]); }
+  var bezig = false;
+  function magNu(){
+    if (typeof appHeeftOnopgeslagenWerk === 'function' && appHeeftOnopgeslagenWerk()) return false;
+    var el = document.activeElement;
+    if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return false;
+    return document.hidden || Date.now() - laatst >= 2 * 60 * 1000;
+  }
+  function bijwerken(nieuw){
+    if (bezig) return;
+    var log = {}; try { log = JSON.parse(sessionStorage.getItem('app_update_pogingen') || '{}'); } catch(e) {}
+    var p = log[nieuw] || { n: 0, t: 0 };
+    if (p.n >= 2 && Date.now() - p.t < 10 * 60 * 1000) return;
+    if (!magNu()) { setTimeout(function(){ bijwerken(nieuw); }, 30 * 1000); return; }
+    bezig = true;
+    log[nieuw] = { n: p.n + 1, t: Date.now() };
+    try { sessionStorage.setItem('app_update_pogingen', JSON.stringify(log)); } catch(e) {}
+    (async function(){
+      try { if ('serviceWorker' in navigator) { var regs = await navigator.serviceWorker.getRegistrations(); await Promise.all(regs.map(function(r){ return r.unregister(); })); } } catch(e) {}
+      try { if (window.caches && caches.keys) { var n = await caches.keys(); await Promise.all(n.map(function(k){ return caches.delete(k); })); } } catch(e) {}
+      location.replace(location.pathname + '?v=' + Date.now());
+    })();
+  }
+  async function controleer(){
+    try {
+      var r = await fetch(location.pathname + '?versiecheck=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) return;
+      var m = /var APP_BUILD = '([^']+)'/.exec(await r.text());
+      if (m && nieuwer(m[1], APP_BUILD)) bijwerken(m[1]);
+    } catch(e) {}
+  }
+  window.appVersieControleren = controleer;
+  window.addEventListener('load', function(){ setTimeout(controleer, 3000); });
+  setInterval(function(){ if (!document.hidden) controleer(); }, 5 * 60 * 1000);
+  document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'visible') controleer(); });
+  if (/[?&]v=\d+/.test(location.search)) { try { history.replaceState(null, '', location.pathname + location.hash); } catch(e) {} }
+  // Vinkje + melding op het inlogscherm
+  document.addEventListener('DOMContentLoaded', function(){
+    var st = document.getElementById('mtMsStatus');
+    if (!st) return;
+    var lbl = document.createElement('label');
+    lbl.style.cssText = 'display:flex;gap:8px;align-items:flex-start;margin-top:12px;color:rgba(255,255,255,0.7);font-size:12px;cursor:pointer;line-height:1.35;text-align:left;';
+    lbl.innerHTML = '<input type="checkbox" id="app-niet-uitloggen" style="margin-top:2px;"><span>' +
+      appTxt('Niet automatisch uitloggen op deze pc', 'Do not sign out automatically on this PC') +
+      '<br><span style="color:rgba(255,255,255,0.45);font-size:11px;">' +
+      appTxt('Alleen aanvinken op een eigen pc of een vast scherm. Anders: na 30 minuten zonder gebruik uitloggen en bij inloggen altijd wachtwoord vragen.',
+             'Only tick on your own PC or a fixed screen. Otherwise: sign out after 30 minutes of inactivity and always ask for the password when signing in.') + '</span></span>';
+    st.parentNode.insertBefore(lbl, st.nextSibling);
+    var c = document.getElementById('app-niet-uitloggen');
+    c.checked = localStorage.getItem('dj_niet_uitloggen') === '1';
+    c.addEventListener('change', function(){ localStorage.setItem('dj_niet_uitloggen', c.checked ? '1' : '0'); });
+    if (sessionStorage.getItem('app_uitgelogd_reden') === 'inactief') {
+      st.textContent = appTxt('Automatisch uitgelogd na 30 minuten zonder gebruik.', 'Signed out automatically after 30 minutes of inactivity.');
+      st.style.color = '#e8a020';
+      sessionStorage.removeItem('app_uitgelogd_reden');
+    }
+  });
+})();
+</script>
+
+</body>
+</html>
