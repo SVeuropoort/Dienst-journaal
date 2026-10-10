@@ -6926,6 +6926,7 @@ window.addEventListener('resize', () => {
     'materieel_mail_v1',
     'werkorder_mail_v1',
     'werkorder_lijst_v1',
+    'schade_mail_v1',
     'werkoverdracht_abnormal_config_v1',
     'werkoverdracht_abnormal_lijst_v1',
     'std_bezetting_v1',
@@ -7178,6 +7179,7 @@ window.addEventListener('resize', () => {
     'materieel_mail_v1',
     'werkorder_mail_v1',
     'werkorder_lijst_v1',
+    'schade_mail_v1',
     'werkoverdracht_abnormal_config_v1',
     'werkoverdracht_abnormal_lijst_v1',
     'std_bezetting_v1',
@@ -11454,6 +11456,7 @@ document.getElementById('archOverlay').addEventListener('click',function(e){
         style="padding:10px 24px;border:none;background:#e8eef5;color:#003366;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;border-radius:6px 6px 0 0;margin-left:4px;">
         &#x1F4CB; Incidentrapport
       </button>
+      <button type="button" onclick="djSchadeMailInstellingen()" title="Ontvangers per formulier" style="margin-left:auto;padding:8px 14px;border:1px solid #c8d7e8;background:#fff;color:#003366;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;cursor:pointer;border-radius:6px 6px 0 0;">&#x2709;&#xFE0F; Ontvangers</button>
     </div>
     <!-- Tab panels -->
     <div id="schade-panel-1" style="width:100%;height:calc(100vh - 160px);">
@@ -13026,6 +13029,7 @@ function generatePDF() {
       const filename = `${t.pdf_bestandsnaam_prefix}_${dateStr}_${reporter}.pdf`;
 
       doc.save(filename);
+      try { window.parent.postMessage({ type: 'schade-pdf', formulier: 1, naam: filename, blob: doc.output('blob') }, '*'); } catch(e) {}
 
     } catch(err) {
       console.error(err);
@@ -13451,6 +13455,7 @@ window.addEventListener('resize', () => {
   <div style=&quot;display:flex;gap:8px;align-items:center;&quot;>
     <button class=&quot;lang-btn-eu active&quot; onclick=&quot;setLangEU('nl',this)&quot; style=&quot;background:transparent;border:1.5px solid rgba(255,255,255,0.4);color:white;padding:6px 14px;border-radius:20px;cursor:pointer;font-size:0.8rem;&quot;>NL</button>
     <button class=&quot;lang-btn-eu&quot; onclick=&quot;setLangEU('en',this)&quot; style=&quot;background:transparent;border:1.5px solid rgba(255,255,255,0.4);color:white;padding:6px 14px;border-radius:20px;cursor:pointer;font-size:0.8rem;&quot;>EN</button>
+    <button class=&quot;btn-print&quot; onclick=&quot;if (window.parent.djSchadeFormulier2Versturen) window.parent.djSchadeFormulier2Versturen(this)&quot; style=&quot;background:#1a7a40;&quot;>✉️ Versturen</button>
     <button class=&quot;btn-print&quot; onclick=&quot;window.print()&quot;>
       🖨️ <span data-i18n=&quot;btn_print&quot;>Afdrukken / Opslaan als PDF</span>
     </button>
@@ -14576,6 +14581,7 @@ document.getElementById(&quot;pdfMailBtn&quot;).addEventListener(&quot;click&quo
     }
 
     pdf.save(bestandsnaam);
+    try { window.parent.postMessage({ type: 'schade-pdf', formulier: 3, naam: bestandsnaam, blob: pdf.output('blob') }, '*'); } catch(e) {}
   } catch(err){
     alert(t.pdf_fout + err.message);
     btn.disabled = false;
@@ -14602,6 +14608,8 @@ document.getElementById(&quot;pdfMailBtn&quot;).addEventListener(&quot;click&quo
   const mailto = &quot;mailto:?subject=&quot; + encodeURIComponent(subject) + &quot;&amp;body=&quot; + encodeURIComponent(body);
 
   // Korte vertraging zodat de PDF-download in de browser kan starten voordat Outlook opent
+  // Automatisch verstuurd? Dan geen handmatige mail meer openen.
+  if (window.parent &amp;&amp; window.parent.djSchadeHeeftOntvanger &amp;&amp; window.parent.djSchadeHeeftOntvanger(3)) return;
   setTimeout(function(){
     window.location.href = mailto;
   }, 400);
@@ -23344,7 +23352,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.48';
+var DJ_BUILD = '2026-10-06.50';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -25263,6 +25271,10 @@ if(_sfrEd) _sfrEd.addEventListener('keypress', function(e){if(e.key==='Enter')ca
       { l: en() ? 'State pension calculation' : 'AOW berekening', i: '&#x1F4B0;', f: function(){ aowSwitchTab('aow'); } },
       { l: en() ? 'SFR / ESW leave' : 'SFR / ESW verlof', i: '&#x1F4C5;', f: function(){ aowSwitchTab('sfr'); } },
       { l: en() ? 'Explanation & CLA' : 'Toelichting & CAO', i: '&#x2139;&#xFE0F;', f: function(){ aowSwitchTab('uitleg'); } } ]; } },
+    { knop: "button[onclick^=\"navTo('schade'\"]", subs: function(){ return [
+      { l: en() ? 'Stena property' : 'Stena eigendommen', i: '&#x1F6A2;', f: function(){ switchSchadeTab(1); } },
+      { l: en() ? 'European accident statement' : 'Europees schadeformulier', i: '&#x1F1EA;&#x1F1FA;', f: function(){ switchSchadeTab(2); } },
+      { l: en() ? 'Incident report' : 'Incidentrapport', i: '&#x1F4CB;', f: function(){ switchSchadeTab(3); } } ]; } },
     { knop: "button[onclick^=\"navTo('opleidingen'\"]", subs: function(){
       return (typeof OPLEIDINGEN_FORMS !== 'undefined' ? OPLEIDINGEN_FORMS : []).map(function(f){
         return { l: String(f.naam_kort || f.titel).replace(/^📋\s*/, ''), i: f.id === 'overzicht' ? '&#x1F4CB;' : '&#x1F393;', f: function(){ oplToonTab(f.id); } }; }); } }
@@ -30470,6 +30482,141 @@ window.djInstRechtBijwerken = djInstRechtBijwerken;
     setInterval(houdVandaag, 60 * 1000);
   });
 })();
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// Schadeformulieren automatisch mailen (per formulier eigen ontvangers, per terminal)
+// De formulieren (in iframes) sturen hun PDF via postMessage naar de app. De app zet de PDF in
+// Bijlagen/Schade/<terminal>/ en schrijft schade_<terminal>_<tijd>.json in Data; de Power
+// Automate-flow "Schadeformulier versturen" mailt de PDF en ruimt het seintje op.
+// ══════════════════════════════════════════════════════════════════
+var DJ_SCHADE_NAMEN = { 1: 'Stena eigendommen', 2: 'Europees schadeformulier', 3: 'Incidentrapport' };
+var DJ_SCHADE_NAMEN_EN = { 1: 'Stena property', 2: 'European accident statement', 3: 'Incident report' };
+function djSchadeEn(){ return sessionStorage.getItem('dj_terminal') === 'IMM'; }
+function djSchadeNaam(n){ return (djSchadeEn() ? DJ_SCHADE_NAMEN_EN : DJ_SCHADE_NAMEN)[n] || ('Formulier ' + n); }
+function djSchadeMailKey(){ return tk('schade_mail_v1'); }
+function djSchadeMailGet(){
+  var t = sessionStorage.getItem('dj_terminal') || 'EP';
+  var std = { van: t === 'EP' ? 'supervisors.europoort@stenaline.com' : '', aan: '', cc: '' };
+  var s = {}; try { s = JSON.parse(localStorage.getItem(djSchadeMailKey()) || '{}') || {}; } catch(e) {}
+  [1, 2, 3].forEach(function(n){ s[n] = Object.assign({}, std, s[n] || {}); });
+  return s;
+}
+window.djSchadeHeeftOntvanger = function(n){ var s = djSchadeMailGet()[n]; return !!(s && s.aan && s.van); };
+function djSchadeToast(tekst, kleur){
+  var el = document.getElementById('dj-schade-toast');
+  if (!el) {
+    el = document.createElement('div'); el.id = 'dj-schade-toast';
+    el.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:100003;padding:12px 18px;border-radius:10px;color:#fff;font-weight:700;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.3);max-width:90vw;';
+    document.body.appendChild(el);
+  }
+  el.style.background = kleur || '#1a7a40'; el.textContent = tekst; el.style.display = 'block';
+  clearTimeout(el._t); el._t = setTimeout(function(){ el.style.display = 'none'; }, 7000);
+}
+async function djSchadeVersturen(n, naam, blob){
+  var en = djSchadeEn(), inst = djSchadeMailGet()[n];
+  if (!inst.aan || !inst.van) { djSchadeToast((en ? 'No recipient set for ' : 'Geen ontvanger ingesteld voor ') + djSchadeNaam(n) + (en ? ' (✉️ Recipients). Please e-mail the PDF yourself.' : ' (✉️ Ontvangers). Mail de PDF deze keer zelf.'), '#b8860b'); return false; }
+  try {
+    if (typeof spIngelogdAsync === 'function' && !(await spIngelogdAsync())) throw new Error(en ? 'not signed in' : 'niet ingelogd');
+    djSchadeToast((en ? 'Sending ' : 'Versturen: ') + djSchadeNaam(n) + '…', '#0f6cbd');
+    var t = sessionStorage.getItem('dj_terminal') || 'EP';
+    var nu = new Date();
+    var stempel = nu.getFullYear() + String(nu.getMonth()+1).padStart(2,'0') + String(nu.getDate()).padStart(2,'0') + '_' +
+      String(nu.getHours()).padStart(2,'0') + String(nu.getMinutes()).padStart(2,'0') + String(nu.getSeconds()).padStart(2,'0') + '_' + Math.random().toString(36).slice(2, 6);
+    var schoon = String(naam || ('schade_' + stempel + '.pdf')).replace(/[\\\/:*?"<>|#%]+/g, '_');
+    if (!/\.pdf$/i.test(schoon)) schoon += '.pdf';
+    var pad = 'Schade/' + t + '/' + stempel + '_' + schoon;
+    var item = await spUploadBijlage(pad, blob);
+    var pdfPad = '';
+    try { pdfPad = decodeURIComponent(new URL(item.webUrl).pathname).replace(/^\/sites\/[^\/]+/, ''); } catch(e) {}
+    if (!pdfPad) pdfPad = '/Shared Documents/Bijlagen/' + pad;
+    var tNaam = { EP: 'Europoort', HVH: 'Hoek van Holland', IMM: 'Immingham' }[t] || t;
+    var datum = nu.toLocaleDateString('nl-NL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    var tekst = en
+      ? '<p>Hello,</p><p>Attached is a new <b>' + djSchadeNaam(n) + '</b> from Stena Line ' + tNaam + ' (' + datum + ').</p><p>Kind regards,<br>Supervisors ' + tNaam + '</p><p style="color:#888;font-size:11px;">Sent automatically from Dienst Journaal.</p>'
+      : '<p>Beste,</p><p>Bijgevoegd een nieuw <b>' + djSchadeNaam(n) + '</b> van Stena Line ' + tNaam + ' (' + datum + ').</p><p>Met vriendelijke groet,<br>Supervisors ' + tNaam + '</p><p style="color:#888;font-size:11px;">Deze e-mail is automatisch verstuurd vanuit Dienst Journaal.</p>';
+    await spOpslaanBestand('schade_' + t + '_' + stempel + '.json', {
+      soort: 'schade', formulier: djSchadeNaam(n), terminal: t,
+      van: inst.van.trim(), aan: inst.aan.trim(), cc: String(inst.cc || '').split(/[;,\s]+/).filter(Boolean).join(';'),
+      onderwerp: djSchadeNaam(n) + ' - Stena Line ' + tNaam + ' - ' + datum,
+      tekst: tekst, pdfPad: pdfPad, pdfNaam: schoon, aangemaakt: nu.toISOString()
+    });
+    djSchadeToast('\u2714 ' + djSchadeNaam(n) + (en ? ' sent to ' : ' verstuurd naar ') + inst.aan);
+    return true;
+  } catch(e) {
+    djSchadeToast((en ? '\u2717 Automatic sending failed — please e-mail the PDF yourself (' : '\u2717 Automatisch versturen mislukt — mail de PDF deze keer zelf (') + ((e && e.message) || e) + ')', '#c0392b');
+    return false;
+  }
+}
+window.addEventListener('message', function(ev){
+  var d = ev.data;
+  if (!d || d.type !== 'schade-pdf' || !d.blob) return;
+  djSchadeVersturen(d.formulier, d.naam, d.blob);
+});
+// Formulier 2 (Europees schadeformulier) heeft geen eigen PDF: de app maakt er een van de pagina.
+window.djSchadeFormulier2Versturen = async function(knop){
+  var en = djSchadeEn();
+  if (!djSchadeHeeftOntvanger(2)) { djSchadeToast((en ? 'No recipient set for ' : 'Geen ontvanger ingesteld voor ') + djSchadeNaam(2) + ' (✉️).', '#b8860b'); return; }
+  var fr = document.querySelector('#schade-panel-2 iframe'); if (!fr) return;
+  var doc = fr.contentDocument, pagina = doc && doc.querySelector('.page');
+  if (!pagina) return;
+  if (knop) { knop.disabled = true; knop.dataset.oud = knop.innerHTML; knop.innerHTML = '\u23F3'; }
+  try {
+    if (!window.html2canvas) await woLaadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+    if (!(window.jspdf && window.jspdf.jsPDF)) await woLaadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    var canvas = await window.html2canvas(pagina, { scale: 2, backgroundColor: '#ffffff' });
+    var pdf = new window.jspdf.jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+    var bw = 210, bh = 297, imgH = canvas.height * bw / canvas.width, data = canvas.toDataURL('image/jpeg', 0.92);
+    for (var y = 0; y < imgH - 3; y += bh) { if (y > 0) pdf.addPage(); pdf.addImage(data, 'JPEG', 0, -y, bw, imgH); }
+    var datum = new Date().toISOString().slice(0, 10);
+    await djSchadeVersturen(2, 'Europees_schadeformulier_' + datum + '.pdf', pdf.output('blob'));
+  } catch(e) { djSchadeToast('\u2717 ' + ((e && e.message) || e), '#c0392b'); }
+  finally { if (knop) { knop.disabled = false; knop.innerHTML = knop.dataset.oud; } }
+};
+// Ontvangers per formulier instellen
+window.djSchadeMailInstellingen = function(){
+  var en = djSchadeEn(), s = djSchadeMailGet();
+  var oud = document.getElementById('dj-schade-dialoog'); if (oud) oud.remove();
+  var o = document.createElement('div'); o.id = 'dj-schade-dialoog';
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(0,20,40,.45);z-index:100002;display:flex;align-items:center;justify-content:center;padding:16px;';
+  var veld = 'width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #c8d7e8;border-radius:6px;font-size:12.5px;font-family:inherit;';
+  var lbl = 'display:block;font-size:10.5px;font-weight:700;color:#5a6b80;text-transform:uppercase;letter-spacing:.4px;margin:8px 0 3px;';
+  var blok = function(n){
+    return '<div style="border:1px solid #e3eaf2;border-radius:8px;padding:10px 12px;margin-top:10px;">' +
+      '<div style="font-weight:800;color:#003366;font-size:13px;">' + djSchadeNaam(n) + '</div>' +
+      '<label style="' + lbl + '">' + (en ? 'From' : 'Van') + '</label><input id="dsm-van-' + n + '" style="' + veld + '" value="' + woEsc(s[n].van) + '">' +
+      '<label style="' + lbl + '">' + (en ? 'To (who handles it)' : 'Aan (wie het afhandelt)') + '</label><input id="dsm-aan-' + n + '" style="' + veld + '" value="' + woEsc(s[n].aan) + '">' +
+      '<label style="' + lbl + '">CC</label><input id="dsm-cc-' + n + '" style="' + veld + '" value="' + woEsc(s[n].cc) + '" placeholder="' + (en ? 'separate with ;' : 'scheiden met ;') + '">' +
+    '</div>';
+  };
+  o.innerHTML = '<div style="background:#fff;border-radius:12px;width:480px;max-width:100%;max-height:90vh;overflow:auto;padding:18px;box-shadow:0 16px 40px rgba(0,0,0,.35);">' +
+    '<div style="font-weight:800;font-size:15px;color:#003366;">&#x2709;&#xFE0F; ' + (en ? 'Damage forms – recipients' : 'Schadeformulieren – ontvangers') + '</div>' +
+    '<div style="font-size:12px;color:#5a6b80;margin-top:4px;">' + (en ? 'Each form can go to someone else. Applies to this terminal. Leave "To" empty to e-mail it yourself.' : 'Elk formulier kan naar iemand anders. Geldt voor deze terminal. Laat "Aan" leeg om het zelf te mailen.') + '</div>' +
+    blok(1) + blok(2) + blok(3) +
+    '<div id="dsm-fout" style="color:#c0392b;font-size:12px;min-height:14px;margin-top:8px;"></div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px;">' +
+      '<button type="button" onclick="document.getElementById(\'dj-schade-dialoog\').remove()" style="background:#fff;border:1px solid #c8d7e8;color:#003366;border-radius:6px;padding:8px 14px;cursor:pointer;font-weight:700;">' + (en ? 'Cancel' : 'Annuleren') + '</button>' +
+      '<button type="button" onclick="djSchadeMailOpslaan()" style="background:#003366;color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-weight:700;">' + (en ? 'Save' : 'Opslaan') + '</button>' +
+    '</div></div>';
+  o.addEventListener('click', function(e){ if (e.target === o) o.remove(); });
+  document.body.appendChild(o);
+};
+window.djSchadeMailOpslaan = function(){
+  var ok = function(x){ return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x); }, fout = [], uit = {};
+  [1, 2, 3].forEach(function(n){
+    var lees = function(k){ return (document.getElementById('dsm-' + k + '-' + n).value || '').trim().toLowerCase(); };
+    var van = lees('van'), aan = lees('aan'), cc = lees('cc').split(/[;,\s]+/).filter(Boolean);
+    [van, aan].concat(cc).forEach(function(x){ if (x && !ok(x)) fout.push(x); });
+    if (aan && !van) fout.push(djSchadeNaam(n) + ': ' + (djSchadeEn() ? 'sender missing' : 'afzender ontbreekt'));
+    uit[n] = { van: van, aan: aan, cc: cc.join(';') };
+  });
+  if (fout.length) { document.getElementById('dsm-fout').textContent = (djSchadeEn() ? 'Check: ' : 'Controleer: ') + fout.join(', '); return; }
+  localStorage.setItem(djSchadeMailKey(), JSON.stringify(uit));
+  if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+  document.getElementById('dj-schade-dialoog').remove();
+  djSchadeToast(djSchadeEn() ? '\u2714 Recipients saved' : '\u2714 Ontvangers opgeslagen');
+};
 </script>
 
 </body>
