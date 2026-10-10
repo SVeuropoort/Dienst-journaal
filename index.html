@@ -8572,6 +8572,7 @@ function setP(k, v){
   refreshDropdowns(pfx, pool);
   buildStats();
   updateCertCell(k, v);
+  if (typeof djZiekKleurCel === 'function') djZiekKleurCel(k, v, pool);
   if(k.startsWith('kade_dd_')||/_mhcv/.test(k)){var kp=document.getElementById('panelKade');if(kp&&kp.innerHTML)buildKadeCheck();}
 }
 function clearPos(){
@@ -9563,10 +9564,11 @@ function ddd(id, pool, cls=''){
     const mb = _isMentor(e) ? '🎓 ' : '';
     opts+=`<option value="${esc(e.name)}"${e.name===sv?' selected':''}>${mb}${e.name}</option>`;
   });
-  const bg = selBg(sv, pool);
+  const _ziek = (typeof djIsZiekInPlanning === 'function') && djIsZiekInPlanning(sv);
+  const bg = _ziek ? '#e74c3c' : selBg(sv, pool);
   const _cbadges = certBadgesHtml(sv);
   const _verjBadge = (sv && typeof isVerjaardag === 'function' && isVerjaardag(sv)) ? '<span style="font-size:14px;margin-left:2px;" title="Vandaag jarig!">🎂</span>' : '';
-  return `<div class="cert-wrap" style="background:${bg}">${_verjBadge}<select class="psel${cls?' '+cls:''}" data-pfx="${pfx}" data-key="${id}" data-dup="true" style="background:${bg}" onchange="setP('${id}',this.value)"><option value=""></option>${opts}</select>${_cbadges}</div>`;
+  return `<div class="cert-wrap" style="background:${bg}">${_ziek?'<span class="dj-ziek-badge" style="font-size:13px;margin-right:2px;" title="Ziekgemeld — eerst beter melden of uit de planning halen">🤒</span>':''}${_verjBadge}<select class="psel${cls?' '+cls:''}" data-pfx="${pfx}" data-key="${id}" data-dup="true" style="background:${bg}${_ziek?';color:#fff;font-weight:700':''}"${_ziek?' title="Ziekgemeld — eerst beter melden of uit de planning halen"':''} onchange="setP('${id}',this.value)"><option value=""></option>${opts}</select>${_cbadges}</div>`;
 }
 
 function dd(id, pool, cls=''){
@@ -9584,10 +9586,11 @@ function dd(id, pool, cls=''){
       opts+=`<option value="${esc(e.name)}"${e.name===sv?' selected':''}>${mb}${e.name}</option>`;
     }
   });
-  const bg = selBg(sv, pool);
+  const _ziek = (typeof djIsZiekInPlanning === 'function') && djIsZiekInPlanning(sv);
+  const bg = _ziek ? '#e74c3c' : selBg(sv, pool);
   const _cbadges = certBadgesHtml(sv);
   const _verjBadge = (sv && typeof isVerjaardag === 'function' && isVerjaardag(sv)) ? '<span style="font-size:14px;margin-left:2px;" title="Vandaag jarig!">🎂</span>' : '';
-  return `<div class="cert-wrap" style="background:${bg}">${_verjBadge}<select class="psel${cls?' '+cls:''}" data-pfx="${pfx}" data-key="${id}" style="background:${bg}" onchange="setP('${id}',this.value)"><option value=""></option>${opts}</select>${_cbadges}</div>`;
+  return `<div class="cert-wrap" style="background:${bg}">${_ziek?'<span class="dj-ziek-badge" style="font-size:13px;margin-right:2px;" title="Ziekgemeld — eerst beter melden of uit de planning halen">🤒</span>':''}${_verjBadge}<select class="psel${cls?' '+cls:''}" data-pfx="${pfx}" data-key="${id}" style="background:${bg}${_ziek?';color:#fff;font-weight:700':''}"${_ziek?' title="Ziekgemeld — eerst beter melden of uit de planning halen"':''} onchange="setP('${id}',this.value)"><option value=""></option>${opts}</select>${_cbadges}</div>`;
 }
 
 // Determine which panel a position-key belongs to
@@ -21468,6 +21471,7 @@ function wisselPunctualityDatum(dateStr) {
   // Zet nieuwe instanties van terugkerende taken in de lijst als de periode
   // (dag/week/maand/jaar) nog niet is gegenereerd én het gekozen moment is aangebroken.
   function pGenereerHerhalingen(){
+    try { if (typeof djCertTodoGenereren === 'function') djCertTodoGenereren(); } catch(e) {}
     var d = pGet();
     if (!d.r || !d.r.length) return;
     var now = new Date();
@@ -23371,7 +23375,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.58';
+var DJ_BUILD = '2026-10-06.60';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -30788,6 +30792,160 @@ window.djSchadeMailOpslaan = function(){
   document.getElementById('dj-schade-dialoog').remove();
   djSchadeToast(djSchadeEn() ? '\u2714 Recipients saved' : '\u2714 Ontvangers opgeslagen');
 };
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// 1) Ziekgemelde medewerker in de dagplanning → ROOD + melding bovenaan
+// 2) Certificaat verloopt binnen 30 dagen → automatisch een taak in de To Do List
+// ══════════════════════════════════════════════════════════════════
+var _djZiekCache = { t: 0, datum: null, namen: [] };
+function djZiekNamenOpDatum(){
+  var d = (typeof planDate !== 'undefined' && planDate) || (typeof ziekmVandaagIso === 'function' ? ziekmVandaagIso() : '');
+  if (_djZiekCache.datum === d && Date.now() - _djZiekCache.t < 1500) return _djZiekCache.namen;
+  var namen = [];
+  try { if (typeof ziekmActief === 'function') namen = ziekmActief(d).map(function(z){ return z.naam; }); } catch(e) {}
+  _djZiekCache = { t: Date.now(), datum: d, namen: namen };
+  return namen;
+}
+function djIsZiekInPlanning(naam){
+  if (!naam) return false;
+  var n = String(naam).replace(/^\*+/, '').trim();
+  return djZiekNamenOpDatum().some(function(z){
+    var zz = String(z).replace(/ \([^)]+\)$/, '').trim();
+    return zz === n || (typeof certNaamMatch === 'function' && certNaamMatch(zz, n));
+  });
+}
+function djZiekKleurCel(key, naam, pool){
+  var sel = document.querySelector('[data-key="' + key + '"]'); if (!sel) return;
+  var wrap = sel.closest('.cert-wrap');
+  var ziek = djIsZiekInPlanning(naam);
+  var bg = ziek ? '#e74c3c' : (typeof selBg === 'function' ? selBg(naam, pool || []) : '');
+  sel.style.background = bg; sel.style.color = ziek ? '#fff' : ''; sel.style.fontWeight = ziek ? '700' : '';
+  sel.title = ziek ? 'Ziekgemeld — eerst beter melden of uit de planning halen' : '';
+  if (wrap) {
+    wrap.style.background = bg;
+    var b = wrap.querySelector('.dj-ziek-badge'); if (b) b.remove();
+    if (ziek) { var s = document.createElement('span'); s.className = 'dj-ziek-badge'; s.textContent = '🤒'; s.title = sel.title; s.style.cssText = 'font-size:13px;margin-right:2px;'; wrap.insertBefore(s, sel); }
+  }
+  djZiekPlanningBanner();
+}
+function djZiekPlanningBanner(){
+  var cont = document.getElementById('dagplanning-container'); if (!cont) return;
+  var el = document.getElementById('dj-ziek-banner');
+  var gevonden = {};
+  document.querySelectorAll('#dagplanning-container select.psel').forEach(function(sel){
+    var v = sel.value; if (v && djIsZiekInPlanning(v)) gevonden[v] = true;
+  });
+  var namen = Object.keys(gevonden);
+  if (!namen.length) { if (el) el.remove(); return; }
+  if (!el) { el = document.createElement('div'); el.id = 'dj-ziek-banner'; cont.insertBefore(el, cont.firstChild); }
+  el.style.cssText = 'background:#e74c3c;color:#fff;font-weight:700;font-size:13px;padding:9px 14px;border-radius:6px;margin:8px 0;';
+  el.innerHTML = '&#x1F912; ' + namen.length + (namen.length === 1 ? ' ziekgemelde medewerker staat' : ' ziekgemelde medewerkers staan') +
+    ' in de planning: <span style="font-weight:800;">' + namen.map(function(n){ return String(n).replace(/[&<>]/g, ''); }).join(', ') +
+    '</span>. Meld beter in de Werkoverdracht, of haal uit de planning.';
+}
+(function(){
+  if (typeof buildPanels === 'function') {
+    var _orig = buildPanels;
+    buildPanels = function(){ var r = _orig.apply(this, arguments); try { djZiekPlanningBanner(); } catch(e) {} return r; };
+  }
+})();
+
+// ── Certificaten die binnen 30 dagen verlopen → taak in de To Do List (één keer per certificaat)
+function djCertTodoGenereren(){
+  if (typeof getCertDates !== 'function' || typeof getCertVervalDatum !== 'function' || typeof pGet !== 'function') return;
+  if (!sessionStorage.getItem('_cloudGeladen')) return; // pas als de gegevens binnen zijn
+  var d = pGet(); if (!d.a) d.a = []; if (!d.d) d.d = [];
+  if (!d.certGen) d.certGen = [];
+  var dates = getCertDates(), nu = new Date(); nu.setHours(0,0,0,0);
+  var labels = { bhv: 'BHV', adm: 'Ademlucht', ehbo: 'EHBO', gevst: 'Gevaarlijke stoffen' };
+  var nieuw = 0;
+  Object.keys(dates).forEach(function(cat){
+    Object.keys(dates[cat] || {}).forEach(function(naam){
+      var verval = getCertVervalDatum(dates[cat][naam], cat); if (!verval) return;
+      var dagen = Math.round((verval - nu) / 86400000);
+      if (dagen > 30) return;
+      var iso = verval.getFullYear() + '-' + String(verval.getMonth()+1).padStart(2,'0') + '-' + String(verval.getDate()).padStart(2,'0');
+      var sleutel = 'cert:' + cat + ':' + naam + ':' + iso;
+      if (d.certGen.indexOf(sleutel) !== -1) return; // al eens aangemaakt (ook als hij is afgerond of verwijderd)
+      var label = labels[cat] || cat.toUpperCase();
+      var nl = String(verval.getDate()).padStart(2,'0') + '/' + String(verval.getMonth()+1).padStart(2,'0') + '/' + verval.getFullYear();
+      d.a.push({ id: Date.now() + nieuw, wie: '', datum: String(nu.getDate()).padStart(2,'0') + '/' + String(nu.getMonth()+1).padStart(2,'0') + '/' + nu.getFullYear(),
+        taak: (dagen < 0 ? '⛔ ' : '⚠️ ') + label + '-certificaat ' + naam + (dagen < 0 ? ' is verlopen op ' : ' verloopt op ') + nl + ' — laten verlengen',
+        uitleg: 'Automatisch aangemaakt vanuit Certificeringen (30 dagen vóór de vervaldatum).', certKey: sleutel });
+      d.certGen.push(sleutel); nieuw++;
+    });
+  });
+  if (nieuw) { pSet(d); if (typeof pRender === 'function') { try { pRender(); } catch(e) {} } }
+}
+document.addEventListener('DOMContentLoaded', function(){
+  setTimeout(djCertTodoGenereren, 6000);
+  setInterval(djCertTodoGenereren, 6 * 3600 * 1000);
+});
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// Arbo: medewerkers van 60 jaar of ouder niet inplannen op TW-posities en Meren VAST
+// (Meren HC VAST + Meren IMM VAST). Leeftijd komt uit de geboortedatum in het personeelsdossier.
+// Staat iemand er al, dan blijft de naam staan maar wordt het vakje oranje met ⚠️.
+// ══════════════════════════════════════════════════════════════════
+function djIs60PlusPositie(key){
+  return /^(o|a|on|av)_(imm_)?tw/.test(key) || /^(o|a|on|av)_m(hcv|immv)\d/.test(key);
+}
+var _dj60Cache = { t: 0, lijst: [] };
+function djGeboorteLijst(){
+  if (Date.now() - _dj60Cache.t < 2000) return _dj60Cache.lijst;
+  var v = (typeof getVerjaardagen === 'function') ? getVerjaardagen() : {};
+  var lijst = Object.keys(v).filter(function(n){ return v[n] && v[n].jaar; })
+    .map(function(n){ return { naam: n.replace(/ \([^)]+\)$/, ''), dag: +v[n].dag || 1, maand: +v[n].maand || 1, jaar: +v[n].jaar }; });
+  _dj60Cache = { t: Date.now(), lijst: lijst };
+  return lijst;
+}
+function djLeeftijd(naam){
+  if (!naam) return null;
+  var n = String(naam).replace(/^\*+/, '').trim();
+  var g = djGeboorteLijst().find(function(x){ return x.naam === n; }) ||
+          djGeboorteLijst().find(function(x){ return typeof certNaamMatch === 'function' && certNaamMatch(x.naam, n); });
+  if (!g) return null;
+  var ref = (typeof planDate !== 'undefined' && planDate) ? new Date(planDate + 'T12:00:00') : new Date();
+  var leeftijd = ref.getFullYear() - g.jaar;
+  if (ref.getMonth() + 1 < g.maand || (ref.getMonth() + 1 === g.maand && ref.getDate() < g.dag)) leeftijd--;
+  return leeftijd;
+}
+function dj60PlusFilter(){
+  var cache = {};
+  var is60 = function(n){ if (!(n in cache)) { var l = djLeeftijd(n); cache[n] = l !== null && l >= 60; } return cache[n]; };
+  document.querySelectorAll('#dagplanning-container select.psel[data-key]').forEach(function(sel){
+    var key = sel.getAttribute('data-key');
+    if (!djIs60PlusPositie(key)) return;
+    Array.prototype.slice.call(sel.options).forEach(function(o){
+      if (o.value && o.value !== sel.value && is60(o.value)) o.remove();
+    });
+    var wrap = sel.closest('.cert-wrap') || sel.parentNode;
+    var oud = wrap && wrap.querySelector('.dj-60-badge'); if (oud) oud.remove();
+    if (sel.value && is60(sel.value)) {
+      sel.style.background = '#f39c12'; sel.style.color = '#fff'; sel.style.fontWeight = '700';
+      sel.title = '60 jaar of ouder — volgens de arbo niet inplannen op deze positie';
+      var b = document.createElement('span'); b.className = 'dj-60-badge'; b.textContent = '⚠️60+'; b.title = sel.title;
+      b.style.cssText = 'font-size:10px;font-weight:800;color:#b9770e;margin-right:2px;';
+      sel.parentNode.insertBefore(b, sel);
+    } else if (sel.title && sel.title.indexOf('60 jaar') === 0) {
+      sel.style.color = ''; sel.style.fontWeight = ''; sel.title = '';
+    }
+  });
+}
+(function(){
+  if (typeof buildPanels === 'function') {
+    var _bp = buildPanels;
+    buildPanels = function(){ var r = _bp.apply(this, arguments); try { dj60PlusFilter(); } catch(e) {} return r; };
+  }
+  if (typeof refreshDropdowns === 'function') {
+    var _rd = refreshDropdowns;
+    refreshDropdowns = function(){ var r = _rd.apply(this, arguments); try { dj60PlusFilter(); } catch(e) {} return r; };
+  }
+})();
 </script>
 
 </body>
