@@ -23375,7 +23375,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.60';
+var DJ_BUILD = '2026-10-06.61';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -30808,13 +30808,30 @@ function djZiekNamenOpDatum(){
   _djZiekCache = { t: Date.now(), datum: d, namen: namen };
   return namen;
 }
+// Welke medewerker (rij in Certificeringen/Maandafsluiting) hoort bij een naam uit de planning?
+// Zelfde regels als bij de certificaten: eerst de 🔗-koppeling, dan exact dezelfde naam, en de losse
+// vergelijking (voorletter + achternaam) alleen als die precies één persoon oplevert. Zo krijgen
+// twee mensen met dezelfde voorletter en achternaam (bijv. H. Karagül) nooit elkaars status.
+var _djRijCache = { t: 0, lijst: [] };
+function djPersoonRijNaam(planningNaam){
+  if (!planningNaam || typeof certZoekRij !== 'function' || typeof oplOverzichtGetData !== 'function') return null;
+  if (Date.now() - _djRijCache.t > 1500) _djRijCache = { t: Date.now(), lijst: oplOverzichtGetData() || [] };
+  var idx = certZoekRij(planningNaam, _djRijCache.lijst);
+  return idx >= 0 ? _djRijCache.lijst[idx].naam : null;
+}
+function djNaamGelijk(a, b){
+  var f = (typeof certNormaliseerNaam === 'function') ? certNormaliseerNaam : function(x){ return String(x).toLowerCase().trim(); };
+  return f(String(a || '').replace(/^\*+/, '')) === f(String(b || '').replace(/^\*+/, ''));
+}
 function djIsZiekInPlanning(naam){
   if (!naam) return false;
-  var n = String(naam).replace(/^\*+/, '').trim();
-  return djZiekNamenOpDatum().some(function(z){
-    var zz = String(z).replace(/ \([^)]+\)$/, '').trim();
-    return zz === n || (typeof certNaamMatch === 'function' && certNaamMatch(zz, n));
-  });
+  var ziek = djZiekNamenOpDatum(); if (!ziek.length) return false;
+  var rij = djPersoonRijNaam(naam);
+  // Ziekmeldingen gebruiken precies de namen uit die lijst (incl. geboortejaar, bijv. "Karagül, H.,'95"),
+  // dus letterlijk vergelijken: het geboortejaar maakt het verschil tussen naamgenoten.
+  var letterlijk = function(a, b){ return String(a || '').replace(/^\*+/, '').trim().toLowerCase() === String(b || '').replace(/^\*+/, '').trim().toLowerCase(); };
+  if (rij) return ziek.some(function(z){ return letterlijk(z, rij); });
+  return ziek.some(function(z){ return letterlijk(z, naam); }); // geen eenduidige koppeling: alleen exact dezelfde naam
 }
 function djZiekKleurCel(key, naam, pool){
   var sel = document.querySelector('[data-key="' + key + '"]'); if (!sel) return;
@@ -30906,8 +30923,15 @@ function djGeboorteLijst(){
 function djLeeftijd(naam){
   if (!naam) return null;
   var n = String(naam).replace(/^\*+/, '').trim();
-  var g = djGeboorteLijst().find(function(x){ return x.naam === n; }) ||
-          djGeboorteLijst().find(function(x){ return typeof certNaamMatch === 'function' && certNaamMatch(x.naam, n); });
+  // Zelfde koppeling als bij de certificaten (🔗), zodat naamgenoten niet door elkaar lopen
+  var rij = (typeof djPersoonRijNaam === 'function') ? djPersoonRijNaam(n) : null;
+  var lijst = djGeboorteLijst();
+  var letterlijk = function(a, b){ return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase(); };
+  var g = (rij && lijst.find(function(x){ return letterlijk(x.naam, rij); })) || lijst.find(function(x){ return letterlijk(x.naam, n); });
+  if (!g) {
+    var kand = lijst.filter(function(x){ return typeof certNaamMatch === 'function' && certNaamMatch(x.naam, n); });
+    if (kand.length === 1) g = kand[0]; // alleen als er precies één persoon past
+  }
   if (!g) return null;
   var ref = (typeof planDate !== 'undefined' && planDate) ? new Date(planDate + 'T12:00:00') : new Date();
   var leeftijd = ref.getFullYear() - g.jaar;
