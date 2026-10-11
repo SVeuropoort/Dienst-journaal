@@ -23384,7 +23384,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.75';
+var DJ_BUILD = '2026-10-06.76';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -25314,7 +25314,9 @@ if(_sfrEd) _sfrEd.addEventListener('keypress', function(e){if(e.key==='Enter')ca
         if (f.id === 'ontwikkelgesprek') return typeof oplMagOntwikkelgesprek === 'function' ? oplMagOntwikkelgesprek() : false;
         return true;
       }).map(function(f){
-        return { l: String(f.naam_kort || f.titel).replace(/^📋\s*/, ''), i: f.id === 'overzicht' ? '&#x1F4CB;' : '&#x1F393;', f: function(){ oplToonTab(f.id); } }; }); } }
+        var slot = (f.id === 'overzicht' || f.id === 'ontwikkelgesprek') ? ' \uD83D\uDD12' : ''; // afgeschermd: slotje
+        return { l: String(f.naam_kort || f.titel).replace(/^📋\s*/, '').replace(/^\uD83D\uDCAC\s*/, '') + slot,
+          i: f.id === 'overzicht' ? '&#x1F4CB;' : (f.id === 'ontwikkelgesprek' ? '&#x1F4AC;' : '&#x1F393;'), f: function(){ oplToonTab(f.id); } }; }); } }
   ];
 
   var fly = null, sluitTimer = null, huidigeKnop = null, geopendOp = 0;
