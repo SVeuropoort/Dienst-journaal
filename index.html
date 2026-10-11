@@ -23398,7 +23398,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.87';
+var DJ_BUILD = '2026-10-06.88';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -32005,12 +32005,14 @@ function djVerzuimPaneel(){
   if (!sig.length) { box.innerHTML = ''; box.style.display = 'none'; return; }
   box.style.display = 'block';
   box.innerHTML = '<div style="background:#fff4e5;border:1px solid #f5c27a;border-left:4px solid #e67e22;border-radius:8px;padding:10px 14px;margin-bottom:12px;">' +
-    '<div style="font-weight:800;color:#a04000;font-size:13.5px;margin-bottom:6px;">&#x26A0;&#xFE0F; Verzuimsignalering &mdash; ' + DJ_VERZUIM_AANTAL + ' of meer ziekmeldingen in ' + DJ_VERZUIM_MAANDEN + ' maanden</div>' +
+    '<div style="font-weight:800;color:#a04000;font-size:14px;">&#x26A0;&#xFE0F; Verzuimsignalering &mdash; advies: plan een verzuimgesprek</div>' +
+    '<div style="font-size:12px;color:#7a4b00;margin:2px 0 8px;">Deze medewerkers hebben zich ' + DJ_VERZUIM_AANTAL + ' keer of vaker ziek gemeld in de afgelopen ' + DJ_VERZUIM_MAANDEN + ' maanden. ' +
+      'Ga met hen in gesprek over hun verzuim en klik daarna op <b>Gesprek gevoerd</b>; het gesprek wordt dan in hun dossier vastgelegd.</div>' +
     sig.map(function(s, i){
       var n = String(s.naam).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
       return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:5px 0;' + (i ? 'border-top:1px solid #f8dcb5;' : '') + '">' +
         '<span style="font-weight:700;min-width:170px;cursor:pointer;color:var(--navy);text-decoration:underline dotted;" onclick="pdSelecteer(\'' + n + '\')" title="Dossier openen">' + pdEsc(s.naam) + '</span>' +
-        '<span style="font-size:12px;color:#7a4b00;flex:1;">' + s.aantal + '\u00D7 ziek: ' + s.data.map(djNL).join(', ') + '</span>' +
+        '<span style="font-size:12px;color:#7a4b00;flex:1;"><b>Advies: verzuimgesprek voeren</b> &middot; ' + s.aantal + '\u00D7 ziek gemeld: ' + s.data.map(djNL).join(', ') + '</span>' +
         '<button type="button" onclick="djVerzuimGesprek(\'' + n + '\')" style="background:#1a7a40;color:#fff;border:none;border-radius:5px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;">&#x2714; Gesprek gevoerd</button></div>';
     }).join('') + '</div>';
 }
