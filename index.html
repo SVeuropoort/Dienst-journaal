@@ -23398,7 +23398,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.86';
+var DJ_BUILD = '2026-10-06.87';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -27582,6 +27582,7 @@ function pdSubTab(t){
     if (el.id === 'nieuw-tab-organogram') el.style.display = t === 'organogram' ? 'block' : 'none';
     else if (el.id === 'nieuw-tab-vakantie') el.style.display = t === 'vakantie' ? 'block' : 'none';
     else if (el.id === 'pd-opl-host') el.style.display = opl ? 'block' : 'none';
+    else if (el.id === 'pd-verzuim') return; // regelt djVerzuimPaneel zelf
     else el.style.display = t === 'dossier' ? '' : 'none';
   });
   [['dossier', 'pd-sub-btn-dossier'], ['organogram', 'pd-sub-btn-organogram'], ['vakantie', 'pd-sub-btn-vakantie'], ['certificeringen', 'pd-sub-btn-certificeringen'], ['ontwikkelgesprek', 'pd-sub-btn-ontwikkelgesprek']].forEach(function(x){
@@ -27592,6 +27593,7 @@ function pdSubTab(t){
   if (t === 'organogram' && typeof orgRender === 'function') orgRender();
   if (t === 'vakantie' && typeof vakRender === 'function') vakRender();
   if (t === 'dossier' && typeof pdInit === 'function') pdInit();
+  if (typeof djVerzuimPaneel === 'function') { if (t === 'dossier') djVerzuimPaneel(); else { var vz = document.getElementById('pd-verzuim'); if (vz) vz.style.display = 'none'; } }
   if (opl && host) {
     djOplContentNaar(host);
     if (typeof initOpleidingen === 'function') { try { initOpleidingen(); } catch(e) {} }
@@ -31966,6 +31968,79 @@ window.djOgVerwijderGesprek = async function(pad){
   var t = sessionStorage.getItem('dj_terminal') || 'EP'; delete _djOgLijst[t];
   if (typeof pdRenderDetail === 'function') pdRenderDetail();
 };
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// VERZUIMSIGNALERING (alleen supervisors — gebruikt de vertrouwelijke ziekmeldingen)
+// Regel: 3 of meer ziekmeldingen in de afgelopen 12 maanden = signaal "verzuimgesprek".
+// "Gesprek gevoerd" legt een registratie vast in het dossier; het signaal verdwijnt tot er
+// daarna opnieuw 3 meldingen binnen 12 maanden zijn.
+// ══════════════════════════════════════════════════════════════════
+var DJ_VERZUIM_AANTAL = 3, DJ_VERZUIM_MAANDEN = 12;
+function djIsoVanNL(d){ var m = /^(\d{1,2})-(\d{1,2})-(\d{4})$/.exec(String(d || '')); return m ? m[3] + '-' + String(m[2]).padStart(2,'0') + '-' + String(m[1]).padStart(2,'0') : String(d || ''); }
+function djVerzuimSignalen(){
+  if (typeof ziekmGet !== 'function' || typeof pdData !== 'function') return [];
+  var meldingen = ziekmGet(); if (!meldingen.length) return [];
+  var grens = new Date(); grens.setMonth(grens.getMonth() - DJ_VERZUIM_MAANDEN);
+  var grensIso = grens.toISOString().slice(0, 10);
+  var dossier = pdData(), perPersoon = {};
+  meldingen.forEach(function(z){ if (z && z.naam && z.gemeldOp && z.gemeldOp >= grensIso) (perPersoon[z.naam] = perPersoon[z.naam] || []).push(z.gemeldOp); });
+  return Object.keys(perPersoon).map(function(naam){
+    var data = perPersoon[naam].sort();
+    if (data.length < DJ_VERZUIM_AANTAL) return null;
+    // Is er na de meldingen die tot dit signaal leiden al een verzuimgesprek vastgelegd?
+    var drempelDatum = data[data.length - DJ_VERZUIM_AANTAL];
+    var gesprekken = (dossier[naam] || []).filter(function(e){ return e.soort === 'verzuimgesprek'; }).map(function(e){ return djIsoVanNL(e.datum); });
+    if (gesprekken.some(function(g){ return g >= data[data.length - 1]; })) return null;
+    return { naam: naam, aantal: data.length, data: data, sinds: drempelDatum };
+  }).filter(Boolean).sort(function(a, b){ return b.aantal - a.aantal || a.naam.localeCompare(b.naam); });
+}
+function djNL(iso){ var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? (+m[3]) + '-' + (+m[2]) + '-' + m[1] : iso; }
+function djVerzuimPaneel(){
+  var box = document.getElementById('pd-verzuim'); if (!box) return;
+  var sig = djVerzuimSignalen();
+  var knop = document.getElementById('pd-sub-btn-dossier');
+  if (knop) { var b = knop.querySelector('.pd-verzuim-badge'); if (b) b.remove(); if (sig.length) { b = document.createElement('span'); b.className = 'pd-verzuim-badge'; b.textContent = ' \u26A0\uFE0F' + sig.length; knop.appendChild(b); } }
+  if (!sig.length) { box.innerHTML = ''; box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  box.innerHTML = '<div style="background:#fff4e5;border:1px solid #f5c27a;border-left:4px solid #e67e22;border-radius:8px;padding:10px 14px;margin-bottom:12px;">' +
+    '<div style="font-weight:800;color:#a04000;font-size:13.5px;margin-bottom:6px;">&#x26A0;&#xFE0F; Verzuimsignalering &mdash; ' + DJ_VERZUIM_AANTAL + ' of meer ziekmeldingen in ' + DJ_VERZUIM_MAANDEN + ' maanden</div>' +
+    sig.map(function(s, i){
+      var n = String(s.naam).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:5px 0;' + (i ? 'border-top:1px solid #f8dcb5;' : '') + '">' +
+        '<span style="font-weight:700;min-width:170px;cursor:pointer;color:var(--navy);text-decoration:underline dotted;" onclick="pdSelecteer(\'' + n + '\')" title="Dossier openen">' + pdEsc(s.naam) + '</span>' +
+        '<span style="font-size:12px;color:#7a4b00;flex:1;">' + s.aantal + '\u00D7 ziek: ' + s.data.map(djNL).join(', ') + '</span>' +
+        '<button type="button" onclick="djVerzuimGesprek(\'' + n + '\')" style="background:#1a7a40;color:#fff;border:none;border-radius:5px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;">&#x2714; Gesprek gevoerd</button></div>';
+    }).join('') + '</div>';
+}
+window.djVerzuimGesprek = function(naam){
+  var o = document.createElement('div'); o.id = 'vz-dialoog';
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(0,20,40,.45);z-index:100005;display:flex;align-items:center;justify-content:center;padding:16px;';
+  var vandaag = new Date(), nl = String(vandaag.getDate()).padStart(2,'0') + '-' + String(vandaag.getMonth()+1).padStart(2,'0') + '-' + vandaag.getFullYear();
+  o.innerHTML = '<div style="background:#fff;border-radius:10px;padding:16px;width:420px;max-width:100%;">' +
+    '<div style="font-weight:800;color:#003366;font-size:15px;">Verzuimgesprek &mdash; ' + pdEsc(naam) + '</div>' +
+    '<label style="display:block;font-size:11px;font-weight:700;color:#5a6b80;margin:10px 0 3px;">DATUM GESPREK</label><input id="vz-datum" value="' + nl + '" placeholder="dd-mm-jjjj" style="width:130px;padding:6px;border:1px solid #c8d7e8;border-radius:5px;">' +
+    '<label style="display:block;font-size:11px;font-weight:700;color:#5a6b80;margin:10px 0 3px;">KORTE NOTITIE (OPTIONEEL)</label><textarea id="vz-notitie" rows="3" style="width:100%;box-sizing:border-box;padding:6px;border:1px solid #c8d7e8;border-radius:5px;font-family:inherit;" placeholder="Bijv. afspraken die zijn gemaakt"></textarea>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;"><button type="button" onclick="document.getElementById(\'vz-dialoog\').remove()" style="padding:7px 12px;">Annuleren</button>' +
+    '<button type="button" id="vz-ok" style="padding:7px 14px;background:#1a7a40;color:#fff;border:none;border-radius:5px;font-weight:700;">Opslaan in dossier</button></div></div>';
+  document.body.appendChild(o);
+  document.getElementById('vz-ok').onclick = function(){
+    var d = document.getElementById('vz-datum').value.trim(), m = /^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/.exec(d);
+    if (!m) { document.getElementById('vz-datum').style.borderColor = '#c0392b'; return; }
+    var notitie = document.getElementById('vz-notitie').value.trim();
+    var data = pdData(); if (!data[naam]) data[naam] = [];
+    data[naam].push({ id: pdVolgendeId(data), datum: (+m[1]) + '-' + (+m[2]) + '-' + m[3], soort: 'verzuimgesprek', tekst: 'Verzuimgesprek gevoerd' + (notitie ? ' — ' + notitie : '') });
+    pdSave(data); o.remove();
+    djVerzuimPaneel(); if (typeof pdRenderLijst === 'function') pdRenderLijst(); if (typeof _pdGeselecteerd !== 'undefined' && _pdGeselecteerd === naam && typeof pdRenderDetail === 'function') pdRenderDetail();
+  };
+};
+document.addEventListener('DOMContentLoaded', function(){
+  var pd = document.getElementById('nieuw-tab-personeelsdossier'); var bar = document.getElementById('pd-subtabs');
+  if (!pd || !bar) return;
+  var box = document.createElement('div'); box.id = 'pd-verzuim'; box.style.display = 'none';
+  bar.parentNode.insertBefore(box, bar.nextSibling);
+});
 </script>
 
 </body>
