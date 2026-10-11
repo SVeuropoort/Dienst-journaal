@@ -23384,7 +23384,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.68';
+var DJ_BUILD = '2026-10-06.70';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -31154,7 +31154,22 @@ function orgImporteren(){
   inp.click();
 }
 var _orgBewerken = false;
-function orgToggleBewerken(){ _orgBewerken = !_orgBewerken; orgRender(); }
+function orgToggleBewerken(){ if (!orgMagBewerken()) return; _orgBewerken = !_orgBewerken; orgRender(); }
+// Bewerken mag wie in het Personeelsdossier het vinkje "SV" heeft (en de beheerder)
+function orgMagBewerken(){
+  var ik = String(localStorage.getItem('dj_sp_account_username') || '').toLowerCase(); if (!ik) return false;
+  if (typeof djToegangHeeft === 'function' && djToegangHeeft(ik, 'beheer')) return true;
+  var f = (typeof djFunctiesGet === 'function') ? djFunctiesGet() : {};
+  var svNamen = Object.keys(f).filter(function(n){ return f[n] && f[n].sv; });
+  if (!svNamen.length) return false;
+  var mijn = [];
+  var acc = (typeof djToegangGet === 'function') ? djToegangGet().find(function(a){ return String(a.email).toLowerCase() === ik; }) : null;
+  if (acc && acc.naam) { var w = acc.naam.trim().split(/\s+/); mijn.push(w[w.length - 1] + ' ' + w.slice(0, -1).join(' ')); }
+  if (typeof djChatNaamUitEmail === 'function') mijn.push(djChatNaamUitEmail(ik));
+  var kand = svNamen.filter(function(n){ return mijn.some(function(m){ return typeof certNaamMatch === 'function' && certNaamMatch(n, m); }); });
+  return kand.length === 1; // alleen bij een eenduidige match
+}
+window.orgMagBewerken = orgMagBewerken;
 function orgKies(pad){ // pad als "supervisors.0.ploegleiders.1.persoon"
   var o = orgGet(); if (!o) return;
   var sel = document.querySelector('[data-orgpad="' + pad + '"]'); if (!sel) return;
@@ -31205,16 +31220,17 @@ window.orgImporteren = orgImporteren; window.orgToggleBewerken = orgToggleBewerk
 function orgRender(){
   var box = document.getElementById('nieuw-tab-organogram'); if (!box) return;
   var o = orgGet(), personen = orgPersonen();
+  if (_orgBewerken && !orgMagBewerken()) _orgBewerken = false;
   var tNaam = { EP: 'Europoort', HVH: 'Hoek van Holland', IMM: 'Immingham' }[sessionStorage.getItem('dj_terminal') || 'EP'];
   var knop = 'background:#fff;border:1px solid #c8d7e8;color:var(--navy);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px;font-weight:700;';
   var kop = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">' +
     '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:var(--navy);letter-spacing:.5px;flex:1;">&#x1F465; Organogram ' + tNaam +
       (o && o.peildatum ? ' <span style="font-size:12px;color:#8795a8;font-weight:600;">per ' + orgEsc(o.peildatum.split('-').reverse().join('-')) + '</span>' : '') +
       (o ? ' <span style="font-size:12px;color:#8795a8;font-weight:600;">\u00B7 ' + orgAlleTeamNamen(o).length + ' ploegen</span>' : '') + '</div>' +
-    (o ? '<button type="button" onclick="orgToggleBewerken()" style="' + knop + (_orgBewerken ? 'background:var(--navy);color:#fff;' : '') + '">' + (_orgBewerken ? '&#x2714; Klaar' : '&#x270F;&#xFE0F; Bewerken') + '</button>' : '') +
-    '<button type="button" onclick="orgImporteren()" style="' + knop + '">&#x1F4E5; Importeren</button></div>';
-  if (!o) { box.innerHTML = kop + '<div style="color:#8795a8;font-size:13px;padding:20px 0;">Nog geen organogram voor ' + tNaam + '. Klik op <b>Importeren</b> en kies het organogram-bestand, of ' +
-    '<button type="button" onclick="orgNieuw()" style="' + knop + '">&#x2795; Begin met een leeg organogram</button></div>'; return; }
+    (o && orgMagBewerken() ? '<button type="button" onclick="orgToggleBewerken()" style="' + knop + (_orgBewerken ? 'background:var(--navy);color:#fff;' : '') + '">' + (_orgBewerken ? '&#x2714; Klaar' : '&#x270F;&#xFE0F; Bewerken') + '</button>' : '') +
+    (!o && orgMagBewerken() ? '<button type="button" onclick="orgImporteren()" style="' + knop + '">&#x1F4E5; Importeren</button>' : '') + '</div>';
+  if (!o) { box.innerHTML = kop + '<div style="color:#8795a8;font-size:13px;padding:20px 0;">Nog geen organogram voor ' + tNaam + '.' +
+    (orgMagBewerken() ? ' Klik op <b>Importeren</b> en kies het organogram-bestand, of <button type="button" onclick="orgNieuw()" style="' + knop + '">&#x2795; Begin met een leeg organogram</button>' : ' Een SV kan het organogram aanmaken.') + '</div>'; return; }
   var alle = orgPersonenAlle();
   var naamVan = function(id){ var p = orgPersoonVan(id, alle); return p ? p.weergave : ''; };
   // Wie al ergens in het organogram staat, komt niet nog eens in een keuzelijst
@@ -31330,6 +31346,36 @@ function djFunctieFilter(){
 (function(){
   if (typeof buildPanels === 'function') { var _bp = buildPanels; buildPanels = function(){ var r = _bp.apply(this, arguments); try { djFunctieFilter(); } catch(e) {} return r; }; }
   if (typeof refreshDropdowns === 'function') { var _rd = refreshDropdowns; refreshDropdowns = function(){ var r = _rd.apply(this, arguments); try { djFunctieFilter(); } catch(e) {} return r; }; }
+})();
+</script>
+
+<script>
+// Certificeringen: vervaldatum zichtbaar maken. ORANJE = verloopt binnen 30 dagen, ROOD = verlopen.
+// Geldt voor de certificaten met een geldigheidsduur (BHV, EHBO, Ademlucht, Gevaarlijke stoffen).
+var DJ_VELD_NAAR_CAT = { bhv: 'bhv', ehbo: 'ehbo', al: 'adm', gs: 'gevst' };
+function djCertVervalKleuren(){
+  if (typeof getCertVervalDatum !== 'function') return;
+  var nu = new Date(); nu.setHours(0,0,0,0);
+  document.querySelectorAll('#opl-content input[data-veld]').forEach(function(inp){
+    var cat = DJ_VELD_NAAR_CAT[inp.getAttribute('data-veld')];
+    inp.style.background = ''; inp.style.color = ''; inp.style.fontWeight = ''; inp.style.borderColor = '#ccd6e5'; inp.title = '';
+    if (!cat || !inp.value) return;
+    var m = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/.exec(inp.value.trim()); if (!m) return;
+    var iso = m[3] + '-' + String(m[2]).padStart(2,'0') + '-' + String(m[1]).padStart(2,'0');
+    var verval = getCertVervalDatum(iso, cat); if (!verval) return;
+    var dagen = Math.round((verval - nu) / 86400000);
+    var nl = String(verval.getDate()).padStart(2,'0') + '/' + String(verval.getMonth()+1).padStart(2,'0') + '/' + verval.getFullYear();
+    if (dagen < 0) { inp.style.background = '#e74c3c'; inp.style.color = '#fff'; inp.style.fontWeight = '700'; inp.style.borderColor = '#c0392b'; inp.title = 'Verlopen op ' + nl + ' — moet verlengd worden'; }
+    else if (dagen <= 30) { inp.style.background = '#f39c12'; inp.style.color = '#fff'; inp.style.fontWeight = '700'; inp.style.borderColor = '#d68910'; inp.title = 'Verloopt op ' + nl + ' (over ' + dagen + ' dagen) — laten verlengen'; }
+  });
+}
+(function(){
+  var box = null, plan = function(){ clearTimeout(plan._t); plan._t = setTimeout(djCertVervalKleuren, 30); };
+  document.addEventListener('DOMContentLoaded', function(){
+    box = document.getElementById('opl-content'); if (!box) return;
+    new MutationObserver(plan).observe(box, { childList: true, subtree: true });
+    box.addEventListener('change', function(e){ if (e.target && e.target.matches && e.target.matches('input[data-veld]')) plan(); }, true);
+  });
 })();
 </script>
 
