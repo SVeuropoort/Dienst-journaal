@@ -23396,7 +23396,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.83';
+var DJ_BUILD = '2026-10-06.84';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -25301,8 +25301,10 @@ if(_sfrEd) _sfrEd.addEventListener('keypress', function(e){if(e.key==='Enter')ca
       (!bhv || bhv.style.display === 'none') ? [] : [{ l: 'BHV / EHBO', i: '&#x26D1;&#xFE0F;', f: function(){ matShowSubTab('bhv'); } }]); } },
     { knop: '#nav-btn-werkoverdracht', eigen: true, subs: function(){ return [
       { l: en() ? 'Handover' : 'Overdracht', i: '&#x21C4;', sub: 'overdracht' },
-      { l: en() ? 'Personnel file' : 'Personeelsdossier', i: '&#x1F4C1;', sub: 'personeelsdossier' },
-      { l: en() ? 'Organisation chart' : 'Organogram', i: '&#x1F465;', sub: 'organogram' },
+      { l: en() ? 'Personnel file' : 'Personeelsdossier', i: '&#x1F4C1;', sub: 'personeelsdossier', kids: (function(){
+        var k = [{ l: en() ? 'File' : 'Dossier', i: '&#x1F4C1;', sub: 'personeelsdossier' }, { l: en() ? 'Organisation chart' : 'Organogram', i: '&#x1F465;', sub: 'organogram' }];
+        if ((sessionStorage.getItem('dj_terminal') || 'EP') === 'EP') k.push({ l: 'Vakantierooster', i: '&#x1F3D6;&#xFE0F;', sub: 'vakantie' });
+        return k; })() },
       { l: 'Toolbox', i: '&#x1F9F0;', sub: 'toolbox' } ]; } },
     { knop: "button[onclick^=\"navTo('werkorder'\"]", subs: function(){ return [
       { l: en() ? 'Work order' : 'Werkorder', i: '&#x1F4DD;', f: function(){ woTabToon('formulier'); } },
@@ -25342,7 +25344,7 @@ if(_sfrEd) _sfrEd.addEventListener('keypress', function(e){if(e.key==='Enter')ca
     document.body.appendChild(fly);
     return fly;
   }
-  function sluit(){ clearTimeout(sluitTimer); if (fly) fly.style.display = 'none'; if (huidigeKnop) huidigeKnop.style.background = 'transparent'; huidigeKnop = null;
+  function sluit(){ clearTimeout(sluitTimer); if (fly) fly.style.display = 'none'; if (typeof sluit2 === 'function') sluit2(); if (huidigeKnop) huidigeKnop.style.background = 'transparent'; huidigeKnop = null;
     Array.prototype.forEach.call(document.querySelectorAll('.nav-sub-inline'), function(x){ x.remove(); }); }
   function planSluiten(){ clearTimeout(sluitTimer); sluitTimer = setTimeout(sluit, 260); }
   function kies(item, s){
@@ -25357,7 +25359,7 @@ if(_sfrEd) _sfrEd.addEventListener('keypress', function(e){if(e.key==='Enter')ca
     var nm = document.getElementById('navMenu'); if (nm) nm.style.display = 'none';
   }
   function itemHtml(s, i){
-    return '<button type="button" data-i="' + i + '" style="display:flex;align-items:center;gap:10px;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:11px 18px;cursor:pointer;text-align:left;" onmouseover="this.style.background=\'rgba(255,255,255,0.08)\'" onmouseout="this.style.background=\'transparent\'"><span style="width:18px;text-align:center;">' + s.i + '</span><span>' + s.l + '</span></button>';
+    return '<button type="button" data-i="' + i + '" style="display:flex;align-items:center;gap:10px;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:11px 18px;cursor:pointer;text-align:left;" onmouseover="this.style.background=\'rgba(255,255,255,0.08)\'" onmouseout="this.style.background=\'transparent\'"><span style="width:18px;text-align:center;">' + s.i + '</span><span style="flex:1;">' + s.l + '</span>' + (s.kids ? '<span style="font-size:18px;opacity:.75;">&#x203A;</span>' : '') + '</button>';
   }
   function open(item, btn){
     clearTimeout(sluitTimer);
@@ -25378,9 +25380,45 @@ if(_sfrEd) _sfrEd.addEventListener('keypress', function(e){if(e.key==='Enter')ca
       d.innerHTML = html.replace(/padding:11px 18px/g, 'padding:10px 18px 10px 34px'); btn.insertAdjacentElement('afterend', d); bind(d, item, subs);
     }
   }
+  var fly2 = null;
+  function sluit2(){ if (fly2) fly2.style.display = 'none'; }
+  function openKids(rij, item, s){
+    var kids = s.kids || []; if (!kids.length) return;
+    if (!fly2) {
+      fly2 = document.createElement('div'); fly2.id = 'navFlyout2';
+      fly2.style.cssText = 'display:none;position:fixed;background:#0a2448;border:1px solid rgba(255,255,255,0.2);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.5);min-width:200px;z-index:100001;overflow:hidden;';
+      fly2.addEventListener('mouseenter', function(){ clearTimeout(sluitTimer); });
+      fly2.addEventListener('mouseleave', planSluiten);
+      document.body.appendChild(fly2);
+    }
+    var r = rij.getBoundingClientRect();
+    if (window.innerWidth - r.right >= 210) {
+      fly2.innerHTML = kids.map(itemHtml).join('');
+      fly2.style.display = 'block'; fly2.style.left = (r.right + 4) + 'px'; fly2.style.top = r.top + 'px';
+      Array.prototype.forEach.call(fly2.querySelectorAll('button[data-i]'), function(b){
+        b.addEventListener('click', function(ev){ ev.stopPropagation(); sluit2(); kies(item, kids[+b.getAttribute('data-i')]); });
+      });
+    } else { // smal scherm: onder de regel uitklappen
+      var bestaand = rij.nextElementSibling;
+      if (bestaand && bestaand.classList.contains('nav-sub-kids')) { bestaand.remove(); return; }
+      var d = document.createElement('div'); d.className = 'nav-sub-kids';
+      d.innerHTML = kids.map(itemHtml).join('').replace(/padding:11px 18px/g, 'padding:9px 18px 9px 50px');
+      rij.insertAdjacentElement('afterend', d);
+      Array.prototype.forEach.call(d.querySelectorAll('button[data-i]'), function(b){
+        b.addEventListener('click', function(ev){ ev.stopPropagation(); kies(item, kids[+b.getAttribute('data-i')]); });
+      });
+    }
+  }
   function bind(el, item, subs){
-    Array.prototype.forEach.call(el.querySelectorAll('button[data-i]'), function(b){
-      b.addEventListener('click', function(ev){ ev.stopPropagation(); kies(item, subs[+b.getAttribute('data-i')]); });
+    Array.prototype.forEach.call(el.querySelectorAll(':scope > button[data-i]'), function(b){
+      var s = subs[+b.getAttribute('data-i')];
+      if (s && s.kids) {
+        b.addEventListener('mouseenter', function(){ if (window.matchMedia && window.matchMedia('(hover: hover)').matches) openKids(b, item, s); });
+        b.addEventListener('click', function(ev){ ev.stopPropagation(); openKids(b, item, s); });
+      } else {
+        b.addEventListener('mouseenter', sluit2);
+        b.addEventListener('click', function(ev){ ev.stopPropagation(); kies(item, s); });
+      }
     });
   }
   function init(){
@@ -27544,7 +27582,7 @@ function pdSubTab(t){
 window.pdSubTab = pdSubTab;
 function nieuwToonTab(tab){
   var sub = null;
-  if (tab === 'organogram') { tab = 'personeelsdossier'; sub = 'organogram'; } // organogram is een subtabblad van Personeelsdossier
+  if (tab === 'organogram' || tab === 'vakantie') { sub = tab; tab = 'personeelsdossier'; } // subtabbladen van Personeelsdossier
   var tabs = ['overdracht', 'personeelsdossier', 'toolbox'];
   tabs.forEach(function(t){
     var body = document.getElementById('nieuw-tab-' + t);
@@ -31723,7 +31761,6 @@ function vakRender(){
       '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:var(--navy);flex:1;">&#x1F3D6;&#xFE0F; Vakantierooster Europoort</div>' +
       '<select onchange="vakKiesJaar(this.value)" style="padding:6px 10px;border:1px solid #c8d7e8;border-radius:6px;font-weight:700;">' + jaren.map(function(y){ return '<option' + (y === jaar ? ' selected' : '') + '>' + y + '</option>'; }).join('') + '</select>' +
       (mag ? '<button type="button" onclick="vakToggleBewerken()" style="' + knop + (_vakBewerken ? 'background:var(--navy);color:#fff;' : '') + '">' + (_vakBewerken ? '&#x2714; Klaar' : '&#x270F;&#xFE0F; Bewerken') + '</button>' : '') +
-      (mag && _vakBewerken ? '<button type="button" onclick="if(confirm(\'Het huidige rooster vervangen door een geïmporteerd bestand?\')) vakImporteren()" style="' + knop + '">&#x1F4E5; Opnieuw importeren</button>' : '') +
       '<button type="button" onclick="vakAfdrukken()" style="' + knop + '">&#x1F5A8;&#xFE0F; Afdrukken</button></div>' +
     (!n.compleet ? '<div style="background:#fff3cd;border:1px solid #f0d78c;border-radius:6px;padding:8px 12px;font-size:12.5px;margin-bottom:10px;">De vakantieperiodes voor ' + jaar + ' zijn nog niet ingevuld.' + (mag ? ' Klik op <b>Bewerken</b> om ze in te vullen.' : '') + '</div>' : '') +
     (_vakBewerken ? '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;background:#f5f8fc;border:1px solid #dbe5f0;border-radius:6px;padding:8px 12px;margin-bottom:10px;">' +
