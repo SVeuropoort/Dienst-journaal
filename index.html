@@ -8463,9 +8463,17 @@ function refreshDropdowns(pfx, pool){
   }
   function esc(t){ return String(t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function sluit(){ if (pop) pop.style.display = 'none'; doelSel = null; }
-  function kies(optIndex){
+  function kies(item){
     var sel = doelSel; sluit();
-    if (!sel) return;
+    if (!sel || !item) return;
+    // Op NAAM kiezen (niet op plaats in de lijst): de keuzelijst kan intussen opnieuw zijn opgebouwd
+    // (opslaan/verversen op de achtergrond), waardoor de plaatsnummers verschoven zijn. Is de cel zelf
+    // vervangen, dan de nieuwe cel met dezelfde sleutel gebruiken.
+    var key = sel.getAttribute('data-key');
+    if (key && !document.body.contains(sel)) { var nieuw = document.querySelector('select.psel[data-key="' + key + '"]'); if (nieuw) sel = nieuw; }
+    var optIndex = -1;
+    for (var oi = 0; oi < sel.options.length; oi++) { if (sel.options[oi].value === item.v) { optIndex = oi; break; } }
+    if (optIndex < 0) return;
     if (sel.selectedIndex !== optIndex) {
       sel.selectedIndex = optIndex;
       var k = sel.getAttribute('data-key');
@@ -8478,9 +8486,9 @@ function refreshDropdowns(pfx, pool){
     gefilterd = [];
     Array.prototype.forEach.call(doelSel.options, function(o, i){
       if (o.disabled) return;
-      if (!o.value) { if (!q) gefilterd.push({ i: i, sc: -1, tekst: '— leeg —', leeg: true }); return; }
+      if (!o.value) { if (!q) gefilterd.push({ i: i, v: '', sc: -1, tekst: '— leeg —', leeg: true }); return; }
       var sc = score(o.text, q);
-      if (sc >= 0) gefilterd.push({ i: i, sc: sc, tekst: o.text });
+      if (sc >= 0) gefilterd.push({ i: i, v: o.value, sc: sc, tekst: o.text });
     });
     if (q) gefilterd.sort(function(a, b){ return a.sc - b.sc || a.i - b.i; });
     if (idx >= gefilterd.length) idx = Math.max(0, gefilterd.length - 1);
@@ -8505,14 +8513,14 @@ function refreshDropdowns(pfx, pool){
       inp.addEventListener('keydown', function(e){
         if (e.key === 'ArrowDown') { e.preventDefault(); idx = Math.min(idx + 1, gefilterd.length - 1); tekenLijst(); }
         else if (e.key === 'ArrowUp') { e.preventDefault(); idx = Math.max(idx - 1, 0); tekenLijst(); }
-        else if (e.key === 'Enter') { e.preventDefault(); if (gefilterd[idx]) kies(gefilterd[idx].i); }
+        else if (e.key === 'Enter') { e.preventDefault(); if (gefilterd[idx]) kies(gefilterd[idx]); }
         else if (e.key === 'Escape') { e.preventDefault(); var s0 = doelSel; sluit(); if (s0) s0.focus(); }
-        else if (e.key === 'Tab') { if (gefilterd[idx] && inp.value) { e.preventDefault(); kies(gefilterd[idx].i); } else sluit(); }
+        else if (e.key === 'Tab') { if (gefilterd[idx] && inp.value) { e.preventDefault(); kies(gefilterd[idx]); } else sluit(); }
       });
       pop.addEventListener('mousedown', function(e){
         var r = e.target.closest('[data-n]');
         e.preventDefault(); // focus in het zoekveld houden
-        if (r) kies(gefilterd[+r.getAttribute('data-n')].i);
+        if (r) kies(gefilterd[+r.getAttribute('data-n')]);
       });
     }
     doelSel = sel;
@@ -23384,7 +23392,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.77';
+var DJ_BUILD = '2026-10-06.78';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
