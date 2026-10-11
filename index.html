@@ -4713,6 +4713,7 @@ function djAdminOpslaan(){
     <div style="display:flex;gap:6px;margin-bottom:16px;">
       <button id="nieuw-tab-btn-overdracht" onclick="nieuwToonTab('overdracht')" style="padding:9px 18px;border:none;border-radius:6px 6px 0 0;background:var(--navy);color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#x21C4; Overdracht</button>
       <button id="nieuw-tab-btn-personeelsdossier" onclick="nieuwToonTab('personeelsdossier')" style="padding:9px 18px;border:none;border-radius:6px 6px 0 0;background:#e8eef5;color:var(--navy);font-family:'Barlow Condensed',sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#x1F4C1; Personeelsdossier</button>
+      <button id="nieuw-tab-btn-organogram" onclick="nieuwToonTab('organogram')" style="padding:9px 18px;border:none;border-radius:6px 6px 0 0;background:#e8eef5;color:var(--navy);font-family:'Barlow Condensed',sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#x1F465; Organogram</button>
       <button id="nieuw-tab-btn-toolbox" onclick="nieuwToonTab('toolbox')" style="padding:9px 18px;border:none;border-radius:6px 6px 0 0;background:#e8eef5;color:var(--navy);font-family:'Barlow Condensed',sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#x1F9F0; Toolbox</button>
     </div>
 
@@ -4834,6 +4835,7 @@ function djAdminOpslaan(){
     </div>
 
     <!-- ===== PERSONEELSDOSSIER (sub-tab) ===== -->
+    <div id="nieuw-tab-organogram" class="card" style="display:none;"></div>
     <div id="nieuw-tab-personeelsdossier" style="display:none;">
       <div class="card">
         <div class="card-header"><div class="icon">&#x1F4C1;</div><h2>Zoeken &amp; Registreren</h2></div>
@@ -6928,6 +6930,7 @@ window.addEventListener('resize', () => {
     'werkorder_mail_v1',
     'werkorder_lijst_v1',
     'schade_mail_v1',
+    'organogram_v1',
     'werkoverdracht_abnormal_config_v1',
     'werkoverdracht_abnormal_lijst_v1',
     'std_bezetting_v1',
@@ -7181,6 +7184,7 @@ window.addEventListener('resize', () => {
     'werkorder_mail_v1',
     'werkorder_lijst_v1',
     'schade_mail_v1',
+    'organogram_v1',
     'werkoverdracht_abnormal_config_v1',
     'werkoverdracht_abnormal_lijst_v1',
     'std_bezetting_v1',
@@ -23375,7 +23379,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.61';
+var DJ_BUILD = '2026-10-06.62';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -25281,6 +25285,7 @@ if(_sfrEd) _sfrEd.addEventListener('keypress', function(e){if(e.key==='Enter')ca
     { knop: '#nav-btn-werkoverdracht', eigen: true, subs: function(){ return [
       { l: en() ? 'Handover' : 'Overdracht', i: '&#x21C4;', sub: 'overdracht' },
       { l: en() ? 'Personnel file' : 'Personeelsdossier', i: '&#x1F4C1;', sub: 'personeelsdossier' },
+      { l: en() ? 'Organisation chart' : 'Organogram', i: '&#x1F465;', sub: 'organogram' },
       { l: 'Toolbox', i: '&#x1F9F0;', sub: 'toolbox' } ]; } },
     { knop: "button[onclick^=\"navTo('werkorder'\"]", subs: function(){ return [
       { l: en() ? 'Work order' : 'Werkorder', i: '&#x1F4DD;', f: function(){ woTabToon('formulier'); } },
@@ -27498,7 +27503,7 @@ function navWerkoverdracht(label, btn, subtab, callback) {
   }, 60);
 }
 function nieuwToonTab(tab){
-  var tabs = ['overdracht', 'personeelsdossier', 'toolbox'];
+  var tabs = ['overdracht', 'personeelsdossier', 'organogram', 'toolbox'];
   tabs.forEach(function(t){
     var body = document.getElementById('nieuw-tab-' + t);
     var btn = document.getElementById('nieuw-tab-btn-' + t);
@@ -27507,6 +27512,7 @@ function nieuwToonTab(tab){
   });
   if (tab === 'personeelsdossier' && typeof pdInit === 'function') pdInit();
   if (tab === 'toolbox' && typeof toolboxRender === 'function') toolboxRender();
+  if (tab === 'organogram' && typeof orgRender === 'function') orgRender();
   if (typeof djVertaalPaginaEngels === 'function') setTimeout(djVertaalPaginaEngels, 60);
 }
 
@@ -30970,6 +30976,163 @@ function dj60PlusFilter(){
     refreshDropdowns = function(){ var r = _rd.apply(this, arguments); try { dj60PlusFilter(); } catch(e) {} return r; };
   }
 })();
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// ORGANOGRAM (Werkoverdracht → tabblad na Personeelsdossier)
+// Structuur + namen staan in de gesynchroniseerde opslag (EP_organogram_v1), NIET in de code.
+// Alleen personen die het systeem kent (Certificeringen/Maandafsluiting-lijst of Toegangsbeheer)
+// worden ingevuld; onbekende namen blijven leeg.
+// ══════════════════════════════════════════════════════════════════
+function orgKey(){ return (sessionStorage.getItem('dj_terminal') || 'EP') + '_organogram_v1'; }
+function orgGet(){ try { return JSON.parse(localStorage.getItem(orgKey()) || 'null'); } catch(e) { return null; } }
+function orgSet(o){ o.bijgewerkt = new Date().toISOString(); localStorage.setItem(orgKey(), JSON.stringify(o)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }
+function orgEsc(t){ return String(t == null ? '' : t).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function orgMooi(n){
+  var m = /^\s*([^,]+),\s*([^,]+?)\s*(,\s*'?\d+)?\s*$/.exec(String(n || ''));
+  return m ? (m[2].trim() + ' ' + m[1].trim()) : String(n || '');
+}
+// Alle personen die het systeem kent
+function orgPersonen(){
+  var uit = [], gezien = {};
+  var opl = (typeof oplOverzichtGetData === 'function') ? (oplOverzichtGetData() || []) : [];
+  opl.forEach(function(r){
+    if (!r || !r.naam || gezien['opl:' + r.naam]) return;
+    gezien['opl:' + r.naam] = true;
+    uit.push({ id: 'opl:' + r.naam, weergave: r.dpNaam || orgMooi(r.naam), labels: [r.naam, r.dpNaam].filter(Boolean), groep: r.groep || '' });
+  });
+  var toeg = (typeof djToegangGet === 'function') ? djToegangGet() : [];
+  toeg.forEach(function(a){
+    if (!a || !a.email || a.nietInGroep) return;
+    // Naam uit de Microsoft-weergavenaam ("van Campen Leon" → "Leon van Campen"), anders uit het e-mailadres
+    var naam = '';
+    if (a.naam && /\s/.test(a.naam) && a.naam.indexOf('@') < 0) { var w = a.naam.trim().split(/\s+/); naam = w.pop() + ' ' + w.join(' '); naam = naam.charAt(0).toUpperCase() + naam.slice(1); }
+    if (!naam) naam = (typeof djChatNaamUitEmail === 'function') ? djChatNaamUitEmail(a.email) : a.email;
+    // Staat deze persoon al in de lijst hierboven? Dan niet dubbel.
+    var dubbel = uit.some(function(p){ return p.labels.some(function(l){ return typeof certNaamMatch === 'function' && certNaamMatch(l, naam); }); });
+    if (dubbel) return;
+    var mailNaam = (typeof djChatNaamUitEmail === 'function') ? djChatNaamUitEmail(a.email) : '';
+    uit.push({ id: 'mail:' + a.email.toLowerCase(), weergave: naam, labels: [naam, a.naam, mailNaam].filter(Boolean), groep: '' });
+  });
+  return uit.sort(function(a, b){ return a.weergave.localeCompare(b.weergave, 'nl'); });
+}
+function orgPersoonVan(id, personen){ return (personen || orgPersonen()).find(function(p){ return p.id === id; }) || null; }
+// Naam uit het organogram (bijv. "S v/d Helden", "Harun") → persoon in het systeem, alleen als het eenduidig is
+function orgZoekPersoon(ruw, personen){
+  var r = String(ruw || '').trim(); if (!r) return null;
+  var norm = r.replace(/\bv\/d\b/gi, 'van der').replace(/\bvd\b/gi, 'van der').replace(/\bv\b/gi, 'van').replace(/\s+jr\.?$/i, '').replace(/\s+/g, ' ');
+  var laag = function(x){ return String(x || '').toLowerCase().replace(/\s+/g, ' ').trim(); };
+  var compact = function(x){ return laag(x).replace(/[\s.]/g, ''); }; // "Leon van Campen" = "Leon Vancampen" (uit e-mailadres)
+  var exact = personen.filter(function(p){ return p.labels.concat([p.weergave]).some(function(l){ return laag(l) === laag(norm) || laag(l) === laag(r) || compact(l) === compact(norm); }); });
+  if (exact.length === 1) return exact[0];
+  var kand;
+  if (!/\s/.test(norm)) { // alleen een voornaam, bijv. "Harun"
+    kand = personen.filter(function(p){ return laag(p.weergave).split(' ')[0] === laag(norm); });
+  } else {
+    kand = personen.filter(function(p){ return p.labels.concat([p.weergave]).some(function(l){ return typeof certNaamMatch === 'function' && certNaamMatch(norm, l); }); });
+    // Staat er een voluit geschreven voornaam (bijv. "All", "Dennis")? Dan moet die ook kloppen als
+    // we de voornaam van de kandidaat kennen — anders wordt "All Rodgers" ten onrechte "Ashley Rodgers".
+    var vn = laag(norm).split(' ')[0];
+    if (vn.replace(/\./g, '').length > 1) kand = kand.filter(function(p){
+      var pv = laag(p.weergave).split(' ')[0];
+      return pv.replace(/\./g, '').length <= 1 || /\./.test(pv) || pv === vn;
+    });
+  }
+  return kand.length === 1 ? kand[0] : null;
+}
+function orgImporteren(){
+  var inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json,application/json';
+  inp.onchange = function(){
+    var f = inp.files && inp.files[0]; if (!f) return;
+    f.text().then(function(t){
+      var bron; try { bron = JSON.parse(t); } catch(e) { alert('Dit is geen geldig organogram-bestand.'); return; }
+      if (!bron || bron.soort !== 'dienst-journaal-organogram') { alert('Dit is geen organogram-bestand van Dienst Journaal.'); return; }
+      var personen = orgPersonen(), onbekend = [], gebruikt = {};
+      var p = function(naam){
+        var x = orgZoekPersoon(naam, personen);
+        if (x && gebruikt[x.id]) x = null; // iedereen maar één keer in het organogram
+        if (!x && naam) onbekend.push(naam);
+        if (x) gebruikt[x.id] = true;
+        return x ? x.id : '';
+      };
+      var o = {
+        peildatum: bron.peildatum || '',
+        pom: { rol: (bron.pom || {}).rol || 'POM', persoon: p((bron.pom || {}).naam) },
+        om: { rol: (bron.om || {}).rol || 'Operations Manager', persoon: p((bron.om || {}).naam) },
+        supervisors: (bron.supervisors || []).map(function(s){ return { persoon: p(s.naam),
+          ploegleiders: (s.ploegleiders || []).map(function(pl){ return { persoon: p(pl.naam),
+            teams: (pl.teams || []).map(function(tm){ return { naam: tm.naam, leden: (tm.leden || []).map(p).filter(Boolean) }; }) }; }) }; })
+      };
+      orgSet(o); orgRender();
+      alert('Organogram geïmporteerd.' + (onbekend.length ? '\n\nDeze namen zijn niet (eenduidig) bekend in het systeem en zijn leeg gelaten:\n• ' + onbekend.join('\n• ') + '\n\nJe kunt ze via ✏️ Bewerken alsnog kiezen.' : ''));
+    });
+  };
+  inp.click();
+}
+var _orgBewerken = false;
+function orgToggleBewerken(){ _orgBewerken = !_orgBewerken; orgRender(); }
+function orgKies(pad){ // pad als "supervisors.0.ploegleiders.1.persoon"
+  var o = orgGet(); if (!o) return;
+  var sel = document.querySelector('[data-orgpad="' + pad + '"]'); if (!sel) return;
+  var delen = pad.split('.'), obj = o;
+  for (var i = 0; i < delen.length - 1; i++) obj = obj[delen[i]];
+  obj[delen[delen.length - 1]] = sel.value;
+  if (Array.isArray(obj) && !sel.value) obj.splice(+delen[delen.length - 1], 1);
+  orgSet(o); orgRender();
+}
+function orgLidErbij(s, pl, t){
+  var o = orgGet(); if (!o) return;
+  o.supervisors[s].ploegleiders[pl].teams[t].leden.push(''); orgSet(o); orgRender();
+}
+window.orgImporteren = orgImporteren; window.orgToggleBewerken = orgToggleBewerken; window.orgKies = orgKies; window.orgLidErbij = orgLidErbij;
+function orgRender(){
+  var box = document.getElementById('nieuw-tab-organogram'); if (!box) return;
+  var o = orgGet(), personen = orgPersonen();
+  var tNaam = { EP: 'Europoort', HVH: 'Hoek van Holland', IMM: 'Immingham' }[sessionStorage.getItem('dj_terminal') || 'EP'];
+  var knop = 'background:#fff;border:1px solid #c8d7e8;color:var(--navy);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px;font-weight:700;';
+  var kop = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">' +
+    '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:var(--navy);letter-spacing:.5px;flex:1;">&#x1F465; Organogram ' + tNaam +
+      (o && o.peildatum ? ' <span style="font-size:12px;color:#8795a8;font-weight:600;">per ' + orgEsc(o.peildatum.split('-').reverse().join('-')) + '</span>' : '') + '</div>' +
+    (o ? '<button type="button" onclick="orgToggleBewerken()" style="' + knop + (_orgBewerken ? 'background:var(--navy);color:#fff;' : '') + '">' + (_orgBewerken ? '&#x2714; Klaar' : '&#x270F;&#xFE0F; Bewerken') + '</button>' : '') +
+    '<button type="button" onclick="orgImporteren()" style="' + knop + '">&#x1F4E5; Importeren</button></div>';
+  if (!o) { box.innerHTML = kop + '<div style="color:#8795a8;font-size:13px;padding:20px 0;">Nog geen organogram voor ' + tNaam + '. Klik op <b>Importeren</b> en kies het organogram-bestand.</div>'; return; }
+  var naamVan = function(id){ var p = orgPersoonVan(id, personen); return p ? p.weergave : ''; };
+  var keuze = function(pad, id){
+    return '<select data-orgpad="' + pad + '" onchange="orgKies(\'' + pad + '\')" style="width:100%;font-size:11.5px;padding:2px;border-radius:4px;border:1px solid #c8d7e8;max-width:170px;">' +
+      '<option value="">—</option>' + personen.map(function(p){ return '<option value="' + orgEsc(p.id) + '"' + (p.id === id ? ' selected' : '') + '>' + orgEsc(p.weergave) + '</option>'; }).join('') + '</select>';
+  };
+  var vak = function(rol, inhoud, donker){
+    return '<div style="background:' + (donker ? 'var(--navy)' : '#e8eef5') + ';color:' + (donker ? '#fff' : 'var(--navy)') + ';border-radius:6px;padding:7px 9px;text-align:center;font-size:12px;line-height:1.3;">' +
+      '<div style="font-weight:800;font-size:11px;opacity:.85;">' + rol + '</div>' + inhoud + '</div>';
+  };
+  var persoonHtml = function(pad, id){ return _orgBewerken ? '<div style="margin-top:4px;">' + keuze(pad, id) + '</div>' : '<div style="font-weight:700;font-size:13px;margin-top:2px;">' + (orgEsc(naamVan(id)) || '<span style="opacity:.5;">—</span>') + '</div>'; };
+  var lijn = '<div style="width:2px;height:14px;background:#9fb3c8;margin:0 auto;"></div>';
+  var html = kop + '<div style="overflow-x:auto;padding-bottom:10px;"><div style="min-width:980px;">' +
+    '<div style="display:flex;justify-content:center;">' + vak(orgEsc(o.pom.rol), persoonHtml('pom.persoon', o.pom.persoon), true) + '</div>' + lijn +
+    '<div style="display:flex;justify-content:center;">' + vak(orgEsc(o.om.rol), persoonHtml('om.persoon', o.om.persoon), true) + '</div>' + lijn +
+    '<div style="display:flex;gap:10px;align-items:flex-start;border-top:2px solid #9fb3c8;padding-top:12px;">' +
+    o.supervisors.map(function(s, si){
+      return '<div style="flex:1;min-width:0;border:1px solid #dbe5f0;border-radius:8px;padding:8px;background:#fbfdff;">' +
+        '<div style="display:flex;justify-content:center;margin-bottom:10px;">' + vak('Supervisor Stevedoring', persoonHtml('supervisors.' + si + '.persoon', s.persoon), true) + '</div>' +
+        '<div style="display:flex;gap:6px;">' + s.ploegleiders.map(function(pl, pi){
+          return '<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;">' +
+            vak('Ploegleider', persoonHtml('supervisors.' + si + '.ploegleiders.' + pi + '.persoon', pl.persoon), false) +
+            pl.teams.map(function(tm, ti){
+              var basis = 'supervisors.' + si + '.ploegleiders.' + pi + '.teams.' + ti + '.leden.';
+              var leden = tm.leden.map(function(id, li){
+                return _orgBewerken ? '<div style="margin-top:3px;">' + keuze(basis + li, id) + '</div>' : '<div>' + (orgEsc(naamVan(id)) || '<span style="opacity:.5;">—</span>') + '</div>';
+              }).join('');
+              return '<div style="border:1px solid #c8d7e8;border-radius:6px;padding:6px 8px;background:#fff;font-size:12px;line-height:1.45;">' +
+                '<div style="font-weight:800;color:var(--navy);margin-bottom:2px;">' + orgEsc(tm.naam) + '</div>' + (leden || '<div style="opacity:.5;">—</div>') +
+                (_orgBewerken ? '<button type="button" onclick="orgLidErbij(' + si + ',' + pi + ',' + ti + ')" style="margin-top:4px;font-size:11px;border:1px dashed #9fb3c8;background:none;border-radius:4px;cursor:pointer;color:var(--navy);">+ lid</button>' : '') + '</div>';
+            }).join('') + '</div>';
+        }).join('') + '</div></div>';
+    }).join('') + '</div></div></div>' +
+    (_orgBewerken ? '<div style="font-size:11.5px;color:#8795a8;margin-top:6px;">Kies "—" om iemand uit een team te halen. Alleen personen die in het systeem bekend zijn, staan in de lijst.</div>' : '');
+  box.innerHTML = html;
+}
+window.orgRender = orgRender;
 </script>
 
 </body>
