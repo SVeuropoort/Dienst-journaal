@@ -23384,7 +23384,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.67';
+var DJ_BUILD = '2026-10-06.68';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -31178,10 +31178,15 @@ function orgVraagTeamNaam(o, huidig){
   return naam;
 }
 window.orgTeamErbij = function(si, pi){ var o = orgGet(); if (!o) return; var n = orgVraagTeamNaam(o, ''); if (!n) return; o.supervisors[si].ploegleiders[pi].teams.push({ naam: n, leden: [''] }); orgSet(o); orgRender(); };
-window.orgTeamNaam = function(si, pi, ti){ var o = orgGet(); if (!o) return; var t = o.supervisors[si].ploegleiders[pi].teams[ti]; var n = orgVraagTeamNaam(o, t.naam); if (!n) return; t.naam = n; orgSet(o); orgRender(); };
+window.orgTeamNaam = function(si, pi, ti){ var o = orgGet(); if (!o) return; var pl = o.supervisors[si].ploegleiders[pi], t = pl.teams[ti]; var n = orgVraagTeamNaam(o, t.naam); if (!n) return;
+  if (pl.eigenTeam === t.naam) pl.eigenTeam = n; t.naam = n; orgSet(o); orgRender(); };
 window.orgTeamWeg = function(si, pi, ti){ var o = orgGet(); if (!o) return; var t = o.supervisors[si].ploegleiders[pi].teams[ti];
   if (!confirm('Ploeg "' + t.naam + '" verwijderen?' + (t.leden.filter(Boolean).length ? '\nDe leden komen weer vrij in de keuzelijsten.' : ''))) return;
-  o.supervisors[si].ploegleiders[pi].teams.splice(ti, 1); orgSet(o); orgRender(); };
+  var plx = o.supervisors[si].ploegleiders[pi]; if (plx.eigenTeam === t.naam) delete plx.eigenTeam;
+  plx.teams.splice(ti, 1); orgSet(o); orgRender(); };
+window.orgEigenTeam = function(si, pi, naam){ var o = orgGet(); if (!o) return; var pl = o.supervisors[si].ploegleiders[pi];
+  if (naam && !pl.teams.some(function(t){ return t.naam === naam; })) return;
+  if (naam) pl.eigenTeam = naam; else delete pl.eigenTeam; orgSet(o); orgRender(); };
 window.orgPloegleiderErbij = function(si){ var o = orgGet(); if (!o) return; o.supervisors[si].ploegleiders.push({ persoon: '', teams: [] }); orgSet(o); orgRender(); };
 window.orgPloegleiderWeg = function(si, pi){ var o = orgGet(); if (!o) return; var pl = o.supervisors[si].ploegleiders[pi];
   if (pl.teams.length && !confirm('Deze ploegleider heeft ' + pl.teams.length + ' ploeg(en). Ploegleider én ploegen verwijderen?')) return;
@@ -31230,6 +31235,15 @@ function orgRender(){
   };
   var persoonHtml = function(pad, id){ return _orgBewerken ? '<div style="margin-top:4px;">' + keuze(pad, id) + '</div>' : '<div style="font-weight:700;font-size:13px;margin-top:2px;">' + (orgEsc(naamVan(id)) || '<span style="opacity:.5;">—</span>') + '</div>'; };
   var lijn = '<div style="width:2px;height:14px;background:#9fb3c8;margin:0 auto;"></div>';
+  // Eigen ploeg van de ploegleider: alleen te kiezen uit de ploegen die onder hem vallen
+  var orgEigenTeamHtml = function(si, pi, pl){
+    var geldig = pl.teams.some(function(t){ return t.naam === pl.eigenTeam; });
+    if (_orgBewerken) {
+      return '<div style="margin-top:4px;"><select onchange="orgEigenTeam(' + si + ',' + pi + ',this.value)" title="Eigen ploeg van deze ploegleider" style="width:100%;font-size:11px;padding:2px;border-radius:4px;border:1px solid #c8d7e8;max-width:170px;">' +
+        '<option value="">— eigen ploeg —</option>' + pl.teams.map(function(t){ return '<option value="' + orgEsc(t.naam) + '"' + (t.naam === pl.eigenTeam ? ' selected' : '') + '>' + orgEsc(t.naam) + '</option>'; }).join('') + '</select></div>';
+    }
+    return geldig ? '<div style="font-size:11px;font-weight:800;margin-top:2px;opacity:.85;">' + orgEsc(pl.eigenTeam) + '</div>' : '';
+  };
   var mini = 'font-size:11px;border:1px dashed #9fb3c8;background:#fff;border-radius:4px;cursor:pointer;color:var(--navy);padding:2px 6px;';
   var weg = function(fn, titel){ return _orgBewerken ? '<button type="button" onclick="' + fn + '" title="' + titel + '" style="border:none;background:none;color:#c0392b;cursor:pointer;font-size:12px;float:right;line-height:1;">&#x2715;</button>' : ''; };
   var html = kop + '<div style="overflow-x:auto;padding-bottom:10px;"><div style="min-width:980px;">' +
@@ -31242,7 +31256,7 @@ function orgRender(){
         '<div style="display:flex;justify-content:center;margin-bottom:10px;">' + vak('Supervisor Stevedoring', persoonHtml('supervisors.' + si + '.persoon', s.persoon), true) + '</div>' +
         '<div style="display:flex;gap:6px;">' + s.ploegleiders.map(function(pl, pi){
           return '<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;">' +
-            '<div>' + weg('orgPloegleiderWeg(' + si + ',' + pi + ')', 'Ploegleider verwijderen') + vak('Ploegleider', persoonHtml('supervisors.' + si + '.ploegleiders.' + pi + '.persoon', pl.persoon), false) + '</div>' +
+            '<div>' + weg('orgPloegleiderWeg(' + si + ',' + pi + ')', 'Ploegleider verwijderen') + vak('Ploegleider', persoonHtml('supervisors.' + si + '.ploegleiders.' + pi + '.persoon', pl.persoon) + orgEigenTeamHtml(si, pi, pl), false) + '</div>' +
             pl.teams.map(function(tm, ti){
               var basis = 'supervisors.' + si + '.ploegleiders.' + pi + '.teams.' + ti + '.leden.';
               var leden = tm.leden.map(function(id, li){
