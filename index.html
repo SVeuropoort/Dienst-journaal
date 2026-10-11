@@ -6934,6 +6934,7 @@ window.addEventListener('resize', () => {
     'werkorder_lijst_v1',
     'schade_mail_v1',
     'organogram_v1',
+    'pd_functies_v1',
     'werkoverdracht_abnormal_config_v1',
     'werkoverdracht_abnormal_lijst_v1',
     'std_bezetting_v1',
@@ -7188,6 +7189,7 @@ window.addEventListener('resize', () => {
     'werkorder_lijst_v1',
     'schade_mail_v1',
     'organogram_v1',
+    'pd_functies_v1',
     'werkoverdracht_abnormal_config_v1',
     'werkoverdracht_abnormal_lijst_v1',
     'std_bezetting_v1',
@@ -23382,7 +23384,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.66';
+var DJ_BUILD = '2026-10-06.67';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -29746,13 +29748,14 @@ function pdRenderDetail(){
     '<button onclick="pdSamenvoegenMet(\'' + _pdGeselecteerd.replace(/'/g, "\\'") + '\')" title="Registraties samenvoegen met een andere naam (bijv. bij een dubbel dossier door naamverschil)" style="background:#eef3fa;color:var(--navy);border:1px solid #ccd6e5;border-radius:6px;padding:8px 12px;cursor:pointer;font-size:12px;font-weight:700;">&#x1F500; Samenvoegen</button>' +
     '<button onclick="pdToevoegenPrompt(\'' + _pdGeselecteerd.replace(/'/g, "\\'") + '\')" style="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:12px;font-weight:700;">+ Registratie toevoegen</button>' +
     '</div></div>';
-  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:8px 12px;background:#fff8e6;border:1px solid #f0e0a8;border-radius:6px;">' +
+  html += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;padding:8px 12px;background:#fff8e6;border:1px solid #f0e0a8;border-radius:6px;">' +
     '<span style="font-size:14px;">&#x1F382;</span>' +
     '<span style="font-size:12px;font-weight:700;color:#7a5c00;">Verjaardag</span>' +
     '<input type="number" min="1" max="31" placeholder="Dag" value="' + pdEsc(verjEntry.dag || '') + '" id="pd-verj-dag" onchange="pdSlaVerjaardagOp()" style="width:60px;padding:5px 6px;border:1px solid #ccb87a;border-radius:4px;font-size:12px;text-align:center;">' +
     '<input type="number" min="1" max="12" placeholder="Mnd" value="' + pdEsc(verjEntry.maand || '') + '" id="pd-verj-maand" onchange="pdSlaVerjaardagOp()" style="width:60px;padding:5px 6px;border:1px solid #ccb87a;border-radius:4px;font-size:12px;text-align:center;">' +
     '<input type="number" min="1900" max="2100" placeholder="Jaar" value="' + pdEsc(verjEntry.jaar || '') + '" id="pd-verj-jaar" onchange="pdSlaVerjaardagOp()" title="Geboortejaar (voor AOW/SFR-berekening)" style="width:70px;padding:5px 6px;border:1px solid #ccb87a;border-radius:4px;font-size:12px;text-align:center;">' +
     '<span id="pd-verj-opgeslagen" style="font-size:11px;color:#166534;opacity:0;transition:opacity 0.4s;">&#10003; Opgeslagen</span>' +
+    (typeof djFunctieVakjesHtml === 'function' && !isGroepslid ? djFunctieVakjesHtml(_pdGeselecteerd) : '') +
     '</div>';
   if (gesprekken.length) {
     html += '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:14px;font-weight:800;color:#1a7a40;letter-spacing:.5px;text-transform:uppercase;margin:4px 0 6px;">&#x1F4AC; Ontwikkelgesprekken (' + gesprekken.length + ')</div>' +
@@ -31256,6 +31259,64 @@ function orgRender(){
   box.innerHTML = html;
 }
 window.orgRender = orgRender;
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// Functies per medewerker (Personeelsdossier: Ploegleider / Controleur / Kraanmeester / SV).
+// In de dagplanning tonen de vakjes Ploegleider, Controleur, Kraanmeester en SV dan alleen de
+// medewerkers met die functie. Alle andere vakjes blijven iedereen tonen.
+// Zolang nog niemand een functie heeft, blijft dat vakje gewoon iedereen tonen.
+// ══════════════════════════════════════════════════════════════════
+var DJ_FUNCTIES = [{ k: 'pl', l: 'Ploegleider' }, { k: 'ctrl', l: 'Controleur' }, { k: 'kraan', l: 'Kraanmeester' }, { k: 'sv', l: 'SV' }];
+function djFunctieKey(){ return tk('pd_functies_v1'); }
+function djFunctiesGet(){ try { return JSON.parse(localStorage.getItem(djFunctieKey()) || '{}') || {}; } catch(e) { return {}; } }
+function djFunctieZet(naam, k, aan){
+  var f = djFunctiesGet(); f[naam] = f[naam] || {};
+  if (aan) f[naam][k] = true; else delete f[naam][k];
+  if (!Object.keys(f[naam]).length) delete f[naam];
+  localStorage.setItem(djFunctieKey(), JSON.stringify(f));
+  if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+  try { if (typeof refreshDropdowns === 'function') { refreshDropdowns('oc', typeof ochEmps !== 'undefined' ? ochEmps : []); refreshDropdowns('av', typeof avondEmps !== 'undefined' ? avondEmps : []); } } catch(e) {}
+}
+window.djFunctieZet = djFunctieZet;
+function djFunctieVakjesHtml(naam){
+  var f = djFunctiesGet()[naam] || {};
+  var n = String(naam).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  return '<span style="width:1px;align-self:stretch;background:#e6d9a8;margin:0 4px;"></span>' +
+    '<span style="font-size:12px;font-weight:700;color:#7a5c00;">Functie</span>' +
+    DJ_FUNCTIES.map(function(x){
+      return '<label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#5c4400;cursor:pointer;text-transform:none;letter-spacing:normal;">' +
+        '<input type="checkbox"' + (f[x.k] ? ' checked' : '') + ' onchange="djFunctieZet(\'' + n + '\',\'' + x.k + '\',this.checked)"> ' + x.l + '</label>';
+    }).join('');
+}
+function djFunctieVanPositie(key){ var m = /^(o|a|on|av)_(pl|ctrl|kraan|sv)\d/.exec(key); return m ? m[2] : null; }
+function djFunctieFilter(){
+  var f = djFunctiesGet();
+  var perFunctie = {};
+  Object.keys(f).forEach(function(naam){ Object.keys(f[naam]).forEach(function(k){ (perFunctie[k] = perFunctie[k] || []).push(naam); }); });
+  var cache = {};
+  var heeft = function(planningNaam, k){
+    var ck = k + '|' + planningNaam; if (ck in cache) return cache[ck];
+    var lijst = perFunctie[k] || [];
+    var rij = (typeof djPersoonRijNaam === 'function') ? djPersoonRijNaam(planningNaam) : null;
+    var laag = function(x){ return String(x || '').replace(/^\*+/, '').trim().toLowerCase(); };
+    var ok = lijst.some(function(n){ return laag(n) === laag(rij || planningNaam); });
+    if (!ok && !rij) { var kand = lijst.filter(function(n){ return typeof certNaamMatch === 'function' && certNaamMatch(n, planningNaam); }); ok = kand.length === 1; }
+    return (cache[ck] = ok);
+  };
+  document.querySelectorAll('#dagplanning-container select.psel[data-key]').forEach(function(sel){
+    var k = djFunctieVanPositie(sel.getAttribute('data-key'));
+    if (!k || !(perFunctie[k] || []).length) return; // nog niemand met deze functie: iedereen tonen
+    Array.prototype.slice.call(sel.options).forEach(function(o){
+      if (o.value && o.value !== sel.value && !heeft(o.value, k)) o.remove();
+    });
+  });
+}
+(function(){
+  if (typeof buildPanels === 'function') { var _bp = buildPanels; buildPanels = function(){ var r = _bp.apply(this, arguments); try { djFunctieFilter(); } catch(e) {} return r; }; }
+  if (typeof refreshDropdowns === 'function') { var _rd = refreshDropdowns; refreshDropdowns = function(){ var r = _rd.apply(this, arguments); try { djFunctieFilter(); } catch(e) {} return r; }; }
+})();
 </script>
 
 </body>
