@@ -23396,7 +23396,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.79';
+var DJ_BUILD = '2026-10-06.80';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -31666,6 +31666,7 @@ function vakRender(){
       '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:var(--navy);flex:1;">&#x1F3D6;&#xFE0F; Vakantierooster Europoort</div>' +
       '<select onchange="vakKiesJaar(this.value)" style="padding:6px 10px;border:1px solid #c8d7e8;border-radius:6px;font-weight:700;">' + jaren.map(function(y){ return '<option' + (y === jaar ? ' selected' : '') + '>' + y + '</option>'; }).join('') + '</select>' +
       (mag ? '<button type="button" onclick="vakToggleBewerken()" style="' + knop + (_vakBewerken ? 'background:var(--navy);color:#fff;' : '') + '">' + (_vakBewerken ? '&#x2714; Klaar' : '&#x270F;&#xFE0F; Bewerken') + '</button>' : '') +
+      (mag && _vakBewerken ? '<button type="button" onclick="if(confirm(\'Het huidige rooster vervangen door een geïmporteerd bestand?\')) vakImporteren()" style="' + knop + '">&#x1F4E5; Opnieuw importeren</button>' : '') +
       '<button type="button" onclick="vakAfdrukken()" style="' + knop + '">&#x1F5A8;&#xFE0F; Afdrukken</button></div>' +
     (!n.compleet ? '<div style="background:#fff3cd;border:1px solid #f0d78c;border-radius:6px;padding:8px 12px;font-size:12.5px;margin-bottom:10px;">De vakantieperiodes voor ' + jaar + ' zijn nog niet ingevuld.' + (mag ? ' Klik op <b>Bewerken</b> om ze in te vullen.' : '') + '</div>' : '') +
     (_vakBewerken ? '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;background:#f5f8fc;border:1px solid #dbe5f0;border-radius:6px;padding:8px 12px;margin-bottom:10px;">' +
