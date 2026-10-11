@@ -23396,7 +23396,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.80';
+var DJ_BUILD = '2026-10-06.82';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -31505,6 +31505,11 @@ function vakNaamDelen(naam){
   // "Karagul Harun" / "Harun Karagul": de langste vorm met hoofdletter-volgorde onbekend → beide kandidaten bewaren
   return { init: init, kern: kern };
 }
+function vakMatchSterkte(a, b){ // 0 = geen, 1 = voorletter + achternaam, 2 = voornaam voluit gelijk
+  if (!vakZelfdePersoon(a, b)) return 0;
+  var A = vakNaamDelen(a), B = vakNaamDelen(b);
+  return (A.kern.length > 1 && B.kern.length > 1 && A.kern.slice().sort().join(' ') === B.kern.slice().sort().join(' ')) ? 2 : 1;
+}
 function vakZelfdePersoon(a, b){
   var A = vakNaamDelen(a), B = vakNaamDelen(b);
   if (!A.kern.length || !B.kern.length) return false;
@@ -31520,10 +31525,11 @@ function vakZelfdePersoon(a, b){
   return !voorlA || !voorlB || voorlA === voorlB;
 }
 // ── Team (uit het organogram) en personeelsnummer (uit Salaris, alleen voor supervisors)
-function vakTeamVan(naam){
+function vakTeamVan(x){
+  var labels = vakLabels(x); var naam = labels[0] || '';
   var o = (typeof orgGet === 'function') ? orgGet() : null; if (!o || !o.supervisors) return '';
   var alle = (typeof orgPersonenAlle === 'function') ? orgPersonenAlle() : [];
-  var past = function(id){ var p = alle.find(function(x){ return x.id === id; }); return p && p.labels.concat([p.weergave]).some(function(l){ return vakZelfdePersoon(l, naam); }); };
+  var past = function(id){ if (vakIsId(x)) return id === x; var p = alle.find(function(q){ return q.id === id; }); return p && p.labels.concat([p.weergave]).some(function(l){ return vakZelfdePersoon(l, naam); }); };
   var team = '';
   o.supervisors.forEach(function(sv){
     if (past(sv.persoon)) team = 'SV';
@@ -31534,11 +31540,38 @@ function vakTeamVan(naam){
   });
   return String(team).replace(/^team\s+/i, '');
 }
-function vakNummerVan(naam){
+function vakNummerVan(x){
   var lijst; try { lijst = JSON.parse(localStorage.getItem('ma_medewerkers_v1') || '[]'); } catch(e) { lijst = []; }
   if (!Array.isArray(lijst)) return '';
-  var kand = lijst.filter(function(m){ return m && m.naam && vakZelfdePersoon(m.naam, naam); });
+  var labels = vakLabels(x);
+  var exact = lijst.filter(function(m){ return m && m.naam && labels.some(function(l){ return String(l).trim().toLowerCase() === String(m.naam).trim().toLowerCase(); }); });
+  if (exact.length === 1) return exact[0].mannr || '';
+  var kand = lijst.filter(function(m){ return m && m.naam && labels.some(function(l){ return vakZelfdePersoon(m.naam, l); }); });
   return kand.length === 1 ? (kand[0].mannr || '') : '';
+}
+// Rooster bevat verwijzingen naar personen in het systeem (opl:… / mail:…), net als het organogram.
+var _vakCache = { t: 0 };
+function vakPersonen(){
+  if (Date.now() - _vakCache.t > 1500) _vakCache = { t: Date.now(),
+    vast: (typeof orgPersonen === 'function') ? orgPersonen() : [], alle: (typeof orgPersonenAlle === 'function') ? orgPersonenAlle() : [] };
+  return _vakCache;
+}
+function vakIsId(x){ return /^(opl|mail):/.test(String(x || '')); }
+function vakNaam(x){ if (!vakIsId(x)) return String(x || ''); var p = vakPersonen().alle.find(function(q){ return q.id === x; }); return p ? p.weergave : ''; }
+function vakLabels(x){ if (!vakIsId(x)) return [String(x || '')]; var p = vakPersonen().alle.find(function(q){ return q.id === x; }); return p ? p.labels.concat([p.weergave]) : []; }
+// Hoort deze persoon (nog) in het rooster? Alleen vaste medewerkers van Europoort (geen inhuur, niet uit dienst)
+function vakIsGeldig(x){ return vakIsId(x) && vakPersonen().vast.some(function(q){ return q.id === x; }); }
+function vakZoekPersoon(ruw){
+  var vast = vakPersonen().vast;
+  var x = (typeof orgZoekPersoon === 'function') ? orgZoekPersoon(ruw, vast) : null;
+  if (x) return x;
+  // Sterkste match wint: voornaam voluit gelijk (Harun ≠ Hakan) gaat vóór alleen voorletter + achternaam
+  var sterkte = function(p){ var best = 0; p.labels.concat([p.weergave]).forEach(function(l){ var s2 = vakMatchSterkte(l, ruw); if (s2 > best) best = s2; }); return best; };
+  var scores = vast.map(function(p){ return { p: p, s: sterkte(p) }; }).filter(function(x){ return x.s > 0; });
+  if (!scores.length) return null;
+  var max = Math.max.apply(null, scores.map(function(x){ return x.s; }));
+  var top = scores.filter(function(x){ return x.s === max; });
+  return top.length === 1 ? top[0].p : null;
 }
 function vakDatum(iso){ var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? m[3] + '-' + m[2] : '…'; }
 function vakNotities(d, jaar){
@@ -31564,13 +31597,18 @@ function vakRoosterHtml(d, jaar, bewerken){
     '<tr><th style="' + td + 'width:9%;background:#d9e1f2;">' + jaar + '</th>' + kol.map(function(k){ return '<th style="' + td + 'background:#d9e1f2;font-size:10.5px;">' + vakEsc(k.l) + '</th>'; }).join('') + '</tr>';
   volg.forEach(function(g, pos){
     var grp = d.groepen[g] || {};
-    var rijen = Math.max(3, Math.max.apply(null, kol.map(function(k){ return (grp[k.k] || []).length + (bewerken ? 1 : 0); })));
+    var rijen = Math.max(3, Math.max.apply(null, kol.map(function(k){ var l = grp[k.k] || []; return (bewerken ? l.length + 1 : l.filter(vakIsGeldig).length); })));
     for (var r = 0; r < rijen; r++) {
       h += '<tr>' + '<td style="' + td + (r === 0 ? 'border-top:2px solid #000;' : '') + 'font-weight:700;">' + (r === 1 ? (pos + 1) + 'e keuze' : '') + '</td>';
       kol.forEach(function(k){
-        var namen = grp[k.k] || [], n = namen[r];
+        var alleNamen = grp[k.k] || [];
+        var namen = bewerken ? alleNamen : alleNamen.filter(vakIsGeldig), n = namen[r];
         var inhoud = '';
-        if (n) inhoud = vakEsc(n) + (bewerken ? ' <span onclick="vakWeg(' + g + ',\'' + k.k + '\',' + r + ')" title="Weghalen" style="color:#c0392b;cursor:pointer;float:right;">&#x2715;</span>' : '');
+        if (n) {
+          var geldig = vakIsGeldig(n);
+          inhoud = (geldig ? vakEsc(vakNaam(n)) : '<span style="color:#c0392b;text-decoration:line-through;" title="Geen vaste medewerker (meer) van Europoort — weghalen of vervangen">&#x26A0;&#xFE0F; ' + vakEsc(vakNaam(n) || n) + '</span>') +
+            (bewerken ? ' <span onclick="vakWeg(' + g + ',\'' + k.k + '\',' + r + ')" title="Weghalen" style="color:#c0392b;cursor:pointer;float:right;">&#x2715;</span>' : '');
+        }
         else if (bewerken && r === namen.length) inhoud = '<span onclick="vakErbij(' + g + ',\'' + k.k + '\')" style="color:#0f6cbd;cursor:pointer;font-size:10.5px;">+ toevoegen</span>';
         h += '<td style="' + td + (r === 0 ? 'border-top:2px solid #000;' : '') + '">' + inhoud + '</td>';
       });
@@ -31592,9 +31630,9 @@ function vakAanvraagHtml(d, jaar){
   var kop = '<tr>' + ['Naam', 'Nummer', 'Team', '1e keuze', '2e keuze', '3e keuze', 'Vrij keuze'].map(function(x, i){ return '<th style="' + td + 'background:#d9e1f2;width:' + [26,11,9,13,13,13,15][i] + '%;">' + x + '</th>'; }).join('') + '</tr>';
   var blok = function(pos){
     var grp = d.groepen[volg[pos]] || {}, namen = [];
-    kol.forEach(function(k){ (grp[k.k] || []).forEach(function(n){ namen.push(n); }); }); // kolom voor kolom, zoals in de Excel
+    kol.forEach(function(k){ (grp[k.k] || []).filter(vakIsGeldig).forEach(function(n){ namen.push(n); }); }); // kolom voor kolom, zoals in de Excel
     var h = '<tr><td colspan="7" style="' + td + 'font-weight:800;background:#f2f2f2;">' + (pos + 1) + 'e Keuze</td></tr>';
-    namen.forEach(function(n){ h += '<tr><td style="' + td + '">' + vakEsc(n) + '</td><td style="' + td + '">' + vakEsc(vakNummerVan(n)) + '</td><td style="' + td + '">' + vakEsc(vakTeamVan(n)) + '</td><td style="' + td + '"></td><td style="' + td + '"></td><td style="' + td + '"></td><td style="' + td + '"></td></tr>'; });
+    namen.forEach(function(n){ h += '<tr><td style="' + td + '">' + vakEsc(vakNaam(n)) + '</td><td style="' + td + '">' + vakEsc(vakNummerVan(n)) + '</td><td style="' + td + '">' + vakEsc(vakTeamVan(n)) + '</td><td style="' + td + '"></td><td style="' + td + '"></td><td style="' + td + '"></td><td style="' + td + '"></td></tr>'; });
     for (var i = namen.length; i < namen.length + 2; i++) h += '<tr><td style="' + td + '">&nbsp;</td><td style="' + td + '"></td><td style="' + td + '"></td><td style="' + td + '"></td><td style="' + td + '"></td><td style="' + td + '"></td><td style="' + td + '"></td></tr>';
     return h;
   };
@@ -31622,14 +31660,13 @@ window.vakWeg = function(g, k, r){ var d = vakGet(); if (!d) return; d.groepen[g
 window.vakErbij = function(g, k){
   var d = vakGet(); if (!d) return;
   var inRooster = []; d.groepen.forEach(function(gr){ Object.keys(gr).forEach(function(kk){ inRooster = inRooster.concat(gr[kk]); }); });
-  var kandidaten = (typeof orgPersonen === 'function' ? orgPersonen() : []).map(function(p){ return p.weergave; })
-    .filter(function(n){ return !inRooster.some(function(x){ return vakZelfdePersoon(x, n); }); });
+  var kandidaten = vakPersonen().vast.filter(function(p){ return inRooster.indexOf(p.id) === -1; });
   var o = document.createElement('div'); o.id = 'vak-kies';
   o.style.cssText = 'position:fixed;inset:0;background:rgba(0,20,40,.45);z-index:100005;display:flex;align-items:center;justify-content:center;';
   o.innerHTML = '<div style="background:#fff;border-radius:10px;padding:16px;width:340px;max-width:92vw;">' +
     '<div style="font-weight:800;color:#003366;margin-bottom:8px;">Medewerker toevoegen</div>' +
     '<select id="vak-kies-sel" style="width:100%;padding:6px;"><option value="">— kies (vaste medewerkers die nog niet in het rooster staan) —</option>' +
-    kandidaten.map(function(n){ return '<option>' + vakEsc(n) + '</option>'; }).join('') + '</select>' +
+    kandidaten.map(function(p){ return '<option value="' + vakEsc(p.id) + '">' + vakEsc(p.weergave) + '</option>'; }).join('') + '</select>' +
     '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;"><button type="button" onclick="document.getElementById(\'vak-kies\').remove()" style="padding:6px 12px;">Annuleren</button>' +
     '<button type="button" id="vak-kies-ok" style="padding:6px 12px;background:#003366;color:#fff;border:none;border-radius:5px;">Toevoegen</button></div></div>';
   document.body.appendChild(o);
@@ -31644,7 +31681,13 @@ window.vakImporteren = function(){
   inp.onchange = function(){ var f = inp.files && inp.files[0]; if (!f) return; f.text().then(function(t){
     var b; try { b = JSON.parse(t); } catch(e) { alert('Geen geldig bestand.'); return; }
     if (!b || b.soort !== 'dienst-journaal-vakantierooster' || !Array.isArray(b.groepen) || b.groepen.length !== 6) { alert('Dit is geen vakantierooster-bestand van Dienst Journaal.'); return; }
-    vakSet({ basisJaar: b.basisJaar, kolommen: b.kolommen, groepen: b.groepen, jaren: b.jaren || {} }); _vakJaar = b.basisJaar; vakRender(); alert('Vakantierooster geïmporteerd.');
+    _vakCache.t = 0;
+    var onbekend = [], gebruikt = {};
+    var groepen = b.groepen.map(function(gr){ var uit = {}; Object.keys(gr).forEach(function(k){
+      uit[k] = (gr[k] || []).map(function(ruw){ var p = vakZoekPersoon(ruw); if (p && gebruikt[p.id]) p = null; if (!p) { onbekend.push(ruw); return null; } gebruikt[p.id] = true; return p.id; }).filter(Boolean);
+    }); return uit; });
+    vakSet({ basisJaar: b.basisJaar, kolommen: b.kolommen, groepen: groepen, jaren: b.jaren || {} }); _vakJaar = b.basisJaar; vakRender();
+    alert('Vakantierooster geïmporteerd.' + (onbekend.length ? '\n\nDeze namen zijn niet (eenduidig) gevonden als vaste medewerker van Europoort en zijn weggelaten:\n• ' + onbekend.join('\n• ') + '\n\nVoeg ze via ✏️ Bewerken toe als ze er wel in horen.' : ''));
   }); };
   inp.click();
 };
