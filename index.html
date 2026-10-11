@@ -14837,8 +14837,8 @@ function initOpleidingen(){
   if (tabsEl && !tabsEl.dataset.built) {
     var magOverzicht = oplMagOverzichtZien();
     tabsEl.innerHTML = OPLEIDINGEN_FORMS.filter(function(f){
-      if (f.id === 'ontwikkelgesprek') return oplMagOntwikkelgesprek();
-      return f.id !== 'overzicht' || magOverzicht;
+      if (f.id === 'ontwikkelgesprek' || f.id === 'overzicht') return false; // staan nu in het Personeelsdossier
+      return true;
     }).map(function(f, i){
       return '<button id="opl-tab-' + f.id + '" onclick="oplToonTab(\'' + f.id + '\')" ' +
         'style="padding:9px 16px;border:none;border-radius:6px 6px 0 0;background:' + (i===0?'#003366':'#e8eef5') + ';color:' + (i===0?'#fff':'#003366') + ';' +
@@ -23396,7 +23396,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.84';
+var DJ_BUILD = '2026-10-06.85';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -25276,6 +25276,7 @@ if(_sfrEd) _sfrEd.addEventListener('keypress', function(e){if(e.key==='Enter')ca
   <button onclick="navTo('planning','TO DO LIST',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x2705; To Do List</button>
   <button onclick="navTo('schade','SCHADE FORMULIER',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x1F4CB; Schade Formulier</button>
   <button id="nav-btn-werkoverdracht" onclick="navWerkoverdracht('WERKOVERDRACHT &#x1F512;',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x21C4; Werkoverdracht &#x1F512;</button>
+  <button id="nav-btn-personeel" onclick="navPersoneel(null,this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x1F5C2;&#xFE0F; Personeelsdossier &#x1F512;</button>
   <button id="nav-btn-maandafsluiting" onclick="navTo('maandafsluiting','MAANDAFSLUITING',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x1F4C8; Maandafsluiting &#x1F512;</button>
   <button id="nav-btn-kpi" onclick="navTo('archief','KPI DASHBOARD',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x1F4CA; KPI Dashboard &#x1F512;</button>
   <button id="nav-btn-aowdash" onclick="navTo('aowdash','AOW & SFR',this)" style="display:block;width:100%;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 20px;cursor:pointer;text-align:left;">&#x1F4B0; AOW &amp; SFR &#x1F512;</button>
@@ -25299,12 +25300,12 @@ if(_sfrEd) _sfrEd.addEventListener('keypress', function(e){if(e.key==='Enter')ca
     { knop: '#nav-btn-materieel', subs: function(){ var bhv = document.getElementById('matTabBhv'); return [
       { l: en() ? 'Equipment status' : 'Status materieel', i: '&#x1F69B;', f: function(){ matShowSubTab('status'); } } ].concat(
       (!bhv || bhv.style.display === 'none') ? [] : [{ l: 'BHV / EHBO', i: '&#x26D1;&#xFE0F;', f: function(){ matShowSubTab('bhv'); } }]); } },
+    { knop: '#nav-btn-personeel', subs: function(){
+      var namen = { dossier: ['&#x1F4C1;', en() ? 'File' : 'Dossier'], organogram: ['&#x1F465;', en() ? 'Organisation chart' : 'Organogram'], vakantie: ['&#x1F3D6;&#xFE0F;', 'Vakantierooster'],
+        certificeringen: ['&#x1F4CB;', en() ? 'Certificates' : 'Certificeringen'], ontwikkelgesprek: ['&#x1F4AC;', en() ? 'Development interview' : 'Ontwikkelgesprek'] };
+      return DJ_PERS_TABS.filter(djPersMag).map(function(t){ return { l: namen[t][1], i: namen[t][0], f: function(){ pdSubTab(t); } }; }); } },
     { knop: '#nav-btn-werkoverdracht', eigen: true, subs: function(){ return [
       { l: en() ? 'Handover' : 'Overdracht', i: '&#x21C4;', sub: 'overdracht' },
-      { l: en() ? 'Personnel file' : 'Personeelsdossier', i: '&#x1F4C1;', sub: 'personeelsdossier', kids: (function(){
-        var k = [{ l: en() ? 'File' : 'Dossier', i: '&#x1F4C1;', sub: 'personeelsdossier' }, { l: en() ? 'Organisation chart' : 'Organogram', i: '&#x1F465;', sub: 'organogram' }];
-        if ((sessionStorage.getItem('dj_terminal') || 'EP') === 'EP') k.push({ l: 'Vakantierooster', i: '&#x1F3D6;&#xFE0F;', sub: 'vakantie' });
-        return k; })() },
       { l: 'Toolbox', i: '&#x1F9F0;', sub: 'toolbox' } ]; } },
     { knop: "button[onclick^=\"navTo('werkorder'\"]", subs: function(){ return [
       { l: en() ? 'Work order' : 'Werkorder', i: '&#x1F4DD;', f: function(){ woTabToon('formulier'); } },
@@ -25324,9 +25325,7 @@ if(_sfrEd) _sfrEd.addEventListener('keypress', function(e){if(e.key==='Enter')ca
       { l: en() ? 'Incident report' : 'Incidentrapport', i: '&#x1F4CB;', f: function(){ switchSchadeTab(3); } } ]; } },
     { knop: "button[onclick^=\"navTo('opleidingen'\"]", subs: function(){
       return (typeof OPLEIDINGEN_FORMS !== 'undefined' ? OPLEIDINGEN_FORMS : []).filter(function(f){
-        if (f.id === 'overzicht') return typeof oplMagOverzichtZien === 'function' ? oplMagOverzichtZien() : true;
-        if (f.id === 'ontwikkelgesprek') return typeof oplMagOntwikkelgesprek === 'function' ? oplMagOntwikkelgesprek() : false;
-        return true;
+        return f.id !== 'overzicht' && f.id !== 'ontwikkelgesprek'; // staan nu in het Personeelsdossier
       }).map(function(f){
         var slot = (f.id === 'overzicht' || f.id === 'ontwikkelgesprek') ? ' \uD83D\uDD12' : ''; // afgeschermd: slotje
         return { l: String(f.naam_kort || f.titel).replace(/^📋\s*/, '').replace(/^\uD83D\uDCAC\s*/, '') + slot,
@@ -26517,8 +26516,8 @@ var DJ_ZOEK_INDEX = [
   { label: 'Werkoverdracht — Personeelsdossier', keywords: 'personeelsdossier werkoverdracht medewerker groepen intercedent pro intermediair schooljongens tos', actie: function(){ navWerkoverdracht('WERKJOURNAAL SUPERVISORS', null, 'personeelsdossier'); } },
   { label: 'Werkoverdracht — Toolbox', keywords: 'toolbox werkoverdracht aftekenlijst pdf presentatie', actie: function(){ navWerkoverdracht('WERKJOURNAAL SUPERVISORS', null, 'toolbox'); } },
   { label: 'Opleidingen', keywords: 'opleidingen training cursus introductie certificaat', actie: function(){ navTo('opleidingen', 'OPLEIDINGEN', null); } },
-  { label: 'Opleidingen — Overzicht Certificeringen', keywords: 'certificeringen certificaten overzicht opleidingen groepen stagiaires pro intermediair basis tw bhv ehbo ploegleider beademingsballon ademlucht gevaarlijke stoffen', actie: function(){ navTo('opleidingen', 'OPLEIDINGEN', null); setTimeout(function(){ if (typeof oplToonTab === 'function') oplToonTab('overzicht'); }, 60); } },
-  { label: 'Opleidingen — Ontwikkelgesprek', keywords: 'ontwikkelgesprek functioneringsgesprek beoordeling evaluatie gesprek', actie: function(){ navTo('opleidingen', 'OPLEIDINGEN', null); setTimeout(function(){ oplToonTab('ontwikkelgesprek'); }, 300); } },
+  { label: 'Personeelsdossier — Certificeringen', keywords: 'certificeringen certificaten overzicht opleidingen groepen stagiaires pro intermediair basis tw bhv ehbo ploegleider beademingsballon ademlucht gevaarlijke stoffen', actie: function(){ navPersoneel('certificeringen'); } },
+  { label: 'Personeelsdossier — Ontwikkelgesprek', keywords: 'ontwikkelgesprek functioneringsgesprek beoordeling evaluatie gesprek', actie: function(){ navPersoneel('ontwikkelgesprek'); } },
   { label: 'Schade formulier', keywords: 'schade formulier incident melding pdf', actie: function(){ navTo('schade', 'SCHADE FORMULIER', null); } },
   { label: 'Maandafsluiting', keywords: 'maandafsluiting payroll salaris quinyx mutaties', actie: function(){ navTo('maandafsluiting', 'MAANDAFSLUITING', null); } },
   { label: 'ORT / Basisrooster', keywords: 'ort basisrooster onregelmatigheidstoeslag cao artikel b8', actie: function(){ navTo('ort', 'ORT / BASISROOSTER', null); } },
@@ -26659,6 +26658,7 @@ function djZoekKeydown(event){
 
 var _djAowToegang = false; // AOW & SFR (persoonsgegevens, AVG): eenmaal per sessie gecontroleerd
 function navTo(view, label, btn){
+  if (view === 'opleidingen' && typeof djOplContentNaar === 'function') djOplContentNaar(null);
   // Hide menu
   document.getElementById('navMenu').style.display = 'none';
   if (view === 'aowdash' && !_djAowToegang) {
@@ -27545,6 +27545,11 @@ function renderTruckChart(maand, jaar) {
 
 var _werkoverdrachtOntgrendeld = false; // blijft ontgrendeld voor de rest van deze sessie
 function navWerkoverdracht(label, btn, subtab, callback) {
+  if (subtab === 'personeelsdossier' || subtab === 'organogram' || subtab === 'vakantie') { // nu een eigen menu-onderdeel
+    navPersoneel(subtab === 'personeelsdossier' ? 'dossier' : subtab);
+    if (typeof callback === 'function') setTimeout(callback, 400);
+    return;
+  }
   if (!_werkoverdrachtOntgrendeld) {
     djToegangCheckOfPopup('werkoverdracht').then(function(ok){
       if (!ok) return;
@@ -27562,36 +27567,47 @@ function navWerkoverdracht(label, btn, subtab, callback) {
 // Subtabbladen binnen Personeelsdossier: het dossier zelf en het organogram
 function pdSubTab(t){
   var box = document.getElementById('nieuw-tab-personeelsdossier'); if (!box) return;
+  if (t === 'personeelsdossier') t = 'dossier';
+  if (typeof djPersMag === 'function' && !djPersMag(t)) t = djPersEersteTab() || 'dossier';
+  if (document.getElementById('view-personeel') && !document.getElementById('view-personeel').classList.contains('active')) { navPersoneel(t); return; }
+  ['dossier', 'organogram', 'vakantie', 'certificeringen', 'ontwikkelgesprek'].forEach(function(x){
+    var b = document.getElementById('pd-sub-btn-' + x); if (b && typeof djPersMag === 'function') b.style.display = djPersMag(x) ? '' : 'none';
+  });
+  var host = document.getElementById('pd-opl-host');
+  var opl = (t === 'certificeringen' || t === 'ontwikkelgesprek');
   Array.prototype.forEach.call(box.children, function(el){
     if (el.id === 'pd-subtabs') return;
     if (el.id === 'nieuw-tab-organogram') el.style.display = t === 'organogram' ? 'block' : 'none';
     else if (el.id === 'nieuw-tab-vakantie') el.style.display = t === 'vakantie' ? 'block' : 'none';
-    else el.style.display = (t === 'organogram' || t === 'vakantie') ? 'none' : '';
+    else if (el.id === 'pd-opl-host') el.style.display = opl ? 'block' : 'none';
+    else el.style.display = t === 'dossier' ? '' : 'none';
   });
-  // Vakantierooster bestaat alleen voor Europoort
-  var vb = document.getElementById('pd-sub-btn-vakantie'); if (vb) vb.style.display = (sessionStorage.getItem('dj_terminal') || 'EP') === 'EP' ? '' : 'none';
-  if (t === 'vakantie' && (sessionStorage.getItem('dj_terminal') || 'EP') !== 'EP') t = 'dossier';
-  [['dossier', 'pd-sub-btn-dossier'], ['organogram', 'pd-sub-btn-organogram'], ['vakantie', 'pd-sub-btn-vakantie']].forEach(function(x){
+  [['dossier', 'pd-sub-btn-dossier'], ['organogram', 'pd-sub-btn-organogram'], ['vakantie', 'pd-sub-btn-vakantie'], ['certificeringen', 'pd-sub-btn-certificeringen'], ['ontwikkelgesprek', 'pd-sub-btn-ontwikkelgesprek']].forEach(function(x){
     var b = document.getElementById(x[1]); if (!b) return;
     var actief = x[0] === t;
     b.style.background = actief ? 'var(--navy)' : '#fff'; b.style.color = actief ? '#fff' : 'var(--navy)'; b.style.borderColor = actief ? 'var(--navy)' : '#c8d7e8';
   });
   if (t === 'organogram' && typeof orgRender === 'function') orgRender();
   if (t === 'vakantie' && typeof vakRender === 'function') vakRender();
+  if (t === 'dossier' && typeof pdInit === 'function') pdInit();
+  if (opl && host) {
+    djOplContentNaar(host);
+    if (typeof initOpleidingen === 'function') { try { initOpleidingen(); } catch(e) {} }
+    oplToonTab(t === 'certificeringen' ? 'overzicht' : 'ontwikkelgesprek');
+  } else if (typeof djOplContentNaar === 'function' && host && host.contains(document.getElementById('opl-content'))) djOplContentNaar(null);
 }
 window.pdSubTab = pdSubTab;
 function nieuwToonTab(tab){
+  if (tab === 'personeelsdossier' || tab === 'organogram' || tab === 'vakantie') { navPersoneel(tab === 'personeelsdossier' ? 'dossier' : tab); return; }
   var sub = null;
   if (tab === 'organogram' || tab === 'vakantie') { sub = tab; tab = 'personeelsdossier'; } // subtabbladen van Personeelsdossier
-  var tabs = ['overdracht', 'personeelsdossier', 'toolbox'];
+  var tabs = ['overdracht', 'toolbox'];
   tabs.forEach(function(t){
     var body = document.getElementById('nieuw-tab-' + t);
     var btn = document.getElementById('nieuw-tab-btn-' + t);
     if (body) body.style.display = (t === tab) ? 'block' : 'none';
     if (btn) { btn.style.background = (t === tab) ? 'var(--navy)' : '#e8eef5'; btn.style.color = (t === tab) ? '#fff' : 'var(--navy)'; }
   });
-  if (tab === 'personeelsdossier' && typeof pdInit === 'function') pdInit();
-  if (tab === 'personeelsdossier' && typeof pdSubTab === 'function') pdSubTab(sub || 'dossier');
   if (tab === 'toolbox' && typeof toolboxRender === 'function') toolboxRender();
   if (typeof djVertaalPaginaEngels === 'function') setTimeout(djVertaalPaginaEngels, 60);
 }
@@ -31770,6 +31786,77 @@ function vakRender(){
       vakRoosterHtml(d, jaar, _vakBewerken) + vakNotitiesHtml(d, jaar) + '</div></div>';
 }
 window.vakRender = vakRender;
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// PERSONEELSDOSSIER als eigen menu-onderdeel (🔒), met subtabbladen:
+// Dossier · Organogram · Vakantierooster (EP) · Certificeringen · Ontwikkelgesprek
+// Elk subtabblad volgt zijn eigen vinkje in Toegangsbeheer.
+// ══════════════════════════════════════════════════════════════════
+function djMijnEmail(){ return localStorage.getItem('dj_sp_account_username') || ''; }
+function djPersMag(t){
+  var e = djMijnEmail(); var heeft = function(k){ return !!(e && typeof djToegangHeeft === 'function' && djToegangHeeft(e, k)); };
+  var ep = (sessionStorage.getItem('dj_terminal') || 'EP') === 'EP';
+  if (t === 'dossier') return heeft('werkoverdracht');
+  if (t === 'organogram') return heeft('werkoverdracht') || heeft('certificeringen') || heeft('ontwikkelgesprek');
+  if (t === 'vakantie') return ep && (heeft('werkoverdracht') || heeft('ontwikkelgesprek'));
+  if (t === 'certificeringen') return heeft('certificeringen');
+  if (t === 'ontwikkelgesprek') return typeof oplMagOntwikkelgesprek === 'function' ? oplMagOntwikkelgesprek() : heeft('ontwikkelgesprek');
+  return false;
+}
+var DJ_PERS_TABS = ['dossier', 'organogram', 'vakantie', 'certificeringen', 'ontwikkelgesprek'];
+function djPersEersteTab(){ return DJ_PERS_TABS.find(djPersMag) || null; }
+window.navPersoneel = function(sub, btn){
+  var t = sub && sub !== 'personeelsdossier' ? sub : (djPersMag('dossier') ? 'dossier' : djPersEersteTab());
+  if (!t || !djPersMag(t)) { alert('Je hebt geen toegang tot dit onderdeel van het Personeelsdossier. Vraag Sebastiaan om dit aan te zetten in Toegangsbeheer.'); return; }
+  var open = function(){
+    navTo('personeel', 'PERSONEELSDOSSIER \uD83D\uDD12', btn || document.getElementById('nav-btn-personeel'));
+    setTimeout(function(){ pdSubTab(t); }, 40);
+  };
+  if (t === 'dossier' && typeof _werkoverdrachtOntgrendeld !== 'undefined' && !_werkoverdrachtOntgrendeld) {
+    djToegangCheckOfPopup('werkoverdracht').then(function(ok){ if (!ok) return; _werkoverdrachtOntgrendeld = true; open(); });
+    return;
+  }
+  open();
+};
+// Het Opleidingen-inhoudsvak (#opl-content) tijdelijk naar het Personeelsdossier verplaatsen
+var _djOplThuis = null;
+function djOplContentNaar(doel){
+  var c = document.getElementById('opl-content'); if (!c) return;
+  if (!_djOplThuis) { _djOplThuis = document.createElement('span'); _djOplThuis.id = 'opl-content-thuis'; c.parentNode.insertBefore(_djOplThuis, c); }
+  if (doel) doel.appendChild(c); else _djOplThuis.parentNode.insertBefore(c, _djOplThuis);
+}
+document.addEventListener('DOMContentLoaded', function(){
+  // 1. Eigen view maken en het personeelsdossier erin zetten
+  var oud = document.getElementById('nieuw-tab-personeelsdossier'); var wo = document.getElementById('view-nieuw');
+  if (!oud || !wo) return;
+  var v = document.createElement('div'); v.id = 'view-personeel'; v.className = 'view';
+  v.innerHTML = '<div class="container" style="padding-top:8px;"><div class="page-header" style="margin-bottom:10px;"><h1 style="font-family:\'Barlow Condensed\',sans-serif;">&#x1F5C2;&#xFE0F; Personeelsdossier</h1></div></div>';
+  wo.parentNode.insertBefore(v, wo.nextSibling);
+  v.querySelector('.container').appendChild(oud);
+  oud.style.display = 'block';
+  // 2. Subtabknoppen Certificeringen en Ontwikkelgesprek + plek voor hun inhoud
+  var bar = document.getElementById('pd-subtabs');
+  var stijl = document.getElementById('pd-sub-btn-organogram').getAttribute('style');
+  [['certificeringen', '&#x1F4CB; Certificeringen'], ['ontwikkelgesprek', '&#x1F4AC; Ontwikkelgesprek']].forEach(function(x, i){
+    var b = document.createElement('button'); b.type = 'button'; b.id = 'pd-sub-btn-' + x[0]; b.innerHTML = x[1];
+    b.setAttribute('style', stijl + 'order:' + (4 + i) + ';'); b.onclick = function(){ pdSubTab(x[0]); }; bar.appendChild(b);
+  });
+  var host = document.createElement('div'); host.id = 'pd-opl-host'; host.style.display = 'none'; oud.appendChild(host);
+  // 3. Oude tab "Personeelsdossier" in Werkoverdracht weg
+  var oudeKnop = document.getElementById('nieuw-tab-btn-personeelsdossier'); if (oudeKnop) oudeKnop.style.display = 'none';
+  // Vaste volgorde van de subtabbladen
+  ['dossier', 'organogram', 'vakantie', 'certificeringen', 'ontwikkelgesprek'].forEach(function(x, i){ var b = document.getElementById('pd-sub-btn-' + x); if (b) b.style.order = String(i + 1); });
+  // 4. Menu-knop zichtbaar als je iets uit het personeelsdossier mag
+  setTimeout(djPersMenuZichtbaar, 1500);
+});
+function djPersMenuZichtbaar(){
+  var b = document.getElementById('nav-btn-personeel'); if (!b) return;
+  b.style.display = djPersEersteTab() ? '' : 'none';
+  var t = document.getElementById('tegel-personeel'); if (t) t.style.display = b.style.display;
+}
+setInterval(djPersMenuZichtbaar, 10000);
 </script>
 
 </body>
