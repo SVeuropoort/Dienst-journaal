@@ -4837,9 +4837,11 @@ function djAdminOpslaan(){
     <div id="nieuw-tab-personeelsdossier" style="display:none;">
       <div id="pd-subtabs" style="display:flex;gap:6px;margin-bottom:10px;">
         <button type="button" id="pd-sub-btn-dossier" onclick="pdSubTab('dossier')" style="padding:7px 14px;border:1px solid var(--navy);border-radius:6px;background:var(--navy);color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#x1F4C1; Dossier</button>
+        <button type="button" id="pd-sub-btn-vakantie" onclick="pdSubTab('vakantie')" style="padding:7px 14px;border:1px solid #c8d7e8;border-radius:6px;background:#fff;color:var(--navy);font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;order:3;">&#x1F3D6;&#xFE0F; Vakantierooster</button>
         <button type="button" id="pd-sub-btn-organogram" onclick="pdSubTab('organogram')" style="padding:7px 14px;border:1px solid #c8d7e8;border-radius:6px;background:#fff;color:var(--navy);font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#x1F465; Organogram</button>
       </div>
       <div id="nieuw-tab-organogram" class="card" style="display:none;padding:16px 20px;"></div>
+      <div id="nieuw-tab-vakantie" class="card" style="display:none;padding:16px 20px;"></div>
       <div class="card">
         <div class="card-header"><div class="icon">&#x1F4C1;</div><h2>Zoeken &amp; Registreren</h2></div>
         <div style="padding:16px 20px;">
@@ -6935,6 +6937,7 @@ window.addEventListener('resize', () => {
     'schade_mail_v1',
     'organogram_v1',
     'pd_functies_v1',
+    'vakantierooster_v1',
     'werkoverdracht_abnormal_config_v1',
     'werkoverdracht_abnormal_lijst_v1',
     'std_bezetting_v1',
@@ -7190,6 +7193,7 @@ window.addEventListener('resize', () => {
     'schade_mail_v1',
     'organogram_v1',
     'pd_functies_v1',
+    'vakantierooster_v1',
     'werkoverdracht_abnormal_config_v1',
     'werkoverdracht_abnormal_lijst_v1',
     'std_bezetting_v1',
@@ -23392,7 +23396,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.78';
+var DJ_BUILD = '2026-10-06.79';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -27523,14 +27527,19 @@ function pdSubTab(t){
   Array.prototype.forEach.call(box.children, function(el){
     if (el.id === 'pd-subtabs') return;
     if (el.id === 'nieuw-tab-organogram') el.style.display = t === 'organogram' ? 'block' : 'none';
-    else el.style.display = t === 'organogram' ? 'none' : '';
+    else if (el.id === 'nieuw-tab-vakantie') el.style.display = t === 'vakantie' ? 'block' : 'none';
+    else el.style.display = (t === 'organogram' || t === 'vakantie') ? 'none' : '';
   });
-  [['dossier', 'pd-sub-btn-dossier'], ['organogram', 'pd-sub-btn-organogram']].forEach(function(x){
+  // Vakantierooster bestaat alleen voor Europoort
+  var vb = document.getElementById('pd-sub-btn-vakantie'); if (vb) vb.style.display = (sessionStorage.getItem('dj_terminal') || 'EP') === 'EP' ? '' : 'none';
+  if (t === 'vakantie' && (sessionStorage.getItem('dj_terminal') || 'EP') !== 'EP') t = 'dossier';
+  [['dossier', 'pd-sub-btn-dossier'], ['organogram', 'pd-sub-btn-organogram'], ['vakantie', 'pd-sub-btn-vakantie']].forEach(function(x){
     var b = document.getElementById(x[1]); if (!b) return;
     var actief = x[0] === t;
     b.style.background = actief ? 'var(--navy)' : '#fff'; b.style.color = actief ? '#fff' : 'var(--navy)'; b.style.borderColor = actief ? 'var(--navy)' : '#c8d7e8';
   });
   if (t === 'organogram' && typeof orgRender === 'function') orgRender();
+  if (t === 'vakantie' && typeof vakRender === 'function') vakRender();
 }
 window.pdSubTab = pdSubTab;
 function nieuwToonTab(tab){
@@ -31453,6 +31462,219 @@ function djCertVervalKleuren(){
     box.addEventListener('change', function(e){ if (e.target && e.target.matches && e.target.matches('input[data-veld]')) plan(); }, true);
   });
 })();
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// VAKANTIEROOSTER (alleen Europoort) — Personeelsdossier → subtabblad "Vakantierooster"
+// Zes vaste groepen; elk jaar schuift de volgorde (1e…6e keuze) door volgens de verspringing
+// 1→4, 2→6, 3→5, 4→2, 5→1, 6→3. Jaar kiezen = juiste volgorde. Namen staan in SharePoint (niet in de code).
+// ══════════════════════════════════════════════════════════════════
+var VAK_DOOR = { 1: 4, 2: 6, 3: 5, 4: 2, 5: 1, 6: 3 };
+var VAK_TERUG = { 4: 1, 6: 2, 5: 3, 2: 4, 1: 5, 3: 6 };
+function vakKey(){ return 'EP_vakantierooster_v1'; }
+function vakGet(){ try { return JSON.parse(localStorage.getItem(vakKey()) || 'null'); } catch(e) { return null; } }
+function vakSet(d){ d.bijgewerkt = new Date().toISOString(); localStorage.setItem(vakKey(), JSON.stringify(d)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }
+function vakEsc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+var _vakJaar = null, _vakBewerken = false;
+function vakStandaardJaar(){ var n = new Date(); return n.getMonth() >= 8 ? n.getFullYear() + 1 : n.getFullYear(); }
+// Op welke keuze (1–6) staat groep g (0–5, = positie in het basisjaar) in jaar j?
+function vakPositie(d, g, jaar){
+  var p = g + 1, b = d.basisJaar || 2027;
+  if (jaar >= b) { for (var y = b; y < jaar; y++) p = VAK_DOOR[p]; }
+  else { for (var y2 = b; y2 > jaar; y2--) p = VAK_TERUG[p]; }
+  return p;
+}
+function vakVolgorde(d, jaar){ // array [groepIndex voor keuze 1, voor keuze 2, …]
+  var uit = []; for (var g = 0; g < 6; g++) uit[vakPositie(d, g, jaar) - 1] = g; return uit;
+}
+// ── Namen vergelijken ("Verwaal G", "G. Verwaal", "Karagul Harun", "Karagül, H.,'95")
+var VAK_TUSSEN = { van:1, de:1, der:1, den:1, vd:1, 'v/d':1, v:1, het:1, ten:1, ter:1, te:1, d:1 };
+function vakNaamDelen(naam){
+  var t = String(naam || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    .replace(/,\s*'?\d+\s*$/, '').replace(/\((.*?)\)/g, ' ').replace(/[,]/g, ' ').replace(/\./g, '. ').trim();
+  var w = t.split(/\s+/).filter(Boolean);
+  var init = [], voornaam = '', kern = [];
+  w.forEach(function(x){
+    var y = x.replace(/\.$/, '');
+    if (!y) return;
+    if (VAK_TUSSEN[y]) return;
+    if (/\.$/.test(x) || y.length === 1) { init.push(y.charAt(0)); return; }
+    kern.push(y);
+  });
+  // "Karagul Harun" / "Harun Karagul": de langste vorm met hoofdletter-volgorde onbekend → beide kandidaten bewaren
+  return { init: init, kern: kern };
+}
+function vakZelfdePersoon(a, b){
+  var A = vakNaamDelen(a), B = vakNaamDelen(b);
+  if (!A.kern.length || !B.kern.length) return false;
+  // achternaam: een kern-woord dat in beide voorkomt
+  var achter = A.kern.filter(function(x){ return B.kern.indexOf(x) !== -1; });
+  if (!achter.length) return false;
+  var restA = A.kern.filter(function(x){ return achter.indexOf(x) === -1; });
+  var restB = B.kern.filter(function(x){ return achter.indexOf(x) === -1; });
+  // voornaam voluit aan beide kanten → moet gelijk zijn (Harun ≠ Hakan)
+  if (restA.length && restB.length) return restA[0] === restB[0];
+  var voorlA = restA.length ? restA[0].charAt(0) : (A.init[0] || '');
+  var voorlB = restB.length ? restB[0].charAt(0) : (B.init[0] || '');
+  return !voorlA || !voorlB || voorlA === voorlB;
+}
+// ── Team (uit het organogram) en personeelsnummer (uit Salaris, alleen voor supervisors)
+function vakTeamVan(naam){
+  var o = (typeof orgGet === 'function') ? orgGet() : null; if (!o || !o.supervisors) return '';
+  var alle = (typeof orgPersonenAlle === 'function') ? orgPersonenAlle() : [];
+  var past = function(id){ var p = alle.find(function(x){ return x.id === id; }); return p && p.labels.concat([p.weergave]).some(function(l){ return vakZelfdePersoon(l, naam); }); };
+  var team = '';
+  o.supervisors.forEach(function(sv){
+    if (past(sv.persoon)) team = 'SV';
+    sv.ploegleiders.forEach(function(pl){
+      if (past(pl.persoon) && pl.eigenTeam) team = pl.eigenTeam;
+      pl.teams.forEach(function(t){ if (t.leden.some(past)) team = t.naam; });
+    });
+  });
+  return String(team).replace(/^team\s+/i, '');
+}
+function vakNummerVan(naam){
+  var lijst; try { lijst = JSON.parse(localStorage.getItem('ma_medewerkers_v1') || '[]'); } catch(e) { lijst = []; }
+  if (!Array.isArray(lijst)) return '';
+  var kand = lijst.filter(function(m){ return m && m.naam && vakZelfdePersoon(m.naam, naam); });
+  return kand.length === 1 ? (kand[0].mannr || '') : '';
+}
+function vakDatum(iso){ var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? m[3] + '-' + m[2] : '…'; }
+function vakNotities(d, jaar){
+  var j = (d.jaren || {})[jaar] || {};
+  return {
+    regels: [
+      'Gedurende de vakantieperiode van ' + vakDatum(j.p1van) + ' t/m ' + vakDatum(j.p2tot) + ' zal het opnemen van snipperdagen slechts bij uitzondering worden toegestaan.',
+      'De vakantie begint en eindigt na afloop van de zaterdagdienst conform het dienstrooster (vakantie periode bestaat uit drie weken).',
+      'Verlengen van de vakantie door het toevoegen van snipperdagen/ruilen voor en na de periode van drie weken is niet mogelijk.',
+      'Feestdagen worden niet als vakantiedag verrekend.'
+    ],
+    perioden: ['Periode 1 :  ' + vakDatum(j.p1van) + ' t/m ' + vakDatum(j.p1tot), 'Periode 2 :  ' + vakDatum(j.p2van) + ' t/m ' + vakDatum(j.p2tot), 'Periode 3 :  Vrij buiten periode 1 en 2'],
+    verspringing: 'Verspringing:  1 - 4  /  2 - 6  /  3 - 5  /  4 - 2  /  5 - 1  /  6 - 3',
+    school: ['Schoolvakantie basis en voortgezet onderwijs is van ' + vakDatum(j.schoolVan) + ' t/m ' + vakDatum(j.schoolTot), '(Bron ministerie van OCW, ' + (j.regio || 'Regio Midden') + ')'],
+    compleet: !!(j.p1van && j.p1tot && j.p2van && j.p2tot)
+  };
+}
+// ── HTML van het rooster (scherm én afdrukken)
+function vakRoosterHtml(d, jaar, bewerken){
+  var volg = vakVolgorde(d, jaar), kol = d.kolommen;
+  var td = 'border:1px solid #000;padding:2px 5px;font-size:11px;height:15px;white-space:nowrap;';
+  var h = '<table style="border-collapse:collapse;width:100%;table-layout:fixed;font-family:Arial,sans-serif;">' +
+    '<tr><th style="' + td + 'width:9%;background:#d9e1f2;">' + jaar + '</th>' + kol.map(function(k){ return '<th style="' + td + 'background:#d9e1f2;font-size:10.5px;">' + vakEsc(k.l) + '</th>'; }).join('') + '</tr>';
+  volg.forEach(function(g, pos){
+    var grp = d.groepen[g] || {};
+    var rijen = Math.max(3, Math.max.apply(null, kol.map(function(k){ return (grp[k.k] || []).length + (bewerken ? 1 : 0); })));
+    for (var r = 0; r < rijen; r++) {
+      h += '<tr>' + '<td style="' + td + (r === 0 ? 'border-top:2px solid #000;' : '') + 'font-weight:700;">' + (r === 1 ? (pos + 1) + 'e keuze' : '') + '</td>';
+      kol.forEach(function(k){
+        var namen = grp[k.k] || [], n = namen[r];
+        var inhoud = '';
+        if (n) inhoud = vakEsc(n) + (bewerken ? ' <span onclick="vakWeg(' + g + ',\'' + k.k + '\',' + r + ')" title="Weghalen" style="color:#c0392b;cursor:pointer;float:right;">&#x2715;</span>' : '');
+        else if (bewerken && r === namen.length) inhoud = '<span onclick="vakErbij(' + g + ',\'' + k.k + '\')" style="color:#0f6cbd;cursor:pointer;font-size:10.5px;">+ toevoegen</span>';
+        h += '<td style="' + td + (r === 0 ? 'border-top:2px solid #000;' : '') + '">' + inhoud + '</td>';
+      });
+      h += '</tr>';
+    }
+  });
+  return h + '</table>';
+}
+function vakNotitiesHtml(d, jaar){
+  var n = vakNotities(d, jaar), p = 'margin:2px 0;font-size:11.5px;font-family:Arial,sans-serif;';
+  return '<div style="margin-top:10px;">' + n.regels.map(function(x){ return '<div style="' + p + '">' + vakEsc(x) + '</div>'; }).join('') +
+    '<div style="display:flex;gap:40px;margin-top:8px;"><div>' + n.perioden.map(function(x){ return '<div style="' + p + 'font-weight:700;">' + vakEsc(x) + '</div>'; }).join('') + '</div>' +
+    '<div style="' + p + 'font-weight:700;">' + vakEsc(n.verspringing) + '</div></div>' +
+    '<div style="margin-top:8px;">' + n.school.map(function(x){ return '<div style="' + p + '">' + vakEsc(x) + '</div>'; }).join('') + '</div></div>';
+}
+function vakAanvraagHtml(d, jaar){
+  var volg = vakVolgorde(d, jaar), kol = d.kolommen;
+  var td = 'border:1px solid #000;padding:2px 5px;font-size:11px;height:16px;font-family:Arial,sans-serif;';
+  var kop = '<tr>' + ['Naam', 'Nummer', 'Team', '1e keuze', '2e keuze', '3e keuze', 'Vrij keuze'].map(function(x, i){ return '<th style="' + td + 'background:#d9e1f2;width:' + [26,11,9,13,13,13,15][i] + '%;">' + x + '</th>'; }).join('') + '</tr>';
+  var blok = function(pos){
+    var grp = d.groepen[volg[pos]] || {}, namen = [];
+    kol.forEach(function(k){ (grp[k.k] || []).forEach(function(n){ namen.push(n); }); }); // kolom voor kolom, zoals in de Excel
+    var h = '<tr><td colspan="7" style="' + td + 'font-weight:800;background:#f2f2f2;">' + (pos + 1) + 'e Keuze</td></tr>';
+    namen.forEach(function(n){ h += '<tr><td style="' + td + '">' + vakEsc(n) + '</td><td style="' + td + '">' + vakEsc(vakNummerVan(n)) + '</td><td style="' + td + '">' + vakEsc(vakTeamVan(n)) + '</td><td style="' + td + '"></td><td style="' + td + '"></td><td style="' + td + '"></td><td style="' + td + '"></td></tr>'; });
+    for (var i = namen.length; i < namen.length + 2; i++) h += '<tr><td style="' + td + '">&nbsp;</td><td style="' + td + '"></td><td style="' + td + '"></td><td style="' + td + '"></td><td style="' + td + '"></td><td style="' + td + '"></td><td style="' + td + '"></td></tr>';
+    return h;
+  };
+  var tabel = function(van, tot){ var h = '<table style="border-collapse:collapse;width:100%;table-layout:fixed;">' + kop; for (var p = van; p < tot; p++) h += blok(p); return h + '</table>'; };
+  return { deel1: tabel(0, 3), deel2: tabel(3, 6) };
+}
+// ── Afdrukken: blad 1 liggend (rooster), daarna staand de aanvraaglijst (2 bladen), zoals de Excel
+window.vakAfdrukken = function(){
+  var d = vakGet(); if (!d) return; var jaar = _vakJaar || vakStandaardJaar();
+  var a = vakAanvraagHtml(d, jaar), n = vakNotities(d, jaar);
+  var titel = '<div style="font:700 15px Arial,sans-serif;text-align:center;margin-bottom:8px;">STENA LINE STEVEDORING B.V.&nbsp;&nbsp;&nbsp;&nbsp;VAKANTIEROOSTER ' + jaar + '</div>';
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Vakantierooster ' + jaar + '</title><style>' +
+    '@page land { size: A4 landscape; margin: 10mm; } @page port { size: A4 portrait; margin: 12mm; }' +
+    '.land { page: land; } .port { page: port; break-before: page; } body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }' +
+    '</style></head><body>' +
+    '<div class="land">' + titel + vakRoosterHtml(d, jaar, false) + vakNotitiesHtml(d, jaar) + '</div>' +
+    '<div class="port">' + titel.replace('VAKANTIEROOSTER', 'VAKANTIEAANVRAAG') + a.deel1 + '</div>' +
+    '<div class="port">' + a.deel2 + '<div style="margin-top:14px;">' + vakNotitiesHtml(d, jaar) + '</div></div>' +
+    '<script>window.onload=function(){ setTimeout(function(){ window.print(); }, 200); };<\/script></body></html>';
+  var w = window.open('', '_blank'); if (!w) { alert('Pop-up geblokkeerd. Sta pop-ups toe om af te drukken.'); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+};
+// ── Bewerken (SV / beheer)
+window.vakWeg = function(g, k, r){ var d = vakGet(); if (!d) return; d.groepen[g][k].splice(r, 1); vakSet(d); vakRender(); };
+window.vakErbij = function(g, k){
+  var d = vakGet(); if (!d) return;
+  var inRooster = []; d.groepen.forEach(function(gr){ Object.keys(gr).forEach(function(kk){ inRooster = inRooster.concat(gr[kk]); }); });
+  var kandidaten = (typeof orgPersonen === 'function' ? orgPersonen() : []).map(function(p){ return p.weergave; })
+    .filter(function(n){ return !inRooster.some(function(x){ return vakZelfdePersoon(x, n); }); });
+  var o = document.createElement('div'); o.id = 'vak-kies';
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(0,20,40,.45);z-index:100005;display:flex;align-items:center;justify-content:center;';
+  o.innerHTML = '<div style="background:#fff;border-radius:10px;padding:16px;width:340px;max-width:92vw;">' +
+    '<div style="font-weight:800;color:#003366;margin-bottom:8px;">Medewerker toevoegen</div>' +
+    '<select id="vak-kies-sel" style="width:100%;padding:6px;"><option value="">— kies (vaste medewerkers die nog niet in het rooster staan) —</option>' +
+    kandidaten.map(function(n){ return '<option>' + vakEsc(n) + '</option>'; }).join('') + '</select>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;"><button type="button" onclick="document.getElementById(\'vak-kies\').remove()" style="padding:6px 12px;">Annuleren</button>' +
+    '<button type="button" id="vak-kies-ok" style="padding:6px 12px;background:#003366;color:#fff;border:none;border-radius:5px;">Toevoegen</button></div></div>';
+  document.body.appendChild(o);
+  document.getElementById('vak-kies-ok').onclick = function(){
+    var v = document.getElementById('vak-kies-sel').value; if (!v) return;
+    var d2 = vakGet(); (d2.groepen[g][k] = d2.groepen[g][k] || []).push(v); vakSet(d2); o.remove(); vakRender();
+  };
+};
+window.vakJaarVeld = function(veld, waarde){ var d = vakGet(); if (!d) return; var j = _vakJaar; d.jaren = d.jaren || {}; d.jaren[j] = d.jaren[j] || {}; d.jaren[j][veld] = waarde; vakSet(d); vakRender(); };
+window.vakImporteren = function(){
+  var inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json';
+  inp.onchange = function(){ var f = inp.files && inp.files[0]; if (!f) return; f.text().then(function(t){
+    var b; try { b = JSON.parse(t); } catch(e) { alert('Geen geldig bestand.'); return; }
+    if (!b || b.soort !== 'dienst-journaal-vakantierooster' || !Array.isArray(b.groepen) || b.groepen.length !== 6) { alert('Dit is geen vakantierooster-bestand van Dienst Journaal.'); return; }
+    vakSet({ basisJaar: b.basisJaar, kolommen: b.kolommen, groepen: b.groepen, jaren: b.jaren || {} }); _vakJaar = b.basisJaar; vakRender(); alert('Vakantierooster geïmporteerd.');
+  }); };
+  inp.click();
+};
+window.vakKiesJaar = function(j){ _vakJaar = +j; vakRender(); };
+window.vakToggleBewerken = function(){ if (typeof orgMagBewerken === 'function' && !orgMagBewerken()) return; _vakBewerken = !_vakBewerken; vakRender(); };
+function vakRender(){
+  var box = document.getElementById('nieuw-tab-vakantie'); if (!box) return;
+  var d = vakGet(), mag = (typeof orgMagBewerken === 'function') && orgMagBewerken();
+  if (_vakBewerken && !mag) _vakBewerken = false;
+  var knop = 'background:#fff;border:1px solid #c8d7e8;color:var(--navy);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px;font-weight:700;';
+  if (!d) { box.innerHTML = '<div style="font-weight:800;color:var(--navy);font-size:17px;margin-bottom:8px;">&#x1F3D6;&#xFE0F; Vakantierooster Europoort</div><div style="color:#8795a8;font-size:13px;">Nog geen vakantierooster. ' +
+    (mag ? '<button type="button" onclick="vakImporteren()" style="' + knop + '">&#x1F4E5; Importeren</button>' : 'Een SV kan het rooster importeren.') + '</div>'; return; }
+  var jaar = _vakJaar || vakStandaardJaar(); _vakJaar = jaar;
+  var nu = new Date().getFullYear(), jaren = []; for (var y = Math.min(d.basisJaar, nu) - 1; y <= nu + 5; y++) jaren.push(y);
+  var n = vakNotities(d, jaar), j = (d.jaren || {})[jaar] || {};
+  var veld = function(k, l){ return '<label style="font-size:11px;font-weight:700;color:#5a6b80;display:flex;flex-direction:column;gap:2px;">' + l + '<input type="date" value="' + vakEsc(j[k] || '') + '" onchange="vakJaarVeld(\'' + k + '\',this.value)" style="padding:4px;border:1px solid #c8d7e8;border-radius:4px;"></label>'; };
+  box.innerHTML =
+    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">' +
+      '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:var(--navy);flex:1;">&#x1F3D6;&#xFE0F; Vakantierooster Europoort</div>' +
+      '<select onchange="vakKiesJaar(this.value)" style="padding:6px 10px;border:1px solid #c8d7e8;border-radius:6px;font-weight:700;">' + jaren.map(function(y){ return '<option' + (y === jaar ? ' selected' : '') + '>' + y + '</option>'; }).join('') + '</select>' +
+      (mag ? '<button type="button" onclick="vakToggleBewerken()" style="' + knop + (_vakBewerken ? 'background:var(--navy);color:#fff;' : '') + '">' + (_vakBewerken ? '&#x2714; Klaar' : '&#x270F;&#xFE0F; Bewerken') + '</button>' : '') +
+      '<button type="button" onclick="vakAfdrukken()" style="' + knop + '">&#x1F5A8;&#xFE0F; Afdrukken</button></div>' +
+    (!n.compleet ? '<div style="background:#fff3cd;border:1px solid #f0d78c;border-radius:6px;padding:8px 12px;font-size:12.5px;margin-bottom:10px;">De vakantieperiodes voor ' + jaar + ' zijn nog niet ingevuld.' + (mag ? ' Klik op <b>Bewerken</b> om ze in te vullen.' : '') + '</div>' : '') +
+    (_vakBewerken ? '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;background:#f5f8fc;border:1px solid #dbe5f0;border-radius:6px;padding:8px 12px;margin-bottom:10px;">' +
+      '<b style="font-size:12px;color:var(--navy);">Periodes ' + jaar + ':</b>' + veld('p1van', 'Periode 1 van') + veld('p1tot', 'Periode 1 t/m') + veld('p2van', 'Periode 2 van') + veld('p2tot', 'Periode 2 t/m') + veld('schoolVan', 'Schoolvakantie van') + veld('schoolTot', 'Schoolvakantie t/m') + '</div>' : '') +
+    '<div style="overflow-x:auto;"><div style="min-width:900px;">' +
+      '<div style="font:700 14px Arial,sans-serif;text-align:center;margin-bottom:6px;">STENA LINE STEVEDORING B.V.&nbsp;&nbsp;&nbsp;VAKANTIEROOSTER ' + jaar + '</div>' +
+      vakRoosterHtml(d, jaar, _vakBewerken) + vakNotitiesHtml(d, jaar) + '</div></div>';
+}
+window.vakRender = vakRender;
 </script>
 
 </body>
