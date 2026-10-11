@@ -4713,7 +4713,6 @@ function djAdminOpslaan(){
     <div style="display:flex;gap:6px;margin-bottom:16px;">
       <button id="nieuw-tab-btn-overdracht" onclick="nieuwToonTab('overdracht')" style="padding:9px 18px;border:none;border-radius:6px 6px 0 0;background:var(--navy);color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#x21C4; Overdracht</button>
       <button id="nieuw-tab-btn-personeelsdossier" onclick="nieuwToonTab('personeelsdossier')" style="padding:9px 18px;border:none;border-radius:6px 6px 0 0;background:#e8eef5;color:var(--navy);font-family:'Barlow Condensed',sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#x1F4C1; Personeelsdossier</button>
-      <button id="nieuw-tab-btn-organogram" onclick="nieuwToonTab('organogram')" style="padding:9px 18px;border:none;border-radius:6px 6px 0 0;background:#e8eef5;color:var(--navy);font-family:'Barlow Condensed',sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#x1F465; Organogram</button>
       <button id="nieuw-tab-btn-toolbox" onclick="nieuwToonTab('toolbox')" style="padding:9px 18px;border:none;border-radius:6px 6px 0 0;background:#e8eef5;color:var(--navy);font-family:'Barlow Condensed',sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#x1F9F0; Toolbox</button>
     </div>
 
@@ -4835,8 +4834,12 @@ function djAdminOpslaan(){
     </div>
 
     <!-- ===== PERSONEELSDOSSIER (sub-tab) ===== -->
-    <div id="nieuw-tab-organogram" class="card" style="display:none;"></div>
     <div id="nieuw-tab-personeelsdossier" style="display:none;">
+      <div id="pd-subtabs" style="display:flex;gap:6px;margin-bottom:10px;">
+        <button type="button" id="pd-sub-btn-dossier" onclick="pdSubTab('dossier')" style="padding:7px 14px;border:1px solid var(--navy);border-radius:6px;background:var(--navy);color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#x1F4C1; Dossier</button>
+        <button type="button" id="pd-sub-btn-organogram" onclick="pdSubTab('organogram')" style="padding:7px 14px;border:1px solid #c8d7e8;border-radius:6px;background:#fff;color:var(--navy);font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#x1F465; Organogram</button>
+      </div>
+      <div id="nieuw-tab-organogram" class="card" style="display:none;padding:16px 20px;"></div>
       <div class="card">
         <div class="card-header"><div class="icon">&#x1F4C1;</div><h2>Zoeken &amp; Registreren</h2></div>
         <div style="padding:16px 20px;">
@@ -23379,7 +23382,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.63';
+var DJ_BUILD = '2026-10-06.66';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -27502,8 +27505,26 @@ function navWerkoverdracht(label, btn, subtab, callback) {
     if (typeof callback === 'function') setTimeout(callback, 80);
   }, 60);
 }
+// Subtabbladen binnen Personeelsdossier: het dossier zelf en het organogram
+function pdSubTab(t){
+  var box = document.getElementById('nieuw-tab-personeelsdossier'); if (!box) return;
+  Array.prototype.forEach.call(box.children, function(el){
+    if (el.id === 'pd-subtabs') return;
+    if (el.id === 'nieuw-tab-organogram') el.style.display = t === 'organogram' ? 'block' : 'none';
+    else el.style.display = t === 'organogram' ? 'none' : '';
+  });
+  [['dossier', 'pd-sub-btn-dossier'], ['organogram', 'pd-sub-btn-organogram']].forEach(function(x){
+    var b = document.getElementById(x[1]); if (!b) return;
+    var actief = x[0] === t;
+    b.style.background = actief ? 'var(--navy)' : '#fff'; b.style.color = actief ? '#fff' : 'var(--navy)'; b.style.borderColor = actief ? 'var(--navy)' : '#c8d7e8';
+  });
+  if (t === 'organogram' && typeof orgRender === 'function') orgRender();
+}
+window.pdSubTab = pdSubTab;
 function nieuwToonTab(tab){
-  var tabs = ['overdracht', 'personeelsdossier', 'organogram', 'toolbox'];
+  var sub = null;
+  if (tab === 'organogram') { tab = 'personeelsdossier'; sub = 'organogram'; } // organogram is een subtabblad van Personeelsdossier
+  var tabs = ['overdracht', 'personeelsdossier', 'toolbox'];
   tabs.forEach(function(t){
     var body = document.getElementById('nieuw-tab-' + t);
     var btn = document.getElementById('nieuw-tab-btn-' + t);
@@ -27511,8 +27532,8 @@ function nieuwToonTab(tab){
     if (btn) { btn.style.background = (t === tab) ? 'var(--navy)' : '#e8eef5'; btn.style.color = (t === tab) ? '#fff' : 'var(--navy)'; }
   });
   if (tab === 'personeelsdossier' && typeof pdInit === 'function') pdInit();
+  if (tab === 'personeelsdossier' && typeof pdSubTab === 'function') pdSubTab(sub || 'dossier');
   if (tab === 'toolbox' && typeof toolboxRender === 'function') toolboxRender();
-  if (tab === 'organogram' && typeof orgRender === 'function') orgRender();
   if (typeof djVertaalPaginaEngels === 'function') setTimeout(djVertaalPaginaEngels, 60);
 }
 
@@ -29791,12 +29812,56 @@ function pdSlaVerjaardagOp(){
 // bewaart het volledige gesprek (incl. handtekeningen) in Data/Vertrouwelijk/<terminal>/
 // Ontwikkelgesprekken/ — alleen supervisors van die terminal kunnen erbij.
 // ══════════════════════════════════════════════════════════════════
+// Wie staat er in het organogram ONDER de ingelogde persoon?
+//  - ploegleider → de leden van zijn ploegen
+//  - supervisor  → zijn ploegleiders + alle leden van hun ploegen
+//  - Operations Manager / POM → iedereen eronder
+// Geeft null terug als er geen organogram is of je er zelf niet in staat (dan: alle vaste medewerkers).
+function djOgMijnMensen(){
+  var o = (typeof orgGet === 'function') ? orgGet() : null; if (!o || !o.supervisors) return null;
+  var ik = String(localStorage.getItem('dj_sp_account_username') || '').toLowerCase(); if (!ik) return null;
+  var alle = (typeof orgPersonenAlle === 'function') ? orgPersonenAlle() : [];
+  var mijnNamen = [];
+  var acc = (typeof djToegangGet === 'function') ? djToegangGet().find(function(a){ return String(a.email).toLowerCase() === ik; }) : null;
+  if (acc && acc.naam) { var w = acc.naam.trim().split(/\s+/); mijnNamen.push(w[w.length - 1] + ' ' + w.slice(0, -1).join(' ')); mijnNamen.push(acc.naam); }
+  if (typeof djChatNaamUitEmail === 'function') mijnNamen.push(djChatNaamUitEmail(ik));
+  var benIk = function(id){
+    if (!id) return false;
+    if (id === 'mail:' + ik) return true;
+    var p = alle.find(function(x){ return x.id === id; }); if (!p) return false;
+    var labels = p.labels.concat([p.weergave]);
+    return mijnNamen.some(function(m){ return labels.some(function(l){
+      return String(l).toLowerCase().replace(/[\s.]/g, '') === String(m).toLowerCase().replace(/[\s.]/g, '') || (typeof certNaamMatch === 'function' && certNaamMatch(l, m)); }); });
+  };
+  var ids = [], plOnder = function(pl){ pl.teams.forEach(function(t){ t.leden.forEach(function(x){ if (x) ids.push(x); }); }); };
+  var svOnder = function(sv){ sv.ploegleiders.forEach(function(pl){ if (pl.persoon) ids.push(pl.persoon); plOnder(pl); }); };
+  var gevonden = false;
+  if (benIk(o.pom && o.pom.persoon) || benIk(o.om && o.om.persoon)) {
+    gevonden = true;
+    if (benIk(o.pom && o.pom.persoon) && o.om && o.om.persoon) ids.push(o.om.persoon);
+    o.supervisors.forEach(function(sv){ if (sv.persoon) ids.push(sv.persoon); svOnder(sv); });
+  }
+  o.supervisors.forEach(function(sv){
+    if (benIk(sv.persoon)) { gevonden = true; svOnder(sv); }
+    sv.ploegleiders.forEach(function(pl){ if (benIk(pl.persoon)) { gevonden = true; plOnder(pl); } });
+  });
+  if (!gevonden) return null;
+  // organogram-id → naam (zoals in het personeelsdossier)
+  return ids.map(function(id){ var p = alle.find(function(x){ return x.id === id; }); return p ? { id: id, labels: p.labels.concat([p.weergave]) } : null; }).filter(Boolean);
+}
 function djOgMedewerkers(){
   var data = (typeof pdData === 'function') ? pdData() : {};
   var groepen = (typeof PD_GROEPEN !== 'undefined' && Array.isArray(PD_GROEPEN)) ? PD_GROEPEN : [];
   // Alleen vaste medewerkers: geen groepen (inhuur, stagiaires, …) en niemand die uit dienst is
+  var mijn = djOgMijnMensen(); // alleen je eigen mensen uit het organogram (als je erin staat)
+  var hoortBijMij = function(n){
+    if (!mijn) return true;
+    return mijn.some(function(m){ return m.labels.some(function(l){
+      return String(l).trim().toLowerCase() === String(n).trim().toLowerCase() || (typeof certNaamMatch === 'function' && certNaamMatch(l, n)); }); });
+  };
   return Object.keys(data).filter(function(n){
     if (!n || groepen.indexOf(n) !== -1) return false;
+    if (!hoortBijMij(n)) return false;
     return (typeof pdCategorieVan === 'function') ? pdCategorieVan(n) === 'actief' : true;
   })
     .sort(function(a, b){ return a.localeCompare(b, 'nl'); });
@@ -31100,6 +31165,34 @@ function orgLidErbij(s, pl, t){
   var o = orgGet(); if (!o) return;
   o.supervisors[s].ploegleiders[pl].teams[t].leden.push(''); orgSet(o); orgRender();
 }
+// ── Ploegen (teams), ploegleiders en supervisors toevoegen / hernoemen / verwijderen
+function orgAlleTeamNamen(o){ var n = []; o.supervisors.forEach(function(s){ s.ploegleiders.forEach(function(pl){ pl.teams.forEach(function(t){ n.push(String(t.naam).toLowerCase()); }); }); }); return n; }
+function orgVraagTeamNaam(o, huidig){
+  var naam = prompt('Naam van de ploeg (bijv. "Team S"):', huidig || '');
+  if (naam === null) return null;
+  naam = naam.trim(); if (!naam) return null;
+  if (naam.toLowerCase() !== String(huidig || '').toLowerCase() && orgAlleTeamNamen(o).indexOf(naam.toLowerCase()) !== -1) { alert('Er bestaat al een ploeg met de naam "' + naam + '".'); return null; }
+  return naam;
+}
+window.orgTeamErbij = function(si, pi){ var o = orgGet(); if (!o) return; var n = orgVraagTeamNaam(o, ''); if (!n) return; o.supervisors[si].ploegleiders[pi].teams.push({ naam: n, leden: [''] }); orgSet(o); orgRender(); };
+window.orgTeamNaam = function(si, pi, ti){ var o = orgGet(); if (!o) return; var t = o.supervisors[si].ploegleiders[pi].teams[ti]; var n = orgVraagTeamNaam(o, t.naam); if (!n) return; t.naam = n; orgSet(o); orgRender(); };
+window.orgTeamWeg = function(si, pi, ti){ var o = orgGet(); if (!o) return; var t = o.supervisors[si].ploegleiders[pi].teams[ti];
+  if (!confirm('Ploeg "' + t.naam + '" verwijderen?' + (t.leden.filter(Boolean).length ? '\nDe leden komen weer vrij in de keuzelijsten.' : ''))) return;
+  o.supervisors[si].ploegleiders[pi].teams.splice(ti, 1); orgSet(o); orgRender(); };
+window.orgPloegleiderErbij = function(si){ var o = orgGet(); if (!o) return; o.supervisors[si].ploegleiders.push({ persoon: '', teams: [] }); orgSet(o); orgRender(); };
+window.orgPloegleiderWeg = function(si, pi){ var o = orgGet(); if (!o) return; var pl = o.supervisors[si].ploegleiders[pi];
+  if (pl.teams.length && !confirm('Deze ploegleider heeft ' + pl.teams.length + ' ploeg(en). Ploegleider én ploegen verwijderen?')) return;
+  o.supervisors[si].ploegleiders.splice(pi, 1); orgSet(o); orgRender(); };
+window.orgSupervisorErbij = function(){ var o = orgGet(); if (!o) return; o.supervisors.push({ persoon: '', ploegleiders: [] }); orgSet(o); orgRender(); };
+window.orgSupervisorWeg = function(si){ var o = orgGet(); if (!o) return; var s = o.supervisors[si];
+  if (s.ploegleiders.length && !confirm('Deze supervisor heeft ' + s.ploegleiders.length + ' ploegleider(s) met hun ploegen. Alles verwijderen?')) return;
+  o.supervisors.splice(si, 1); orgSet(o); orgRender(); };
+window.orgNieuw = function(){
+  if (orgGet() && !confirm('Er staat al een organogram. Overschrijven met een leeg organogram?')) return;
+  orgSet({ peildatum: new Date().toISOString().slice(0, 10), pom: { rol: 'POM Port & Terminals', persoon: '' }, om: { rol: 'Operations Manager Port & Terminals', persoon: '' },
+    supervisors: [{ persoon: '', ploegleiders: [{ persoon: '', teams: [{ naam: 'Team A', leden: [''] }] }] }] });
+  _orgBewerken = true; orgRender();
+};
 window.orgImporteren = orgImporteren; window.orgToggleBewerken = orgToggleBewerken; window.orgKies = orgKies; window.orgLidErbij = orgLidErbij;
 function orgRender(){
   var box = document.getElementById('nieuw-tab-organogram'); if (!box) return;
@@ -31108,10 +31201,12 @@ function orgRender(){
   var knop = 'background:#fff;border:1px solid #c8d7e8;color:var(--navy);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px;font-weight:700;';
   var kop = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">' +
     '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:var(--navy);letter-spacing:.5px;flex:1;">&#x1F465; Organogram ' + tNaam +
-      (o && o.peildatum ? ' <span style="font-size:12px;color:#8795a8;font-weight:600;">per ' + orgEsc(o.peildatum.split('-').reverse().join('-')) + '</span>' : '') + '</div>' +
+      (o && o.peildatum ? ' <span style="font-size:12px;color:#8795a8;font-weight:600;">per ' + orgEsc(o.peildatum.split('-').reverse().join('-')) + '</span>' : '') +
+      (o ? ' <span style="font-size:12px;color:#8795a8;font-weight:600;">\u00B7 ' + orgAlleTeamNamen(o).length + ' ploegen</span>' : '') + '</div>' +
     (o ? '<button type="button" onclick="orgToggleBewerken()" style="' + knop + (_orgBewerken ? 'background:var(--navy);color:#fff;' : '') + '">' + (_orgBewerken ? '&#x2714; Klaar' : '&#x270F;&#xFE0F; Bewerken') + '</button>' : '') +
     '<button type="button" onclick="orgImporteren()" style="' + knop + '">&#x1F4E5; Importeren</button></div>';
-  if (!o) { box.innerHTML = kop + '<div style="color:#8795a8;font-size:13px;padding:20px 0;">Nog geen organogram voor ' + tNaam + '. Klik op <b>Importeren</b> en kies het organogram-bestand.</div>'; return; }
+  if (!o) { box.innerHTML = kop + '<div style="color:#8795a8;font-size:13px;padding:20px 0;">Nog geen organogram voor ' + tNaam + '. Klik op <b>Importeren</b> en kies het organogram-bestand, of ' +
+    '<button type="button" onclick="orgNieuw()" style="' + knop + '">&#x2795; Begin met een leeg organogram</button></div>'; return; }
   var alle = orgPersonenAlle();
   var naamVan = function(id){ var p = orgPersoonVan(id, alle); return p ? p.weergave : ''; };
   // Wie al ergens in het organogram staat, komt niet nog eens in een keuzelijst
@@ -31132,27 +31227,31 @@ function orgRender(){
   };
   var persoonHtml = function(pad, id){ return _orgBewerken ? '<div style="margin-top:4px;">' + keuze(pad, id) + '</div>' : '<div style="font-weight:700;font-size:13px;margin-top:2px;">' + (orgEsc(naamVan(id)) || '<span style="opacity:.5;">—</span>') + '</div>'; };
   var lijn = '<div style="width:2px;height:14px;background:#9fb3c8;margin:0 auto;"></div>';
+  var mini = 'font-size:11px;border:1px dashed #9fb3c8;background:#fff;border-radius:4px;cursor:pointer;color:var(--navy);padding:2px 6px;';
+  var weg = function(fn, titel){ return _orgBewerken ? '<button type="button" onclick="' + fn + '" title="' + titel + '" style="border:none;background:none;color:#c0392b;cursor:pointer;font-size:12px;float:right;line-height:1;">&#x2715;</button>' : ''; };
   var html = kop + '<div style="overflow-x:auto;padding-bottom:10px;"><div style="min-width:980px;">' +
     '<div style="display:flex;justify-content:center;">' + vak(orgEsc(o.pom.rol), persoonHtml('pom.persoon', o.pom.persoon), true) + '</div>' + lijn +
     '<div style="display:flex;justify-content:center;">' + vak(orgEsc(o.om.rol), persoonHtml('om.persoon', o.om.persoon), true) + '</div>' + lijn +
     '<div style="display:flex;gap:10px;align-items:flex-start;border-top:2px solid #9fb3c8;padding-top:12px;">' +
     o.supervisors.map(function(s, si){
       return '<div style="flex:1;min-width:0;border:1px solid #dbe5f0;border-radius:8px;padding:8px;background:#fbfdff;">' +
+        weg('orgSupervisorWeg(' + si + ')', 'Supervisor verwijderen') +
         '<div style="display:flex;justify-content:center;margin-bottom:10px;">' + vak('Supervisor Stevedoring', persoonHtml('supervisors.' + si + '.persoon', s.persoon), true) + '</div>' +
         '<div style="display:flex;gap:6px;">' + s.ploegleiders.map(function(pl, pi){
           return '<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;">' +
-            vak('Ploegleider', persoonHtml('supervisors.' + si + '.ploegleiders.' + pi + '.persoon', pl.persoon), false) +
+            '<div>' + weg('orgPloegleiderWeg(' + si + ',' + pi + ')', 'Ploegleider verwijderen') + vak('Ploegleider', persoonHtml('supervisors.' + si + '.ploegleiders.' + pi + '.persoon', pl.persoon), false) + '</div>' +
             pl.teams.map(function(tm, ti){
               var basis = 'supervisors.' + si + '.ploegleiders.' + pi + '.teams.' + ti + '.leden.';
               var leden = tm.leden.map(function(id, li){
                 return _orgBewerken ? '<div style="margin-top:3px;">' + keuze(basis + li, id) + '</div>' : '<div>' + (orgEsc(naamVan(id)) || '<span style="opacity:.5;">—</span>') + '</div>';
               }).join('');
               return '<div style="border:1px solid #c8d7e8;border-radius:6px;padding:6px 8px;background:#fff;font-size:12px;line-height:1.45;">' +
-                '<div style="font-weight:800;color:var(--navy);margin-bottom:2px;">' + orgEsc(tm.naam) + '</div>' + (leden || '<div style="opacity:.5;">—</div>') +
+                weg('orgTeamWeg(' + si + ',' + pi + ',' + ti + ')', 'Ploeg verwijderen') +
+                '<div style="font-weight:800;color:var(--navy);margin-bottom:2px;' + (_orgBewerken ? 'cursor:pointer;text-decoration:underline dotted;' : '') + '"' + (_orgBewerken ? ' onclick="orgTeamNaam(' + si + ',' + pi + ',' + ti + ')" title="Naam wijzigen"' : '') + '>' + orgEsc(tm.naam) + '</div>' + (leden || '<div style="opacity:.5;">—</div>') +
                 (_orgBewerken ? '<button type="button" onclick="orgLidErbij(' + si + ',' + pi + ',' + ti + ')" style="margin-top:4px;font-size:11px;border:1px dashed #9fb3c8;background:none;border-radius:4px;cursor:pointer;color:var(--navy);">+ lid</button>' : '') + '</div>';
-            }).join('') + '</div>';
-        }).join('') + '</div></div>';
-    }).join('') + '</div></div></div>' +
+            }).join('') + (_orgBewerken ? '<button type="button" onclick="orgTeamErbij(' + si + ',' + pi + ')" style="' + mini + '">+ ploeg</button>' : '') + '</div>';
+        }).join('') + (_orgBewerken ? '<button type="button" onclick="orgPloegleiderErbij(' + si + ')" style="' + mini + 'align-self:flex-start;">+ ploegleider</button>' : '') + '</div></div>';
+    }).join('') + (_orgBewerken ? '<button type="button" onclick="orgSupervisorErbij()" style="' + mini + 'align-self:flex-start;">+ supervisor</button>' : '') + '</div></div></div>' +
     (_orgBewerken ? '<div style="font-size:11.5px;color:#8795a8;margin-top:6px;">Kies "—" om iemand uit een team te halen. Alleen personen die in het systeem bekend zijn, staan in de lijst.</div>' : '');
   box.innerHTML = html;
 }
