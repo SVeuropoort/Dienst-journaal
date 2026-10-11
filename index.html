@@ -3672,6 +3672,8 @@ async function djVertrouwelijkRechtenBijwerken(forceer){
       regels.push('<b>' + t + '</b>: ' + moet.length + ' supervisor' + (moet.length === 1 ? '' : 's') +
         (erbij.length ? ' \u00B7 +' + erbij.length : '') + (eraf.length ? ' \u00B7 \u2212' + eraf.length : ''));
     }
+    try { if (typeof djOgRechtenBijwerken === 'function') regels = regels.concat(await djOgRechtenBijwerken(api, H, lijst, await djPersoonAliassen(ikLc))); }
+    catch(eOg) { regels.push('&#x26A0;&#xFE0F; ' + oplEsc(eOg.message || String(eOg))); fout = true; }
     djVertrStatus((fout ? '' : '&#x1F512; ') + 'Vertrouwelijke mappen: ' + regels.join(' &nbsp;|&nbsp; '), fout ? '#ffb347' : '#6fdc8c');
   } catch(e) {
     console.error('Vertrouwelijke rechten bijwerken mislukt:', e);
@@ -23396,7 +23398,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.85';
+var DJ_BUILD = '2026-10-06.86';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -29810,6 +29812,14 @@ function pdRenderDetail(){
   var _alle = (data[_pdGeselecteerd] || []).slice().sort(function(a,b){ return pdDatumSorteerKey(b.datum).localeCompare(pdDatumSorteerKey(a.datum)); });
   // Ontwikkelgesprekken apart tonen, boven de gewone registraties
   var gesprekken = _alle.filter(function(e){ return e.soort === 'ontwikkelgesprek'; });
+  // Gesprekken uit de map Ontwikkelgesprekken (opgeslagen door ploegleiders én supervisors)
+  var _t = sessionStorage.getItem('dj_terminal') || 'EP', _c = _djOgLijst[_t];
+  if (!_c || Date.now() - _c.t > 60000) { djOgLijstOphalen(_t).then(function(){ if (typeof pdRenderDetail === 'function') pdRenderDetail(); }).catch(function(){}); }
+  if (_c) _c.items.filter(function(x){ return x.naam === _pdGeselecteerd; }).forEach(function(x){
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(x.datum);
+    gesprekken.push({ id: 'map:' + x.pad, datum: m ? (+m[3]) + '-' + (+m[2]) + '-' + m[1] : x.datum, gesprekPad: x.pad, uitMap: true, tekst: '' });
+  });
+  gesprekken.sort(function(a, b){ return pdDatumSorteerKey(b.datum).localeCompare(pdDatumSorteerKey(a.datum)); });
   var entries = _alle.filter(function(e){ return e.soort !== 'ontwikkelgesprek'; });
   var isGroepslid = pdGroepVanNaam(_pdGeselecteerd) && PD_GROEPEN.indexOf(_pdGeselecteerd) === -1;
   var verjData = (typeof getVerjaardagen === 'function') ? getVerjaardagen() : {};
@@ -29836,10 +29846,12 @@ function pdRenderDetail(){
     gesprekken.forEach(function(e, i){
       html += '<div style="padding:10px 14px;' + (i>0?'border-top:1px solid #e3f2e8;':'') + 'display:flex;gap:12px;align-items:flex-start;background:' + (i%2?'#f4fbf6':'#fff') + ';">' +
         '<div style="flex:0 0 90px;font-size:12px;font-weight:700;color:#1a7a40;white-space:nowrap;">' + pdEsc(e.datum || '&#8211;') + '</div>' +
-        '<div style="flex:1;font-size:13px;color:#333;line-height:1.4;">' + pdEsc(String(e.tekst || '').replace(/^Ontwikkelgesprek\s*/, '')) +
+        '<div style="flex:1;font-size:13px;color:#333;line-height:1.4;">' + (e.uitMap ? '<span id="og-sv-' + i + '">Laden\u2026</span>' : pdEsc(String(e.tekst || '').replace(/^Ontwikkelgesprek\s*/, ''))) +
           (e.gesprekPad ? ' <button onclick="djOgBekijk(\'' + pdEsc(e.gesprekPad).replace(/'/g, "\\'") + '\')" style="margin-left:6px;background:#e8f6ed;color:#1a7a40;border:1px solid #bfe3cb;border-radius:5px;padding:2px 8px;cursor:pointer;font-size:11.5px;font-weight:700;">&#x1F4C4; Bekijken</button>' : '') + '</div>' +
-        '<button onclick="pdVerwijder(' + e.id + ')" title="Verwijderen" style="background:none;border:none;color:#c0392b;cursor:pointer;font-size:13px;flex-shrink:0;">&#x2715;</button>' +
+        (e.uitMap ? '<button onclick="djOgVerwijderGesprek(\'' + pdEsc(e.gesprekPad).replace(/'/g, "\\'") + '\')" title="Verwijderen" style="background:none;border:none;color:#c0392b;cursor:pointer;font-size:13px;flex-shrink:0;">&#x2715;</button>'
+          : '<button onclick="pdVerwijder(' + e.id + ')" title="Verwijderen" style="background:none;border:none;color:#c0392b;cursor:pointer;font-size:13px;flex-shrink:0;">&#x2715;</button>') +
         '</div>';
+      if (e.uitMap) setTimeout(function(){ djOgSamenvattingLaden(e.gesprekPad, 'og-sv-' + i); }, 0);
     });
     html += '</div>';
     html += '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:14px;font-weight:800;color:var(--navy);letter-spacing:.5px;text-transform:uppercase;margin:4px 0 6px;">&#x1F4C1; Registraties (' + entries.length + ')</div>';
@@ -29927,6 +29939,10 @@ function djOgMijnMensen(){
 }
 function djOgMedewerkers(){
   var data = (typeof pdData === 'function') ? pdData() : {};
+  if (!Object.keys(data).length && typeof orgPersonen === 'function') {
+    // Geen toegang tot het dossier (bijv. ploegleider): vaste medewerkers uit het organogram/de lijst gebruiken
+    data = {}; orgPersonen().forEach(function(p){ if (p.id.indexOf('opl:') === 0) data[p.id.slice(4)] = []; });
+  }
   var groepen = (typeof PD_GROEPEN !== 'undefined' && Array.isArray(PD_GROEPEN)) ? PD_GROEPEN : [];
   // Alleen vaste medewerkers: geen groepen (inhuur, stagiaires, …) en niemand die uit dienst is
   var mijn = djOgMijnMensen(); // alleen je eigen mensen uit het organogram (als je erin staat)
@@ -30009,25 +30025,25 @@ window.djOgOpslaan = async function(d){
   if (!naam) { alert('Kies eerst een medewerker.'); return false; }
   try {
     if (typeof spIngelogdAsync === 'function' && !(await spIngelogdAsync())) throw new Error('niet ingelogd bij SharePoint');
-    if (!(await djVertrHeeftToegang(t))) throw new Error('alleen supervisors van ' + djOgTerminalNaam() + ' kunnen een gesprek in het personeelsdossier opslaan');
+    if (!(typeof oplMagOntwikkelgesprek === 'function' && oplMagOntwikkelgesprek())) throw new Error('je hebt geen toestemming voor Ontwikkelgesprek');
     var nu = new Date();
-    var stempel = nu.getFullYear() + String(nu.getMonth()+1).padStart(2,'0') + String(nu.getDate()).padStart(2,'0') + '_' + String(nu.getHours()).padStart(2,'0') + String(nu.getMinutes()).padStart(2,'0') + String(nu.getSeconds()).padStart(2,'0');
-    var veilig = naam.replace(/[^\w\-]+/g, '_');
-    var pad = 'Vertrouwelijk/' + t + '/Ontwikkelgesprekken/' + veilig + '_' + (d.datum || '') + '_' + stempel + '.json';
-    await spOpslaanBestandRuw(pad, { soort: 'ontwikkelgesprek', terminal: t, opgeslagen: nu.toISOString(), door: localStorage.getItem('dj_sp_account_username') || '', data: d });
-    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d.datum || '');
-    var datumNL = m ? (+m[3]) + '-' + (+m[2]) + '-' + m[1] : nu.toLocaleDateString('nl-NL');
-    var afspr = String(d.q7a || '').trim().replace(/\s+/g, ' ');
-    if (afspr.length > 180) afspr = afspr.slice(0, 177) + '…';
-    var data = pdData();
-    if (!data[naam]) data[naam] = [];
-    data[naam].push({ id: pdVolgendeId(data), datum: datumNL, soort: 'ontwikkelgesprek', gesprekPad: pad,
-      tekst: 'Ontwikkelgesprek' + (d.functie ? ' (' + d.functie + ')' : '') + ' met ' + (d.leidinggevende || '?') + (afspr ? ' — Afspraken: ' + afspr : '') });
-    pdSave(data);
-    if (typeof pdRenderLijst === 'function') { try { pdRenderLijst(); if (_pdGeselecteerd === naam) pdRenderDetail(); } catch(e) {} }
+    var stempel = String(nu.getHours()).padStart(2,'0') + String(nu.getMinutes()).padStart(2,'0') + String(nu.getSeconds()).padStart(2,'0');
+    var datum = /^\d{4}-\d{2}-\d{2}$/.test(d.datum || '') ? d.datum : nu.toISOString().slice(0, 10);
+    var pad = djOgMapPad(t) + '/OG_' + datum + '_' + stempel + '__' + djB64Url(naam) + '.json';
+    var afspr = String(d.q7a || '').trim().replace(/\s+/g, ' '); if (afspr.length > 180) afspr = afspr.slice(0, 177) + '…';
+    var samenvatting = (d.functie ? '(' + d.functie + ') ' : '') + 'met ' + (d.leidinggevende || '?') + (afspr ? ' — Afspraken: ' + afspr : '');
+    try {
+      await spOpslaanBestandRuw(pad, { soort: 'ontwikkelgesprek', terminal: t, naam: naam, datum: datum, samenvatting: samenvatting,
+        opgeslagen: nu.toISOString(), door: localStorage.getItem('dj_sp_account_username') || '', data: d });
+    } catch(e) {
+      if (e && (e.status === 403 || e.status === 404)) throw new Error('je hebt (nog) geen rechten op de map Ontwikkelgesprekken. Vraag de beheerder om in Toegangsbeheer op "Rechten nu bijwerken" te klikken');
+      throw e;
+    }
+    delete _djOgLijst[t];
+    if (typeof pdRenderDetail === 'function' && typeof _pdGeselecteerd !== 'undefined' && _pdGeselecteerd === naam) { try { pdRenderDetail(); } catch(e) {} }
     return true;
   } catch(e) {
-    alert('Opslaan in het personeelsdossier mislukt: ' + ((e && e.message) || e));
+    alert('Opslaan mislukt: ' + ((e && e.message) || e));
     return false;
   }
 };
@@ -31857,6 +31873,99 @@ function djPersMenuZichtbaar(){
   var t = document.getElementById('tegel-personeel'); if (t) t.style.display = b.style.display;
 }
 setInterval(djPersMenuZichtbaar, 10000);
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// STAP 2 — Ontwikkelgesprekken in een eigen afgeschermde map:
+// Data/Vertrouwelijk/<terminal>/Ontwikkelgesprekken
+//  · schrijven/lezen: supervisors van die terminal + iedereen met het vinkje "Ontwikkelgesprek"
+//    (rechten worden door de app bijgehouden, samen met de vertrouwelijke mappen)
+//  · de supervisors zien de gesprekken in het dossier (groene blok) — de app leest ze uit deze map
+// Bestandsnaam: OG_<datum>_<tijd>__<naam als base64url>.json  (zo is de medewerker te herkennen zonder te openen)
+// ══════════════════════════════════════════════════════════════════
+var DJ_OG_MAP = 'Ontwikkelgesprekken';
+function djB64Url(t){ return btoa(unescape(encodeURIComponent(t))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+function djB64UrlTerug(t){ try { t = t.replace(/-/g, '+').replace(/_/g, '/'); while (t.length % 4) t += '='; return decodeURIComponent(escape(atob(t))); } catch(e) { return null; } }
+function djOgMapPad(t){ return DJ_VERTR_MAP + '/' + (t || sessionStorage.getItem('dj_terminal') || 'EP') + '/' + DJ_OG_MAP; }
+
+// ── Rechten op de map bijhouden (wordt aangeroepen vanuit "Rechten nu bijwerken")
+async function djOgRechtenBijwerken(api, H, lijst, ikAlias){
+  var regels = [];
+  for (var ti = 0; ti < 2; ti++) { // Europoort en Hoek van Holland (Immingham doet nog niet mee)
+    var t = ['EP', 'HVH'][ti];
+    var basis = api + '/root:/Data/' + DJ_VERTR_MAP + '/' + t;
+    var r = await fetch(basis + '/' + DJ_OG_MAP + '?$select=id', { headers: H, cache: 'no-store' });
+    if (r.status === 404) { // map nog niet aanwezig → aanmaken in Vertrouwelijk/<t>
+      var ouder = await fetch(basis + '?$select=id', { headers: H, cache: 'no-store' }); if (!ouder.ok) continue;
+      var oid = (await ouder.json()).id;
+      var mk = await fetch(api + '/items/' + oid + '/children', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, H),
+        body: JSON.stringify({ name: DJ_OG_MAP, folder: {}, '@microsoft.graph.conflictBehavior': 'fail' }) });
+      if (!mk.ok && mk.status !== 409) throw new Error(t + ': map Ontwikkelgesprekken aanmaken mislukt (status ' + mk.status + ')');
+      r = await fetch(basis + '/' + DJ_OG_MAP + '?$select=id', { headers: H, cache: 'no-store' });
+    }
+    if (!r.ok) throw new Error(t + ' Ontwikkelgesprekken: status ' + r.status);
+    var mapId = (await r.json()).id;
+    var pr = await fetch(api + '/items/' + mapId + '/permissions', { headers: H, cache: 'no-store' });
+    if (!pr.ok) throw new Error(t + ' Ontwikkelgesprekken: rechten lezen mislukt');
+    var perms = (await pr.json()).value || [];
+    // Supervisors van de terminal + iedereen met het vinkje Ontwikkelgesprek voor die terminal
+    var moet = lijst.filter(function(a){ return a && a.email && !a.nietInGroep && a.permissies && a.permissies[t] && (a.permissies.supervisor || a.permissies.ontwikkelgesprek); })
+                    .map(function(a){ return a.email.toLowerCase(); });
+    var persoonlijk = perms.filter(function(p){
+      if (p.link || p.inheritedFrom) return false; // overgenomen rechten komen van de bovenliggende map
+      if ((p.roles || []).indexOf('owner') >= 0) return false;
+      return djPermIds(p).some(function(x){ return x.indexOf('@') > 0; });
+    });
+    var overgenomen = perms.filter(function(p){ return p.inheritedFrom && !p.link; });
+    var aliassen = {};
+    for (var ai = 0; ai < moet.length; ai++) aliassen[moet[ai]] = await djPersoonAliassen(moet[ai]);
+    var hoortBij = function(p, la){ var ids = djPermIds(p); return la.some(function(a){ return ids.indexOf(a) >= 0; }); };
+    var erbij = moet.filter(function(e){ return !persoonlijk.concat(overgenomen).some(function(p){ return hoortBij(p, aliassen[e]); }); });
+    var erafPerms = persoonlijk.filter(function(p){ return !hoortBij(p, ikAlias) && !moet.some(function(e){ return hoortBij(p, aliassen[e]); }); });
+    if (erbij.length) {
+      var inv = await fetch(api + '/items/' + mapId + '/invite', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, H),
+        body: JSON.stringify({ requireSignIn: true, sendInvitation: false, roles: ['write'], recipients: erbij.map(function(e){ return { email: e }; }) }) });
+      if (!inv.ok) throw new Error(t + ' Ontwikkelgesprekken: rechten geven mislukt (status ' + inv.status + ')');
+    }
+    for (var di = 0; di < erafPerms.length; di++) {
+      var del = await fetch(api + '/items/' + mapId + '/permissions/' + encodeURIComponent(erafPerms[di].id), { method: 'DELETE', headers: H });
+      if (!del.ok && del.status !== 404) throw new Error(t + ' Ontwikkelgesprekken: rechten intrekken mislukt (status ' + del.status + ')');
+    }
+    regels.push(t + ' gesprekken: ' + moet.length + (erbij.length ? ' \u00B7 +' + erbij.length : '') + (erafPerms.length ? ' \u00B7 \u2212' + erafPerms.length : ''));
+  }
+  return regels;
+}
+
+// ── Lijst van opgeslagen gesprekken (per terminal, kort in het geheugen)
+var _djOgLijst = {};
+async function djOgLijstOphalen(t, forceer){
+  t = t || sessionStorage.getItem('dj_terminal') || 'EP';
+  var c = _djOgLijst[t]; if (c && !forceer && Date.now() - c.t < 60000) return c.items;
+  var token = await spGetToken(), siteId = await spGetSiteId();
+  var r = await fetch('https://graph.microsoft.com/v1.0/sites/' + siteId + '/drive/root:/Data/' + spPadEnc(djOgMapPad(t)) + ':/children?$select=name&$top=999', { headers: { 'Authorization': 'Bearer ' + token }, cache: 'no-store' });
+  var items = [];
+  if (r.ok) ((await r.json()).value || []).forEach(function(f){
+    var m = /^OG_(\d{4}-\d{2}-\d{2})_(\d+)__(.+)\.json$/.exec(f.name || ''); if (!m) return;
+    var naam = djB64UrlTerug(m[3]); if (!naam) return;
+    items.push({ pad: djOgMapPad(t) + '/' + f.name, naam: naam, datum: m[1], stempel: m[2] });
+  });
+  _djOgLijst[t] = { t: Date.now(), items: items };
+  return items;
+}
+var _djOgSamenvatting = {};
+async function djOgSamenvattingLaden(pad, elId){
+  try {
+    if (!_djOgSamenvatting[pad]) { var r = await spOphalenBestandRuw(pad); _djOgSamenvatting[pad] = (r && r.samenvatting) || 'Ontwikkelgesprek'; }
+    var el = document.getElementById(elId); if (el) el.textContent = _djOgSamenvatting[pad];
+  } catch(e) {}
+}
+window.djOgVerwijderGesprek = async function(pad){
+  if (!confirm('Dit ontwikkelgesprek definitief verwijderen?')) return;
+  await djOgVerwijderBestand(pad);
+  var t = sessionStorage.getItem('dj_terminal') || 'EP'; delete _djOgLijst[t];
+  if (typeof pdRenderDetail === 'function') pdRenderDetail();
+};
 </script>
 
 </body>
