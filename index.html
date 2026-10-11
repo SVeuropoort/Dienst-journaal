@@ -23396,7 +23396,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.82';
+var DJ_BUILD = '2026-10-06.83';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -31675,6 +31675,17 @@ window.vakErbij = function(g, k){
     var d2 = vakGet(); (d2.groepen[g][k] = d2.groepen[g][k] || []).push(v); vakSet(d2); o.remove(); vakRender();
   };
 };
+window.vakJaarVeldTekst = function(veld, el){
+  var v = String(el.value || '').trim();
+  if (!v) { vakJaarVeld(veld, ''); return; }
+  var m = /^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2}|\d{4})$/.exec(v);
+  var jaar = m ? (m[3].length === 2 ? 2000 + +m[3] : +m[3]) : 0;
+  var d = m ? new Date(jaar, +m[2] - 1, +m[1]) : null;
+  if (!m || !d || d.getDate() !== +m[1] || d.getMonth() !== +m[2] - 1 || jaar < 2000 || jaar > 2100) {
+    el.style.borderColor = '#c0392b'; el.style.background = '#fdecea'; el.title = 'Typ de datum als dd-mm-jjjj, bijv. 18-07-' + (_vakJaar || '2027'); return;
+  }
+  vakJaarVeld(veld, jaar + '-' + String(+m[2]).padStart(2, '0') + '-' + String(+m[1]).padStart(2, '0'));
+};
 window.vakJaarVeld = function(veld, waarde){ var d = vakGet(); if (!d) return; var j = _vakJaar; d.jaren = d.jaren || {}; d.jaren[j] = d.jaren[j] || {}; d.jaren[j][veld] = waarde; vakSet(d); vakRender(); };
 window.vakImporteren = function(){
   var inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json';
@@ -31703,7 +31714,10 @@ function vakRender(){
   var jaar = _vakJaar || vakStandaardJaar(); _vakJaar = jaar;
   var nu = new Date().getFullYear(), jaren = []; for (var y = Math.min(d.basisJaar, nu) - 1; y <= nu + 5; y++) jaren.push(y);
   var n = vakNotities(d, jaar), j = (d.jaren || {})[jaar] || {};
-  var veld = function(k, l){ return '<label style="font-size:11px;font-weight:700;color:#5a6b80;display:flex;flex-direction:column;gap:2px;">' + l + '<input type="date" value="' + vakEsc(j[k] || '') + '" onchange="vakJaarVeld(\'' + k + '\',this.value)" style="padding:4px;border:1px solid #c8d7e8;border-radius:4px;"></label>'; };
+  // Gewoon intypen als dd-mm-jjjj (bijv. 18-07-2027); wordt pas opgeslagen als je het vak verlaat of op Enter drukt
+  var nl = function(iso){ var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? m[3] + '-' + m[2] + '-' + m[1] : ''; };
+  var veld = function(k, l){ return '<label style="font-size:11px;font-weight:700;color:#5a6b80;display:flex;flex-direction:column;gap:2px;">' + l +
+    '<input type="text" inputmode="numeric" placeholder="dd-mm-jjjj" value="' + vakEsc(nl(j[k])) + '" onchange="vakJaarVeldTekst(\'' + k + '\',this)" onkeydown="if(event.key===\'Enter\')this.blur()" style="padding:5px 6px;border:1px solid #c8d7e8;border-radius:4px;width:105px;"></label>'; };
   box.innerHTML =
     '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">' +
       '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:var(--navy);flex:1;">&#x1F3D6;&#xFE0F; Vakantierooster Europoort</div>' +
