@@ -23384,7 +23384,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.76';
+var DJ_BUILD = '2026-10-06.77';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -31385,7 +31385,10 @@ function djFunctieVakjesHtml(naam){
         '<input type="checkbox"' + (f[x.k] ? ' checked' : '') + ' onchange="djFunctieZet(\'' + n + '\',\'' + x.k + '\',this.checked)"> ' + x.l + '</label>';
     }).join('') + '</div>';
 }
-function djFunctieVanPositie(key){ var m = /^(o|a|on|av)_(pl|ctrl|kraan|sv)\d/.exec(key); return m ? m[2] : null; }
+function djFunctieVanPositie(key){
+  if (/^(o|a|on|av)_imm_plcf\d/.test(key)) return 'pl'; // IMM PL/CF valt onder Ploegleider
+  var m = /^(o|a|on|av)_(pl|ctrl|kraan|sv)\d/.exec(key); return m ? m[2] : null;
+}
 function djFunctieFilter(){
   var f = djFunctiesGet();
   var perFunctie = {};
