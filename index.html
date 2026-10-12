@@ -3136,7 +3136,7 @@ async function spOphalenBestandRuw(bestandsnaam){
 //    nog aan vertrouwelijke sleutels in main stond, blijft ongemoeid staan.
 var DJ_VERTR_SLEUTELS = ['dienstjournaal_stena_v1', 'werkoverdracht_ziekmeldingen_v1',
   'personeelsdossier_v1', 'personeelsdossier_actief_v1',
-  'ma_loongroepen_v1', 'ma_medewerkers_v1', 'ma_hvh_v1'];
+  'ma_loongroepen_v1', 'ma_medewerkers_v1', 'ma_hvh_v1', 'plan_sv_v1'];
 function djIsVertrSleutel(k){ return DJ_VERTR_SLEUTELS.indexOf(String(k).replace(/^(EP|HVH|IMM)_/, '')) >= 0; }
 function djVertrSplits(data){
   var vertr = {}, rest = {};
@@ -5306,6 +5306,10 @@ function djAdminOpslaan(){
       </div>
     </div>
 
+    <div id="plan-tabs" style="display:flex;gap:6px;margin:0 0 12px;">
+      <button type="button" id="plan-tab-alg" onclick="pWisselLijst(false)" style="padding:8px 16px;border:1px solid var(--navy);border-radius:6px;background:var(--navy);color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;cursor:pointer;">&#x2705; TO DO</button>
+      <button type="button" id="plan-tab-sv" onclick="pWisselLijst(true)" style="display:none;padding:8px 16px;border:1px solid var(--navy);border-radius:6px;background:#fff;color:var(--navy);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;cursor:pointer;">&#x1F512; TO-DO SV</button>
+    </div>
     <div id="planTaakContent">
       <div class="page-header" style="margin-bottom:14px;">
         <div></div>
@@ -6941,6 +6945,7 @@ window.addEventListener('resize', () => {
     'pd_functies_v1',
     'vakantierooster_v1',
     'tegel_links_v1',
+    'plan_sv_v1',
     'werkoverdracht_abnormal_config_v1',
     'werkoverdracht_abnormal_lijst_v1',
     'std_bezetting_v1',
@@ -7198,6 +7203,7 @@ window.addEventListener('resize', () => {
     'pd_functies_v1',
     'vakantierooster_v1',
     'tegel_links_v1',
+    'plan_sv_v1',
     'werkoverdracht_abnormal_config_v1',
     'werkoverdracht_abnormal_lijst_v1',
     'std_bezetting_v1',
@@ -7386,7 +7392,7 @@ window.addEventListener('resize', () => {
     try {
       var _todo = document.getElementById('view-planning');
       var _typt = document.activeElement && _todo && _todo.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
-      if (_todo && _todo.classList.contains('active') && !_typt && typeof window.pRender === 'function' && Object.keys(data).some(function(k){ return /(^|_)plan_v3$/.test(k); })) setTimeout(window.pRender, 0);
+      if (_todo && _todo.classList.contains('active') && !_typt && typeof window.pRender === 'function' && Object.keys(data).some(function(k){ return /(^|_)plan_(v3|sv_v1)$/.test(k); })) setTimeout(window.pRender, 0);
     } catch(eTd) {}
   }
 
@@ -7502,7 +7508,7 @@ window.addEventListener('resize', () => {
     Object.keys(lokaal).forEach(function(k){
       if (vuil && (k in cloudData) && !vuil[k]) return; // niet zelf gewijzigd: cloud-versie behouden
       if (/(^|_)vs_data_v1$/.test(k) && cloudData[k]) { data[k] = djVsSamenvoegen(cloudData[k], lokaal[k]); return; }
-      if (/(^|_)plan_v3$/.test(k) && cloudData[k]) { data[k] = djPlanSamenvoegen(cloudData[k], lokaal[k]); return; } // To Do List per taak samenvoegen
+      if (/(^|_)plan_(v3|sv_v1)$/.test(k) && cloudData[k]) { data[k] = djPlanSamenvoegen(cloudData[k], lokaal[k]); return; } // To Do List per taak samenvoegen
       // Dagplanning: per VAK samenvoegen (3-weg). Werken twee collega's tegelijk aan dezelfde dag,
       // dan wint per vak alleen wat déze pc zelf heeft veranderd; vakken die de collega intussen
       // heeft ingevuld blijven staan. Voorheen won de hele dag van wie het laatst opsloeg.
@@ -21526,6 +21532,20 @@ function wisselPunctualityDatum(dateStr) {
 
   // ===== PLANNING (simple) =====
   var PK = tk('plan_v3');
+  // Twee lijsten: de gewone To Do List en "TO-DO SV" (alleen supervisors; staat in de vertrouwelijke map)
+  window._pLijstSV = false;
+  window.pWisselLijst = function(sv){
+    if (sv && !djMagTodoSV()) sv = false;
+    window._pLijstSV = !!sv;
+    PK = tk(sv ? 'plan_sv_v1' : 'plan_v3');
+    var a = document.getElementById('plan-tab-alg'), b = document.getElementById('plan-tab-sv');
+    if (a && b) {
+      [[a, !sv], [b, !!sv]].forEach(function(x){ x[0].style.background = x[1] ? 'var(--navy)' : '#fff'; x[0].style.color = x[1] ? '#fff' : 'var(--navy)'; });
+      b.style.display = djMagTodoSV() ? '' : 'none';
+    }
+    try { pGenereerHerhalingen(); } catch(e) {}
+    pRender();
+  };
   function pGet() {
     try {
       var d = JSON.parse(localStorage.getItem(PK)||'{"a":[],"d":[]}');
@@ -23460,7 +23480,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.92';
+var DJ_BUILD = '2026-10-06.94';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -31148,10 +31168,25 @@ function djZiekPlanningBanner(){
 
 // ── Certificaten die binnen 30 dagen verlopen → taak in de To Do List (één keer per certificaat)
 function djCertTodoGenereren(){
-  if (typeof getCertDates !== 'function' || typeof getCertVervalDatum !== 'function' || typeof pGet !== 'function') return;
+  // Certificaattaken gaan naar TO-DO SV (alleen supervisors). Alleen een supervisor maakt ze aan.
+  if (typeof getCertDates !== 'function' || typeof getCertVervalDatum !== 'function') return;
   if (!sessionStorage.getItem('_cloudGeladen')) return; // pas als de gegevens binnen zijn
-  var d = pGet(); if (!d.a) d.a = []; if (!d.d) d.d = [];
-  if (!d.certGen) d.certGen = [];
+  if (typeof djMagTodoSV !== 'function' || !djMagTodoSV()) return;
+  var lees = function(k){ try { var x = JSON.parse(localStorage.getItem(k) || 'null'); return (x && typeof x === 'object') ? x : { a: [], d: [], r: [] }; } catch(e) { return { a: [], d: [], r: [] }; } };
+  var svKey = tk('plan_sv_v1'), algKey = tk('plan_v3');
+  var sv = lees(svKey), alg = lees(algKey); sv.a = sv.a || []; sv.d = sv.d || []; sv.certGen = sv.certGen || [];
+  var gewijzigdSV = false, gewijzigdAlg = false;
+  // Eenmalig: certificaattaken die nog in de gewone To Do List staan verhuizen naar TO-DO SV
+  if ((alg.a || []).some(function(t){ return t.certKey; })) {
+    alg.x = alg.x || [];
+    alg.a = alg.a.filter(function(t){
+      if (!t.certKey) return true;
+      if (!sv.a.some(function(x){ return x.certKey === t.certKey; })) { t.gw = Date.now(); sv.a.push(t); }
+      alg.x.push({ id: t.id, gw: Date.now() }); return false;
+    });
+    (alg.certGen || []).forEach(function(k){ if (sv.certGen.indexOf(k) === -1) sv.certGen.push(k); });
+    gewijzigdSV = gewijzigdAlg = true;
+  }
   var dates = getCertDates(), nu = new Date(); nu.setHours(0,0,0,0);
   var labels = { bhv: 'BHV', adm: 'Ademlucht', ehbo: 'EHBO', gevst: 'Gevaarlijke stoffen' };
   var nieuw = 0;
@@ -31162,16 +31197,19 @@ function djCertTodoGenereren(){
       if (dagen > 30) return;
       var iso = verval.getFullYear() + '-' + String(verval.getMonth()+1).padStart(2,'0') + '-' + String(verval.getDate()).padStart(2,'0');
       var sleutel = 'cert:' + cat + ':' + naam + ':' + iso;
-      if (d.certGen.indexOf(sleutel) !== -1) return; // al eens aangemaakt (ook als hij is afgerond of verwijderd)
+      if (sv.certGen.indexOf(sleutel) !== -1 || ((alg.certGen || []).indexOf(sleutel) !== -1)) return; // al eens aangemaakt
       var label = labels[cat] || cat.toUpperCase();
       var nl = String(verval.getDate()).padStart(2,'0') + '/' + String(verval.getMonth()+1).padStart(2,'0') + '/' + verval.getFullYear();
-      d.a.push({ id: Date.now() + nieuw, wie: '', datum: String(nu.getDate()).padStart(2,'0') + '/' + String(nu.getMonth()+1).padStart(2,'0') + '/' + nu.getFullYear(),
+      sv.a.push({ id: Date.now() + nieuw, gw: Date.now(), wie: '', datum: String(nu.getDate()).padStart(2,'0') + '/' + String(nu.getMonth()+1).padStart(2,'0') + '/' + nu.getFullYear(),
         taak: (dagen < 0 ? '⛔ ' : '⚠️ ') + label + '-certificaat ' + naam + (dagen < 0 ? ' is verlopen op ' : ' verloopt op ') + nl + ' — laten verlengen',
         uitleg: 'Automatisch aangemaakt vanuit Certificeringen (30 dagen vóór de vervaldatum).', certKey: sleutel });
-      d.certGen.push(sleutel); nieuw++;
+      sv.certGen.push(sleutel); nieuw++; gewijzigdSV = true;
     });
   });
-  if (nieuw) { pSet(d); if (typeof pRender === 'function') { try { pRender(); } catch(e) {} } }
+  if (gewijzigdSV) localStorage.setItem(svKey, JSON.stringify(sv));
+  if (gewijzigdAlg) localStorage.setItem(algKey, JSON.stringify(alg));
+  if ((gewijzigdSV || gewijzigdAlg) && typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+  if ((gewijzigdSV || gewijzigdAlg) && typeof pRender === 'function') { try { pRender(); } catch(e) {} }
 }
 document.addEventListener('DOMContentLoaded', function(){
   setTimeout(djCertTodoGenereren, 6000);
@@ -32163,5 +32201,17 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 </script>
 
+<script>
+// Wie mag TO-DO SV zien? Alleen wie in Toegangsbeheer het vinkje "Supervisor" heeft (voor deze terminal).
+// De lijst zelf staat in de vertrouwelijke map; daar kan SharePoint ook alleen deze supervisors bij.
+function djMagTodoSV(){
+  var e = localStorage.getItem('dj_sp_account_username'), t = sessionStorage.getItem('dj_terminal') || 'EP';
+  return !!(e && typeof djToegangHeeft === 'function' && djToegangHeeft(e, 'supervisor') && djToegangHeeft(e, t));
+}
+document.addEventListener('DOMContentLoaded', function(){
+  var b = document.getElementById('plan-tab-sv'); if (b) b.style.display = djMagTodoSV() ? '' : 'none';
+  setInterval(function(){ var b2 = document.getElementById('plan-tab-sv'); if (b2) { b2.style.display = djMagTodoSV() ? '' : 'none'; if (window._pLijstSV && !djMagTodoSV()) pWisselLijst(false); } }, 10000);
+});
+</script>
 </body>
 </html>
