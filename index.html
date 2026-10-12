@@ -6940,6 +6940,7 @@ window.addEventListener('resize', () => {
     'organogram_v1',
     'pd_functies_v1',
     'vakantierooster_v1',
+    'tegel_links_v1',
     'werkoverdracht_abnormal_config_v1',
     'werkoverdracht_abnormal_lijst_v1',
     'std_bezetting_v1',
@@ -7196,6 +7197,7 @@ window.addEventListener('resize', () => {
     'organogram_v1',
     'pd_functies_v1',
     'vakantierooster_v1',
+    'tegel_links_v1',
     'werkoverdracht_abnormal_config_v1',
     'werkoverdracht_abnormal_lijst_v1',
     'std_bezetting_v1',
@@ -23398,7 +23400,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.88';
+var DJ_BUILD = '2026-10-06.89';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -32042,6 +32044,61 @@ document.addEventListener('DOMContentLoaded', function(){
   if (!pd || !bar) return;
   var box = document.createElement('div'); box.id = 'pd-verzuim'; box.style.display = 'none';
   bar.parentNode.insertBefore(box, bar.nextSibling);
+});
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// Externe tegels (rePort, Quinyx, blueVi, Van den IJssel, Near-miss): adres aanpasbaar via ⚙️
+// Alleen zichtbaar/te gebruiken met "Mag instellingen aanpassen" (zelfde regeling als alle tandwieltjes).
+// Aangepaste adressen worden gesynchroniseerd (per terminal).
+// ══════════════════════════════════════════════════════════════════
+var DJ_TEGELS = [
+  { k: 'report',   n: 'rePort',                 std: 'https://stena.tolynx.com/#/public/login' },
+  { k: 'quinyx',   n: 'Quinyx',                 std: 'https://login.quinyx.com/' },
+  { k: 'bluevi',   n: 'blueVi',                 std: 'https://app.bluevi.com/login' },
+  { k: 'ijssel',   n: 'Van den IJssel',         std: 'https://kmsvandenijssel.com/stenaline/Login/tabid/2214508/language/nl-NL/Default.aspx?returnurl=%2fstenaline%2f' },
+  { k: 'nearmiss', n: 'Near-miss (Pro-sapien)', std: 'https://stena.sharepoint.com/sites/SL-ProSapien/SitePages/Home.aspx' }
+];
+function djTegelKey(){ return tk('tegel_links_v1'); }
+function djTegelLinks(){ try { return JSON.parse(localStorage.getItem(djTegelKey()) || '{}') || {}; } catch(e) { return {}; } }
+function djTegelsToepassen(){
+  var eigen = djTegelLinks();
+  document.querySelectorAll('a[data-tegel]').forEach(function(a){
+    var t = DJ_TEGELS.find(function(x){ return x.k === a.getAttribute('data-tegel'); }); if (!t) return;
+    var url = eigen[t.k] || t.std;
+    if (a.getAttribute('href') !== url) a.setAttribute('href', url);
+    a.title = t.n + (eigen[t.k] ? ' (aangepast adres)' : '');
+  });
+}
+window.djTegelAanpassen = function(k, ev){
+  if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+  if (window._djMagInst !== true) return;
+  var t = DJ_TEGELS.find(function(x){ return x.k === k; }); if (!t) return;
+  var eigen = djTegelLinks(), huidig = eigen[k] || t.std;
+  var nieuw = prompt('Adres van de tegel "' + t.n + '".\n\nLaat leeg om het standaardadres terug te zetten:\n' + t.std, huidig);
+  if (nieuw === null) return;
+  nieuw = nieuw.trim();
+  if (nieuw && !/^https:\/\/[^\s]+$/i.test(nieuw)) { alert('Het adres moet beginnen met https:// en mag geen spaties bevatten.'); return; }
+  if (!nieuw || nieuw === t.std) delete eigen[k]; else eigen[k] = nieuw;
+  localStorage.setItem(djTegelKey(), JSON.stringify(eigen));
+  if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+  djTegelsToepassen();
+};
+document.addEventListener('DOMContentLoaded', function(){
+  DJ_TEGELS.forEach(function(t){
+    var a = Array.prototype.find.call(document.querySelectorAll('a[href]'), function(x){ return x.getAttribute('href') === t.std; });
+    if (!a) return;
+    a.setAttribute('data-tegel', t.k);
+    if (getComputedStyle(a).position === 'static') a.style.position = 'relative';
+    var g = document.createElement('span');
+    g.textContent = '\u2699\uFE0F'; g.title = 'Adres van deze tegel aanpassen';
+    g.setAttribute('onclick', 'djTegelAanpassen(\'' + t.k + '\', event)');
+    g.style.cssText = 'position:absolute;top:4px;right:6px;font-size:14px;cursor:pointer;background:rgba(255,255,255,.85);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.25);z-index:2;';
+    a.appendChild(g);
+  });
+  djTegelsToepassen();
+  setInterval(djTegelsToepassen, 15000); // na synchronisatie van een collega
 });
 </script>
 
