@@ -6946,6 +6946,7 @@ window.addEventListener('resize', () => {
     'vakantierooster_v1',
     'tegel_links_v1',
     'plan_sv_v1',
+    'tugmasters_v1',
     'werkoverdracht_abnormal_config_v1',
     'werkoverdracht_abnormal_lijst_v1',
     'std_bezetting_v1',
@@ -7204,6 +7205,7 @@ window.addEventListener('resize', () => {
     'vakantierooster_v1',
     'tegel_links_v1',
     'plan_sv_v1',
+    'tugmasters_v1',
     'werkoverdracht_abnormal_config_v1',
     'werkoverdracht_abnormal_lijst_v1',
     'std_bezetting_v1',
@@ -23480,7 +23482,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.94';
+var DJ_BUILD = '2026-10-06.95';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -25385,7 +25387,7 @@ if(_sfrEd) _sfrEd.addEventListener('keypress', function(e){if(e.key==='Enter')ca
       { l: en() ? 'Equipment status' : 'Status materieel', i: '&#x1F69B;', f: function(){ matShowSubTab('status'); } } ].concat(
       (!bhv || bhv.style.display === 'none') ? [] : [{ l: 'BHV / EHBO', i: '&#x26D1;&#xFE0F;', f: function(){ matShowSubTab('bhv'); } }]); } },
     { knop: '#nav-btn-personeel', subs: function(){
-      var namen = { dossier: ['&#x1F4C1;', en() ? 'File' : 'Dossier'], organogram: ['&#x1F465;', en() ? 'Organisation chart' : 'Organogram'], vakantie: ['&#x1F3D6;&#xFE0F;', 'Vakantierooster'],
+      var namen = { dossier: ['&#x1F4C1;', en() ? 'File' : 'Dossier'], organogram: ['&#x1F465;', en() ? 'Organisation chart' : 'Organogram'], vakantie: ['&#x1F3D6;&#xFE0F;', 'Vakantierooster'], tugmaster: ['&#x1F69B;', 'Tugmasters'],
         certificeringen: ['&#x1F4CB;', en() ? 'Certificates' : 'Certificeringen'], ontwikkelgesprek: ['&#x1F4AC;', en() ? 'Development interview' : 'Ontwikkelgesprek'] };
       return DJ_PERS_TABS.filter(djPersMag).map(function(t){ return { l: namen[t][1], i: namen[t][0], f: function(){ pdSubTab(t); } }; }); } },
     { knop: '#nav-btn-werkoverdracht', eigen: true, subs: function(){ return [
@@ -27654,7 +27656,7 @@ function pdSubTab(t){
   if (t === 'personeelsdossier') t = 'dossier';
   if (typeof djPersMag === 'function' && !djPersMag(t)) t = djPersEersteTab() || 'dossier';
   if (document.getElementById('view-personeel') && !document.getElementById('view-personeel').classList.contains('active')) { navPersoneel(t); return; }
-  ['dossier', 'organogram', 'vakantie', 'certificeringen', 'ontwikkelgesprek'].forEach(function(x){
+  ['dossier', 'organogram', 'vakantie', 'tugmaster', 'certificeringen', 'ontwikkelgesprek'].forEach(function(x){
     var b = document.getElementById('pd-sub-btn-' + x); if (b && typeof djPersMag === 'function') b.style.display = djPersMag(x) ? '' : 'none';
   });
   var host = document.getElementById('pd-opl-host');
@@ -27663,17 +27665,19 @@ function pdSubTab(t){
     if (el.id === 'pd-subtabs') return;
     if (el.id === 'nieuw-tab-organogram') el.style.display = t === 'organogram' ? 'block' : 'none';
     else if (el.id === 'nieuw-tab-vakantie') el.style.display = t === 'vakantie' ? 'block' : 'none';
+    else if (el.id === 'nieuw-tab-tugmaster') el.style.display = t === 'tugmaster' ? 'block' : 'none';
     else if (el.id === 'pd-opl-host') el.style.display = opl ? 'block' : 'none';
     else if (el.id === 'pd-verzuim') return; // regelt djVerzuimPaneel zelf
     else el.style.display = t === 'dossier' ? '' : 'none';
   });
-  [['dossier', 'pd-sub-btn-dossier'], ['organogram', 'pd-sub-btn-organogram'], ['vakantie', 'pd-sub-btn-vakantie'], ['certificeringen', 'pd-sub-btn-certificeringen'], ['ontwikkelgesprek', 'pd-sub-btn-ontwikkelgesprek']].forEach(function(x){
+  [['dossier', 'pd-sub-btn-dossier'], ['organogram', 'pd-sub-btn-organogram'], ['vakantie', 'pd-sub-btn-vakantie'], ['tugmaster', 'pd-sub-btn-tugmaster'], ['certificeringen', 'pd-sub-btn-certificeringen'], ['ontwikkelgesprek', 'pd-sub-btn-ontwikkelgesprek']].forEach(function(x){
     var b = document.getElementById(x[1]); if (!b) return;
     var actief = x[0] === t;
     b.style.background = actief ? 'var(--navy)' : '#fff'; b.style.color = actief ? '#fff' : 'var(--navy)'; b.style.borderColor = actief ? 'var(--navy)' : '#c8d7e8';
   });
   if (t === 'organogram' && typeof orgRender === 'function') orgRender();
   if (t === 'vakantie' && typeof vakRender === 'function') vakRender();
+  if (t === 'tugmaster' && typeof tugRender === 'function') tugRender();
   if (t === 'dossier' && typeof pdInit === 'function') pdInit();
   if (typeof djVerzuimPaneel === 'function') { if (t === 'dossier') djVerzuimPaneel(); else { var vz = document.getElementById('pd-verzuim'); if (vz) vz.style.display = 'none'; } }
   if (opl && host) {
@@ -31920,11 +31924,12 @@ function djPersMag(t){
   if (t === 'dossier') return heeft('werkoverdracht');
   if (t === 'organogram') return heeft('werkoverdracht') || heeft('certificeringen') || heeft('ontwikkelgesprek');
   if (t === 'vakantie') return ep && (heeft('werkoverdracht') || heeft('ontwikkelgesprek'));
+  if (t === 'tugmaster') return ep && (heeft('werkoverdracht') || heeft('certificeringen') || heeft('ontwikkelgesprek'));
   if (t === 'certificeringen') return heeft('certificeringen');
   if (t === 'ontwikkelgesprek') return typeof oplMagOntwikkelgesprek === 'function' ? oplMagOntwikkelgesprek() : heeft('ontwikkelgesprek');
   return false;
 }
-var DJ_PERS_TABS = ['dossier', 'organogram', 'vakantie', 'certificeringen', 'ontwikkelgesprek'];
+var DJ_PERS_TABS = ['dossier', 'organogram', 'vakantie', 'tugmaster', 'certificeringen', 'ontwikkelgesprek'];
 function djPersEersteTab(){ return DJ_PERS_TABS.find(djPersMag) || null; }
 window.navPersoneel = function(sub, btn){
   var t = sub && sub !== 'personeelsdossier' ? sub : (djPersMag('dossier') ? 'dossier' : djPersEersteTab());
@@ -32213,5 +32218,105 @@ document.addEventListener('DOMContentLoaded', function(){
   setInterval(function(){ var b2 = document.getElementById('plan-tab-sv'); if (b2) { b2.style.display = djMagTodoSV() ? '' : 'none'; if (window._pLijstSV && !djMagTodoSV()) pWisselLijst(false); } }, 10000);
 });
 </script>
+<script>
+// ══════════════════════════════════════════════════════════════════
+// TUGMASTER-INDELING (alleen Europoort) — Personeelsdossier → subtabblad "Tugmasters"
+// Zichtbaar voor iedereen met toegang tot het personeelsdossier (ook ploegleiders); bewerken: SV / beheer.
+// Namen zijn gekoppeld aan personen in het systeem (zoals organogram en vakantierooster).
+// ══════════════════════════════════════════════════════════════════
+function tugKey(){ return 'EP_tugmasters_v1'; }
+function tugGet(){ try { return JSON.parse(localStorage.getItem(tugKey()) || 'null'); } catch(e) { return null; } }
+function tugSet(d){ d.bijgewerkt = new Date().toISOString(); localStorage.setItem(tugKey(), JSON.stringify(d)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }
+var _tugBewerken = false;
+function tugMag(){ return typeof orgMagBewerken === 'function' && orgMagBewerken(); }
+window.tugToggle = function(){ if (!tugMag()) return; _tugBewerken = !_tugBewerken; tugRender(); };
+window.tugImporteren = function(){
+  var inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json';
+  inp.onchange = function(){ var f = inp.files && inp.files[0]; if (!f) return; f.text().then(function(t){
+    var b; try { b = JSON.parse(t); } catch(e) { alert('Geen geldig bestand.'); return; }
+    if (!b || b.soort !== 'dienst-journaal-tugmasters' || !Array.isArray(b.tugmasters)) { alert('Dit is geen tugmaster-bestand van Dienst Journaal.'); return; }
+    if (typeof _vakCache !== 'undefined') _vakCache.t = 0;
+    var onbekend = [], gebruikt = {};
+    var tm = b.tugmasters.map(function(x){ return { nr: String(x.nr), label: x.label || '', leden: (x.namen || []).map(function(ruw){
+      var p = vakZoekPersoon(String(ruw).replace(/\s*\((sr|jr)\)\s*$/i, '')); if (p && gebruikt[p.id]) p = null;
+      if (!p) { onbekend.push('No.' + x.nr + ': ' + ruw); return null; } gebruikt[p.id] = 1; return p.id; }).filter(Boolean) }; });
+    tugSet({ titel: b.titel || 'Indeling Tugmasters', voettekst: b.voettekst || '', tugmasters: tm }); tugRender();
+    alert('Tugmaster-indeling geïmporteerd.' + (onbekend.length ? '\n\nNiet (eenduidig) gevonden als vaste medewerker van Europoort, dus leeg gelaten:\n• ' + onbekend.join('\n• ') + '\n\nVoeg ze via ✏️ Bewerken toe.' : ''));
+  }); };
+  inp.click();
+};
+window.tugLidWeg = function(i, j){ var d = tugGet(); d.tugmasters[i].leden.splice(j, 1); tugSet(d); tugRender(); };
+window.tugLidErbij = function(i){
+  var d = tugGet(), inGebruik = []; d.tugmasters.forEach(function(t){ inGebruik = inGebruik.concat(t.leden); });
+  var kand = vakPersonen().vast.filter(function(p){ return inGebruik.indexOf(p.id) === -1; });
+  var o = document.createElement('div'); o.id = 'tug-kies';
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(0,20,40,.45);z-index:100005;display:flex;align-items:center;justify-content:center;';
+  o.innerHTML = '<div style="background:#fff;border-radius:10px;padding:16px;width:340px;max-width:92vw;"><div style="font-weight:800;color:#003366;margin-bottom:8px;">Chauffeur toevoegen aan Tugmaster No.' + vakEsc(d.tugmasters[i].nr) + '</div>' +
+    '<select id="tug-kies-sel" style="width:100%;padding:6px;"><option value="">— kies (nog niet ingedeelde vaste medewerkers) —</option>' + kand.map(function(p){ return '<option value="' + vakEsc(p.id) + '">' + vakEsc(p.weergave) + '</option>'; }).join('') + '</select>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;"><button type="button" onclick="document.getElementById(\'tug-kies\').remove()" style="padding:6px 12px;">Annuleren</button><button type="button" id="tug-kies-ok" style="padding:6px 12px;background:#003366;color:#fff;border:none;border-radius:5px;">Toevoegen</button></div></div>';
+  document.body.appendChild(o);
+  document.getElementById('tug-kies-ok').onclick = function(){ var v = document.getElementById('tug-kies-sel').value; if (!v) return; var d2 = tugGet(); d2.tugmasters[i].leden.push(v); tugSet(d2); o.remove(); tugRender(); };
+};
+window.tugNieuw = function(){ var nr = prompt('Nummer van de nieuwe tugmaster:'); if (!nr) return; nr = nr.trim(); var d = tugGet();
+  if (d.tugmasters.some(function(t){ return t.nr === nr; })) { alert('Tugmaster No.' + nr + ' bestaat al.'); return; }
+  d.tugmasters.push({ nr: nr, label: '', leden: [] }); tugSet(d); tugRender(); };
+window.tugWeg = function(i){ var d = tugGet(); if (!confirm('Tugmaster No.' + d.tugmasters[i].nr + ' verwijderen? De chauffeurs komen weer vrij.')) return; d.tugmasters.splice(i, 1); tugSet(d); tugRender(); };
+window.tugHernoem = function(i){ var d = tugGet(), t = d.tugmasters[i];
+  var nr = prompt('Nummer van deze tugmaster:', t.nr); if (nr === null) return; nr = nr.trim(); if (!nr) return;
+  if (nr !== t.nr && d.tugmasters.some(function(x){ return x.nr === nr; })) { alert('Tugmaster No.' + nr + ' bestaat al.'); return; }
+  var lab = prompt('Omschrijving (optioneel, bijv. "Opleidings-TT"):', t.label || ''); if (lab === null) lab = t.label || '';
+  t.nr = nr; t.label = lab.trim(); tugSet(d); tugRender(); };
+window.tugVoettekst = function(){ var d = tugGet(); var v = prompt('Tekst onderaan de indeling:', d.voettekst || ''); if (v === null) return; d.voettekst = v.trim(); tugSet(d); tugRender(); };
+function tugBlokken(d, bewerken){
+  return d.tugmasters.map(function(t, i){
+    var leden = (bewerken ? t.leden : t.leden.filter(vakIsGeldig));
+    return '<div class="tug-blok" style="break-inside:avoid;">' +
+      '<div style="font-size:15px;margin-bottom:8px;' + (bewerken ? 'cursor:pointer;text-decoration:underline dotted;' : '') + '"' + (bewerken ? ' onclick="tugHernoem(' + i + ')" title="Nummer/omschrijving wijzigen"' : '') + '>Tugmaster No.' + vakEsc(t.nr) + (t.label ? ' <span style="font-size:12px;color:#5a6b80;">(' + vakEsc(t.label) + ')</span>' : '') +
+      (bewerken ? ' <span onclick="event.stopPropagation();tugWeg(' + i + ')" title="Tugmaster verwijderen" style="color:#c0392b;cursor:pointer;float:right;">&#x2715;</span>' : '') + '</div>' +
+      leden.map(function(id, j){
+        var geldig = vakIsGeldig(id);
+        return '<div style="font-size:13px;line-height:1.55;">' + (geldig ? vakEsc(vakNaam(id)) : '<span style="color:#c0392b;text-decoration:line-through;" title="Geen vaste medewerker (meer)">&#x26A0;&#xFE0F; ' + vakEsc(vakNaam(id) || id) + '</span>') +
+          (bewerken ? ' <span onclick="tugLidWeg(' + i + ',' + j + ')" title="Weghalen" style="color:#c0392b;cursor:pointer;">&#x2715;</span>' : '') + '</div>';
+      }).join('') +
+      (bewerken ? '<div onclick="tugLidErbij(' + i + ')" style="font-size:12px;color:#0f6cbd;cursor:pointer;margin-top:3px;">+ chauffeur</div>' : '') + '</div>';
+  }).join('');
+}
+window.tugAfdrukken = function(){
+  var d = tugGet(); if (!d) return;
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + vakEsc(d.titel) + '</title><style>' +
+    '@page { size: A4 portrait; margin: 16mm; } body { font-family: Calibri, Arial, sans-serif; margin: 0; }' +
+    'h1 { text-align:center; font-size:20px; margin:0 0 22px; } .raster { display:grid; grid-template-columns: repeat(3, 1fr); gap: 20px 24px; }' +
+    '.voet { text-align:center; font-size:13px; margin-top:26px; }</style></head><body>' +
+    '<h1>' + vakEsc(d.titel) + '</h1><div class="raster">' + tugBlokken(d, false) + '</div>' +
+    (d.voettekst ? '<div class="voet">' + vakEsc(d.voettekst) + '</div>' : '') +
+    '<script>window.onload=function(){ setTimeout(function(){ window.print(); }, 200); };<\/script></body></html>';
+  var w = window.open('', '_blank'); if (!w) { alert('Pop-up geblokkeerd. Sta pop-ups toe om af te drukken.'); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+};
+function tugRender(){
+  var box = document.getElementById('nieuw-tab-tugmaster'); if (!box) return;
+  var d = tugGet(), mag = tugMag(); if (_tugBewerken && !mag) _tugBewerken = false;
+  var knop = 'background:#fff;border:1px solid #c8d7e8;color:var(--navy);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px;font-weight:700;';
+  var kop = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:var(--navy);flex:1;">&#x1F69B; ' + vakEsc(d ? d.titel : 'Indeling Tugmasters') + '</div>';
+  if (!d) { box.innerHTML = kop + '</div><div style="color:#8795a8;font-size:13px;">Nog geen indeling. ' + (mag ? '<button type="button" onclick="tugImporteren()" style="' + knop + '">&#x1F4E5; Importeren</button>' : 'Een SV kan de indeling importeren.') + '</div>'; return; }
+  kop += (mag ? '<button type="button" onclick="tugToggle()" style="' + knop + (_tugBewerken ? 'background:var(--navy);color:#fff;' : '') + '">' + (_tugBewerken ? '&#x2714; Klaar' : '&#x270F;&#xFE0F; Bewerken') + '</button>' : '') +
+    '<button type="button" onclick="tugAfdrukken()" style="' + knop + '">&#x1F5A8;&#xFE0F; Afdrukken</button></div>';
+  box.innerHTML = kop +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:18px 22px;">' + tugBlokken(d, _tugBewerken) +
+      (_tugBewerken ? '<div onclick="tugNieuw()" style="border:1px dashed #9fb3c8;border-radius:8px;display:flex;align-items:center;justify-content:center;min-height:80px;cursor:pointer;color:#0f6cbd;font-weight:700;">+ tugmaster</div>' : '') + '</div>' +
+    '<div style="text-align:center;font-size:13px;color:#333;margin-top:20px;' + (_tugBewerken ? 'cursor:pointer;text-decoration:underline dotted;' : '') + '"' + (_tugBewerken ? ' onclick="tugVoettekst()" title="Tekst wijzigen"' : '') + '>' + vakEsc(d.voettekst || (_tugBewerken ? '(klik om een tekst onderaan toe te voegen)' : '')) + '</div>';
+}
+window.tugRender = tugRender;
+document.addEventListener('DOMContentLoaded', function(){
+  var pd = document.getElementById('nieuw-tab-personeelsdossier'), bar = document.getElementById('pd-subtabs'); if (!pd || !bar) return;
+  var c = document.createElement('div'); c.id = 'nieuw-tab-tugmaster'; c.className = 'card'; c.style.cssText = 'display:none;padding:16px 20px;'; pd.appendChild(c);
+  var ref = document.getElementById('pd-sub-btn-organogram');
+  var b = document.createElement('button'); b.type = 'button'; b.id = 'pd-sub-btn-tugmaster'; b.innerHTML = '&#x1F69B; Tugmasters';
+  b.setAttribute('style', ref.getAttribute('style')); b.style.order = '4'; b.onclick = function(){ pdSubTab('tugmaster'); }; bar.appendChild(b);
+  // volgorde: Dossier, Organogram, Vakantierooster, Tugmasters, Certificeringen, Ontwikkelgesprek
+  ['dossier', 'organogram', 'vakantie', 'tugmaster', 'certificeringen', 'ontwikkelgesprek'].forEach(function(x, i){ var k = document.getElementById('pd-sub-btn-' + x); if (k) k.style.order = String(i + 1); });
+});
+</script>
+
 </body>
 </html>
