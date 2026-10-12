@@ -7438,6 +7438,48 @@ window.addEventListener('resize', () => {
     return uit;
   }
   window.djVsSamenvoegen = djVsSamenvoegen;
+  // To Do List: per TAAK samenvoegen i.p.v. de hele lijst. Elke taak heeft een wijzigtijd (gw); per taak wint
+  // de nieuwste toestand (open / klaar / verwijderd). Zo verdwijnt een taak die een collega op Klaar zet ook
+  // bij jou, ook als jij intussen zelf iets in de lijst hebt veranderd.
+  function djPlanSamenvoegen(cloud, lok){
+    var parse = function(x){ if (typeof x === 'string') { try { x = JSON.parse(x); } catch(e) { x = null; } } return (x && typeof x === 'object') ? x : null; };
+    var C = parse(cloud), L = parse(lok);
+    if (!C) return lok; if (!L) return cloud;
+    var best = {}, volgorde = [];
+    var zet = function(t, status){
+      if (!t || t.id == null) return;
+      var k = String(t.id), gw = +t.gw || 0, rang = { a: 0, d: 1, x: 2 }[status];
+      var cur = best[k];
+      if (!cur) volgorde.push(k);
+      if (!cur || gw > cur.gw || (gw === cur.gw && rang > cur.rang)) best[k] = { t: t, status: status, gw: gw, rang: rang };
+    };
+    [C, L].forEach(function(o){
+      (o.a || []).forEach(function(t){ zet(t, 'a'); });
+      (o.d || []).forEach(function(t){ zet(t, 'd'); });
+      (o.x || []).forEach(function(t){ zet(t, 'x'); });
+    });
+    var uit = { a: [], d: [], x: [], r: [] };
+    volgorde.forEach(function(k){ var b = best[k]; uit[b.status].push(b.t); });
+    // Terugkerende taak: maar één open taak per sjabloon (anders dubbel als twee pc's hem tegelijk aanmaakten)
+    var gezienH = {};
+    uit.a = uit.a.filter(function(t){ if (!t.herhalingId) return true; var k = t.herhalingId + '|' + t.datum; if (gezienH[k]) return false; gezienH[k] = 1; return true; });
+    // Sjablonen: samenvoegen per id, verwijderde sjablonen (xr) blijven weg, laatste periode = de nieuwste
+    var weg = {}; (C.xr || []).concat(L.xr || []).forEach(function(id){ weg[String(id)] = 1; });
+    var rMap = {};
+    (C.r || []).concat(L.r || []).forEach(function(tpl){
+      if (!tpl || weg[String(tpl.id)]) return;
+      var k = String(tpl.id), cur = rMap[k];
+      if (!cur) { rMap[k] = tpl; uit.r.push(tpl); return; }
+      if ((+tpl.gw || 0) > (+cur.gw || 0)) { Object.assign(cur, tpl); }
+      if (String(tpl.lastPeriod || '') > String(cur.lastPeriod || '')) cur.lastPeriod = tpl.lastPeriod;
+    });
+    uit.xr = Object.keys(weg);
+    var cg = {}; (C.certGen || []).concat(L.certGen || []).forEach(function(x){ cg[x] = 1; }); uit.certGen = Object.keys(cg);
+    // Prullenbak niet eindeloos laten groeien: verwijder-markeringen ouder dan 60 dagen opruimen
+    var grens = Date.now() - 60 * 864e5; uit.x = uit.x.filter(function(t){ return (+t.gw || 0) > grens; });
+    return uit;
+  }
+  window.djPlanSamenvoegen = djPlanSamenvoegen;
   // Samenvoegen met de cloud. Met 'vuil' (sleutels die DIT apparaat zelf heeft gewijzigd sinds de
   // vorige opslag) wint de lokale versie alleen voor die sleutels; voor alle andere sleutels blijft
   // de cloud-versie staan. Zonder dit stuurde elke opslag de complete lokale kopie mee — inclusief
@@ -7447,6 +7489,7 @@ window.addEventListener('resize', () => {
     Object.keys(lokaal).forEach(function(k){
       if (vuil && (k in cloudData) && !vuil[k]) return; // niet zelf gewijzigd: cloud-versie behouden
       if (/(^|_)vs_data_v1$/.test(k) && cloudData[k]) { data[k] = djVsSamenvoegen(cloudData[k], lokaal[k]); return; }
+      if (/(^|_)plan_v3$/.test(k) && cloudData[k]) { data[k] = djPlanSamenvoegen(cloudData[k], lokaal[k]); return; } // To Do List per taak samenvoegen
       // Dagplanning: per VAK samenvoegen (3-weg). Werken twee collega's tegelijk aan dezelfde dag,
       // dan wint per vak alleen wat déze pc zelf heeft veranderd; vakken die de collega intussen
       // heeft ingevuld blijven staan. Voorheen won de hele dag van wie het laatst opsloeg.
@@ -21619,6 +21662,7 @@ function wisselPunctualityDatum(dateStr) {
     if (!confirm(_immVH ? 'Permanently stop this recurring task? Tasks already created in the list will remain.' : 'Deze terugkerende taak definitief stoppen? Al aangemaakte taken in de lijst blijven gewoon staan.')) return;
     var d = pGet();
     d.r = d.r.filter(function(tpl){ return tpl.id !== id; });
+    d.xr = (d.xr || []).concat([String(id)]); // ook bij collega's weg
     pSet(d);
     pBouwHerhalingLijst();
   }
@@ -22022,7 +22066,7 @@ function wisselPunctualityDatum(dateStr) {
           inp.value = val || '';
           inp.addEventListener('change', function() {
             var d2 = pGet();
-            if (d2.a[idx]) { d2.a[idx][field] = this.value; pSet(d2); }
+            if (d2.a[idx]) { d2.a[idx][field] = this.value; d2.a[idx].gw = Date.now(); pSet(d2); }
           });
           return inp;
         }
@@ -22037,7 +22081,7 @@ function wisselPunctualityDatum(dateStr) {
         ta.value = t.uitleg || '';
         ta.addEventListener('change', function() {
           var d2 = pGet();
-          if (d2.a[idx]) { d2.a[idx].uitleg = this.value; pSet(d2); }
+          if (d2.a[idx]) { d2.a[idx].uitleg = this.value; d2.a[idx].gw = Date.now(); pSet(d2); }
         });
         mkRow(_immTaskHdr ? 'Explanation:' : 'Uitleg:', ta);
         card.appendChild(tbl);
@@ -22050,7 +22094,9 @@ function wisselPunctualityDatum(dateStr) {
         delBtn.innerHTML = '&#x2715;';
         delBtn.addEventListener('click', function() {
           if (!confirm(_immTaskHdr ? 'Delete task?' : 'Taak verwijderen?')) return;
-          var d2 = pGet(); d2.a.splice(idx, 1); pSet(d2); pRender();
+          var d2 = pGet(); var weg = d2.a.splice(idx, 1)[0];
+          if (weg) { d2.x = d2.x || []; d2.x.push({ id: weg.id, gw: Date.now() }); } // verwijder-markering voor de collega's
+          pSet(d2); pRender();
         });
 
         var klaarBtn = document.createElement('button');
@@ -22061,6 +22107,7 @@ function wisselPunctualityDatum(dateStr) {
           var removed = d2.a.splice(idx, 1)[0];
           if (!removed) return;
           removed.afgerond = new Date().toLocaleDateString('nl-NL');
+          removed.gw = Date.now();
           d2.d.push(removed);
           pSet(d2);
           pRender();
@@ -22104,7 +22151,7 @@ function wisselPunctualityDatum(dateStr) {
           restBtn.innerHTML = '&#x21A9; Terugzetten';
           restBtn.addEventListener('click', function() {
             var d2 = pGet(); var t2 = d2.d.splice(jdx, 1)[0];
-            if (!t2) return; t2.done = false; d2.a.push(t2); pSet(d2); pRender();
+            if (!t2) return; t2.done = false; t2.gw = Date.now(); d2.a.push(t2); pSet(d2); pRender();
           });
           row.appendChild(chk); row.appendChild(info); row.appendChild(restBtn);
           archLijst.appendChild(row);
@@ -23400,7 +23447,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.90';
+var DJ_BUILD = '2026-10-06.91';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
