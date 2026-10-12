@@ -7334,6 +7334,13 @@ window.addEventListener('resize', () => {
       setSyncData(result.data);
       _djLivePollLaatsteWijziging = gewijzigd;
       if (puActief && typeof window.djPunctualityHerlaadInPlace === 'function') window.djPunctualityHerlaadInPlace();
+      // To Do List open? Dan direct bijwerken (een collega zette bijv. een taak op Klaar).
+      // Niet als je zelf net in een taak aan het typen bent.
+      try {
+        var _todo = document.getElementById('view-planning');
+        var _typt = document.activeElement && _todo && _todo.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+        if (_todo && _todo.classList.contains('active') && !_typt && typeof window.pRender === 'function') window.pRender();
+      } catch(eTd) {}
       if (!dpActief) { if (typeof showSyncStatus === 'function') showSyncStatus('\u2713 Bijgewerkt door collega', 'ok'); return; }
       if (typeof window.djDagplanningHerlaadInPlace === 'function') {
         window.djDagplanningHerlaadInPlace();
@@ -7375,6 +7382,12 @@ window.addEventListener('resize', () => {
       console.warn('setSyncData: ' + _vol + ' onderdelen niet opgeslagen — browseropslag vol');
       if (typeof showSyncStatus === 'function') showSyncStatus('⚠ Browseropslag vol: ' + _vol + ' onderdelen niet bijgewerkt', 'err');
     }
+    // To Do List staat open? Direct de nieuwe stand tonen (bijv. collega zette een taak op Klaar)
+    try {
+      var _todo = document.getElementById('view-planning');
+      var _typt = document.activeElement && _todo && _todo.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+      if (_todo && _todo.classList.contains('active') && !_typt && typeof window.pRender === 'function' && Object.keys(data).some(function(k){ return /(^|_)plan_v3$/.test(k); })) setTimeout(window.pRender, 0);
+    } catch(eTd) {}
   }
 
   function showSyncStatus(msg, type) {
@@ -23447,7 +23460,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.91';
+var DJ_BUILD = '2026-10-06.92';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
