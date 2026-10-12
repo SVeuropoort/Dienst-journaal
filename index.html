@@ -23400,7 +23400,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.89';
+var DJ_BUILD = '2026-10-06.90';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -30659,6 +30659,7 @@ window._djMagInst = null; // null = nog onbekend
 function djIsGear(el){
   if (!el || el.nodeType !== 1 || !el.getAttribute) return false;
   if (el.id === 'dj-admin-gear') return false;
+  if (el.hasAttribute('data-tegel')) return false; // de tegel zelf is geen tandwiel (alleen het ⚙️ erin)
   var tag = el.tagName; if (tag !== 'BUTTON' && tag !== 'SPAN' && tag !== 'A' && !el.getAttribute('onclick')) return false;
   var oc = el.getAttribute('onclick') || '';
   // Uitzonderingen: Beheer-tandwiel en 'Kade capaciteit bijwerken' (dagelijkse invoer door iedereen)
