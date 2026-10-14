@@ -23496,7 +23496,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.3';
+var DJ_BUILD = '2026-10-07.4';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -31612,6 +31612,17 @@ function djFunctieFilter(){
     if (!ok && !rij) { var kand = lijst.filter(function(n){ return typeof certNaamMatch === 'function' && certNaamMatch(n, planningNaam); }); ok = kand.length === 1; }
     return (cache[ck] = ok);
   };
+  // Europoort, onderste deel (na 12:00 / avond-na): geen EXO/EXA (geel) en geen korte diensten (oranje)
+  var ep = (sessionStorage.getItem('dj_terminal') || 'EP') === 'EP';
+  var nietNa = function(naam, pfx){
+    var pool = pfx === 'av' ? (typeof avondEmps !== 'undefined' ? avondEmps : []) : (typeof ochEmps !== 'undefined' ? ochEmps : []);
+    var e = pool.find(function(x){ return x.name === naam; }); if (!e) return false;
+    var t = String(e.type || ''); return t.indexOf('EX') !== -1 || t.toLowerCase().indexOf('kort') !== -1;
+  };
+  if (ep) document.querySelectorAll('#dagplanning-container select.psel[data-key]:not([data-truck])').forEach(function(sel){
+    var key = sel.getAttribute('data-key'), m = /^(on|av)_/.exec(key); if (!m) return;
+    Array.prototype.slice.call(sel.options).forEach(function(o){ if (o.value && o.value !== sel.value && nietNa(o.value, m[1])) o.remove(); });
+  });
   document.querySelectorAll('#dagplanning-container select.psel[data-key]').forEach(function(sel){
     var k = djFunctieVanPositie(sel.getAttribute('data-key'));
     if (!k || !(perFunctie[k] || []).length) return; // nog niemand met deze functie: iedereen tonen
