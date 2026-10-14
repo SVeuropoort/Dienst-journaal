@@ -8159,6 +8159,10 @@ function dpKopjesToepassen(){
     var standaard = sel.dataset.standaard || (sel.options[0] ? sel.options[0].value : '');
     sel.dataset.standaard = standaard;
     var huidig = sel.value;
+    // De opgeslagen keuze voor deze datum gaat vóór: bij het opnieuw opbouwen bestond die optie soms
+    // nog niet, waardoor het kopje na een paar seconden terugsprong naar de standaardtekst.
+    var cidSel = sel.getAttribute('data-cid');
+    try { if (cidSel && typeof texts !== 'undefined' && texts && texts[cidSel]) huidig = texts[cidSel]; } catch(e) {}
     var opties = [standaard].concat(lijst.filter(function(x){ return x !== standaard; }));
     if (huidig && opties.indexOf(huidig) < 0) opties.push(huidig); // eerder gekozen waarde nooit laten verdwijnen
     sel.innerHTML = opties.map(function(o){ var e = String(o).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); return '<option value="' + e + '"' + (o === huidig ? ' selected' : '') + '>' + e + '</option>'; }).join('');
@@ -23496,7 +23500,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.5';
+var DJ_BUILD = '2026-10-07.6';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
