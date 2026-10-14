@@ -23496,7 +23496,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.4';
+var DJ_BUILD = '2026-10-07.5';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -31614,7 +31614,9 @@ function djFunctieFilter(){
   };
   // Europoort, onderste deel (na 12:00 / avond-na): geen EXO/EXA (geel) en geen korte diensten (oranje)
   var ep = (sessionStorage.getItem('dj_terminal') || 'EP') === 'EP';
+  var dubbel = (typeof doubleShiftNames === 'function') ? doubleShiftNames() : new Set();
   var nietNa = function(naam, pfx){
+    if (dubbel.has(naam)) return true; // geel: staat zowel in de ochtend als in de avond
     var pool = pfx === 'av' ? (typeof avondEmps !== 'undefined' ? avondEmps : []) : (typeof ochEmps !== 'undefined' ? ochEmps : []);
     var e = pool.find(function(x){ return x.name === naam; }); if (!e) return false;
     var t = String(e.type || ''); return t.indexOf('EX') !== -1 || t.toLowerCase().indexOf('kort') !== -1;
