@@ -23485,7 +23485,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.97';
+var DJ_BUILD = '2026-10-06.98';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -32431,6 +32431,89 @@ window.suPrintHtml = function(datum){
   return '<h2>' + (en ? 'To take into the start-up' : 'Meenemen voor de start-up') + '</h2><div class="vak">' + (e(suMeenemen(datum)) || '\u2014') + '</div>' +
     '<table style="width:100%;border-collapse:collapse;margin-top:8px;"><tr>' + kolom('ochtend', en ? 'Start-up morning' : 'Start-up ochtend') + kolom('middag', en ? 'Start-up afternoon' : 'Start-up middag') + '</tr></table>' +
     '<h2>' + (en ? 'Start-up for tomorrow' : 'Start-up voor morgen') + '</h2><div class="vak">' + (e((d.morgen || {}).tekst || '') || '\u2014') + '</div>';
+};
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// Werkoverdracht: volgorde van de vakken + zoeken in eerdere start-ups / overdrachten
+// Volgorde: Dienst Overdracht · Zoeken · Mijn agenda · Start-Up · Openstaande taken · Bijzonderheden · Ziekmeldingen
+// ══════════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', function(){
+  var tab = document.getElementById('nieuw-tab-overdracht'); if (!tab) return;
+  var kaarten = Array.prototype.slice.call(tab.querySelectorAll('.card')).filter(function(c){ return c.querySelector('h2'); });
+  var vind = function(t){ return kaarten.find(function(c){ return c.querySelector('h2').textContent.trim().toLowerCase().indexOf(t) === 0; }); };
+  var eerste = vind('dienst overdracht'); if (!eerste) return;
+  // Zoekvak
+  var z = document.createElement('div'); z.className = 'card'; z.id = 'wo-zoek-kaart';
+  z.innerHTML = '<div class="card-header"><div class="icon">&#x1F50D;</div><h2>Zoeken in de werkoverdracht</h2></div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">' +
+    '<input id="wo-zoek" type="search" placeholder="Zoek een onderwerp, bijv. reachstacker, PBM, Stena Transit…" oninput="woZoekPlan()" style="flex:1;min-width:240px;padding:9px 12px;border:1px solid #c8d7e8;border-radius:6px;font-size:13.5px;">' +
+    '<select id="wo-zoek-waar" onchange="woZoek()" style="padding:8px;border:1px solid #c8d7e8;border-radius:6px;font-size:12.5px;">' +
+      '<option value="alles">Overal</option><option value="startup">Alleen start-ups</option><option value="taken">Alleen openstaande taken</option><option value="incident">Alleen bijzonderheden</option></select></div>' +
+    '<div id="wo-zoek-uit" style="margin-top:8px;"></div>';
+  var volgorde = [z, vind('mijn agenda'), vind('start-up'), vind('openstaande taken'), vind('bijzonderheden'), vind('ziekmeldingen')].filter(Boolean);
+  var na = eerste;
+  volgorde.forEach(function(c){ na.parentNode.insertBefore(c, na.nextSibling); na = c; });
+});
+var _woZoekT = null;
+window.woZoekPlan = function(){ clearTimeout(_woZoekT); _woZoekT = setTimeout(woZoek, 250); };
+function woZoekBronnen(){
+  var uit = [];
+  // Nieuwe start-ups (per datum: ochtend, middag, voor morgen)
+  var su = (typeof suGet === 'function') ? suGet() : {};
+  Object.keys(su).forEach(function(d){
+    var x = su[d] || {};
+    if (x.ochtend && x.ochtend.tekst) uit.push({ datum: d, soort: 'startup', label: 'Start-up ochtend', tekst: x.ochtend.tekst, door: x.ochtend.door });
+    if (x.middag && x.middag.tekst) uit.push({ datum: d, soort: 'startup', label: 'Start-up middag', tekst: x.middag.tekst, door: x.middag.door });
+    if (x.morgen && x.morgen.tekst) uit.push({ datum: d, soort: 'startup', label: 'Start-up voor morgen', tekst: x.morgen.tekst, door: x.morgen.door });
+  });
+  // Werkoverdracht-regels (incl. oude start-up-tekst)
+  var data = []; try { data = getData() || []; } catch(e) {}
+  data.forEach(function(e){
+    if (!e || !e.datum) return;
+    if (e.taken) uit.push({ datum: e.datum, soort: 'taken', label: 'Openstaande taken', tekst: e.taken });
+    if (e.incident) uit.push({ datum: e.datum, soort: 'incident', label: 'Bijzonderheden', tekst: e.incident });
+    if (e.startup) uit.push({ datum: e.datum, soort: 'startup', label: 'Start-up (oud)', tekst: e.startup });
+  });
+  return uit;
+}
+function woZoek(){
+  var q = String((document.getElementById('wo-zoek') || {}).value || '').trim().toLowerCase();
+  var waar = (document.getElementById('wo-zoek-waar') || {}).value || 'alles';
+  var box = document.getElementById('wo-zoek-uit'); if (!box) return;
+  if (q.length < 2) { box.innerHTML = ''; return; }
+  var woorden = q.split(/\s+/).filter(Boolean);
+  var hits = woZoekBronnen().filter(function(h){
+    if (waar !== 'alles' && h.soort !== waar) return false;
+    var t = h.tekst.toLowerCase(); return woorden.every(function(w){ return t.indexOf(w) !== -1; });
+  }).sort(function(a, b){ return b.datum.localeCompare(a.datum); });
+  var esc = function(t){ return String(t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
+  var markeer = function(t){
+    var tekst = String(t), lt = tekst.toLowerCase(), pos = lt.indexOf(woorden[0]);
+    var start = Math.max(0, pos - 70), stuk = (start ? '\u2026' : '') + tekst.slice(start, start + 220) + (tekst.length > start + 220 ? '\u2026' : '');
+    var h = esc(stuk);
+    woorden.forEach(function(w){ h = h.replace(new RegExp('(' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi'), '<mark style="background:#ffe08a;padding:0 1px;">$1</mark>'); });
+    return h;
+  };
+  var nl = function(iso){ var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso); return m ? m[3] + '-' + m[2] + '-' + m[1] : iso; };
+  var dagen = {}; hits.forEach(function(h){ dagen[h.datum] = 1; });
+  box.innerHTML = !hits.length ? '<div style="color:#8795a8;font-size:13px;">Niets gevonden.</div>' :
+    '<div style="font-size:12.5px;font-weight:700;color:' + (Object.keys(dagen).length >= 3 ? '#a04000' : 'var(--navy)') + ';margin-bottom:6px;">' +
+      hits.length + ' keer gevonden, op ' + Object.keys(dagen).length + ' verschillende ' + (Object.keys(dagen).length === 1 ? 'dag' : 'dagen') +
+      (Object.keys(dagen).length >= 3 ? ' \u2014 dit onderwerp komt vaker terug' : '') + '</div>' +
+    '<div style="max-height:340px;overflow:auto;border:1px solid #dbe5f0;border-radius:6px;">' +
+    hits.slice(0, 100).map(function(h, i){
+      return '<div onclick="woZoekOpen(\'' + h.datum + '\')" title="Deze dag openen" style="cursor:pointer;padding:7px 10px;' + (i ? 'border-top:1px solid #eef2f7;' : '') + 'font-size:12.5px;line-height:1.4;">' +
+        '<b style="color:var(--navy);">' + nl(h.datum) + '</b> <span style="color:#5a6b80;">\u00B7 ' + esc(h.label) + (h.door ? ' \u00B7 ' + esc(String(h.door).split('@')[0].replace(/\./g, ' ')) : '') + '</span>' +
+        '<div style="color:#333;">' + markeer(h.tekst) + '</div></div>';
+    }).join('') + '</div>';
+}
+window.woZoek = woZoek;
+window.woZoekOpen = function(datum){
+  var el = document.getElementById('f-datum'); if (!el) return;
+  el.value = datum; if (typeof laadDagData === 'function') laadDagData();
+  var su = document.getElementById('wo-startup'); if (su) su.scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
 </script>
 
