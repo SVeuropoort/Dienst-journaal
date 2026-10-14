@@ -8566,10 +8566,15 @@ function refreshDropdowns(pfx, pool){
     if (q) gefilterd.sort(function(a, b){ return a.sc - b.sc || a.i - b.i; });
     if (idx >= gefilterd.length) idx = Math.max(0, gefilterd.length - 1);
     var lijst = pop.querySelector('.djnp-lijst');
+    // Truckkeuze: de vaste tugmaster van de medewerker op deze regel markeren
+    var vastNr = (doelSel.getAttribute('data-truck') === 'true' && typeof djVasteTruckVoorSelect === 'function') ? djVasteTruckVoorSelect(doelSel) : null;
     lijst.innerHTML = gefilterd.length ? gefilterd.map(function(k, n){
       var huidig = k.i === doelSel.selectedIndex;
+      var vast = vastNr && typeof djIsVasteTruck === 'function' && djIsVasteTruck(k.v, vastNr);
       return '<div data-n="' + n + '" style="padding:5px 10px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;' +
-        (n === idx ? 'background:#0f6cbd;color:#fff;' : '') + (k.leeg ? 'color:' + (n === idx ? '#fff' : '#8795a8') + ';font-style:italic;' : '') + (huidig ? 'font-weight:800;' : '') + '">' + esc(k.tekst) + '</div>';
+        (n === idx ? 'background:#0f6cbd;color:#fff;' : (vast ? 'background:repeating-linear-gradient(45deg,#d9f2e1,#d9f2e1 6px,#c5ead1 6px,#c5ead1 12px);color:#14532d;' : '')) +
+        (k.leeg ? 'color:' + (n === idx ? '#fff' : '#8795a8') + ';font-style:italic;' : '') + (huidig || vast ? 'font-weight:800;' : '') + '"' + (vast ? ' title="Vaste truck van deze medewerker"' : '') + '>' +
+        esc(k.tekst) + (vast ? ' <span style="font-size:11px;font-weight:700;">\u2605 vaste truck</span>' : '') + '</div>';
     }).join('') : '<div style="padding:6px 10px;color:#c0392b;">Geen naam gevonden</div>';
     var act = lijst.querySelector('[data-n="' + idx + '"]');
     if (act) act.scrollIntoView({ block: 'nearest' });
@@ -23485,7 +23490,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.99';
+var DJ_BUILD = '2026-10-07.1';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -32517,6 +32522,43 @@ window.woZoekOpen = function(datum){
   el.value = datum; if (typeof laadDagData === 'function') laadDagData();
   var su = document.getElementById('wo-startup'); if (su) su.scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// Vaste truck (Tugmaster-indeling, Europoort): in het keuzelijstje van een truck wordt de vaste
+// tugmaster van de medewerker op die regel groen gemarkeerd. De cel zelf verandert niet; alle
+// trucks blijven gewoon te kiezen.
+// ══════════════════════════════════════════════════════════════════
+function djVasteTruckVoorSelect(truckSel){
+  try {
+    if ((sessionStorage.getItem('dj_terminal') || 'EP') !== 'EP' || typeof tugGet !== 'function') return null;
+    var d = tugGet(); if (!d || !d.tugmasters) return null;
+    var td = truckSel.closest('td'); if (!td) return null;
+    var naamSel = td.previousElementSibling ? td.previousElementSibling.querySelector('select.psel:not([data-truck])') : null;
+    var naam = naamSel && naamSel.value; if (!naam) return null;
+    var rij = (typeof djPersoonRijNaam === 'function') ? djPersoonRijNaam(naam) : null;
+    var t = rij ? d.tugmasters.find(function(tm){ return (tm.leden || []).indexOf('opl:' + rij) !== -1; }) : null;
+    if (!t && typeof vakMatchSterkte === 'function' && typeof vakLabels === 'function') {
+      // Geen koppeling via de lijst: alleen als precies één ingedeelde chauffeur bij deze naam past
+      var kand = [];
+      d.tugmasters.forEach(function(tm){ (tm.leden || []).forEach(function(id){
+        var sterk = Math.max.apply(null, vakLabels(id).map(function(l){ return vakMatchSterkte(l, naam); }).concat([0]));
+        if (sterk) kand.push({ tm: tm, s: sterk });
+      }); });
+      var max = Math.max.apply(null, kand.map(function(x){ return x.s; }).concat([0]));
+      var top = kand.filter(function(x){ return x.s === max; });
+      if (top.length === 1) t = top[0].tm;
+    }
+    if (!t) return null;
+    return String(t.nr).replace(/\D/g, '');
+  } catch(e) { return null; }
+}
+function djIsVasteTruck(optieWaarde, nr){
+  if (!nr || !optieWaarde) return false;
+  var cijfers = String(optieWaarde).replace(/\D/g, '');
+  return cijfers !== '' && +cijfers === +nr;
+}
 </script>
 
 </body>
