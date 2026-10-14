@@ -6942,6 +6942,7 @@ window.addEventListener('resize', () => {
     'organogram_v1',
     'pd_functies_v1',
     'vakantierooster_v1',
+    'opl_afgerond_v1',
     'tegel_links_v1',
     'plan_sv_v1',
     'tugmasters_v1',
@@ -7202,6 +7203,7 @@ window.addEventListener('resize', () => {
     'organogram_v1',
     'pd_functies_v1',
     'vakantierooster_v1',
+    'opl_afgerond_v1',
     'tegel_links_v1',
     'plan_sv_v1',
     'tugmasters_v1',
@@ -7510,6 +7512,7 @@ window.addEventListener('resize', () => {
     Object.keys(lokaal).forEach(function(k){
       if (vuil && (k in cloudData) && !vuil[k]) return; // niet zelf gewijzigd: cloud-versie behouden
       if (/(^|_)vs_data_v1$/.test(k) && cloudData[k]) { data[k] = djVsSamenvoegen(cloudData[k], lokaal[k]); return; }
+      if (/(^|_)opl_afgerond_v1$/.test(k) && cloudData[k]) { data[k] = djOplAfgSamenvoegen(cloudData[k], lokaal[k]); return; }
       if (/(^|_)startup_v1$/.test(k) && cloudData[k]) { data[k] = djSuSamenvoegen(cloudData[k], lokaal[k]); return; }
       if (/(^|_)plan_(v3|sv_v1)$/.test(k) && cloudData[k]) { data[k] = djPlanSamenvoegen(cloudData[k], lokaal[k]); return; } // To Do List per taak samenvoegen
       // Dagplanning: per VAK samenvoegen (3-weg). Werken twee collega's tegelijk aan dezelfde dag,
@@ -16394,6 +16397,8 @@ function oplSetHandtekening(formId, key, val){
   s.handtekeningen = s.handtekeningen || {};
   s.handtekeningen[key] = val;
   oplSaveState(formId, s);
+  // Alle drie getekend? Dan automatisch naar het personeelsdossier
+  if (val && typeof oplNaarDossier === 'function' && oplIsCompleet(s) && !s.dossierId) setTimeout(function(){ oplNaarDossier(formId, true); }, 300);
 }
 function oplWissen(formId){
   if (!confirm('Alle ingevulde velden van dit formulier wissen?')) return;
@@ -16402,10 +16407,10 @@ function oplWissen(formId){
   oplToonTab(formId);
 }
 
-function oplPrint(formId){
+function oplPrint(formId, staatOverride){
   var form = OPLEIDINGEN_FORMS.find(function(f){ return f.id === formId; });
   if (!form) return;
-  var state = oplGetState(formId);
+  var state = staatOverride || oplGetState(formId); // ook voor een opgeslagen kopie uit het dossier
   var h = state.header || {};
 
   var vo = function(rid, veld){ return (state.rijen && state.rijen[rid] && state.rijen[rid][veld]) ? '&#9745;' : '&#9744;'; };
@@ -23535,7 +23540,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.9';
+var DJ_BUILD = '2026-10-07.10';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -29981,6 +29986,20 @@ function pdRenderDetail(){
     '<span id="pd-verj-opgeslagen" style="font-size:11px;color:#166534;opacity:0;transition:opacity 0.4s;">&#10003; Opgeslagen</span>' +
     '</div>' +
     (typeof djFunctieVakjesHtml === 'function' && !isGroepslid ? djFunctieVakjesHtml(_pdGeselecteerd) : '');
+  // Afgeronde opleidingen (aftekenlijsten), apart vermeld
+  var _opl = (typeof oplAfgVoorPersoon === 'function') ? oplAfgVoorPersoon(_pdGeselecteerd) : [];
+  if (_opl.length) {
+    html += '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:14px;font-weight:800;color:#6b3fa0;letter-spacing:.5px;text-transform:uppercase;margin:4px 0 6px;">&#x1F393; Opleidingen (' + _opl.length + ')</div>' +
+      '<div style="border:1px solid #d8c9ef;border-radius:8px;overflow:hidden;margin-bottom:16px;">' +
+      _opl.slice().reverse().map(function(it, i){
+        var periode = (it.begin || it.eind) ? ' <span style="color:#7a6a93;font-size:12px;">(' + pdEsc(it.begin || '?') + ' t/m ' + pdEsc(it.eind || '?') + ')</span>' : '';
+        return '<div style="padding:9px 14px;' + (i ? 'border-top:1px solid #eee5f8;' : '') + 'display:flex;gap:12px;align-items:center;background:' + (i % 2 ? '#faf7fe' : '#fff') + ';">' +
+          '<div style="flex:0 0 90px;font-size:12px;font-weight:700;color:#6b3fa0;">' + pdEsc(it.datum) + '</div>' +
+          '<div style="flex:1;font-size:13px;"><b>' + pdEsc(it.titel) + '</b> afgerond' + periode + '</div>' +
+          '<button onclick="oplAfgBekijken(\'' + it.id + '\')" style="background:#f1eafb;color:#6b3fa0;border:1px solid #d8c9ef;border-radius:5px;padding:2px 8px;cursor:pointer;font-size:11.5px;font-weight:700;">&#x1F4C4; Bekijken</button>' +
+          '<button onclick="oplAfgVerwijderen(\'' + it.id + '\')" title="Verwijderen" style="background:none;border:none;color:#c0392b;cursor:pointer;font-size:13px;">&#x2715;</button></div>';
+      }).join('') + '</div>';
+  }
   if (gesprekken.length) {
     html += '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:14px;font-weight:800;color:#1a7a40;letter-spacing:.5px;text-transform:uppercase;margin:4px 0 6px;">&#x1F4AC; Ontwikkelgesprekken (' + gesprekken.length + ')</div>' +
       '<div style="border:1px solid #bfe3cb;border-radius:8px;overflow:hidden;margin-bottom:16px;">';
@@ -29995,8 +30014,8 @@ function pdRenderDetail(){
       if (e.uitMap) setTimeout(function(){ djOgSamenvattingLaden(e.gesprekPad, 'og-sv-' + i); }, 0);
     });
     html += '</div>';
-    html += '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:14px;font-weight:800;color:var(--navy);letter-spacing:.5px;text-transform:uppercase;margin:4px 0 6px;">&#x1F4C1; Registraties (' + entries.length + ')</div>';
   }
+  if (gesprekken.length || _opl.length) html += '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:14px;font-weight:800;color:var(--navy);letter-spacing:.5px;text-transform:uppercase;margin:4px 0 6px;">&#x1F4C1; Registraties (' + entries.length + ')</div>';
   if (!entries.length) {
     html += '<div style="color:var(--muted);font-size:13px;padding:14px 0;">Nog geen registraties voor deze medewerker.</div>';
   } else {
@@ -32617,6 +32636,82 @@ function djIsVasteTruck(optieWaarde, nr){
   if (!nr || !optieWaarde) return false;
   var cijfers = String(optieWaarde).replace(/\D/g, '');
   return cijfers !== '' && +cijfers === +nr;
+}
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// Afgeronde opleidingen → automatisch in het personeelsdossier (apart blok "🎓 Opleidingen")
+// Zodra Cursist, Mentor én Supervisor hebben getekend, vraagt de app bij welke medewerker het hoort
+// en bewaart een kopie van de complete aftekenlijst (vinkjes, opmerkingen, handtekeningen).
+// ══════════════════════════════════════════════════════════════════
+function oplAfgKey(){ return tk('opl_afgerond_v1'); }
+function oplAfgGet(){ try { var x = JSON.parse(localStorage.getItem(oplAfgKey()) || 'null'); return (x && x.items) ? x : { items: [], weg: [] }; } catch(e) { return { items: [], weg: [] }; } }
+function oplAfgSet(x){ localStorage.setItem(oplAfgKey(), JSON.stringify(x)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }
+function djOplAfgSamenvoegen(cloud, lok){
+  var p = function(x){ if (typeof x === 'string') { try { x = JSON.parse(x); } catch(e) { x = null; } } return (x && x.items) ? x : null; };
+  var C = p(cloud), L = p(lok); if (!C) return lok; if (!L) return cloud;
+  var weg = {}; (C.weg || []).concat(L.weg || []).forEach(function(id){ weg[id] = 1; });
+  var gezien = {}, items = [];
+  C.items.concat(L.items).forEach(function(it){ if (!it || weg[it.id] || gezien[it.id]) return; gezien[it.id] = 1; items.push(it); });
+  return { items: items, weg: Object.keys(weg) };
+}
+window.djOplAfgSamenvoegen = djOplAfgSamenvoegen;
+function oplKandidaatNamen(){
+  var namen = [];
+  try { if (typeof pdData === 'function') namen = Object.keys(pdData()); } catch(e) {}
+  if (!namen.length && typeof oplOverzichtGetData === 'function') namen = (oplOverzichtGetData() || []).map(function(r){ return r.naam + (r.groep ? ' (' + r.groep + ')' : ''); });
+  var groepen = (typeof PD_GROEPEN !== 'undefined' && Array.isArray(PD_GROEPEN)) ? PD_GROEPEN : [];
+  return namen.filter(function(n){ return n && groepen.indexOf(n) === -1 && !/\(uit dienst\)\s*$/i.test(n); }).sort(function(a, b){ return a.localeCompare(b, 'nl'); });
+}
+function oplGokNaam(h, namen){
+  var vol = ((h.roepnaam || '') + ' ' + (h.achternaam || '')).trim(); if (!vol) return '';
+  var schoon = function(n){ return String(n).replace(/\s*\([^)]*\)\s*$/, ''); };
+  var kand = namen.filter(function(n){ return typeof vakMatchSterkte === 'function' ? vakMatchSterkte(schoon(n), vol) > 0 : (typeof certNaamMatch === 'function' && certNaamMatch(schoon(n), vol)); });
+  if (kand.length > 1 && typeof vakMatchSterkte === 'function') { var sterk = kand.filter(function(n){ return vakMatchSterkte(schoon(n), vol) === 2; }); if (sterk.length === 1) return sterk[0]; }
+  return kand.length === 1 ? kand[0] : '';
+}
+function oplIsCompleet(st){ var h = (st && st.handtekeningen) || {}; return !!(h.cursist && h.mentor && h.supervisor); }
+window.oplNaarDossier = function(formId, automatisch){
+  var form = OPLEIDINGEN_FORMS.find(function(f){ return f.id === formId; }); if (!form) return;
+  var st = oplGetState(formId);
+  if (!oplIsCompleet(st)) { if (!automatisch) alert('Laat eerst Cursist, Mentor en Supervisor tekenen. Daarna wordt de aftekenlijst in het dossier opgeslagen.'); return; }
+  if (st.dossierId && automatisch) return; // al opgeslagen
+  var namen = oplKandidaatNamen(), gok = oplGokNaam(st.header || {}, namen);
+  var oud = document.getElementById('opl-dossier-dialoog'); if (oud) oud.remove();
+  var o = document.createElement('div'); o.id = 'opl-dossier-dialoog';
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(0,20,40,.45);z-index:100005;display:flex;align-items:center;justify-content:center;padding:16px;';
+  var h = st.header || {};
+  o.innerHTML = '<div style="background:#fff;border-radius:10px;padding:18px;width:440px;max-width:100%;">' +
+    '<div style="font-weight:800;color:#003366;font-size:15px;">&#x1F393; ' + oplEsc(form.titel) + ' &mdash; afgerond</div>' +
+    '<div style="font-size:12.5px;color:#5a6b80;margin:6px 0 10px;">Alle handtekeningen zijn gezet. In welk personeelsdossier hoort deze aftekenlijst?' +
+      ((h.roepnaam || h.achternaam) ? '<br>Ingevuld op het formulier: <b>' + oplEsc(((h.roepnaam || '') + ' ' + (h.achternaam || '')).trim()) + '</b>' : '') + '</div>' +
+    '<select id="opl-dossier-naam" style="width:100%;padding:7px;border:1px solid #c8d7e8;border-radius:6px;"><option value="">— kies medewerker —</option>' +
+      namen.map(function(n){ return '<option' + (n === gok ? ' selected' : '') + '>' + oplEsc(n) + '</option>'; }).join('') + '</select>' +
+    '<label style="display:flex;gap:6px;align-items:center;font-size:12.5px;margin-top:10px;text-transform:none;letter-spacing:normal;font-weight:400;"><input type="checkbox" id="opl-dossier-leeg" checked style="width:auto;"> Formulier daarna leegmaken voor de volgende cursist</label>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;"><button type="button" onclick="document.getElementById(\'opl-dossier-dialoog\').remove()" style="padding:7px 12px;">Later</button>' +
+    '<button type="button" id="opl-dossier-ok" style="padding:7px 14px;background:#1a7a40;color:#fff;border:none;border-radius:5px;font-weight:700;">Opslaan in dossier</button></div></div>';
+  document.body.appendChild(o);
+  document.getElementById('opl-dossier-ok').onclick = function(){
+    var naam = document.getElementById('opl-dossier-naam').value; if (!naam) { document.getElementById('opl-dossier-naam').style.borderColor = '#c0392b'; return; }
+    var leeg = document.getElementById('opl-dossier-leeg').checked;
+    var x = oplAfgGet(), id = 'opl' + Date.now() + Math.random().toString(36).slice(2, 5);
+    var nu = new Date(), nl = nu.getDate() + '-' + (nu.getMonth() + 1) + '-' + nu.getFullYear();
+    x.items.push({ id: id, formId: formId, titel: form.titel, naam: naam, datum: nl, begin: h.begindatum || '', eind: h.einddatum || '',
+      door: localStorage.getItem('dj_sp_account_username') || '', snapshot: JSON.parse(JSON.stringify(st)) });
+    oplAfgSet(x);
+    if (leeg) { localStorage.removeItem(oplKey(formId)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }
+    else { st.dossierId = id; oplSaveState(formId, st); }
+    o.remove();
+    if (typeof showToast === 'function') showToast('\u2714 Aftekenlijst opgeslagen in het dossier van ' + naam);
+    if (typeof oplToonTab === 'function' && leeg) { try { oplToonTab(formId); } catch(e) {} }
+  };
+};
+window.oplAfgBekijken = function(id){ var it = oplAfgGet().items.find(function(x){ return x.id === id; }); if (it) oplPrint(it.formId, it.snapshot); };
+window.oplAfgVerwijderen = function(id){ if (!confirm('Deze opleiding uit het dossier verwijderen?')) return; var x = oplAfgGet(); x.items = x.items.filter(function(i){ return i.id !== id; }); x.weg = (x.weg || []).concat([id]); oplAfgSet(x); if (typeof pdRenderDetail === 'function') pdRenderDetail(); };
+function oplAfgVoorPersoon(naam){
+  var schoon = function(n){ return String(n || '').replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase(); };
+  return oplAfgGet().items.filter(function(it){ return it.naam === naam || schoon(it.naam) === schoon(naam); });
 }
 </script>
 
