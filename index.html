@@ -9222,15 +9222,21 @@ function getAvailableTrucks(){
       : ["E1","E2","E3","E4","E5","E6","E7","E8","E9","E10","E11","E12","E13","E14","E15","E16","E17","E18","E19","E20","E21","E22","E23","E24"];
     // Haal statussen op uit mat_standalone_v2 (bevat huidige dag-statussen)
     var statusData = JSON.parse(localStorage.getItem(tk('mat_standalone_v2'))||'{}');
+    // OK én ONDERHOUD (die laatste met de opmerking "onderhoud" in het keuzelijstje); DEFECT niet
     return all.filter(function(t){
       var s = (statusData['t-'+t]||{}).s||'OK';
-      return s === 'OK';
+      return s === 'OK' || s === 'ONDERHOUD';
     });
   } catch(e){
     return ["E1","E2","E3","E4","E5","E6","E7","E8","E9","E10","E11","E12","E13","E14","E15","E16","E17","E18","E19","E20","E21","E22","E23","E24"];
   }
 }
 
+// Tekst in het keuzelijstje van een truck: trucks in onderhoud krijgen de opmerking "onderhoud"
+function djTruckLabel(t){
+  try { var st = JSON.parse(localStorage.getItem(tk('mat_standalone_v2')) || '{}'); if (((st['t-' + t] || {}).s) === 'ONDERHOUD') return t + ' \u2013 onderhoud'; } catch(e) {}
+  return t;
+}
 function ddt(id){
   const sv   = pos[id]||'';
   const pfx  = (id.startsWith('a_')) ? 'av' : 'oc';
@@ -9239,7 +9245,7 @@ function ddt(id){
   let opts = '';
   avail.forEach(function(v){
     if(!used.has(v)||v===sv)
-      opts+=`<option value="${v}"${v===sv?' selected':''}>${v}</option>`;
+      opts+=`<option value="${v}"${v===sv?' selected':''}>${djTruckLabel(v)}</option>`;
   });
   // Huidig geselecteerde maar niet meer beschikbaar: tonen met waarschuwing
   if(sv && !avail.includes(sv)){
@@ -9262,7 +9268,7 @@ function setTruck(k, v){
     let html = '<option value=""></option>';
     trucks.forEach(t=>{
       if(!used.has(t)||t===own)
-        html+=`<option value="${t}"${t===own?' selected':''}>${t}</option>`;
+        html+=`<option value="${t}"${t===own?' selected':''}>${djTruckLabel(t)}</option>`;
     });
     sel.innerHTML = html;
   });
@@ -23490,7 +23496,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.1';
+var DJ_BUILD = '2026-10-07.2';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
