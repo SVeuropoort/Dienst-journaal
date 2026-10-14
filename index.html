@@ -23485,7 +23485,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.98';
+var DJ_BUILD = '2026-10-06.99';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -32444,15 +32444,17 @@ document.addEventListener('DOMContentLoaded', function(){
   var kaarten = Array.prototype.slice.call(tab.querySelectorAll('.card')).filter(function(c){ return c.querySelector('h2'); });
   var vind = function(t){ return kaarten.find(function(c){ return c.querySelector('h2').textContent.trim().toLowerCase().indexOf(t) === 0; }); };
   var eerste = vind('dienst overdracht'); if (!eerste) return;
-  // Zoekvak
-  var z = document.createElement('div'); z.className = 'card'; z.id = 'wo-zoek-kaart';
-  z.innerHTML = '<div class="card-header"><div class="icon">&#x1F50D;</div><h2>Zoeken in de werkoverdracht</h2></div>' +
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">' +
-    '<input id="wo-zoek" type="search" placeholder="Zoek een onderwerp, bijv. reachstacker, PBM, Stena Transit…" oninput="woZoekPlan()" style="flex:1;min-width:240px;padding:9px 12px;border:1px solid #c8d7e8;border-radius:6px;font-size:13.5px;">' +
-    '<select id="wo-zoek-waar" onchange="woZoek()" style="padding:8px;border:1px solid #c8d7e8;border-radius:6px;font-size:12.5px;">' +
-      '<option value="alles">Overal</option><option value="startup">Alleen start-ups</option><option value="taken">Alleen openstaande taken</option><option value="incident">Alleen bijzonderheden</option></select></div>' +
-    '<div id="wo-zoek-uit" style="margin-top:8px;"></div>';
-  var volgorde = [z, vind('mijn agenda'), vind('start-up'), vind('openstaande taken'), vind('bijzonderheden'), vind('ziekmeldingen')].filter(Boolean);
+  // Zoeken: klein, onderaan in het vak "Dienst Overdracht"
+  var z = document.createElement('div'); z.id = 'wo-zoek-blok';
+  z.style.cssText = 'margin-top:12px;padding-top:10px;border-top:1px solid #e3eaf2;';
+  z.innerHTML = '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">' +
+    '<span style="font-size:13px;">&#x1F50D;</span>' +
+    '<input id="wo-zoek" type="search" placeholder="Zoeken in eerdere overdrachten en start-ups…" oninput="woZoekPlan()" style="flex:1 1 220px!important;width:auto!important;max-width:420px;padding:6px 10px!important;border:1px solid #c8d7e8;border-radius:6px;font-size:12.5px!important;min-height:0!important;height:32px;">' +
+    '<select id="wo-zoek-waar" onchange="woZoek()" style="width:auto!important;flex:0 0 auto;padding:4px 6px!important;border:1px solid #c8d7e8;border-radius:6px;font-size:12px!important;height:32px;min-height:0!important;">' +
+      '<option value="alles">Overal</option><option value="startup">Start-ups</option><option value="taken">Openstaande taken</option><option value="incident">Bijzonderheden</option></select></div>' +
+    '<div id="wo-zoek-uit" style="margin-top:6px;"></div>';
+  eerste.appendChild(z);
+  var volgorde = [vind('mijn agenda'), vind('start-up'), vind('openstaande taken'), vind('bijzonderheden'), vind('ziekmeldingen')].filter(Boolean);
   var na = eerste;
   volgorde.forEach(function(c){ na.parentNode.insertBefore(c, na.nextSibling); na = c; });
 });
