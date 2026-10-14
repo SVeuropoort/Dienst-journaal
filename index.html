@@ -3136,7 +3136,7 @@ async function spOphalenBestandRuw(bestandsnaam){
 //    nog aan vertrouwelijke sleutels in main stond, blijft ongemoeid staan.
 var DJ_VERTR_SLEUTELS = ['dienstjournaal_stena_v1', 'werkoverdracht_ziekmeldingen_v1',
   'personeelsdossier_v1', 'personeelsdossier_actief_v1',
-  'ma_loongroepen_v1', 'ma_medewerkers_v1', 'ma_hvh_v1', 'plan_sv_v1'];
+  'ma_loongroepen_v1', 'ma_medewerkers_v1', 'ma_hvh_v1', 'plan_sv_v1', 'startup_v1'];
 function djIsVertrSleutel(k){ return DJ_VERTR_SLEUTELS.indexOf(String(k).replace(/^(EP|HVH|IMM)_/, '')) >= 0; }
 function djVertrSplits(data){
   var vertr = {}, rest = {};
@@ -4817,12 +4817,10 @@ function djAdminOpslaan(){
     <div class="card">
       <div class="card-header">
         <div class="icon">🚀</div>
-        <h2>Opmerkingen voor Volgende Dienst (Start-Up)</h2>
+        <h2>Start-Up</h2>
       </div>
-      <div class="field">
-        <label>Instructies & aandachtspunten voor de volgende ploeg</label>
-        <textarea id="f-startup" style="min-height:120px;" placeholder="Schrijf hier uw bericht"></textarea>
-      </div>
+      <div id="wo-startup"></div>
+      <textarea id="f-startup" style="display:none;"></textarea>
     </div>
 
 
@@ -6947,6 +6945,7 @@ window.addEventListener('resize', () => {
     'tegel_links_v1',
     'plan_sv_v1',
     'tugmasters_v1',
+    'startup_v1',
     'werkoverdracht_abnormal_config_v1',
     'werkoverdracht_abnormal_lijst_v1',
     'std_bezetting_v1',
@@ -7206,6 +7205,7 @@ window.addEventListener('resize', () => {
     'tegel_links_v1',
     'plan_sv_v1',
     'tugmasters_v1',
+    'startup_v1',
     'werkoverdracht_abnormal_config_v1',
     'werkoverdracht_abnormal_lijst_v1',
     'std_bezetting_v1',
@@ -7510,6 +7510,7 @@ window.addEventListener('resize', () => {
     Object.keys(lokaal).forEach(function(k){
       if (vuil && (k in cloudData) && !vuil[k]) return; // niet zelf gewijzigd: cloud-versie behouden
       if (/(^|_)vs_data_v1$/.test(k) && cloudData[k]) { data[k] = djVsSamenvoegen(cloudData[k], lokaal[k]); return; }
+      if (/(^|_)startup_v1$/.test(k) && cloudData[k]) { data[k] = djSuSamenvoegen(cloudData[k], lokaal[k]); return; }
       if (/(^|_)plan_(v3|sv_v1)$/.test(k) && cloudData[k]) { data[k] = djPlanSamenvoegen(cloudData[k], lokaal[k]); return; } // To Do List per taak samenvoegen
       // Dagplanning: per VAK samenvoegen (3-weg). Werken twee collega's tegelijk aan dezelfde dag,
       // dan wint per vak alleen wat déze pc zelf heeft veranderd; vakken die de collega intussen
@@ -19766,7 +19767,7 @@ function woPrinten(){
     '<td><b>' + (en ? 'Supervisor afternoon' : 'Supervisor middag') + '</b>' + (esc(val('f-sup-nieuw')) || '\u2014') + '</td></tr></table>' +
     blok(en ? 'Open tasks' : 'Openstaande taken', val('f-taken')) +
     blok(en ? 'Special notes / incidents' : 'Bijzonderheden / incidenten', val('f-incident')) +
-    blok(en ? 'Notes for next shift (start-up)' : 'Opmerkingen voor volgende dienst (start-up)', val('f-startup')) +
+    (typeof suPrintHtml === 'function' ? suPrintHtml(iso) : blok(en ? 'Notes for next shift (start-up)' : 'Opmerkingen voor volgende dienst (start-up)', val('f-startup'))) +
     '<div class="voet">' + (en ? 'Printed ' : 'Afgedrukt ') + geprint + '</div>' +
     '</body></html>';
   var oud = document.getElementById('wo-print-frame'); if (oud) oud.remove();
@@ -19827,6 +19828,7 @@ document.addEventListener('visibilitychange', function(){ if (document.hidden &&
 // Na binnengehaalde collega-wijzigingen: het formulier voor de gekozen datum opnieuw vullen,
 // behalve het veld waarin je nu aan het typen bent.
 window.djWerkoverdrachtHerlaadInPlace = function(){
+  if (typeof suRender === 'function') suRender();
   var el = document.getElementById('f-datum');
   if (!el || !el.value || window._woAutoTimer) return;
   var dienst = (document.getElementById('f-dienst') || {}).value || 'Dag';
@@ -19854,7 +19856,7 @@ function laadDagData() {
     document.getElementById('f-datum').dataset.prevDatum=datum;
     document.getElementById('f-datum').dataset.prevDienst=dienst;
     var allD=getData(), ents=allD.filter(function(e){return e.datum===datum&&e.dienst===dienst;});
-    if(!ents.length){document.getElementById('f-taken').value='';document.getElementById('f-ziek').value='';document.getElementById('f-incident').value='';document.getElementById('f-startup').value='';syncSupervisorVanDagplan(datum);if(typeof ziekmRender==='function')ziekmRender();if(typeof fKnoppenMarkeer==='function')fKnoppenMarkeer();if(typeof djAgendaLaden==='function')djAgendaLaden(false);return;}
+    if(!ents.length){document.getElementById('f-taken').value='';document.getElementById('f-ziek').value='';document.getElementById('f-incident').value='';document.getElementById('f-startup').value='';syncSupervisorVanDagplan(datum);if(typeof ziekmRender==='function')ziekmRender();if(typeof suRender==='function')suRender();if(typeof fKnoppenMarkeer==='function')fKnoppenMarkeer();if(typeof djAgendaLaden==='function')djAgendaLaden(false);return;}
     var e=ents[ents.length-1];
     document.getElementById('f-taken').value=e.taken||'';document.getElementById('f-ziek').value=e.ziek||'';
     document.getElementById('f-incident').value=e.incident||'';document.getElementById('f-startup').value=e.startup||'';
@@ -19863,6 +19865,7 @@ function laadDagData() {
     if(e.sjorringen){setSjorringen(e.sjorringen);}else{document.querySelectorAll('.sjor-input').forEach(function(i){i.value='';}); }
     syncSupervisorVanDagplan(datum);
     if (typeof ziekmRender === 'function') ziekmRender();
+    if (typeof suRender === 'function') suRender();
     if (typeof fKnoppenMarkeer === 'function') fKnoppenMarkeer();
     if (typeof djAgendaLaden === 'function') djAgendaLaden(false);
   }
@@ -23482,7 +23485,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-06.95';
+var DJ_BUILD = '2026-10-06.97';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -32316,6 +32319,119 @@ document.addEventListener('DOMContentLoaded', function(){
   // volgorde: Dossier, Organogram, Vakantierooster, Tugmasters, Certificeringen, Ontwikkelgesprek
   ['dossier', 'organogram', 'vakantie', 'tugmaster', 'certificeringen', 'ontwikkelgesprek'].forEach(function(x, i){ var k = document.getElementById('pd-sub-btn-' + x); if (k) k.style.order = String(i + 1); });
 });
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// START-UP (Werkoverdracht) — opzet vanuit het MT:
+//  1. Meenemen voor de start-up: tekst die de dag ervoor bij "Start-up voor morgen" is ingevuld (alleen lezen)
+//  2. Start-up ochtend en Start-up middag naast elkaar: veiligheidspunten afvinken + wat er besproken is
+//  3. Start-up voor morgen: wordt morgen ongewijzigd getoond in vak 1
+// Per datum opgeslagen in de vertrouwelijke werkoverdracht-gegevens; per vak samengevoegd met collega's.
+// ══════════════════════════════════════════════════════════════════
+var SU_PUNTEN = [
+  'Zorg ervoor dat alle teamleden de benodigde PBM\u2019s hebben en dat deze in goede staat verkeren.',
+  'Een herinnering dat iedereen het recht heeft om het werk te stoppen als ze zich zorgen maken over hun eigen veiligheid of die van anderen.',
+  'Herinnering om een controle voor gebruik uit te voeren van elk stuk apparatuur dat wordt gebruikt; eventuele defecten aan apparatuur moeten worden gemeld.',
+  'Veiligheidsgordel moeten worden gedragen bij het bedienen of reizen in voertuigen.',
+  'Alle bijna-ongevallen, ongevallen, incidenten en defecten moeten zo snel mogelijk worden gemeld.',
+  'Zijn er updates over recente bijna-ongevallen, ongevallen, incidenten of defecten? Zo ja, dan moet er feedback worden gegeven.'
+];
+var SU_PUNTEN_EN = [
+  'Make sure all team members have the required PPE and that it is in good condition.',
+  'A reminder that everyone has the right to stop work if they are concerned about their own safety or that of others.',
+  'Reminder to carry out a pre-use check on every piece of equipment used; any equipment defects must be reported.',
+  'Seat belts must be worn when operating or travelling in vehicles.',
+  'All near misses, accidents, incidents and defects must be reported as soon as possible.',
+  'Are there updates on recent near misses, accidents, incidents or defects? If so, feedback must be given.'
+];
+function suEn(){ return sessionStorage.getItem('dj_terminal') === 'IMM'; }
+function suKey(){ return tk('startup_v1'); }
+function suGet(){ try { return JSON.parse(localStorage.getItem(suKey()) || '{}') || {}; } catch(e) { return {}; } }
+function suVorigeDag(iso){ var d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() - 1); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function suDatum(){ return (document.getElementById('f-datum') || {}).value || ''; }
+function suMeenemen(datum){
+  var v = (suGet()[suVorigeDag(datum)] || {}).morgen;
+  if (v && v.tekst) return v.tekst;
+  // Overgang: oude start-up-tekst van de vorige dag uit de werkoverdracht
+  try { var oud = getData().filter(function(e){ return e.datum === suVorigeDag(datum); }); var e = oud[oud.length - 1]; if (e && e.startup) return e.startup; } catch(e2) {}
+  return '';
+}
+var _suTimer = null, _suWacht = {};
+function suZet(datum, vak, veld, waarde){
+  var d = suGet(); d[datum] = d[datum] || {}; var v = d[datum][vak] = d[datum][vak] || {};
+  v[veld] = waarde; v.gw = Date.now();
+  v.door = localStorage.getItem('dj_sp_account_username') || '';
+  localStorage.setItem(suKey(), JSON.stringify(d));
+  clearTimeout(_suTimer); _suTimer = setTimeout(function(){ if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }, 800);
+  var st = document.getElementById('su-status'); if (st) { var n = new Date(); st.textContent = '\u2714 ' + (suEn() ? 'Saved ' : 'Opgeslagen ') + String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0'); }
+}
+window.suVinkje = function(vak, i, aan){ var datum = suDatum(); var v = (suGet()[datum] || {})[vak] || {}; var p = (v.punten || []).slice(); p[i] = !!aan; suZet(datum, vak, 'punten', p); suTelling(); };
+window.suAlles = function(vak){ var datum = suDatum(); suZet(datum, vak, 'punten', SU_PUNTEN.map(function(){ return true; })); suRender(); };
+window.suTekst = function(vak, el){ suZet(suDatum(), vak, 'tekst', el.value); };
+function suTelling(){
+  var d = suGet()[suDatum()] || {};
+  ['ochtend', 'middag'].forEach(function(vak){ var el = document.getElementById('su-tel-' + vak); if (!el) return;
+    var n = ((d[vak] || {}).punten || []).filter(Boolean).length; el.textContent = n + '/' + SU_PUNTEN.length; el.style.background = n === SU_PUNTEN.length ? '#1a7a40' : (n ? '#e67e22' : '#8795a8'); });
+}
+function suEsc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function suRender(){
+  var box = document.getElementById('wo-startup'); if (!box) return;
+  var actief = document.activeElement; if (actief && box.contains(actief) && actief.tagName === 'TEXTAREA') return; // niet storen tijdens typen
+  var en = suEn(), datum = suDatum(), d = suGet()[datum] || {}, punten = en ? SU_PUNTEN_EN : SU_PUNTEN;
+  var lbl = 'display:block;font-size:11px;font-weight:700;color:#5a6b80;text-transform:uppercase;letter-spacing:.5px;margin:10px 0 4px;';
+  var ta = 'width:100%;box-sizing:border-box;min-height:90px;padding:8px 10px;border:1px solid #c8d7e8;border-radius:6px;font-family:inherit;font-size:13px;';
+  var kolom = function(vak, titel){
+    var v = d[vak] || {}, p = v.punten || [];
+    return '<div style="flex:1;min-width:280px;border:1px solid #dbe5f0;border-radius:8px;padding:12px 14px;background:#fbfdff;">' +
+      '<div style="display:flex;align-items:center;gap:8px;"><div style="font-weight:800;color:var(--navy);font-size:14px;flex:1;">' + titel + '</div>' +
+      '<span id="su-tel-' + vak + '" style="color:#fff;font-size:11px;font-weight:800;border-radius:10px;padding:2px 8px;">0/6</span>' +
+      '<button type="button" onclick="suAlles(\'' + vak + '\')" style="font-size:11px;border:1px solid #c8d7e8;background:#fff;border-radius:5px;padding:3px 8px;cursor:pointer;color:var(--navy);">' + (en ? 'Tick all' : 'Alles afvinken') + '</button></div>' +
+      '<div style="' + lbl + '">' + (en ? 'Safety points discussed' : 'Veiligheid aandachtspunten behandeld') + '</div>' +
+      punten.map(function(t, i){ return '<label style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px;line-height:1.35;margin:5px 0;cursor:pointer;text-transform:none;letter-spacing:normal;font-weight:400;color:#17232b;">' +
+        '<input type="checkbox"' + (p[i] ? ' checked' : '') + ' onchange="suVinkje(\'' + vak + '\',' + i + ',this.checked)" style="width:16px!important;min-width:16px;height:16px;margin:2px 0 0;padding:0;flex:0 0 16px;"><span style="flex:1;">' + suEsc(t) + '</span></label>'; }).join('') +
+      '<div style="' + lbl + '">' + (en ? 'Discussed during the start-up' : 'Besproken tijdens de start-up') + '</div>' +
+      '<textarea oninput="suTekst(\'' + vak + '\',this)" style="' + ta + '" placeholder="' + (en ? 'What was discussed…' : 'Wat is er besproken…') + '">' + suEsc(v.tekst || '') + '</textarea></div>';
+  };
+  var mee = suMeenemen(datum);
+  box.innerHTML =
+    '<div style="' + lbl + 'margin-top:0;">&#x1F4CC; ' + (en ? 'To take into the start-up (filled in the day before)' : 'Meenemen voor de start-up (de dag ervoor ingevuld)') + '</div>' +
+    '<div style="white-space:pre-wrap;min-height:44px;padding:10px 12px;border:1px solid #e0d5a8;border-radius:6px;background:#fff8e6;font-size:13px;color:#3d3200;">' + (mee ? suEsc(mee) : '<span style="color:#9a8d5c;">' + (en ? 'Nothing noted yesterday.' : 'Gisteren is niets genoteerd.') + '</span>') + '</div>' +
+    '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:14px;">' + kolom('ochtend', '&#x1F305; ' + (en ? 'Start-up morning' : 'Start-up ochtend')) + kolom('middag', '&#x1F307; ' + (en ? 'Start-up afternoon' : 'Start-up middag')) + '</div>' +
+    '<div style="' + lbl + 'margin-top:14px;">&#x1F5D3;&#xFE0F; ' + (en ? 'Start-up for tomorrow (shown tomorrow under "To take into the start-up")' : 'Start-up voor morgen (komt morgen bovenaan bij "Meenemen")') + '</div>' +
+    '<textarea oninput="suTekst(\'morgen\',this)" style="' + ta + '" placeholder="' + (en ? 'What should be taken into account tomorrow…' : 'Waar moet morgen rekening mee gehouden worden…') + '">' + suEsc((d.morgen || {}).tekst || '') + '</textarea>' +
+    '<div id="su-status" style="font-size:11px;color:#1a7a40;margin-top:4px;min-height:14px;"></div>';
+  suTelling();
+}
+window.suRender = suRender;
+// Samenvoegen met collega's: per datum, per vak (ochtend / middag / morgen) wint de nieuwste versie
+function djSuSamenvoegen(cloud, lok){
+  var p = function(x){ if (typeof x === 'string') { try { x = JSON.parse(x); } catch(e) { x = null; } } return (x && typeof x === 'object') ? x : null; };
+  var C = p(cloud), L = p(lok); if (!C) return lok; if (!L) return cloud;
+  var uit = {};
+  Object.keys(C).concat(Object.keys(L)).forEach(function(dt){
+    if (uit[dt]) return; uit[dt] = {};
+    ['ochtend', 'middag', 'morgen'].forEach(function(v){
+      var a = (C[dt] || {})[v], b = (L[dt] || {})[v];
+      var w = !a ? b : (!b ? a : ((+b.gw || 0) > (+a.gw || 0) ? b : a));
+      if (w) uit[dt][v] = w;
+    });
+  });
+  return uit;
+}
+window.djSuSamenvoegen = djSuSamenvoegen;
+// Afdrukken (Werkoverdracht): start-up als nette tekst
+window.suPrintHtml = function(datum){
+  var en = suEn(), d = suGet()[datum] || {}, punten = en ? SU_PUNTEN_EN : SU_PUNTEN;
+  var e = function(t){ return suEsc(t); };
+  var kolom = function(vak, titel){ var v = d[vak] || {}, p = v.punten || [];
+    return '<td style="width:50%;vertical-align:top;border:1px solid #c8d7e8;padding:6px 8px;"><b>' + titel + '</b> (' + p.filter(Boolean).length + '/' + punten.length + ')' +
+      '<div style="font-size:9pt;margin:4px 0;">' + punten.map(function(t, i){ return (p[i] ? '\u2611 ' : '\u2610 ') + e(t); }).join('<br>') + '</div>' +
+      '<div style="white-space:pre-wrap;border-top:1px dashed #c8d7e8;padding-top:4px;">' + (e(v.tekst || '') || '\u2014') + '</div></td>'; };
+  return '<h2>' + (en ? 'To take into the start-up' : 'Meenemen voor de start-up') + '</h2><div class="vak">' + (e(suMeenemen(datum)) || '\u2014') + '</div>' +
+    '<table style="width:100%;border-collapse:collapse;margin-top:8px;"><tr>' + kolom('ochtend', en ? 'Start-up morning' : 'Start-up ochtend') + kolom('middag', en ? 'Start-up afternoon' : 'Start-up middag') + '</tr></table>' +
+    '<h2>' + (en ? 'Start-up for tomorrow' : 'Start-up voor morgen') + '</h2><div class="vak">' + (e((d.morgen || {}).tekst || '') || '\u2014') + '</div>';
+};
 </script>
 
 </body>
