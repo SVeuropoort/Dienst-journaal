@@ -15343,9 +15343,9 @@ function oplAftekTabelHtml(formId){
   var h = state.header || {};
   var html = oplIntroCardOpen('Bijlage 1 \u2013 Praktijk aftekenlijst', '&#x1F4CB;');
   html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:14px;">';
-  html += oplVeldHtml(formId, 'roepnaam', 'Naam', h.roepnaam);
+  html += oplPersoonKeuzeHtml(formId, 'roepnaam', 'Naam', h.roepnaam, true);
   html += oplVeldHtml(formId, 'nummer', 'Nummer', h.nummer);
-  html += oplVeldHtml(formId, 'mentor', 'Naam mentor', h.mentor);
+  html += oplPersoonKeuzeHtml(formId, 'mentor', 'Naam mentor', h.mentor, false);
   html += oplVeldHtml(formId, 'datum', 'Datum', h.datum, 'date');
   html += '</div>';
   html += '<div style="overflow-x:auto;margin:0 -20px;padding:0 20px;"><table style="width:100%;border-collapse:collapse;min-width:640px;">';
@@ -16266,8 +16266,9 @@ function oplBouwFormHtml(form){
     '</span></div>';
 
   html += '<div style="padding:14px 16px;background:#fafcff;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;border-bottom:1px solid #ddd;">';
-  html += oplVeldHtml(form.id, 'roepnaam', 'Roepnaam', h.roepnaam);
-  html += oplVeldHtml(form.id, 'achternaam', 'Achternaam', h.achternaam);
+  // Naam cursist: keuze uit vaste medewerkers en stagiaires (geen inhuur)
+  var _oudeNaam = h.roepnaam && h.achternaam ? (h.roepnaam + ' ' + h.achternaam) : h.roepnaam;
+  html += '<div style="grid-column:span 2;">' + oplPersoonKeuzeHtml(form.id, 'roepnaam', 'Naam cursist', _oudeNaam, false, true).replace(/^<div>|<\/div>$/g, '') + '</div>';
   html += oplVeldHtml(form.id, 'datum', 'Datum', h.datum, 'date');
   html += '<div></div>';
   html += oplVeldHtml(form.id, 'begindatum', 'Begin datum', h.begindatum, 'date');
@@ -16323,6 +16324,35 @@ function oplBouwFormHtml(form){
   return html;
 }
 
+// Keuzelijst met medewerkers uit het systeem (ook inhuur, stage enz.; niet uit dienst)
+function oplPersoonNamen(alleenVastEnStage){
+  var lijst = (typeof oplOverzichtGetData === 'function') ? (oplOverzichtGetData() || []) : [];
+  return lijst.filter(function(r){
+      if (!r || !r.naam || /\(uit dienst\)\s*$/i.test(r.naam)) return false;
+      if (alleenVastEnStage && r.groep && !/stagiair|stage/i.test(r.groep)) return false; // geen inhuur e.d.
+      return true; })
+    .map(function(r){ return { v: r.naam, t: (r.dpNaam || r.naam) + (r.groep ? ' (' + r.groep + ')' : '') }; })
+    .sort(function(a, b){ return a.t.localeCompare(b.t, 'nl'); });
+}
+function oplPersoonKeuzeHtml(formId, veld, label, val, metNummer, alleenVastEnStage){
+  var namen = oplPersoonNamen(alleenVastEnStage);
+  if (val && !namen.some(function(n){ return n.v === val; })) namen.unshift({ v: val, t: val + ' (niet in de lijst)' });
+  return '<div>' +
+    '<div style="font-size:10.5px;color:#667;text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px;">' + oplEsc(label) + '</div>' +
+    '<select style="width:100%;padding:7px 9px;border:1px solid #ccd6e5;border-radius:5px;font-size:13px;box-sizing:border-box;background:#fff;" ' +
+    'onchange="oplSetHeader(\'' + formId + '\',\'' + veld + '\',this.value)' + (alleenVastEnStage ? ';oplSetHeader(\'' + formId + '\',\'achternaam\',\'\')' : '') + (metNummer ? ';oplNummerInvullen(\'' + formId + '\',this.value)' : '') + '">' +
+    '<option value="">— kies —</option>' + namen.map(function(n){ return '<option value="' + oplEsc(n.v) + '"' + (n.v === val ? ' selected' : '') + '>' + oplEsc(n.t) + '</option>'; }).join('') +
+    '</select></div>';
+}
+// Personeelsnummer automatisch invullen (uit Salaris, als die gegevens beschikbaar zijn)
+function oplNummerInvullen(formId, naam){
+  if (!naam) return;
+  var lijst; try { lijst = JSON.parse(localStorage.getItem('ma_medewerkers_v1') || '[]'); } catch(e) { lijst = []; }
+  if (!Array.isArray(lijst)) return;
+  var m = lijst.filter(function(x){ return x && x.naam && String(x.naam).trim().toLowerCase() === String(naam).trim().toLowerCase(); });
+  if (m.length !== 1 && typeof vakZelfdePersoon === 'function') m = lijst.filter(function(x){ return x && x.naam && vakZelfdePersoon(x.naam, naam); });
+  if (m.length === 1 && m[0].mannr) { oplSetHeader(formId, 'nummer', String(m[0].mannr)); if (typeof oplToonTab === 'function') { try { oplToonTab(formId); } catch(e) {} } }
+}
 function oplVeldHtml(formId, veld, label, val, type){
   return '<div>' +
     '<div style="font-size:10.5px;color:#667;text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px;">' + oplEsc(label) + '</div>' +
@@ -16428,8 +16458,8 @@ function oplPrint(formId, staatOverride){
   body += '<div style="border:1px solid #333;">';
   body += '<div style="padding:8px 12px;">' +
     '<div>' + oplEsc(form.titel) + '</div><br>' +
-    'Roepnaam: <b>' + oplEsc(h.roepnaam) + '</b><br>' +
-    'Achternaam: <b>' + oplEsc(h.achternaam) + '</b><br>' +
+    (h.achternaam ? 'Roepnaam: <b>' + oplEsc(h.roepnaam) + '</b><br>Achternaam: <b>' + oplEsc(h.achternaam) + '</b><br>'
+      : 'Naam cursist: <b>' + oplEsc(h.roepnaam) + '</b><br>') +
     'Datum: <b>' + oplEsc(h.datum) + '</b><br><br>' +
     'Begin datum: <b>' + oplEsc(h.begindatum) + '</b> &nbsp;&nbsp;&nbsp; Eind datum: <b>' + oplEsc(h.einddatum) + '</b>' +
     '</div>';
@@ -23540,7 +23570,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.10';
+var DJ_BUILD = '2026-10-07.12';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
