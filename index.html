@@ -8461,12 +8461,19 @@ function usedNamesInPanel(pfx){
 function refreshDropdowns(pfx, pool){
   const allSels = Array.from(document.querySelectorAll('[data-pfx="'+pfx+'"]'));
 
-  // Names used by regular (non-meren, non-al, non-truck, non-dup) selects
+  // Het onderste deel (NA 12:00 / avond-na, sleutels on_… en av_…) is een APARTE lijst:
+  // daarbinnen mag iemand maar één keer voorkomen, maar het staat los van het bovenste deel.
+  const isOnderKey = s=>/^(on|av)_/.test(s.getAttribute('data-key')||'');
+  const isGewoon = s=>s.getAttribute('data-meren')!=='true' && s.getAttribute('data-al')!=='true' && s.getAttribute('data-truck')!=='true';
+  // Names used by regular (non-meren, non-al, non-truck, non-dup) selects in het BOVENSTE deel
   const used = new Set();
   allSels.forEach(s=>{
-    if(s.value && s.getAttribute('data-meren')!=='true' && s.getAttribute('data-al')!=='true' && s.getAttribute('data-truck')!=='true' && s.getAttribute('data-dup')!=='true')
+    if(s.value && isGewoon(s) && s.getAttribute('data-dup')!=='true' && !isOnderKey(s))
       used.add(s.value);
   });
+  // Namen die al in het ONDERSTE deel staan
+  const usedOnder = new Set();
+  allSels.forEach(s=>{ if(s.value && isGewoon(s) && isOnderKey(s)) usedOnder.add(s.value); });
 
   // Names placed in non-meren positions (for Meren pool)
   const placedNames = getPlacedNames(pfx);
@@ -8501,9 +8508,11 @@ function refreshDropdowns(pfx, pool){
       });
     } else {
       const isDup = sel.getAttribute('data-dup')==='true';
+      const onder = isOnderKey(sel);
       pool.forEach(e=>{
         if (_isUitgesloten(e) && e.name !== own) return;
-        if(isDup || !used.has(e.name) || e.name===own) {
+        const vrij = onder ? (!usedOnder.has(e.name) || e.name===own) : (isDup || !used.has(e.name) || e.name===own);
+        if(vrij) {
           const mb = _isMentor(e) ? '🎓 ' : '';
           html += '<option value="'+esc(e.name)+'"'+(e.name===own?' selected':'')+'>'+mb+e.name+'</option>';
         }
@@ -21635,6 +21644,7 @@ function wisselPunctualityDatum(dateStr) {
     }
     try { pGenereerHerhalingen(); } catch(e) {}
     pRender();
+    if (typeof djTodoSvMelding === 'function') djTodoSvMelding();
   };
   function pGet() {
     try {
@@ -23570,7 +23580,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.12';
+var DJ_BUILD = '2026-10-07.14';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -32745,5 +32755,32 @@ function oplAfgVoorPersoon(naam){
 }
 </script>
 
+<script>
+// TO-DO SV: melding als deze pc (nog) geen toegang heeft tot de vertrouwelijke map — dan zijn de taken niet te zien
+async function djTodoSvMelding(){
+  var oud = document.getElementById('todo-sv-melding'); if (oud) oud.remove();
+  if (!window._pLijstSV) return;
+  var T = sessionStorage.getItem('dj_terminal') || 'EP', ok = null;
+  try { ok = await djVertrHeeftToegang(T); } catch(e) { ok = false; }
+  if (ok || !window._pLijstSV) return;
+  var c = document.getElementById('planTaakContent'); if (!c) return;
+  var d = document.createElement('div'); d.id = 'todo-sv-melding';
+  d.style.cssText = 'background:#fff4e5;border:1px solid #f5c27a;border-left:4px solid #e67e22;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#7a4b00;';
+  d.innerHTML = '<b>&#x26A0;&#xFE0F; De taken van TO-DO SV kunnen nog niet worden opgehaald.</b><br>Dit account heeft (nog) geen toegang tot de vertrouwelijke map van ' + T + '. ' +
+    'Vraag de beheerder om in Toegangsbeheer het vinkje <b>Supervisor</b> te controleren en op <b>Rechten nu bijwerken</b> te klikken. Log daarna uit en opnieuw in. ' +
+    '<button type="button" onclick="delete _djVertrToegangCache[\'' + T + '\']; location.reload();" style="margin-left:6px;padding:3px 10px;border:1px solid #e0b26b;background:#fff;border-radius:5px;cursor:pointer;font-weight:700;color:#7a4b00;">&#x1F504; Opnieuw proberen</button>';
+  c.insertBefore(d, c.firstChild);
+}
+</script>
+<script>
+// Na het opbouwen van de planning de keuzelijsten één keer gelijktrekken (boven en onder als aparte lijsten)
+(function(){
+  if (typeof buildPanels !== 'function' || typeof refreshDropdowns !== 'function') return;
+  var _bp = buildPanels;
+  buildPanels = function(){ var r = _bp.apply(this, arguments);
+    try { refreshDropdowns('oc', typeof ochEmps !== 'undefined' ? ochEmps : []); refreshDropdowns('av', typeof avondEmps !== 'undefined' ? avondEmps : []); } catch(e) {}
+    return r; };
+})();
+</script>
 </body>
 </html>
