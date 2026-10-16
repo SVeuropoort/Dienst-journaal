@@ -22160,6 +22160,7 @@ function wisselPunctualityDatum(dateStr) {
     for (var i = 0; i < data.a.length; i++) {
       (function(idx) {
         var t = data.a[idx];
+        if (typeof djTodoVerborgen === 'function' && djTodoVerborgen(t)) return; // toegewezen aan iemand anders
         var card = document.createElement('div');
         card.className = 'ptask-card' + (t.herhalingId ? ' ptask-recur' : '');
 
@@ -22266,6 +22267,7 @@ function wisselPunctualityDatum(dateStr) {
       for (var j = data.d.length - 1; j >= 0; j--) {
         (function(jdx) {
           var at = data.d[jdx];
+          if (typeof djTodoVerborgen === 'function' && djTodoVerborgen(at)) return; // toegewezen aan iemand anders
           var row = document.createElement('div');
           row.className = 'parch-item';
           var chk = document.createElement('div');
@@ -23581,7 +23583,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.15';
+var DJ_BUILD = '2026-10-07.16';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -32846,5 +32848,13 @@ function djTodoMeldingBijwerken(){
 document.addEventListener('DOMContentLoaded', function(){ setTimeout(djTodoMeldingBijwerken, 3000); setInterval(djTodoMeldingBijwerken, 8000); });
 </script>
 
+<script>
+// Een toegewezen taak zien alleen degene aan wie hij is toegewezen en degene die hem toewees.
+function djTodoVerborgen(t){
+  if (!t || !t.toegewezen) return false;
+  var ik = String(localStorage.getItem('dj_sp_account_username') || '').toLowerCase();
+  return ik !== String(t.toegewezen).toLowerCase() && ik !== String(t.toegewezenDoor || '').toLowerCase();
+}
+</script>
 </body>
 </html>
