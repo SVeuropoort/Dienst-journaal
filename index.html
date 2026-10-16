@@ -16741,9 +16741,10 @@ const MUTATIE_DAGEN = 21.75; // Werkdagen per maand (vast)
 const AANPASSING_PCT = {
   &quot;A1&quot;:null,&quot;A1A&quot;:0.70,&quot;A2&quot;:null,&quot;A2A&quot;:0.70,&quot;A3&quot;:null,&quot;A3A&quot;:0.75,
   &quot;A4&quot;:null,&quot;A4A&quot;:0.825,&quot;B1&quot;:null,&quot;B1A&quot;:0.90,&quot;B2&quot;:null,&quot;B2A&quot;:0.95,
-  &quot;C1&quot;:null,&quot;C2&quot;:false,&quot;C3&quot;:false,&quot;D1&quot;:false,&quot;D2&quot;:false,&quot;D2B&quot;:false,&quot;E&quot;:false
+  &quot;C1&quot;:null,&quot;C2&quot;:false,&quot;C3&quot;:false,&quot;D1&quot;:&quot;D2B&quot;,&quot;D2&quot;:false,&quot;D2B&quot;:false,&quot;E&quot;:false
 };
 // false  = nooit mutatie (C2+)
+// &quot;D2B&quot;  = D1: mutatie naar het verschil met loongroep D2B
 // null   = ref = C1 salaris (hele groepen + C1)
 // getal  = ref = C1 salaris * pct (deelgroepen)
 
@@ -16819,6 +16820,7 @@ function getC1Salaris() {
 function getRefSalaris(groep) {
   const pct = AANPASSING_PCT[groep];
   if (pct === false) return null;          // C2+ -> geen mutatie
+  if (typeof pct === &quot;string&quot;) return LOONGROEPEN[pct]?.salaris || null; // D1 -> ref = D2B
   if (pct === null)  return getC1Salaris(); // hele groepen -> ref = C1
   return getC1Salaris() * pct;             // deelgroepen -> ref = C1 * pct
 }
@@ -17166,7 +17168,8 @@ function renderLgTable() {
     const mutatie = getMutatie(groep);
     const pct     = AANPASSING_PCT[groep];
     const refLabel = ref !== null
-      ? (pct === null ? `C1 (${new Intl.NumberFormat(&quot;nl-NL&quot;,{style:&quot;currency&quot;,currency:&quot;EUR&quot;}).format(ref)})`
+      ? (typeof pct === &quot;string&quot; ? `${pct} (${new Intl.NumberFormat(&quot;nl-NL&quot;,{style:&quot;currency&quot;,currency:&quot;EUR&quot;}).format(ref)})`
+       : pct === null ? `C1 (${new Intl.NumberFormat(&quot;nl-NL&quot;,{style:&quot;currency&quot;,currency:&quot;EUR&quot;}).format(ref)})`
                       : `C1 × ${(pct*100)}% = ${new Intl.NumberFormat(&quot;nl-NL&quot;,{style:&quot;currency&quot;,currency:&quot;EUR&quot;}).format(ref)}`)
       : &quot;—&quot;;
     return `<tr>
@@ -17197,6 +17200,8 @@ function updateLgRow(groep) {
       if (g !== &quot;C1&quot;) updateLgRowMutatie(g);
     });
   }
+  // Als D2B verandert: D1 opnieuw berekenen (D1 muteert naar D2B)
+  Object.keys(AANPASSING_PCT).forEach(g => { if (AANPASSING_PCT[g] === groep) updateLgRowMutatie(g); });
   updateLgRowMutatie(groep);
 }
 
@@ -17210,7 +17215,9 @@ function updateLgRowMutatie(groep) {
   const el_ref = document.getElementById(&quot;ref-&quot;+groep);
   const el_mut = document.getElementById(&quot;mutatie-&quot;+groep);
   if (el_ref &amp;&amp; ref !== null) {
-    el_ref.textContent = pct === null
+    el_ref.textContent = typeof pct === &quot;string&quot;
+      ? `${pct} (${fmt(ref)})`
+      : pct === null
       ? `C1 (${fmt(ref)})`
       : `C1 × ${pct*100}% = ${fmt(ref)}`;
   }
@@ -23595,7 +23602,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.17';
+var DJ_BUILD = '2026-10-07.18';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
