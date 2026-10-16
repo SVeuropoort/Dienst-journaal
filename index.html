@@ -7397,6 +7397,7 @@ window.addEventListener('resize', () => {
       var _todo = document.getElementById('view-planning');
       var _typt = document.activeElement && _todo && _todo.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
       if (_todo && _todo.classList.contains('active') && !_typt && typeof window.pRender === 'function' && Object.keys(data).some(function(k){ return /(^|_)plan_(v3|sv_v1)$/.test(k); })) setTimeout(window.pRender, 0);
+      if (typeof djTodoMeldingBijwerken === 'function') setTimeout(djTodoMeldingBijwerken, 0);
     } catch(eTd) {}
   }
 
@@ -21654,7 +21655,7 @@ function wisselPunctualityDatum(dateStr) {
       return d;
     } catch(e){ return {a:[],d:[],r:[]}; }
   }
-  function pSet(x) { localStorage.setItem(PK,JSON.stringify(x)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }
+  function pSet(x) { localStorage.setItem(PK,JSON.stringify(x)); if (typeof djTodoMeldingBijwerken === 'function') setTimeout(djTodoMeldingBijwerken, 50); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }
 
   // ISO-weeknummer, bv. "2026-W03" — gebruikt om te bepalen of de wekelijkse
   // taak deze week al is aangemaakt (ook als de app niet exact op maandag open is).
@@ -22205,7 +22206,7 @@ function wisselPunctualityDatum(dateStr) {
         }
 
         mkRow(_immTaskHdr ? 'Task:' : 'Taak:', mkInp(t.taak, _immTaskHdr ? 'Description...' : 'Omschrijving...', 'taak'));
-        mkRow(_immTaskHdr ? 'Who will pick this up:' : 'Wie pakt dit op:', mkInp(t.wie, _immTaskHdr ? 'Supervisor name...' : 'Naam supervisor...', 'wie'));
+        mkRow(_immTaskHdr ? 'Who will pick this up:' : 'Wie pakt dit op:', (typeof djTodoToewijzer === 'function') ? djTodoToewijzer(t, idx) : mkInp(t.wie, _immTaskHdr ? 'Supervisor name...' : 'Naam supervisor...', 'wie'));
         mkRow(_immTaskHdr ? 'Date:' : 'Datum:', mkInp(t.datum, _immTaskHdr ? 'dd/mm/yyyy' : 'dd/mm/jjjj', 'datum'));
 
         var ta = document.createElement('textarea');
@@ -23580,7 +23581,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.14';
+var DJ_BUILD = '2026-10-07.15';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -32782,5 +32783,68 @@ async function djTodoSvMelding(){
     return r; };
 })();
 </script>
+<script>
+// ══════════════════════════════════════════════════════════════════
+// To Do: taak toewijzen aan een collega + melding bovenin het scherm voor wie hem moet uitvoeren
+// ══════════════════════════════════════════════════════════════════
+function djTodoMensen(sv){
+  var t = sessionStorage.getItem('dj_terminal') || 'EP';
+  var lijst = (typeof djToegangGet === 'function') ? djToegangGet() : [];
+  return lijst.filter(function(a){ return a && a.email && !a.nietInGroep && a.permissies && a.permissies[t] && (!sv || a.permissies.supervisor); })
+    .map(function(a){
+      var naam = ''; if (a.naam && /\s/.test(a.naam) && a.naam.indexOf('@') < 0) { var w = a.naam.trim().split(/\s+/); naam = w.pop() + ' ' + w.join(' '); naam = naam.charAt(0).toUpperCase() + naam.slice(1); }
+      if (!naam && typeof djChatNaamUitEmail === 'function') naam = djChatNaamUitEmail(a.email);
+      return { email: a.email.toLowerCase(), naam: naam || a.email };
+    }).sort(function(x, y){ return x.naam.localeCompare(y.naam, 'nl'); });
+}
+window.djTodoToewijzer = function(t, idx){
+  var sel = document.createElement('select'); sel.className = 'ptask-inp';
+  var mensen = djTodoMensen(!!window._pLijstSV), huidig = (t.toegewezen || '').toLowerCase();
+  var opties = '<option value="">— nog niemand —</option>' + mensen.map(function(m){ return '<option value="' + m.email + '"' + (m.email === huidig ? ' selected' : '') + '>' + m.naam.replace(/</g, '&lt;') + '</option>'; }).join('');
+  if (!huidig && t.wie) opties = '<option value="" selected>' + String(t.wie).replace(/</g, '&lt;') + ' (oude invoer)</option>' + opties.replace('<option value="">— nog niemand —</option>', '<option value="__leeg">— nog niemand —</option>');
+  sel.innerHTML = opties;
+  sel.addEventListener('change', function(){
+    var d2 = pGet(); var x = d2.a[idx]; if (!x) return;
+    var v = this.value === '__leeg' ? '' : this.value, m = mensen.find(function(p){ return p.email === v; });
+    x.toegewezen = v; x.wie = m ? m.naam : ''; x.toegewezenDoor = localStorage.getItem('dj_sp_account_username') || ''; x.toegewezenOp = Date.now(); x.gw = Date.now();
+    pSet(d2);
+  });
+  return sel;
+};
+// ── Melding bovenin: taken die aan jou zijn toegewezen
+function djTodoMijn(){
+  var ik = String(localStorage.getItem('dj_sp_account_username') || '').toLowerCase(); if (!ik) return [];
+  var lees = function(k, sv){ try { var x = JSON.parse(localStorage.getItem(tk(k)) || 'null'); return ((x && x.a) || []).filter(function(t){ return String(t.toegewezen || '').toLowerCase() === ik; }).map(function(t){ return { t: t, sv: sv }; }); } catch(e) { return []; } };
+  var uit = lees('plan_v3', false);
+  if (typeof djMagTodoSV === 'function' && djMagTodoSV()) uit = uit.concat(lees('plan_sv_v1', true));
+  return uit;
+}
+function djTodoMeldingBijwerken(){
+  var mijn = djTodoMijn(), el = document.getElementById('dj-todo-melding');
+  if (!sessionStorage.getItem('dj_auth') || !mijn.length) { if (el) el.remove(); return; }
+  if (!el) {
+    el = document.createElement('div'); el.id = 'dj-todo-melding';
+    el.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:100004;background:#e67e22;color:#fff;font-weight:800;font-size:13px;padding:8px 16px;border-radius:20px;box-shadow:0 6px 18px rgba(0,0,0,.3);cursor:pointer;display:flex;gap:8px;align-items:center;';
+    el.title = 'Naar de To Do List';
+    el.onclick = function(){
+      var m = djTodoMijn(); navTo('planning', 'TO DO LIST', null);
+      setTimeout(function(){ if (typeof pWisselLijst === 'function') pWisselLijst(!!(m[0] && m[0].sv)); }, 100);
+    };
+    document.body.appendChild(el);
+  }
+  el.innerHTML = '&#x1F4CC; ' + mijn.length + (mijn.length === 1 ? ' taak voor jou' : ' taken voor jou') +
+    '<span style="font-weight:600;font-size:12px;opacity:.9;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + String(mijn[0].t.taak || '').replace(/</g, '&lt;') + (mijn.length > 1 ? ' …' : '') + '</span>';
+  // Nieuw toegewezen sinds de vorige keer? Even extra laten opvallen.
+  var ik = String(localStorage.getItem('dj_sp_account_username') || '').toLowerCase(), k = 'dj_todo_gezien_' + ik, gezien = {};
+  try { gezien = JSON.parse(localStorage.getItem(k) || '{}') || {}; } catch(e) {}
+  var nieuw = mijn.filter(function(x){ return !gezien[x.t.id]; });
+  if (nieuw.length) {
+    el.animate && el.animate([{ transform: 'translateX(-50%) scale(1)' }, { transform: 'translateX(-50%) scale(1.12)' }, { transform: 'translateX(-50%) scale(1)' }], { duration: 600, iterations: 3 });
+    nieuw.forEach(function(x){ gezien[x.t.id] = 1; }); try { localStorage.setItem(k, JSON.stringify(gezien)); } catch(e) {}
+  }
+}
+document.addEventListener('DOMContentLoaded', function(){ setTimeout(djTodoMeldingBijwerken, 3000); setInterval(djTodoMeldingBijwerken, 8000); });
+</script>
+
 </body>
 </html>
