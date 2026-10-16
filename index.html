@@ -22157,7 +22157,12 @@ function wisselPunctualityDatum(dateStr) {
       lijst.appendChild(em);
     }
 
-    for (var i = 0; i < data.a.length; i++) {
+    // Eigen (aan mij toegewezen) taken altijd bovenaan
+    var _ik = String(localStorage.getItem('dj_sp_account_username') || '').toLowerCase();
+    var _isMijn = function(t){ return !!(t && t.toegewezen && String(t.toegewezen).toLowerCase() === _ik); };
+    var _volgorde = data.a.map(function(_, n){ return n; });
+    _volgorde = _volgorde.filter(function(n){ return _isMijn(data.a[n]); }).concat(_volgorde.filter(function(n){ return !_isMijn(data.a[n]); }));
+    for (var i = 0; i < _volgorde.length; i++) {
       (function(idx) {
         var t = data.a[idx];
         if (typeof djTodoVerborgen === 'function' && djTodoVerborgen(t)) return; // toegewezen aan iemand anders
@@ -22175,6 +22180,13 @@ function wisselPunctualityDatum(dateStr) {
         hdr.appendChild(hL);
         hdr.appendChild(hR);
         card.appendChild(hdr);
+        if (_isMijn(t)) { // opvallend: deze taak is voor jou
+          card.style.border = '3px solid #e67e22'; card.style.boxShadow = '0 0 0 4px rgba(230,126,34,.18), 0 6px 16px rgba(230,126,34,.25)';
+          hdr.style.background = '#e67e22'; hdr.style.color = '#fff'; hR.style.color = '#fff';
+          var _b = document.createElement('span'); _b.textContent = '\uD83D\uDCCC VOOR JOU';
+          _b.style.cssText = 'background:#fff;color:#e67e22;font-weight:800;font-size:10.5px;border-radius:10px;padding:2px 8px;margin-left:8px;letter-spacing:.5px;';
+          hL.appendChild(_b);
+        }
 
         var tbl = document.createElement('table');
         tbl.style.width = '100%';
@@ -22252,7 +22264,7 @@ function wisselPunctualityDatum(dateStr) {
         ftr.appendChild(klaarBtn);
         card.appendChild(ftr);
         lijst.appendChild(card);
-      })(i);
+      })(_volgorde[i]);
     }
 
     var arch = document.getElementById('plan-archief-sectie');
@@ -23583,7 +23595,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.16';
+var DJ_BUILD = '2026-10-07.17';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
