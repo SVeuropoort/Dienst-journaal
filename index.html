@@ -22169,7 +22169,11 @@ function wisselPunctualityDatum(dateStr) {
     var _ik = String(localStorage.getItem('dj_sp_account_username') || '').toLowerCase();
     var _isMijn = function(t){ return !!(t && t.toegewezen && String(t.toegewezen).toLowerCase() === _ik); };
     var _volgorde = data.a.map(function(_, n){ return n; });
-    _volgorde = _volgorde.filter(function(n){ return _isMijn(data.a[n]); }).concat(_volgorde.filter(function(n){ return !_isMijn(data.a[n]); }));
+    // Drie groepen, duidelijk gescheiden: Voor jou · Algemeen · Verlengingen certificaten (automatisch)
+    var _groep = function(t){ return _isMijn(t) ? 'mijn' : (t && t.certKey ? 'cert' : 'alg'); };
+    _volgorde = ['mijn', 'alg', 'cert'].reduce(function(acc, g){ return acc.concat(_volgorde.filter(function(n){ return _groep(data.a[n]) === g; })); }, []);
+    var _laatsteGroep = null;
+    var _GROEP_KOP = { mijn: ['\uD83D\uDCCC', 'Voor jou', '#e67e22'], alg: ['\uD83D\uDCCB', 'Algemeen', 'var(--navy)'], cert: ['\uD83C\uDF93', 'Verlengingen certificaten (automatisch)', '#6b3fa0'] };
     for (var i = 0; i < _volgorde.length; i++) {
       (function(idx) {
         var t = data.a[idx];
@@ -22271,6 +22275,15 @@ function wisselPunctualityDatum(dateStr) {
         ftr.appendChild(delBtn);
         ftr.appendChild(klaarBtn);
         card.appendChild(ftr);
+        var _g = _groep(t);
+        if (_g !== _laatsteGroep) { // kopje boven elke groep
+          _laatsteGroep = _g;
+          var _aantal = _volgorde.filter(function(n){ return _groep(data.a[n]) === _g && !(typeof djTodoVerborgen === 'function' && djTodoVerborgen(data.a[n])); }).length;
+          var kop = document.createElement('div');
+          kop.style.cssText = 'grid-column:1/-1;flex-basis:100%;width:100%;box-sizing:border-box;display:flex;align-items:center;gap:8px;margin:' + (lijst.children.length ? '18px' : '0') + ' 0 2px;padding:6px 12px;border-left:4px solid ' + _GROEP_KOP[_g][2] + ';background:rgba(255,255,255,.88);border-radius:6px;font-family:\'Barlow Condensed\',sans-serif;font-weight:800;font-size:15px;letter-spacing:.5px;text-transform:uppercase;color:' + _GROEP_KOP[_g][2] + ';';
+          kop.innerHTML = _GROEP_KOP[_g][0] + ' ' + _GROEP_KOP[_g][1] + ' <span style="font-size:12px;opacity:.75;">(' + _aantal + ')</span>';
+          lijst.appendChild(kop);
+        }
         lijst.appendChild(card);
       })(_volgorde[i]);
     }
@@ -23603,7 +23616,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.20';
+var DJ_BUILD = '2026-10-07.21';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
