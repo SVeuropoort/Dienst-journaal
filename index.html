@@ -6943,6 +6943,7 @@ window.addEventListener('resize', () => {
     'pd_functies_v1',
     'vakantierooster_v1',
     'opl_afgerond_v1',
+    'dagplan_log_v1',
     'tegel_links_v1',
     'plan_sv_v1',
     'tugmasters_v1',
@@ -7204,6 +7205,7 @@ window.addEventListener('resize', () => {
     'pd_functies_v1',
     'vakantierooster_v1',
     'opl_afgerond_v1',
+    'dagplan_log_v1',
     'tegel_links_v1',
     'plan_sv_v1',
     'tugmasters_v1',
@@ -7513,6 +7515,7 @@ window.addEventListener('resize', () => {
     Object.keys(lokaal).forEach(function(k){
       if (vuil && (k in cloudData) && !vuil[k]) return; // niet zelf gewijzigd: cloud-versie behouden
       if (/(^|_)vs_data_v1$/.test(k) && cloudData[k]) { data[k] = djVsSamenvoegen(cloudData[k], lokaal[k]); return; }
+      if (/(^|_)dagplan_log_v1$/.test(k) && cloudData[k]) { data[k] = djDpLogSamenvoegen(cloudData[k], lokaal[k]); return; }
       if (/(^|_)opl_afgerond_v1$/.test(k) && cloudData[k]) { data[k] = djOplAfgSamenvoegen(cloudData[k], lokaal[k]); return; }
       if (/(^|_)startup_v1$/.test(k) && cloudData[k]) { data[k] = djSuSamenvoegen(cloudData[k], lokaal[k]); return; }
       if (/(^|_)plan_(v3|sv_v1)$/.test(k) && cloudData[k]) { data[k] = djPlanSamenvoegen(cloudData[k], lokaal[k]); return; } // To Do List per taak samenvoegen
@@ -23616,7 +23619,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.21';
+var DJ_BUILD = '2026-10-07.22';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -32890,5 +32893,104 @@ function djTodoVerborgen(t){
   return ik !== String(t.toegewezen).toLowerCase() && ik !== String(t.toegewezenDoor || '').toLowerCase();
 }
 </script>
+<script>
+// ══════════════════════════════════════════════════════════════════
+// Dagplanning: wie heeft wat het laatst aangepast? (per datum een logboek, gesynchroniseerd)
+// ══════════════════════════════════════════════════════════════════
+function dpLogKey(){ return tk('dagplan_log_v1'); }
+function dpLogGet(){ try { return JSON.parse(localStorage.getItem(dpLogKey()) || '{}') || {}; } catch(e) { return {}; } }
+function dpLogNaam(email){
+  var e = String(email || '').toLowerCase();
+  var a = (typeof djToegangGet === 'function') ? djToegangGet().find(function(x){ return String(x.email).toLowerCase() === e; }) : null;
+  if (a && a.naam && /\s/.test(a.naam) && a.naam.indexOf('@') < 0) { var w = a.naam.trim().split(/\s+/); var n = w.pop() + ' ' + w.join(' '); return n.charAt(0).toUpperCase() + n.slice(1); }
+  return (typeof djChatNaamUitEmail === 'function') ? djChatNaamUitEmail(e) : e;
+}
+var DP_VAK_NAMEN = [
+  [/_tr_/, 'Truck'], [/cf_td/, 'CF Top deck'], [/cf_md/, 'CF Main deck'], [/cf_pit/, 'CF Pit'], [/cf_tw/, 'CF Tussen deck'],
+  [/tw_td/, 'TW Top deck'], [/tw_md/, 'TW Main deck'], [/tw_pit/, 'TW Pit'], [/tw_tw/, 'TW Tussen deck'],
+  [/mhcv/, 'Meren HC vast'], [/mhcl/, 'Meren HC los'], [/mimmv/, 'Meren IMM vast'], [/imm_plcf/, 'IMM PL/CF'], [/imm_cf/, 'IMM CF'], [/imm_tw/, 'IMM TW'],
+  [/_al_/, 'Alleen lossen'], [/_pl\d/, 'Ploegleider'], [/_ctrl/, 'Controleur'], [/_kraan/, 'Kraanmeester'], [/_sv\d/, 'SV'], [/kade/, 'Kade'], [/trade/, 'Trade']
+];
+function dpVakNaam(key){
+  var k = String(key || ''), dienst = /^on_/.test(k) ? 'Na 12:00' : /^av_/.test(k) ? 'Avond (onder)' : /^a_/.test(k) ? 'Avond' : /^o_/.test(k) ? 'Ochtend' : '';
+  var v = DP_VAK_NAMEN.find(function(x){ return x[0].test(k); });
+  if (/_tr_/.test(k)) { var v2 = DP_VAK_NAMEN.slice(1).find(function(x){ return x[0].test(k); }); return (dienst ? dienst + ' · ' : '') + 'Truck' + (v2 ? ' ' + v2[1] : ''); }
+  return (dienst ? dienst + ' · ' : '') + (v ? v[1] : k);
+}
+var _dpTekstTimer = null;
+function dpLogSchrijf(veld, oud, nieuw){
+  if (window.DJ_MEELEES) return;
+  var datum = (typeof planDate !== 'undefined' && planDate) || ''; if (!datum) return;
+  var ik = localStorage.getItem('dj_sp_account_username') || ''; if (!ik) return;
+  if (String(oud || '') === String(nieuw || '')) return;
+  var log = dpLogGet(); log[datum] = log[datum] || [];
+  log[datum].push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), t: Date.now(), door: ik.toLowerCase(), veld: veld, oud: oud || '', nieuw: nieuw || '' });
+  if (log[datum].length > 300) log[datum] = log[datum].slice(-300);
+  // oude dagen opruimen (ouder dan 30 dagen)
+  var grens = new Date(); grens.setDate(grens.getDate() - 30); var gIso = grens.toISOString().slice(0, 10);
+  Object.keys(log).forEach(function(d){ if (d < gIso) delete log[d]; });
+  try { localStorage.setItem(dpLogKey(), JSON.stringify(log)); } catch(e) {}
+  dpLogBalk();
+}
+function djDpLogSamenvoegen(cloud, lok){
+  var p = function(x){ if (typeof x === 'string') { try { x = JSON.parse(x); } catch(e) { x = null; } } return (x && typeof x === 'object') ? x : null; };
+  var C = p(cloud), L = p(lok); if (!C) return lok; if (!L) return cloud;
+  var uit = {};
+  Object.keys(C).concat(Object.keys(L)).forEach(function(d){
+    if (uit[d]) return; var gezien = {}, lijst = [];
+    (C[d] || []).concat(L[d] || []).forEach(function(e){ if (e && !gezien[e.id]) { gezien[e.id] = 1; lijst.push(e); } });
+    lijst.sort(function(a, b){ return a.t - b.t; }); uit[d] = lijst.slice(-300);
+  });
+  return uit;
+}
+window.djDpLogSamenvoegen = djDpLogSamenvoegen;
+function dpTijd(t){
+  var d = new Date(t), nu = new Date(), hm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  var gisteren = new Date(nu); gisteren.setDate(nu.getDate() - 1);
+  if (d.toDateString() === nu.toDateString()) return 'vandaag ' + hm;
+  if (d.toDateString() === gisteren.toDateString()) return 'gisteren ' + hm;
+  return d.getDate() + '-' + (d.getMonth() + 1) + ' ' + hm;
+}
+function dpLogBalk(){
+  var cont = document.getElementById('dagplanning-container'); if (!cont || window.DJ_MEELEES) return;
+  var el = document.getElementById('dp-log-balk');
+  var datum = (typeof planDate !== 'undefined' && planDate) || '', lijst = (dpLogGet()[datum] || []);
+  if (!el) { el = document.createElement('div'); el.id = 'dp-log-balk'; cont.insertBefore(el, cont.firstChild); }
+  el.style.cssText = 'font-size:12px;color:#5a6b80;margin:4px 0 6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;';
+  if (!lijst.length) { el.innerHTML = '&#x1F558; Nog geen wijzigingen vastgelegd voor deze dag.'; return; }
+  var l = lijst[lijst.length - 1];
+  el.innerHTML = '&#x1F558; Laatst gewijzigd door <b style="color:var(--navy);">' + oplEsc(dpLogNaam(l.door)) + '</b>, ' + dpTijd(l.t) +
+    ' <a href="#" onclick="dpLogTonen();return false;" style="color:#0f6cbd;font-weight:700;">Bekijk wijzigingen (' + lijst.length + ')</a>';
+}
+window.dpLogTonen = function(){
+  var datum = (typeof planDate !== 'undefined' && planDate) || '', lijst = (dpLogGet()[datum] || []).slice().reverse();
+  var o = document.createElement('div'); o.id = 'dp-log-dialoog';
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(0,20,40,.45);z-index:100005;display:flex;align-items:center;justify-content:center;padding:16px;';
+  o.innerHTML = '<div style="background:#fff;border-radius:10px;padding:16px;width:640px;max-width:100%;max-height:85vh;display:flex;flex-direction:column;">' +
+    '<div style="display:flex;align-items:center;margin-bottom:8px;"><div style="font-weight:800;color:#003366;font-size:15px;flex:1;">&#x1F558; Wijzigingen dagplanning ' + oplEsc(datum.split('-').reverse().join('-')) + '</div>' +
+    '<button type="button" onclick="document.getElementById(\'dp-log-dialoog\').remove()" style="border:none;background:none;font-size:18px;cursor:pointer;">&#x2715;</button></div>' +
+    '<div style="overflow:auto;border:1px solid #e3eaf2;border-radius:6px;">' + (lijst.length ? lijst.map(function(e, i){
+      return '<div style="display:flex;gap:10px;padding:6px 10px;font-size:12.5px;' + (i ? 'border-top:1px solid #f0f3f7;' : '') + '">' +
+        '<span style="flex:0 0 92px;color:#5a6b80;">' + dpTijd(e.t) + '</span>' +
+        '<span style="flex:0 0 150px;font-weight:700;color:var(--navy);">' + oplEsc(dpLogNaam(e.door)) + '</span>' +
+        '<span style="flex:1;">' + oplEsc(e.veld) + ': <span style="color:#c0392b;text-decoration:line-through;">' + oplEsc(e.oud || '—') + '</span> &rarr; <b style="color:#1a7a40;">' + oplEsc(e.nieuw || '(leeg)') + '</b></span></div>';
+    }).join('') : '<div style="padding:12px;color:#8795a8;">Nog geen wijzigingen.</div>') + '</div></div>';
+  o.addEventListener('click', function(ev){ if (ev.target === o) o.remove(); });
+  document.body.appendChild(o);
+};
+(function(){
+  // Wijzigingen vastleggen: namen, trucks, kopjes en opmerkingen
+  var wrap = function(naam, maak){ if (typeof window[naam] === 'function') { var orig = window[naam]; window[naam] = maak(orig); } };
+  wrap('setP', function(orig){ return function(k, v){ var oud = (typeof pos !== 'undefined' && pos) ? pos[k] : ''; var r = orig.apply(this, arguments); try { dpLogSchrijf(dpVakNaam(k), oud, v); } catch(e) {} return r; }; });
+  wrap('setTruck', function(orig){ return function(k, v){ var oud = (typeof pos !== 'undefined' && pos) ? pos[k] : ''; var r = orig.apply(this, arguments); try { dpLogSchrijf(dpVakNaam(k), oud, v); } catch(e) {} return r; }; });
+  wrap('setHdrText', function(orig){ return function(cid, v){ var oud = (typeof texts !== 'undefined' && texts) ? texts[cid] : ''; var r = orig.apply(this, arguments); try { dpLogSchrijf('Kopje', oud, v); } catch(e) {} return r; }; });
+  wrap('saveTexts', function(orig){ return function(){ var r = orig.apply(this, arguments);
+    clearTimeout(_dpTekstTimer); _dpTekstTimer = setTimeout(function(){ try { var a = document.activeElement; if (a && a.closest && a.closest('#dagplanning-container') && /TEXTAREA|INPUT/.test(a.tagName) && !a.classList.contains('psel')) dpLogSchrijf('Tekst/opmerking', '', 'aangepast'); } catch(e) {} }, 2500);
+    return r; }; });
+  if (typeof buildPanels === 'function') { var _bp = buildPanels; buildPanels = function(){ var r = _bp.apply(this, arguments); try { dpLogBalk(); } catch(e) {} return r; }; }
+  document.addEventListener('DOMContentLoaded', function(){ setInterval(function(){ try { if (document.getElementById('view-dagplanning') && document.getElementById('view-dagplanning').classList.contains('active')) dpLogBalk(); } catch(e) {} }, 15000); });
+})();
+</script>
+
 </body>
 </html>
