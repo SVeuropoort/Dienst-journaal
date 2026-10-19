@@ -23603,7 +23603,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.19';
+var DJ_BUILD = '2026-10-07.20';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -23729,8 +23729,9 @@ async function djNieuwsteVersie(){
 <script>
   if ('serviceWorker' in navigator && !location.hostname.includes('claude')) {
     window.addEventListener('load', function() {
-      navigator.serviceWorker.register('sw.js')
-        .then(function(reg) { console.log('SW registered:', reg.scope); })
+      // updateViaCache:'none' = sw.js nooit uit de browsercache; bij elk openen controleren op een nieuwe versie
+      navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+        .then(function(reg) { try { reg.update(); } catch(e) {} console.log('SW registered:', reg.scope); })
         .
 catch(function(err) { /* silent */ });
     });
