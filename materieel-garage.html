@@ -487,6 +487,35 @@ var _mgWijzigingPending = false; // staat op true zolang er een niet-opgeslagen 
 var _mgLaatsteServerData = {}; // meest recent bekende volledige inhoud van het SharePoint-bestand
 
 function prefix(){ return terminal + '_'; }
+// Activiteit van de garage vastleggen, zodat de supervisors zien dat de lijst bekeken/bijgewerkt is
+function mgIk(){ return String(localStorage.getItem('dj_sp_account_username') || '').toLowerCase(); }
+var _mgWijzigingen = {}; // naam materieel -> beschrijving van de wijziging (sinds de vorige opslag)
+function mgActiviteitZet(data, soort){
+  var k = prefix() + 'mat_garage_activiteit_v1', a = data[k] || {};
+  a[soort] = { door: mgIk(), t: Date.now() };
+  if (soort === 'gewijzigd') a.gezien = { door: mgIk(), t: Date.now() };
+  // Logboek: wie heeft wanneer gekeken / wat aangepast (laatste 100 regels)
+  a.log = a.log || [];
+  var details = soort === 'gewijzigd' ? Object.keys(_mgWijzigingen).map(function(n){ return n + ': ' + _mgWijzigingen[n]; }) : [];
+  if (soort === 'gewijzigd' && !details.length) details = ['(aangepast)'];
+  a.log.push({ soort: soort, door: mgIk(), t: Date.now(), details: details });
+  if (a.log.length > 100) a.log = a.log.slice(-100);
+  if (soort === 'gewijzigd') _mgWijzigingen = {};
+  data[k] = a;
+}
+var _mgGezienGemeld = 0;
+async function mgGezienMelden(){
+  // Hooguit eens per 30 minuten wegschrijven dat de lijst bekeken is
+  if (!mgIk() || Date.now() - _mgGezienGemeld < 30 * 60000) return;
+  _mgGezienGemeld = Date.now();
+  try {
+    var result = await spOphalenBestand(rowId() + '.json');
+    var data = (result && result.data) || {};
+    mgActiviteitZet(data, 'gezien');
+    await spOpslaanBestand(rowId() + '.json', { data: data, updated_at: new Date().toISOString() });
+    _mgLaatsteServerData = data;
+  } catch(e) { _mgGezienGemeld = 0; }
+}
 function rowId(){ return terminal + '_main'; }
 
 // Opslaan en verversen gaan automatisch; het wolkje laat zien hoe het ervoor staat.
@@ -541,6 +570,7 @@ async function ladenVanServer(){
     matData = basis;
     bouwTabel();
     setStatus('Bijgewerkt ' + new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}), 'ok');
+    if (!isSaving && !_mgWijzigingPending) mgGezienMelden();
   }catch(e){
     setStatus('Kon niet laden: ' + e.message, 'err');
   }
@@ -623,6 +653,7 @@ function updateSamenvatting(){
 }
 
 function statusGewijzigd(i, sel){
+  _mgWijzigingen[matData[i].naam] = 'status ' + (matData[i].status || '?') + ' \u2192 ' + sel.value;
   matData[i].status = sel.value;
   sel.className = 'stat-sel ' + statClass(sel.value);
   var isOK = sel.value === 'OK';
@@ -644,6 +675,8 @@ function statusGewijzigd(i, sel){
 }
 
 function opmerkingGewijzigd(i, val){
+  var oud = _mgWijzigingen[matData[i].naam];
+  _mgWijzigingen[matData[i].naam] = (oud && oud.indexOf('status') === 0 ? oud + ', ' : '') + 'opmerking: "' + String(val).slice(0, 60) + '"';
   matData[i].opmerking = val;
   plannenOpslaan();
 }
@@ -674,6 +707,7 @@ async function opslaanNaarServer(){
     var data = (result && result.data) || {};
 
     data[prefix() + 'materieel_status_v1'] = matData;
+    mgActiviteitZet(data, 'gewijzigd');
 
     // Truckstatus ook wegschrijven in mat_standalone_v2 zodat de Dagplanning-dropdown in de hoofdapp synchroon blijft
     var matStore = data[prefix() + 'mat_standalone_v2'] || {};
@@ -822,6 +856,7 @@ function _mgOpslaanSync(){
     });
     data[prefix() + 'mat_standalone_v2'] = matStore;
     data[prefix() + 'mat_custom_list'] = matData.map(function(m){ return {type:m.type, naam:m.naam}; });
+    mgActiviteitZet(data, 'gewijzigd');
     var url = 'https://graph.microsoft.com/v1.0/sites/' + _spSiteId + '/drive/root:/Data/' + encodeURIComponent(rowId() + '.json') + ':/content';
     fetch(url, {
       method: 'PUT',
@@ -854,7 +889,7 @@ document.addEventListener('visibilitychange', function(){ if (document.visibilit
 //    (die instelling is gedeeld met Dienst Journaal zelf: zelfde vinkje, zelfde pc);
 //  - automatisch bijwerken naar de nieuwste versie, alleen als niemand bezig is.
 // ══════════════════════════════════════════════════════════════════
-var APP_BUILD = '2026-10-09.4';
+var APP_BUILD = '2026-10-09.6';
 var APP_AUTH_KEY = 'mg_auth';
 var APP_EN = false;
 function appGedeeldePc(){ return localStorage.getItem('dj_niet_uitloggen') !== '1'; }

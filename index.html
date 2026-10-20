@@ -23635,7 +23635,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.30';
+var DJ_BUILD = '2026-10-07.32';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -33138,5 +33138,50 @@ window.djKpFilter = function(mensen){
 };
 </script>
 
+<script>
+// Materieel: laat zien of de garage de lijst heeft bekeken en bijgewerkt (vastgelegd door de Garage-pagina)
+function djGarageActiviteitBalk(){
+  var v = document.getElementById('view-materieel'); if (!v || window.DJ_MEELEES) return;
+  var a = {}; try { a = JSON.parse(localStorage.getItem(tk('mat_garage_activiteit_v1')) || '{}') || {}; } catch(e) {}
+  var el = document.getElementById('mat-garage-balk');
+  if (!el) { el = document.createElement('div'); el.id = 'mat-garage-balk'; var ph = v.querySelector('.page-header'); v.insertBefore(el, ph ? ph.nextSibling : v.firstChild); }
+  var naam = function(e){ return typeof dpLogNaam === 'function' ? dpLogNaam(e) : e; };
+  var wanneer = function(t){ return typeof dpTijd === 'function' ? dpTijd(t) : new Date(t).toLocaleString('nl-NL'); };
+  var uren = function(x){ return x ? (Date.now() - x.t) / 3600000 : Infinity; };
+  var g = a.gezien, w = a.gewijzigd, hG = uren(g);
+  var kleur = hG <= 24 ? '#1a7a40' : hG <= 72 ? '#b9770e' : '#c0392b', bg = hG <= 24 ? '#eaf7ef' : hG <= 72 ? '#fff4e5' : '#fdecea';
+  el.style.cssText = 'margin:0 0 12px;padding:8px 14px;border-radius:8px;border-left:4px solid ' + kleur + ';background:' + bg + ';font-size:13px;color:#24313f;display:flex;gap:18px;flex-wrap:wrap;align-items:center;';
+  el.innerHTML = '<b style="color:' + kleur + ';">&#x1F527; Garage</b>' +
+    '<span>&#x1F441;&#xFE0F; Laatst bekeken: ' + (g ? '<b>' + oplEsc(naam(g.door)) + '</b>, ' + wanneer(g.t) : '<b style="color:#c0392b;">nog nooit</b>') + '</span>' +
+    '<span>&#x270F;&#xFE0F; Laatst bijgewerkt: ' + (w ? '<b>' + oplEsc(naam(w.door)) + '</b>, ' + wanneer(w.t) : '<b>nog niet</b>') + '</span>' +
+    (hG > 72 ? '<span style="color:#c0392b;font-weight:700;">&#x26A0;&#xFE0F; Al meer dan 3 dagen niet bekeken door de garage</span>' : hG > 24 ? '<span style="color:#b9770e;font-weight:700;">Langer dan een dag niet bekeken</span>' : '') +
+    ((a.log && a.log.length) ? '<a href="#" onclick="djGarageLogTonen();return false;" style="color:#0f6cbd;font-weight:700;margin-left:auto;">Wie heeft gekeken / aangepast (' + a.log.length + ')</a>' : '');
+}
+window.djGarageLogTonen = function(){
+  var a = {}; try { a = JSON.parse(localStorage.getItem(tk('mat_garage_activiteit_v1')) || '{}') || {}; } catch(e) {}
+  var lijst = (a.log || []).slice().reverse();
+  var naam = function(e){ return typeof dpLogNaam === 'function' ? dpLogNaam(e) : e; };
+  var wanneer = function(t){ return typeof dpTijd === 'function' ? dpTijd(t) : new Date(t).toLocaleString('nl-NL'); };
+  var o = document.createElement('div'); o.id = 'garage-log';
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(0,20,40,.45);z-index:100005;display:flex;align-items:center;justify-content:center;padding:16px;';
+  o.innerHTML = '<div style="background:#fff;border-radius:10px;padding:16px;width:680px;max-width:100%;max-height:85vh;display:flex;flex-direction:column;">' +
+    '<div style="display:flex;align-items:center;margin-bottom:8px;"><div style="font-weight:800;color:#003366;font-size:15px;flex:1;">&#x1F527; Garage &mdash; wie heeft gekeken en aangepast</div>' +
+    '<button type="button" onclick="document.getElementById(\'garage-log\').remove()" style="border:none;background:none;font-size:18px;cursor:pointer;">&#x2715;</button></div>' +
+    '<div style="overflow:auto;border:1px solid #e3eaf2;border-radius:6px;">' + lijst.map(function(e, i){
+      var aangepast = e.soort === 'gewijzigd';
+      return '<div style="display:flex;gap:10px;padding:7px 10px;font-size:12.5px;' + (i ? 'border-top:1px solid #f0f3f7;' : '') + (aangepast ? 'background:#f5f9ff;' : '') + '">' +
+        '<span style="flex:0 0 100px;color:#5a6b80;">' + wanneer(e.t) + '</span>' +
+        '<span style="flex:0 0 150px;font-weight:700;color:var(--navy);">' + oplEsc(naam(e.door)) + '</span>' +
+        '<span style="flex:1;">' + (aangepast ? '&#x270F;&#xFE0F; <b>Aangepast</b>' + ((e.details || []).length ? ': ' + (e.details || []).map(oplEsc).join('; ') : '') : '&#x1F441;&#xFE0F; Bekeken') + '</span></div>';
+    }).join('') + '</div></div>';
+  o.addEventListener('click', function(ev){ if (ev.target === o) o.remove(); });
+  document.body.appendChild(o);
+};
+document.addEventListener('DOMContentLoaded', function(){
+  setTimeout(djGarageActiviteitBalk, 2500);
+  setInterval(function(){ var v = document.getElementById('view-materieel'); if (v && v.classList.contains('active')) djGarageActiviteitBalk(); }, 20000);
+});
+(function(){ if (typeof navTo !== 'function') return; var _n = navTo; navTo = function(view){ var r = _n.apply(this, arguments); if (view === 'materieel') setTimeout(djGarageActiviteitBalk, 50); return r; }; window.navTo = navTo; })();
+</script>
 </body>
 </html>
