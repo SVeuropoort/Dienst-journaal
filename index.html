@@ -23632,7 +23632,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.23';
+var DJ_BUILD = '2026-10-07.24';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -33015,6 +33015,64 @@ window.dpLogTonen = function(){
   if (typeof buildPanels === 'function') { var _bp = buildPanels; buildPanels = function(){ var r = _bp.apply(this, arguments); try { dpLogBalk(); } catch(e) {} return r; }; }
   document.addEventListener('DOMContentLoaded', function(){ setInterval(function(){ try { if (document.getElementById('view-dagplanning') && document.getElementById('view-dagplanning').classList.contains('active')) dpLogBalk(); } catch(e) {} }, 15000); });
 })();
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// Teams-meeting melding bovenin het scherm: vanaf 1 uur vóór de start (en tijdens de meeting),
+// net als de To Do-melding. Met knop "Deelnemen". Alleen voor jezelf (je eigen Outlook-agenda).
+// ══════════════════════════════════════════════════════════════════
+var _djMeetings = [], _djMeetingWeg = {};
+try { _djMeetingWeg = JSON.parse(sessionStorage.getItem('dj_meeting_weg') || '{}') || {}; } catch(e) {}
+async function djMeetingsOphalen(){
+  if (window.DJ_MEELEES || sessionStorage.getItem('dj_auth') !== '1' || typeof djAgendaToken !== 'function') return;
+  var token; try { token = await djAgendaToken(false); } catch(e) { return; } if (!token) return;
+  var nu = new Date(), tot = new Date(nu.getTime() + 60 * 60000);
+  var url = 'https://graph.microsoft.com/v1.0/me/calendarView?startDateTime=' + encodeURIComponent(nu.toISOString()) + '&endDateTime=' + encodeURIComponent(tot.toISOString()) +
+    '&$select=id,subject,start,end,isAllDay,isCancelled,showAs,isOnlineMeeting,onlineMeeting,onlineMeetingProvider,webLink&$orderby=start/dateTime&$top=20';
+  try {
+    var r = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token, 'Prefer': 'outlook.timezone="UTC"' } });
+    if (!r.ok) return;
+    var j = await r.json();
+    _djMeetings = (j.value || []).filter(function(ev){
+      if (ev.isCancelled || ev.isAllDay) return false;
+      var teams = (ev.onlineMeeting && ev.onlineMeeting.joinUrl) || (ev.isOnlineMeeting && /teams/i.test(ev.onlineMeetingProvider || ''));
+      return !!teams;
+    }).map(function(ev){
+      return { id: ev.id, titel: ev.subject || 'Teams-meeting', start: new Date(ev.start.dateTime + 'Z'), eind: new Date(ev.end.dateTime + 'Z'),
+        join: (ev.onlineMeeting && ev.onlineMeeting.joinUrl) || ev.webLink };
+    });
+  } catch(e) {}
+  djMeetingMeldingTekenen();
+}
+function djMeetingMeldingTekenen(){
+  var nu = Date.now();
+  var m = _djMeetings.filter(function(x){ return x.eind.getTime() > nu && x.start.getTime() - nu <= 60 * 60000 && !_djMeetingWeg[x.id]; })
+    .sort(function(a, b){ return a.start - b.start; })[0];
+  var el = document.getElementById('dj-meeting-melding');
+  if (!m || sessionStorage.getItem('dj_auth') !== '1') { if (el) el.remove(); return; }
+  if (!el) {
+    el = document.createElement('div'); el.id = 'dj-meeting-melding';
+    el.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);z-index:100004;background:#5b5fc7;color:#fff;font-weight:800;font-size:13px;padding:7px 8px 7px 16px;border-radius:20px;box-shadow:0 6px 18px rgba(0,0,0,.3);display:flex;gap:10px;align-items:center;max-width:94vw;';
+    document.body.appendChild(el);
+  }
+  // onder de To Do-melding als die er ook is
+  el.style.top = document.getElementById('dj-todo-melding') ? '54px' : '10px';
+  var min = Math.round((m.start.getTime() - nu) / 60000);
+  var hm = String(m.start.getHours()).padStart(2, '0') + ':' + String(m.start.getMinutes()).padStart(2, '0');
+  var wanneer = min > 0 ? 'om ' + hm + ' (over ' + min + ' min)' : 'nu bezig (sinds ' + hm + ')';
+  var esc = function(t){ return String(t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
+  el.innerHTML = '<span>&#x1F3A5; Teams ' + wanneer + '</span>' +
+    '<span style="font-weight:600;font-size:12px;opacity:.95;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(m.titel) + '</span>' +
+    (m.join ? '<a href="' + esc(m.join) + '" target="_blank" rel="noopener" style="background:#fff;color:#5b5fc7;border-radius:14px;padding:4px 12px;font-size:12px;font-weight:800;text-decoration:none;">Deelnemen</a>' : '') +
+    '<span onclick="_djMeetingWeg[\'' + m.id.replace(/'/g, '') + '\']=1;try{sessionStorage.setItem(\'dj_meeting_weg\',JSON.stringify(_djMeetingWeg))}catch(e){};djMeetingMeldingTekenen();" title="Verbergen" style="cursor:pointer;padding:0 6px;opacity:.85;">&#x2715;</span>';
+  if (min <= 5 && min > 0 && !el.dataset.geknipperd) { el.dataset.geknipperd = '1'; if (el.animate) el.animate([{ opacity: 1 }, { opacity: .4 }, { opacity: 1 }], { duration: 700, iterations: 4 }); }
+}
+document.addEventListener('DOMContentLoaded', function(){
+  setTimeout(djMeetingsOphalen, 5000);
+  setInterval(djMeetingsOphalen, 3 * 60000);    // agenda elke 3 minuten bekijken
+  setInterval(djMeetingMeldingTekenen, 30000);  // aftellen elke 30 seconden bijwerken
+});
 </script>
 
 </body>
