@@ -23635,7 +23635,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.32';
+var DJ_BUILD = '2026-10-07.33';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -33149,12 +33149,14 @@ function djGarageActiviteitBalk(){
   var wanneer = function(t){ return typeof dpTijd === 'function' ? dpTijd(t) : new Date(t).toLocaleString('nl-NL'); };
   var uren = function(x){ return x ? (Date.now() - x.t) / 3600000 : Infinity; };
   var g = a.gezien, w = a.gewijzigd, hG = uren(g);
-  var kleur = hG <= 24 ? '#1a7a40' : hG <= 72 ? '#b9770e' : '#c0392b', bg = hG <= 24 ? '#eaf7ef' : hG <= 72 ? '#fff4e5' : '#fdecea';
+  var kleur = !g ? '#8795a8' : hG <= 24 ? '#1a7a40' : hG <= 72 ? '#b9770e' : '#c0392b', bg = !g ? '#f3f5f8' : hG <= 24 ? '#eaf7ef' : hG <= 72 ? '#fff4e5' : '#fdecea';
   el.style.cssText = 'margin:0 0 12px;padding:8px 14px;border-radius:8px;border-left:4px solid ' + kleur + ';background:' + bg + ';font-size:13px;color:#24313f;display:flex;gap:18px;flex-wrap:wrap;align-items:center;';
   el.innerHTML = '<b style="color:' + kleur + ';">&#x1F527; Garage</b>' +
-    '<span>&#x1F441;&#xFE0F; Laatst bekeken: ' + (g ? '<b>' + oplEsc(naam(g.door)) + '</b>, ' + wanneer(g.t) : '<b style="color:#c0392b;">nog nooit</b>') + '</span>' +
+    '<span>&#x1F441;&#xFE0F; Laatst bekeken: ' + (g ? '<b>' + oplEsc(naam(g.door)) + '</b>, ' + wanneer(g.t) : '<b>nog niet vastgelegd</b>') + '</span>' +
     '<span>&#x270F;&#xFE0F; Laatst bijgewerkt: ' + (w ? '<b>' + oplEsc(naam(w.door)) + '</b>, ' + wanneer(w.t) : '<b>nog niet</b>') + '</span>' +
-    (hG > 72 ? '<span style="color:#c0392b;font-weight:700;">&#x26A0;&#xFE0F; Al meer dan 3 dagen niet bekeken door de garage</span>' : hG > 24 ? '<span style="color:#b9770e;font-weight:700;">Langer dan een dag niet bekeken</span>' : '') +
+    (!g ? '<span style="color:#5a6b80;font-style:italic;">Nog geen gegevens: dit wordt bijgehouden vanaf het moment dat de garage de nieuwe garagepagina opent.</span>'
+      : hG > 72 ? '<span style="color:#c0392b;font-weight:700;">&#x26A0;&#xFE0F; Al ' + Math.floor(hG / 24) + ' dagen niet bekeken door de garage</span>'
+      : hG > 24 ? '<span style="color:#b9770e;font-weight:700;">Langer dan een dag niet bekeken</span>' : '') +
     ((a.log && a.log.length) ? '<a href="#" onclick="djGarageLogTonen();return false;" style="color:#0f6cbd;font-weight:700;margin-left:auto;">Wie heeft gekeken / aangepast (' + a.log.length + ')</a>' : '');
 }
 window.djGarageLogTonen = function(){
