@@ -22173,10 +22173,11 @@ function wisselPunctualityDatum(dateStr) {
     var _isMijn = function(t){ return !!(t && t.toegewezen && String(t.toegewezen).toLowerCase() === _ik); };
     var _volgorde = data.a.map(function(_, n){ return n; });
     // Drie groepen, duidelijk gescheiden: Voor jou · Algemeen · Verlengingen certificaten (automatisch)
-    var _groep = function(t){ return _isMijn(t) ? 'mijn' : (t && t.certKey ? 'cert' : 'alg'); };
-    _volgorde = ['mijn', 'alg', 'cert'].reduce(function(acc, g){ return acc.concat(_volgorde.filter(function(n){ return _groep(data.a[n]) === g; })); }, []);
+    var _doorMij = function(t){ return !!(t && t.toegewezen && !_isMijn(t) && String(t.toegewezenDoor || '').toLowerCase() === _ik); };
+    var _groep = function(t){ return _isMijn(t) ? 'mijn' : _doorMij(t) ? 'uit' : (t && t.certKey ? 'cert' : 'alg'); };
+    _volgorde = ['mijn', 'uit', 'alg', 'cert'].reduce(function(acc, g){ return acc.concat(_volgorde.filter(function(n){ return _groep(data.a[n]) === g; })); }, []);
     var _laatsteGroep = null;
-    var _GROEP_KOP = { mijn: ['\uD83D\uDCCC', 'Voor jou', '#e67e22'], alg: ['\uD83D\uDCCB', 'Algemeen', 'var(--navy)'], cert: ['\uD83C\uDF93', 'Verlengingen certificaten (automatisch)', '#6b3fa0'] };
+    var _GROEP_KOP = { mijn: ['\uD83D\uDCCC', 'Voor jou', '#e67e22'], uit: ['\u27A1\uFE0F', 'Door jou toegewezen', '#0f6cbd'], alg: ['\uD83D\uDCCB', 'Algemeen', 'var(--navy)'], cert: ['\uD83C\uDF93', 'Verlengingen certificaten (automatisch)', '#6b3fa0'] };
     for (var i = 0; i < _volgorde.length; i++) {
       (function(idx) {
         var t = data.a[idx];
@@ -22195,6 +22196,18 @@ function wisselPunctualityDatum(dateStr) {
         hdr.appendChild(hL);
         hdr.appendChild(hR);
         card.appendChild(hdr);
+        if (_doorMij(t)) { // door jou toegewezen aan een collega: aan wie, en heeft die de melding gehad?
+          card.style.border = '2px solid #0f6cbd';
+          var _ub = document.createElement('span');
+          _ub.textContent = '\u27A1\uFE0F AAN ' + String(t.wie || t.toegewezen).toUpperCase();
+          _ub.style.cssText = 'background:#0f6cbd;color:#fff;font-weight:800;font-size:10.5px;border-radius:10px;padding:2px 8px;margin-left:8px;letter-spacing:.4px;';
+          hL.appendChild(_ub);
+          var _st = document.createElement('span');
+          var _g2 = t.gezienOp ? new Date(t.gezienOp) : null;
+          _st.textContent = _g2 ? '\u2714 melding ontvangen ' + String(_g2.getDate()) + '-' + String(_g2.getMonth() + 1) + ' ' + String(_g2.getHours()).padStart(2, '0') + ':' + String(_g2.getMinutes()).padStart(2, '0') : '\u23F3 nog niet gezien';
+          _st.style.cssText = 'font-size:10.5px;font-weight:700;margin-left:6px;color:' + (_g2 ? '#1a7a40' : '#b9770e') + ';';
+          hL.appendChild(_st);
+        }
         if (_isMijn(t)) { // opvallend: deze taak is voor jou
           card.style.border = '3px solid #e67e22'; card.style.boxShadow = '0 0 0 4px rgba(230,126,34,.18), 0 6px 16px rgba(230,126,34,.25)';
           hdr.style.background = '#e67e22'; hdr.style.color = '#fff'; hR.style.color = '#fff';
@@ -23619,7 +23632,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.22';
+var DJ_BUILD = '2026-10-07.23';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -32846,6 +32859,7 @@ window.djTodoToewijzer = function(t, idx){
     var d2 = pGet(); var x = d2.a[idx]; if (!x) return;
     var v = this.value === '__leeg' ? '' : this.value, m = mensen.find(function(p){ return p.email === v; });
     x.toegewezen = v; x.wie = m ? m.naam : ''; x.toegewezenDoor = localStorage.getItem('dj_sp_account_username') || ''; x.toegewezenOp = Date.now(); x.gw = Date.now();
+    delete x.gezienOp; // nieuwe ontvanger moet de melding nog krijgen
     pSet(d2);
   });
   return sel;
@@ -32877,6 +32891,17 @@ function djTodoMeldingBijwerken(){
   var ik = String(localStorage.getItem('dj_sp_account_username') || '').toLowerCase(), k = 'dj_todo_gezien_' + ik, gezien = {};
   try { gezien = JSON.parse(localStorage.getItem(k) || '{}') || {}; } catch(e) {}
   var nieuw = mijn.filter(function(x){ return !gezien[x.t.id]; });
+  // Laat de toewijzer weten dat de melding is aangekomen
+  var nogNiet = mijn.filter(function(x){ return !x.t.gezienOp; });
+  if (nogNiet.length) {
+    ['plan_v3', 'plan_sv_v1'].forEach(function(k){
+      try { var x = JSON.parse(localStorage.getItem(tk(k)) || 'null'); if (!x || !x.a) return; var veranderd = false;
+        x.a.forEach(function(t){ if (String(t.toegewezen || '').toLowerCase() === ik && !t.gezienOp) { t.gezienOp = Date.now(); t.gw = Date.now(); veranderd = true; } });
+        if (veranderd) localStorage.setItem(tk(k), JSON.stringify(x));
+      } catch(e) {}
+    });
+    if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+  }
   if (nieuw.length) {
     el.animate && el.animate([{ transform: 'translateX(-50%) scale(1)' }, { transform: 'translateX(-50%) scale(1.12)' }, { transform: 'translateX(-50%) scale(1)' }], { duration: 600, iterations: 3 });
     nieuw.forEach(function(x){ gezien[x.t.id] = 1; }); try { localStorage.setItem(k, JSON.stringify(gezien)); } catch(e) {}
