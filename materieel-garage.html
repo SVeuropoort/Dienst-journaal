@@ -498,7 +498,14 @@ function mgActiviteitZet(data, soort){
   a.log = a.log || [];
   var details = soort === 'gewijzigd' ? Object.keys(_mgWijzigingen).map(function(n){ return n + ': ' + _mgWijzigingen[n]; }) : [];
   if (soort === 'gewijzigd' && !details.length) details = ['(aangepast)'];
-  a.log.push({ soort: soort, door: mgIk(), t: Date.now(), details: details });
+  // Bekeken door dezelfde persoon binnen een uur? Dan de bestaande regel bijwerken (met teller) i.p.v. een nieuwe
+  var laatste = null;
+  for (var li = a.log.length - 1; li >= 0; li--) { if (a.log[li].door === mgIk()) { laatste = a.log[li]; break; } }
+  if (soort === 'gezien' && laatste && laatste.soort === 'gezien' && Date.now() - laatste.t < 60 * 60000) {
+    laatste.t = Date.now(); laatste.n = (laatste.n || 1) + 1;
+  } else {
+    a.log.push({ soort: soort, door: mgIk(), t: Date.now(), details: details });
+  }
   if (a.log.length > 100) a.log = a.log.slice(-100);
   if (soort === 'gewijzigd') _mgWijzigingen = {};
   data[k] = a;
@@ -506,8 +513,10 @@ function mgActiviteitZet(data, soort){
 var _mgGezienGemeld = 0;
 async function mgGezienMelden(){
   // Hooguit eens per 30 minuten wegschrijven dat de lijst bekeken is
+  var _lk = 'mg_gezien_laatst_' + terminal;
+  _mgGezienGemeld = Math.max(_mgGezienGemeld, +localStorage.getItem(_lk) || 0);
   if (!mgIk() || Date.now() - _mgGezienGemeld < 30 * 60000) return;
-  _mgGezienGemeld = Date.now();
+  _mgGezienGemeld = Date.now(); try { localStorage.setItem(_lk, String(_mgGezienGemeld)); } catch(e) {}
   try {
     var result = await spOphalenBestand(rowId() + '.json');
     var data = (result && result.data) || {};
@@ -913,7 +922,7 @@ document.addEventListener('visibilitychange', function(){ if (document.visibilit
 //    (die instelling is gedeeld met Dienst Journaal zelf: zelfde vinkje, zelfde pc);
 //  - automatisch bijwerken naar de nieuwste versie, alleen als niemand bezig is.
 // ══════════════════════════════════════════════════════════════════
-var APP_BUILD = '2026-10-09.12';
+var APP_BUILD = '2026-10-09.13';
 var APP_AUTH_KEY = 'mg_auth';
 var APP_EN = false;
 function appGedeeldePc(){ return localStorage.getItem('dj_niet_uitloggen') !== '1'; }
