@@ -719,6 +719,17 @@ async function opslaanNaarServer(){
     var result = await spOphalenBestand(rowId() + '.json');
     var data = (result && result.data) || {};
 
+    // Per voertuig samenvoegen: alleen wat de garage NU zelf heeft aangepast gaat mee; voor de rest
+    // geldt de nieuwste stand van de server (zo worden status, opmerking en datum die een supervisor
+    // intussen in Dienst Journaal heeft aangepast niet teruggezet door een verouderde lijst).
+    var serverMap = {};
+    (data[prefix() + 'materieel_status_v1'] || []).forEach(function(m){ serverMap[m.type + '|' + m.naam] = m; });
+    matData.forEach(function(m){
+      var sv = serverMap[m.type + '|' + m.naam];
+      if (!sv || _mgWijzigingen[m.naam]) return; // door de garage aangepast: eigen stand
+      m.status = sv.status || 'OK'; m.opmerking = sv.opmerking || '';
+      if (sv.aangepastOp) m.aangepastOp = sv.aangepastOp; else delete m.aangepastOp;
+    });
     data[prefix() + 'materieel_status_v1'] = matData;
     mgActiviteitZet(data, 'gewijzigd');
 
@@ -902,7 +913,7 @@ document.addEventListener('visibilitychange', function(){ if (document.visibilit
 //    (die instelling is gedeeld met Dienst Journaal zelf: zelfde vinkje, zelfde pc);
 //  - automatisch bijwerken naar de nieuwste versie, alleen als niemand bezig is.
 // ══════════════════════════════════════════════════════════════════
-var APP_BUILD = '2026-10-09.10';
+var APP_BUILD = '2026-10-09.11';
 var APP_AUTH_KEY = 'mg_auth';
 var APP_EN = false;
 function appGedeeldePc(){ return localStorage.getItem('dj_niet_uitloggen') !== '1'; }
