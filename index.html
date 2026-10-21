@@ -21014,8 +21014,10 @@ function wisselPunctualityDatum(dateStr) {
       var cloudCustom  = data[pfx + 'mat_custom_list'];
       var cloudStore   = data[pfx + 'mat_standalone_v2'];
       // Activiteit van de garage (bekeken/aangepast) direct uit dezelfde verversing meenemen
+      // Nieuwe garagepagina: apart bestand <T>_garage_activiteit.json; oudere gegevens staan nog in het hoofdbestand
       try {
-        var cloudAct = data[pfx + 'mat_garage_activiteit_v1'];
+        var cloudAct = data[pfx + 'mat_garage_activiteit_v1'] || null;
+        try { var _af = await spOphalenBestandRuw(pfx + 'garage_activiteit.json'); if (_af && _af.activiteit) cloudAct = djGarageActSamen(cloudAct, _af.activiteit); } catch(eF) {}
         if (cloudAct) { localStorage.setItem(pfx + 'mat_garage_activiteit_v1', JSON.stringify(cloudAct)); if (typeof djGarageActiviteitBalk === 'function') djGarageActiviteitBalk(); }
       } catch(eAct) {}
 
@@ -23668,7 +23670,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.42';
+var DJ_BUILD = '2026-10-07.43';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -33301,6 +33303,17 @@ function djMatUitleg(){
 }
 document.addEventListener('DOMContentLoaded', function(){ setTimeout(djMatUitleg, 2000); });
 (function(){ if (typeof navTo !== 'function') return; var _n = navTo; navTo = function(view){ var r = _n.apply(this, arguments); if (view === 'materieel') setTimeout(djMatUitleg, 100); return r; }; window.navTo = navTo; })();
+</script>
+<script>
+// Garage-activiteit uit het oude (hoofdbestand) en nieuwe (apart bestand) samenvoegen
+function djGarageActSamen(oud, nieuw){
+  if (!oud) return nieuw; if (!nieuw) return oud;
+  var nieuwste = function(a, b){ return !a ? b : !b ? a : (a.t >= b.t ? a : b); };
+  var gezien = {}, log = [];
+  (oud.log || []).concat(nieuw.log || []).forEach(function(e){ var k = e.soort + '|' + e.door + '|' + e.t; if (!gezien[k]) { gezien[k] = 1; log.push(e); } });
+  log.sort(function(a, b){ return a.t - b.t; });
+  return { gezien: nieuwste(oud.gezien, nieuw.gezien), gewijzigd: nieuwste(oud.gewijzigd, nieuw.gewijzigd), log: log.slice(-100) };
+}
 </script>
 </body>
 </html>
