@@ -608,7 +608,7 @@ function bouwTabel(){
       '<td>' + statSelectHTML(m, i) + '</td>' +
       '<td><input type="text" class="opm-input" id="opm-' + i + '" value="' + (isOK ? '' : esc(m.opmerking||'')) + '" ' +
         'placeholder="' + (isOK ? '—' : 'Omschrijf de situatie...') + '" ' + (isOK ? 'disabled' : '') +
-        ' oninput="opmerkingGewijzigd(' + i + ',this.value)"></td>';
+        ' oninput="opmerkingGewijzigd(' + i + ',this.value)">' + mgAangepastHtml(m, i) + '</td>';
     tb.appendChild(tr);
     var sel = tr.querySelector('select');
     sel.className = 'stat-sel ' + statClass(m.status);
@@ -625,7 +625,7 @@ function bouwTabel(){
       '<td>' + esc(m.naam) + '</td>' +
       '<td>' + statSelectHTML(m, i) + '</td>' +
       '<td><input type="text" class="opm-input" id="opm-' + i + '" value="' + esc(m.opmerking||'') + '" ' +
-        'placeholder="optioneel..." oninput="opmerkingGewijzigd(' + i + ',this.value)"></td>';
+        'placeholder="optioneel..." oninput="opmerkingGewijzigd(' + i + ',this.value)">' + mgAangepastHtml(m, i) + '</td>';
     ob.appendChild(tr);
     var sel = tr.querySelector('select');
     sel.className = 'stat-sel ' + statClass(m.status);
@@ -652,10 +652,20 @@ function updateSamenvatting(){
   });
 }
 
+// "Aangepast op <datum>" bij alles wat niet OK is
+function mgAangepastTekst(m){
+  if (!m || m.status === 'OK') return '';
+  if (!m.aangepastOp) return '&#x1F4C5; Datum onbekend (al v\u00F3\u00F3r 21-10-2026)';
+  var d = new Date(m.aangepastOp);
+  return '&#x1F4C5; Aangepast op ' + String(d.getDate()).padStart(2,'0') + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + d.getFullYear();
+}
+function mgAangepastHtml(m, i){ return '<div id="mg-aangepast-' + i + '" style="font-size:11px;color:#7a6a5a;padding:3px 2px 0;">' + mgAangepastTekst(m) + '</div>'; }
+function mgAangepastBijwerken(i){ var el = document.getElementById('mg-aangepast-' + i); if (el) el.innerHTML = mgAangepastTekst(matData[i]); }
 function statusGewijzigd(i, sel){
   _mgWijzigingen[matData[i].naam] = 'status ' + (matData[i].status || '?') + ' \u2192 ' + sel.value;
   matData[i].status = sel.value;
   matData[i].aangepastOp = Date.now();
+  mgAangepastBijwerken(i);
   sel.className = 'stat-sel ' + statClass(sel.value);
   var isOK = sel.value === 'OK';
   var inp = document.getElementById('opm-' + i);
@@ -680,6 +690,7 @@ function opmerkingGewijzigd(i, val){
   _mgWijzigingen[matData[i].naam] = (oud && oud.indexOf('status') === 0 ? oud + ', ' : '') + 'opmerking: "' + String(val).slice(0, 60) + '"';
   matData[i].opmerking = val;
   matData[i].aangepastOp = Date.now();
+  mgAangepastBijwerken(i);
   plannenOpslaan();
 }
 
@@ -891,7 +902,7 @@ document.addEventListener('visibilitychange', function(){ if (document.visibilit
 //    (die instelling is gedeeld met Dienst Journaal zelf: zelfde vinkje, zelfde pc);
 //  - automatisch bijwerken naar de nieuwste versie, alleen als niemand bezig is.
 // ══════════════════════════════════════════════════════════════════
-var APP_BUILD = '2026-10-09.7';
+var APP_BUILD = '2026-10-09.9';
 var APP_AUTH_KEY = 'mg_auth';
 var APP_EN = false;
 function appGedeeldePc(){ return localStorage.getItem('dj_niet_uitloggen') !== '1'; }

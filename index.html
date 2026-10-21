@@ -21146,12 +21146,26 @@ function wisselPunctualityDatum(dateStr) {
 
   // "Aangepast op <datum>" bij alles wat niet OK is
   function matAangepastTekst(m) {
-    if (!m || m.status === 'OK' || !m.aangepastOp) return '';
+    if (!m || m.status === 'OK') return '';
+    var i = matSaData.indexOf(m);
+    var klik = ' onclick="matDatumKiezen(' + i + ')" title="Klik om de datum aan te passen" style="cursor:pointer;text-decoration:underline dotted;"';
+    if (!m.aangepastOp) return '<span' + klik + '>&#x1F4C5; Datum onbekend (al vóór 21-10-2026) &mdash; klik om in te vullen</span>';
     var d = new Date(m.aangepastOp);
-    return '&#x1F4C5; Aangepast op ' + String(d.getDate()).padStart(2,'0') + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + d.getFullYear();
+    return '<span' + klik + '>&#x1F4C5; Aangepast op ' + String(d.getDate()).padStart(2,'0') + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + d.getFullYear() + '</span>';
   }
   window.matAangepastTekst = matAangepastTekst;
   window.matAangepastBijwerken = function(i) { var el = document.getElementById('mat-aangepast-' + i); if (el) el.innerHTML = matAangepastTekst(matSaData[i]); };
+  // Datum zelf invullen of corrigeren (bijv. voor meldingen van vóór deze functie)
+  window.matDatumKiezen = function(i) {
+    var m = matSaData[i]; if (!m) return;
+    var nu = m.aangepastOp ? new Date(m.aangepastOp) : new Date();
+    var v = prompt('Sinds wanneer staat ' + m.naam + ' op ' + m.status + '? (dd-mm-jjjj)', String(nu.getDate()).padStart(2,'0') + '-' + String(nu.getMonth()+1).padStart(2,'0') + '-' + nu.getFullYear());
+    if (v === null) return;
+    var r = /^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/.exec(v.trim());
+    var d = r ? new Date(+r[3], +r[2] - 1, +r[1], 12) : null;
+    if (!d || d.getDate() !== +r[1] || d > new Date()) { alert('Typ een geldige datum (niet in de toekomst), bijvoorbeeld 14-10-2026.'); return; }
+    m.aangepastOp = d.getTime(); autoSaveMat(); matAangepastBijwerken(i);
+  };
   function matSaSelectHTML(m, i) {
     return `<select onchange="matSaData[${i}].status=this.value;matSaData[${i}].aangepastOp=Date.now();updateStatusStyle(this);updateMatSaSummary();autoSaveMat();_syncTruckStatus(matSaData[${i}]);matAangepastBijwerken(${i})">
       <option value="OK"        ${m.status==='OK'?'selected':''}>&#10003; OK</option>
@@ -23645,7 +23659,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.35';
+var DJ_BUILD = '2026-10-07.36';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
