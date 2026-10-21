@@ -913,7 +913,7 @@ document.addEventListener('visibilitychange', function(){ if (document.visibilit
 //    (die instelling is gedeeld met Dienst Journaal zelf: zelfde vinkje, zelfde pc);
 //  - automatisch bijwerken naar de nieuwste versie, alleen als niemand bezig is.
 // ══════════════════════════════════════════════════════════════════
-var APP_BUILD = '2026-10-09.11';
+var APP_BUILD = '2026-10-09.12';
 var APP_AUTH_KEY = 'mg_auth';
 var APP_EN = false;
 function appGedeeldePc(){ return localStorage.getItem('dj_niet_uitloggen') !== '1'; }
@@ -1005,6 +1005,22 @@ async function appUitloggen(automatisch){
 // Materieel-garage: eerst een wachtende wijziging opslaan, en niet bijwerken zolang er iets openstaat
 function appHeeftOnopgeslagenWerk(){ return !!(window._mgWijzigingPending || (typeof isSaving !== 'undefined' && isSaving) || (typeof saveTimer !== 'undefined' && saveTimer && window._mgWijzigingPending)); }
 async function appVoorUitloggen(){ if (window._mgWijzigingPending && typeof opslaanNu === 'function') { opslaanNu(); await new Promise(function(r){ setTimeout(r, 2500); }); } }
+</script>
+<script>
+// Korte uitleg van de statussen boven de trucklijst
+(function(){
+  function plaats(){
+    var tb = document.getElementById('trucks-body'); if (!tb || document.getElementById('mg-uitleg')) return;
+    var tabel = tb.closest('table'); if (!tabel) return;
+    var d = document.createElement('div'); d.id = 'mg-uitleg';
+    d.style.cssText = 'display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-size:12px;padding:8px 12px;margin:0 0 10px;background:#f5f8fc;border:1px solid #dbe5f0;border-radius:6px;';
+    d.innerHTML = '<b>Uitleg status:</b><span><b style="color:#1a7a40;">&#10003; OK</b> = gewoon in orde</span><span><b style="color:#d35400;">&#9881; ONDERHOUD</b> = truck blijft beschikbaar</span><span><b style="color:#0f6cbd;">&#10007; DEFECT</b> = staat bij de garage en kan niet rijden</span><span><b style="color:#5a6b80;">&#8212; N.V.T.</b> = truck wordt niet meer gebruikt</span>';
+    var blok = tabel.closest('.card, .panel, section') || tabel;
+    blok.parentNode.insertBefore(d, blok);
+  }
+  document.addEventListener('DOMContentLoaded', function(){ setTimeout(plaats, 800); });
+  setTimeout(plaats, 2500);
+})();
 </script>
 </body>
 </html>

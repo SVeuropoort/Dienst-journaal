@@ -23663,7 +23663,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.38';
+var DJ_BUILD = '2026-10-07.39';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -33270,5 +33270,24 @@ window.djKpiLogTonen = function(){
 (function(){ if (typeof navTo !== 'function') return; var _n = navTo; navTo = function(view){ var r = _n.apply(this, arguments); if (view === 'archief') { setTimeout(djKpiBekekenMelden, 1500); setTimeout(djKpiBalk, 300); } return r; }; window.navTo = navTo; })();
 </script>
 
+<script>
+// Materieel: korte uitleg van de statussen
+var DJ_MAT_UITLEG_HTML = '<b style="color:var(--navy);">Uitleg status:</b>' +
+  '<span><b style="color:#1a7a40;">&#10003; OK</b> = gewoon in orde</span>' +
+  '<span><b style="color:#d35400;">&#9881; ONDERHOUD</b> = truck blijft beschikbaar</span>' +
+  '<span><b style="color:#0f6cbd;">&#10007; DEFECT</b> = staat bij de garage en kan niet rijden</span>' +
+  '<span><b style="color:#5a6b80;">&#8212; N.V.T.</b> = truck wordt niet meer gebruikt</span>';
+function djMatUitleg(){
+  var tb = document.getElementById('mat-trucks-sa'); if (!tb || document.getElementById('mat-uitleg')) return;
+  var tabel = tb.closest('table'); if (!tabel) return;
+  var d = document.createElement('div'); d.id = 'mat-uitleg';
+  d.style.cssText = 'display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-size:12px;color:#24313f;padding:8px 12px;margin:0 0 10px;background:#f5f8fc;border:1px solid #dbe5f0;border-radius:6px;';
+  d.innerHTML = DJ_MAT_UITLEG_HTML;
+  var kaart = tabel.closest('.card') || tabel.parentNode;
+  kaart.parentNode.insertBefore(d, kaart);
+}
+document.addEventListener('DOMContentLoaded', function(){ setTimeout(djMatUitleg, 2000); });
+(function(){ if (typeof navTo !== 'function') return; var _n = navTo; navTo = function(view){ var r = _n.apply(this, arguments); if (view === 'materieel') setTimeout(djMatUitleg, 100); return r; }; window.navTo = navTo; })();
+</script>
 </body>
 </html>
