@@ -21085,11 +21085,12 @@ function wisselPunctualityDatum(dateStr) {
               value="${isOK ? '' : (m.opmerking||'')}"
               placeholder="${isOK ? '—' : 'Omschrijf de situatie...'}"
               ${isOK ? 'disabled' : ''}
-              onchange="matSaData[${i}].opmerking=this.value;autoSaveMat()"
+              onchange="matSaData[${i}].opmerking=this.value;matSaData[${i}].aangepastOp=Date.now();autoSaveMat();matAangepastBijwerken(${i})"
               style="width:100%;border:none;background:${isOK ? 'transparent' : 'var(--bg)'};
                      font-family:'Barlow',sans-serif;font-size:13px;padding:8px 6px;
                      outline:none;border-radius:4px;color:${isOK ? 'var(--muted)' : 'var(--text)'};
                      cursor:${isOK ? 'default' : 'text'};" />
+            <div id="mat-aangepast-${i}" style="font-size:11px;color:#7a6a5a;padding:0 6px 4px;">${matAangepastTekst(m)}</div>
           </td>
         `;
         truckBody.appendChild(tr);
@@ -21131,8 +21132,9 @@ function wisselPunctualityDatum(dateStr) {
           <td>${m.naam}</td>
           <td>${matSaSelectHTML(m, i)}</td>
           <td><input type="text" value="${m.opmerking||''}" placeholder="optioneel..."
-               onchange="matSaData[${i}].opmerking=this.value;autoSaveMat()"
-               style="width:100%;border:none;background:transparent;font-family:'Barlow',sans-serif;font-size:13px;padding:8px 4px;outline:none;" /></td>
+               onchange="matSaData[${i}].opmerking=this.value;matSaData[${i}].aangepastOp=Date.now();autoSaveMat();matAangepastBijwerken(${i})"
+               style="width:100%;border:none;background:transparent;font-family:'Barlow',sans-serif;font-size:13px;padding:8px 4px;outline:none;" />
+               <div id="mat-aangepast-${i}" style="font-size:11px;color:#7a6a5a;padding:0 4px 4px;">${matAangepastTekst(m)}</div></td>
         `;
         overigBody.appendChild(tr);
         updateStatusStyle(tr.querySelector('select'));
@@ -21142,8 +21144,16 @@ function wisselPunctualityDatum(dateStr) {
     updateMatSaSummary();
   }
 
+  // "Aangepast op <datum>" bij alles wat niet OK is
+  function matAangepastTekst(m) {
+    if (!m || m.status === 'OK' || !m.aangepastOp) return '';
+    var d = new Date(m.aangepastOp);
+    return '&#x1F4C5; Aangepast op ' + String(d.getDate()).padStart(2,'0') + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + d.getFullYear();
+  }
+  window.matAangepastTekst = matAangepastTekst;
+  window.matAangepastBijwerken = function(i) { var el = document.getElementById('mat-aangepast-' + i); if (el) el.innerHTML = matAangepastTekst(matSaData[i]); };
   function matSaSelectHTML(m, i) {
-    return `<select onchange="matSaData[${i}].status=this.value;updateStatusStyle(this);updateMatSaSummary();autoSaveMat();_syncTruckStatus(matSaData[${i}])">
+    return `<select onchange="matSaData[${i}].status=this.value;matSaData[${i}].aangepastOp=Date.now();updateStatusStyle(this);updateMatSaSummary();autoSaveMat();_syncTruckStatus(matSaData[${i}]);matAangepastBijwerken(${i})">
       <option value="OK"        ${m.status==='OK'?'selected':''}>&#10003; OK</option>
       <option value="DEFECT"    ${m.status==='DEFECT'?'selected':''}>&#10007; DEFECT</option>
       <option value="ONDERHOUD" ${m.status==='ONDERHOUD'?'selected':''}>&#9881; ONDERHOUD</option>
@@ -23635,7 +23645,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.34';
+var DJ_BUILD = '2026-10-07.35';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.

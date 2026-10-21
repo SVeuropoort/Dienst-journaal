@@ -655,6 +655,7 @@ function updateSamenvatting(){
 function statusGewijzigd(i, sel){
   _mgWijzigingen[matData[i].naam] = 'status ' + (matData[i].status || '?') + ' \u2192 ' + sel.value;
   matData[i].status = sel.value;
+  matData[i].aangepastOp = Date.now();
   sel.className = 'stat-sel ' + statClass(sel.value);
   var isOK = sel.value === 'OK';
   var inp = document.getElementById('opm-' + i);
@@ -678,6 +679,7 @@ function opmerkingGewijzigd(i, val){
   var oud = _mgWijzigingen[matData[i].naam];
   _mgWijzigingen[matData[i].naam] = (oud && oud.indexOf('status') === 0 ? oud + ', ' : '') + 'opmerking: "' + String(val).slice(0, 60) + '"';
   matData[i].opmerking = val;
+  matData[i].aangepastOp = Date.now();
   plannenOpslaan();
 }
 
@@ -889,7 +891,7 @@ document.addEventListener('visibilitychange', function(){ if (document.visibilit
 //    (die instelling is gedeeld met Dienst Journaal zelf: zelfde vinkje, zelfde pc);
 //  - automatisch bijwerken naar de nieuwste versie, alleen als niemand bezig is.
 // ══════════════════════════════════════════════════════════════════
-var APP_BUILD = '2026-10-09.6';
+var APP_BUILD = '2026-10-09.7';
 var APP_AUTH_KEY = 'mg_auth';
 var APP_EN = false;
 function appGedeeldePc(){ return localStorage.getItem('dj_niet_uitloggen') !== '1'; }
