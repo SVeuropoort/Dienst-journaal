@@ -23668,7 +23668,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.41';
+var DJ_BUILD = '2026-10-07.42';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -32900,6 +32900,7 @@ window.djTodoToewijzer = function(t, idx){
     x.toegewezen = v; x.wie = m ? m.naam : ''; x.toegewezenDoor = localStorage.getItem('dj_sp_account_username') || ''; x.toegewezenOp = Date.now(); x.gw = Date.now();
     delete x.gezienOp; // nieuwe ontvanger moet de melding nog krijgen
     pSet(d2);
+    if (typeof pRender === 'function') setTimeout(pRender, 0); // meteen naar de juiste groep (Door jou toegewezen / Voor jou / Algemeen)
   });
   return sel;
 };
