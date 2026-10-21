@@ -375,6 +375,19 @@ async function spOphalenBestand(bestandsnaam){
 }
 // ══════════════════════════════════════════════════════════════════
 
+// KPI bekeken: vastleggen wie de MT-pagina bekijkt (hooguit eens per 30 min per persoon). Alleen de beheerder ziet dit.
+async function kpiBekekenMelden(){
+  try {
+    var ik = String(localStorage.getItem('dj_sp_account_username') || '').toLowerCase(); if (!ik) return;
+    if (!(await spIngelogdAsync())) return;
+    var k = 'kpi_bekeken_laatst_mt'; if (Date.now() - (+localStorage.getItem(k) || 0) < 30 * 60000) return;
+    var r = (await spOphalenBestand('kpi_bekeken.json')) || {}; r.log = Array.isArray(r.log) ? r.log : [];
+    r.log.push({ door: ik, t: Date.now(), bron: 'MT-pagina' }); if (r.log.length > 1000) r.log = r.log.slice(-1000);
+    await spOpslaanBestand('kpi_bekeken.json', r);
+    localStorage.setItem(k, String(Date.now()));
+  } catch(e) {}
+}
+setTimeout(kpiBekekenMelden, 8000); setInterval(kpiBekekenMelden, 5 * 60000);
 function mtWwCloudPush(){ /* wachtwoorden worden niet meer gebruikt (alleen Microsoft-login) */ }
 async function mtWwCloudPull(){ /* wachtwoorden worden niet meer gebruikt (alleen Microsoft-login) */ }
 
@@ -2313,7 +2326,7 @@ function kpiOrden(ouder, buiten){
 //    (die instelling is gedeeld met Dienst Journaal zelf: zelfde vinkje, zelfde pc);
 //  - automatisch bijwerken naar de nieuwste versie, alleen als niemand bezig is.
 // ══════════════════════════════════════════════════════════════════
-var APP_BUILD = '2026-10-09.4';
+var APP_BUILD = '2026-10-09.5';
 var APP_AUTH_KEY = 'kpi_mt_auth';
 var APP_EN = true;
 function appGedeeldePc(){ return localStorage.getItem('dj_niet_uitloggen') !== '1'; }
