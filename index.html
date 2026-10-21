@@ -21264,11 +21264,11 @@ function wisselPunctualityDatum(dateStr) {
   // terug, en zo kon de materieelhistorie verdwijnen.)
   var _matBasis = null;
   function _matSleutel(m){ return m.type + '|' + m.naam; }
-  function _matBasisZet(lijst){ _matBasis = {}; (lijst || []).forEach(function(m){ _matBasis[_matSleutel(m)] = { status: m.status || 'OK', opmerking: m.opmerking || '' }; }); }
+  function _matBasisZet(lijst){ _matBasis = {}; (lijst || []).forEach(function(m){ _matBasis[_matSleutel(m)] = { status: m.status || 'OK', opmerking: m.opmerking || '', aangepastOp: m.aangepastOp || 0 }; }); }
   function _matGewijzigd(m){
     if (!_matBasis) return true;
     var b = _matBasis[_matSleutel(m)];
-    return !b || b.status !== (m.status || 'OK') || b.opmerking !== (m.opmerking || '');
+    return !b || b.status !== (m.status || 'OK') || b.opmerking !== (m.opmerking || '') || (b.aangepastOp || 0) !== (m.aangepastOp || 0); // ook een gewijzigde datum telt
   }
   // Meldingen per voertuig 30 sec. bundelen: status en omschrijving worden vaak vlak na elkaar
   // ingevuld; zo krijgt de garage één mail met de complete melding.
@@ -21400,8 +21400,8 @@ function wisselPunctualityDatum(dateStr) {
         // Lijst volgens deze pc; per voertuig de cloud-stand, behalve wat deze pc zelf veranderde.
         samengevoegd = teVerzendenStatus.map(function(m){
           var c = cloudMap[_matSleutel(m)];
-          if (!_matGewijzigd(m) && c) return { type: m.type, naam: m.naam, status: c.status || 'OK', opmerking: c.opmerking || '' };
-          return { type: m.type, naam: m.naam, status: m.status || 'OK', opmerking: m.opmerking || '' };
+          if (!_matGewijzigd(m) && c) return { type: m.type, naam: m.naam, status: c.status || 'OK', opmerking: c.opmerking || '', aangepastOp: c.aangepastOp || m.aangepastOp || undefined };
+          return { type: m.type, naam: m.naam, status: m.status || 'OK', opmerking: m.opmerking || '', aangepastOp: m.aangepastOp || undefined };
         });
         data[MAT_SA_KEY] = samengevoegd;
         var store = {};
@@ -21415,6 +21415,8 @@ function wisselPunctualityDatum(dateStr) {
       // Meldingen naar de garage voor wat deze pc veranderde (t.o.v. de vorige cloud-stand).
       gewijzigd.forEach(function(m){
         var vorig = cloudMap[_matSleutel(m)] || (_matBasis && _matBasis[_matSleutel(m)]) || { status: 'OK', opmerking: '' };
+        // Alleen een gewijzigde datum? Dan geen melding naar de garage.
+        if ((vorig.status || 'OK') === (m.status || 'OK') && (vorig.opmerking || '') === (m.opmerking || '')) return;
         _matMeldPlan(m, { status: vorig.status || 'OK', opmerking: vorig.opmerking || '' });
       });
       _matBasisZet(samengevoegd);
@@ -23661,7 +23663,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.37';
+var DJ_BUILD = '2026-10-07.38';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
