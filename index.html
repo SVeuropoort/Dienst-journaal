@@ -20971,6 +20971,8 @@ function wisselPunctualityDatum(dateStr) {
           sel.value = m.status;
           updateStatusStyle(sel);
         }
+        var _dt = document.getElementById('mat-aangepast-' + i);
+        if (_dt && typeof matAangepastTekst === 'function') { var _h = matAangepastTekst(m); if (_dt.innerHTML !== _h) _dt.innerHTML = _h; }
         if (inp && inp !== actief) {
           var isOK = m.status === 'OK';
           var nieuweWaarde = isOK ? '' : (m.opmerking || '');
@@ -21025,7 +21027,7 @@ function wisselPunctualityDatum(dateStr) {
         cloudStatus.forEach(function(m){ map[m.type + '|' + m.naam] = m; });
         basis.forEach(function(m){
           var s = map[m.type + '|' + m.naam];
-          if (s) { m.status = s.status || 'OK'; m.opmerking = s.opmerking || ''; }
+          if (s) { m.status = s.status || 'OK'; m.opmerking = s.opmerking || ''; if (s.aangepastOp) m.aangepastOp = s.aangepastOp; }
         });
       }
       matSaData = basis;
@@ -21528,7 +21530,7 @@ function wisselPunctualityDatum(dateStr) {
     if (saved && saved.length > 0 && savedNames === freshNames) {
       saved.forEach(s => {
         const match = fresh.find(f => f.naam === s.naam && f.type === s.type);
-        if (match) { match.status = s.status; match.opmerking = s.opmerking || ''; }
+        if (match) { match.status = s.status; match.opmerking = s.opmerking || ''; if (s.aangepastOp) match.aangepastOp = s.aangepastOp; }
       });
     } else if (savedNames !== freshNames) {
       // Old data detected — clear and start fresh
@@ -23659,7 +23661,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.36';
+var DJ_BUILD = '2026-10-07.37';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.

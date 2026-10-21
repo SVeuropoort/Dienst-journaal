@@ -564,7 +564,7 @@ async function ladenVanServer(){
       opgeslagen.forEach(function(m){ map[m.type + '|' + m.naam] = m; });
       basis.forEach(function(m){
         var s = map[m.type + '|' + m.naam];
-        if (s){ m.status = s.status || 'OK'; m.opmerking = s.opmerking || ''; }
+        if (s){ m.status = s.status || 'OK'; m.opmerking = s.opmerking || ''; if (s.aangepastOp) m.aangepastOp = s.aangepastOp; }
       });
     }
     matData = basis;
@@ -902,7 +902,7 @@ document.addEventListener('visibilitychange', function(){ if (document.visibilit
 //    (die instelling is gedeeld met Dienst Journaal zelf: zelfde vinkje, zelfde pc);
 //  - automatisch bijwerken naar de nieuwste versie, alleen als niemand bezig is.
 // ══════════════════════════════════════════════════════════════════
-var APP_BUILD = '2026-10-09.9';
+var APP_BUILD = '2026-10-09.10';
 var APP_AUTH_KEY = 'mg_auth';
 var APP_EN = false;
 function appGedeeldePc(){ return localStorage.getItem('dj_niet_uitloggen') !== '1'; }
