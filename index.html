@@ -23678,7 +23678,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.58';
+var DJ_BUILD = '2026-10-07.59';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -33343,11 +33343,19 @@ var BEZ_EP_WEKEN = [
 var BEZ_DAGEN = ['Zo', 'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za'];
 // Standaard volgens de CAO: A25 = 5 weken vakantie (3 vakantieweken + 10 snipperdagen = 25 dagen), B3 = ADV 5% = 11,5 dag per jaar
 var BEZ_CAO_VAKANTIE = 28, BEZ_CAO_ADV = 11.5; // huidige afspraak: 28 snipperdagen + 11,5 ADV-dagen per jaar
-function bezInstGet(){ var d = { ortTab: 'Europoort', ploeg: 3, snipper: BEZ_CAO_VAKANTIE, adv: BEZ_CAO_ADV, ziekte: 5, stag: 0, stagDagen: 3.5 }, x = {};
+// Hoek van Holland: 13-weeks rooster ("Rooster HvH" in de ORT-rekentool) met 4 man per ploeg
+var BEZ_HVH_WEKEN = [
+  ['V','S6','S6','S6','S6','V','S1'],['S1','S1','S1','V','V','S4','S4'],['S4','S5','V','S1','S1','S1','V'],['V','S4','S4','S4','S4','V','S1'],
+  ['S1','S1','V','V','S6','S6','S6'],['S6','V','S2','S2','S2','S2','V'],['V','S6','S6','S6','S6','V','S2'],['S2','V','S5','S5','V','S5','S5'],
+  ['S4','V','S2','S2','S2','S2','V'],['V','S3','S3','S3','S3','S3','S3'],['V','S2','S2','S2','V','S6','S6'],['S6','S6','V','V','S2','S2','S2'],['S2','V','S6','S6','S5','S5','V']];
+function bezTerminalStandaard(){ return (sessionStorage.getItem('dj_terminal') || 'EP') === 'HVH' ? { ortTab: 'Rooster HvH', ploeg: 4 } : { ortTab: 'Europoort', ploeg: 3 }; }
+function bezInstGet(){ var ts = bezTerminalStandaard(); var d = { ortTab: ts.ortTab, ploeg: ts.ploeg, snipper: BEZ_CAO_VAKANTIE, adv: BEZ_CAO_ADV, ziekte: 5, stag: 0, stagDagen: 3.5 }, x = {};
   try { x = JSON.parse(localStorage.getItem(tk('bezetting_instellingen_v1')) || '{}') || {}; } catch(e) {}
   // Eenmalig: de oude standaard (35 snipperdagen, geen ADV) vervangen door de CAO-waarden
   if (!x.caoStandaard && (x.snipper === undefined || Number(x.snipper) === 35) && !Number(x.adv)) { x.snipper = BEZ_CAO_VAKANTIE; x.adv = BEZ_CAO_ADV; x.caoStandaard = 1; }
   if (x.caoStandaard !== 2 && (x.snipper === undefined || Number(x.snipper) === 25) && (x.adv === undefined || Number(x.adv) === 11.5)) { x.snipper = BEZ_CAO_VAKANTIE; x.adv = BEZ_CAO_ADV; x.caoStandaard = 2; }
+  // Hoek van Holland stond per ongeluk op het Europoort-rooster met 3 man: eenmalig rechtzetten
+  if ((sessionStorage.getItem('dj_terminal') || 'EP') === 'HVH' && !x.hvhStandaard) { if (!x.ortTab || x.ortTab === 'Europoort') x.ortTab = ts.ortTab; if (!x.ploeg || Number(x.ploeg) === 3) x.ploeg = ts.ploeg; x.hvhStandaard = 1; }
   return Object.assign(d, x); }
 function bezInstSet(x){ localStorage.setItem(tk('bezetting_instellingen_v1'), JSON.stringify(x)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }
 function bezDeeltijdGet(){ try { return JSON.parse(localStorage.getItem(tk('bezetting_deeltijd_v1')) || '{}') || {}; } catch(e) { return {}; } }
@@ -33360,6 +33368,8 @@ function bezRoosters(){
       werk: function(w, d){ var c = t.data[w + '_' + d]; return c && !c.vrij; },
       ochtend: function(w, d){ var c = t.data[w + '_' + d]; return !!(c && parseInt(String(c.start || '07'), 10) < 11); } }); });
   } catch(e) {}
+  if (!lijst.some(function(r){ return r.naam === 'Rooster HvH'; })) lijst.push({ naam: 'Rooster HvH', weken: 13, werk: function(w, d){ return BEZ_HVH_WEKEN[w][d] !== 'V'; },
+    ochtend: function(w, d){ var c = BEZ_HVH_WEKEN[w][d]; return c === 'S1' || c === 'S2'; } }); // S1/S2 07:15 = ochtend, S3–S6 vanaf 12:30 = middag
   if (!lijst.some(function(r){ return r.naam === 'Europoort'; })) lijst.unshift({ naam: 'Europoort', weken: 18, werk: function(w, d){ return BEZ_EP_WEKEN[w][d] !== 'V'; },
     ochtend: function(w, d){ var c = BEZ_EP_WEKEN[w][d]; return c === 'D' || (c === 'S' && d === 6); } }); // zondag 12:00 = middag, zaterdag 07:00 = ochtend
   return lijst;

@@ -216,6 +216,11 @@
       </div>
 
       <div class="card">
+        <div class="card-header"><div>&#x1F4CA;</div><h2>Occupancy rate own staff</h2></div>
+        <div id="bez-mt-body" style="padding:16px;"></div>
+      </div>
+
+      <div class="card">
         <div class="card-header"><div>&#x1F912;</div><h2>Absence &amp; staffing</h2></div>
         <div id="vz-body" style="padding:16px;"></div>
       </div>
@@ -707,6 +712,7 @@ function mtRenderKpi(){
   mtRenderTolynxKade();
   try { owMtRender(); } catch(e) {}
   try { vzMtRender(); } catch(e) {}
+  try { bezMtRender(); } catch(e) {}
   try { scMtRender(); } catch(e) {}
   try { mtSnapRender(); } catch(e) {}
   var _ML = mt_ML(), _RT = mt_RT();
@@ -2236,6 +2242,43 @@ function vzMtRender(){
 }
 function vzMtPeriode(p){ _vzMtPeriode = p; vzMtRender(); }
 
+// ── Bezettingsgraad eigen medewerkers (MT, alleen-lezen) ──
+// Leest de uitkomst die Dienst Journaal berekent (zonder namen) en rekent de knoppen
+// met/zonder stagiaires, ziekte, geboorteverlof, ouderschapsverlof, A30- en SFR-dagen op dezelfde manier door.
+function bezMtWeergave(){ var d = { stag: true, ziekte: true, geb: true, ouder: true, sen: true, sfr: true }; try { return Object.assign(d, JSON.parse(localStorage.getItem('bez_weergave') || '{}')); } catch(e) { return d; } }
+function bezMtWissel(k){ var w = bezMtWeergave(); w[k] = !w[k]; localStorage.setItem('bez_weergave', JSON.stringify(w)); bezMtRender(); }
+function bezMtRender(){
+  var el = document.getElementById('bez-mt-body'); if (!el) return;
+  var en = MT_ENGELS, T = function(nl, e){ return en ? e : nl; };
+  var b = null; try { b = JSON.parse(LS.getItem(mtTk('bezetting_samenvatting_v1')) || 'null'); } catch(e) {}
+  if (!b || b.som0 === undefined) { el.innerHTML = '<div style="color:#5a7090;font-size:13px;">' + T('Nog niet berekend. Een supervisor opent het KPI Dashboard in Dienst Journaal één keer; daarna is de uitkomst hier zichtbaar.', 'Not calculated yet. A supervisor needs to open the KPI Dashboard in Dienst Journaal once; the result then appears here.') + '</div>'; return; }
+  var wg = bezMtWeergave(), vl = b.verlof || {}, zf = wg.ziekte ? (1 - (b.ziekte || 0) / 100) : 1;
+  var verlofJaar = (wg.geb ? (vl.geb || 0) + (vl.aanv || 0) : 0) + (wg.ouder ? (vl.ouder || 0) : 0) + (wg.sen ? (vl.sen || 0) : 0) + (wg.sfr ? (vl.sfr || 0) : 0);
+  var besch = ((b.som0 - verlofJaar) * zf + (wg.stag ? (b.stagJaar || 0) : 0)) / 52;
+  var graad = b.nodig ? besch / b.nodig : 0, tekort = Math.max(0, b.nodig - besch), perFte = (b.roosterPerJaar - (b.vrijPerJaar || 0)) * zf / 52;
+  var f = function(x, n){ return Number(x).toLocaleString(en ? 'en-GB' : 'nl-NL', { minimumFractionDigits: n || 0, maximumFractionDigits: n || 0 }); };
+  var kleur = graad >= 0.95 ? '#1a7a40' : graad >= 0.85 ? '#b9770e' : '#c0392b';
+  var knop = function(k, nl, e){ var on = wg[k]; return '<button type="button" onclick="bezMtWissel(\'' + k + '\')" style="padding:5px 10px;border:1px solid ' + (on ? '#003366' : '#c8d7e8') + ';background:' + (on ? '#003366' : '#fff') + ';color:' + (on ? '#fff' : '#003366') + ';border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">' + (on ? '&#x2714; ' : '') + T((on ? 'Met ' : 'Zonder ') + nl, (on ? 'With ' : 'Without ') + e) + '</button>'; };
+  var tegel = function(t, w, sub, k){ return '<div style="flex:1;min-width:150px;background:#f5f8fc;border:1px solid #dbe5f0;border-radius:8px;padding:10px 12px;"><div style="font-size:11px;font-weight:700;color:#5a6b80;text-transform:uppercase;">' + t + '</div><div style="font-size:24px;font-weight:800;color:' + (k || '#003366') + ';">' + w + '</div><div style="font-size:11.5px;color:#5a6b80;">' + (sub || '') + '</div></div>'; };
+  var dagen = en ? ['Su','Mo','Tu','We','Th','Fr','Sa'] : ['Zo','Ma','Di','Wo','Do','Vr','Za'];
+  var rij = function(t, arr, tot, stijl){ return '<tr><td style="padding:4px 8px;' + (stijl || '') + '">' + t + '</td>' + arr.map(function(x){ return '<td style="text-align:center;padding:4px 10px;' + (stijl || '') + '">' + x + '</td>'; }).join('') + '<td style="text-align:center;font-weight:800;' + (stijl || '') + '">' + tot + '</td></tr>'; };
+  el.innerHTML =
+    '<div style="font-size:11.5px;color:#7a8696;margin-bottom:8px;">' + T('Rooster', 'Roster') + ': <b>' + (b.rooster || '') + '</b> (' + b.weken + ' ' + T('ploegen', 'teams') + ' \u00D7 ' + ((b.inst || {}).ploeg || '') + ') &middot; ' + f((b.inst || {}).snipper || 0) + T(' vakantiedagen', ' holidays') + ' + ' + f((b.inst || {}).adv || 0, 1) + ' ADV &middot; ' + T('ziekte', 'sickness') + ' ' + f(b.ziekte || 0, 1) + '%</div>' +
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">' + knop('stag', 'stagiaires', 'trainees') + knop('ziekte', 'ziekteverzuim', 'sickness') + knop('geb', 'geboorteverlof', 'birth leave') + knop('ouder', 'ouderschapsverlof', 'parental leave') + knop('sen', 'A30-dagen (senioren)', 'A30 senior days') + knop('sfr', 'SFR-dagen', 'SFR days') + '</div>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;">' +
+      tegel(T('Bezettingsgraad', 'Occupancy rate'), f(graad * 100, 1) + '%', T('met eigen medewerkers', 'with own staff'), kleur) +
+      tegel(T('Nodig per week', 'Required per week'), f(b.nodig) + T(' diensten', ' shifts'), T('volgens het basisrooster', 'according to the base roster')) +
+      tegel(T('Beschikbaar per week', 'Available per week'), f(besch, 1) + T(' diensten', ' shifts'), b.medewerkers + T(' medewerkers = ', ' employees = ') + f(b.fte, 1) + ' fte') +
+      tegel(T('Flexibele pool nodig', 'Flexible pool needed'), f(tekort, 1) + T(' diensten/wk', ' shifts/wk'), '\u2248 ' + f(perFte ? tekort / perFte : 0, 1) + ' fte', tekort > 0 ? '#c0392b' : '#1a7a40') +
+    '</div>' +
+    (b.perDag ? '<div style="overflow-x:auto;margin-top:12px;"><table style="border-collapse:collapse;font-size:12.5px;min-width:520px;"><tr><th style="text-align:left;padding:4px 8px;color:#5a6b80;">' + T('Per dag', 'Per day') + '</th>' + dagen.map(function(d){ return '<th style="padding:4px 10px;color:#5a6b80;">' + d + '</th>'; }).join('') + '<th style="padding:4px 10px;color:#5a6b80;">' + T('Week', 'Week') + '</th></tr>' +
+      (b.ochtend ? rij(T('Nodig ochtend', 'Required morning'), b.ochtend, b.ochtend.reduce(function(a, c){ return a + c; }, 0), 'color:#5a6b80;') + rij(T('Nodig middag', 'Required afternoon'), b.middag, b.middag.reduce(function(a, c){ return a + c; }, 0), 'color:#5a6b80;') : '') +
+      rij(T('Nodig (op dienst)', 'Required (on duty)'), b.perDag, b.nodig, 'font-weight:700;') +
+      rij(T('Eigen mensen (gem.)', 'Own staff (avg.)'), b.perDag.map(function(x){ return f(x * graad, 1); }), f(besch, 1)) +
+      rij(T('Tekort (flex)', 'Shortage (flex)'), b.perDag.map(function(x){ return f(Math.max(0, x * (1 - graad)), 1); }), f(tekort, 1), 'color:#c0392b;') + '</table></div>' : '') +
+    '<div style="font-size:11px;color:#7a8696;margin-top:8px;">' + T('Berekend door Dienst Journaal op ', 'Calculated by Dienst Journaal on ') + new Date(b.berekend || Date.now()).toLocaleString(en ? 'en-GB' : 'nl-NL') + T('. Alleen aantallen, geen namen.', '. Counts only, no names.') + '</div>';
+}
+
 // ── Scorekaart (MT, alleen-lezen) ──
 function scMtRender(){
   var el = document.getElementById('sc-body'); if (!el) return;
@@ -2326,7 +2369,7 @@ function kpiOrden(ouder, buiten){
 //    (die instelling is gedeeld met Dienst Journaal zelf: zelfde vinkje, zelfde pc);
 //  - automatisch bijwerken naar de nieuwste versie, alleen als niemand bezig is.
 // ══════════════════════════════════════════════════════════════════
-var APP_BUILD = '2026-10-09.5';
+var APP_BUILD = '2026-10-09.6';
 var APP_AUTH_KEY = 'kpi_mt_auth';
 var APP_EN = true;
 function appGedeeldePc(){ return localStorage.getItem('dj_niet_uitloggen') !== '1'; }
