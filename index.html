@@ -23678,7 +23678,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.48';
+var DJ_BUILD = '2026-10-07.49';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -30423,9 +30423,13 @@ function pdZoek(query){
   var namen = Object.keys(data).sort(function(a,b){ return a.localeCompare(b); });
   var matchendeNamen = namen.filter(function(n){ return n.toLowerCase().indexOf(q) !== -1; });
   if (lijstEl) {
-    lijstEl.innerHTML = namen.map(function(naam){
+    // Alleen de medewerkers tonen die bij de zoekterm passen (op naam; anders wie een registratie met die tekst heeft)
+    var getoond = matchendeNamen.length ? matchendeNamen : namen.filter(function(n){ return (data[n] || []).some(function(e){ return (e.tekst || '').toLowerCase().indexOf(q) !== -1; }); });
+    lijstEl.innerHTML = (getoond.length ? '<div style="padding:6px 14px;font-size:11px;color:var(--muted);background:#f5f8fc;border-bottom:1px solid #e2e8f0;">' + getoond.length + (getoond.length === 1 ? ' medewerker' : ' medewerkers') + (matchendeNamen.length ? ' met &quot;' + pdEsc(query) + '&quot; in de naam' : ' met &quot;' + pdEsc(query) + '&quot; in een registratie') + '</div>'
+      : '<div style="padding:14px;color:var(--muted);font-size:12.5px;text-align:center;">Geen medewerker gevonden.</div>') +
+      getoond.map(function(naam){
       var matchNaam = naam.toLowerCase().indexOf(q) !== -1;
-      return '<div onclick="pdSelecteer(\'' + naam.replace(/'/g, "\\'") + '\')" style="padding:9px 14px;cursor:pointer;border-bottom:1px solid #f0f2f5;font-size:13px;display:flex;justify-content:space-between;align-items:center;' + (matchNaam ? 'background:#fff7e0;color:#333;font-weight:700;' : 'background:#fff;color:#ccc;') + '">' +
+      return '<div onclick="pdSelecteer(\'' + naam.replace(/'/g, "\\'") + '\')" style="padding:9px 14px;cursor:pointer;border-bottom:1px solid #f0f2f5;font-size:13px;display:flex;justify-content:space-between;align-items:center;' + (matchNaam ? 'background:#fff7e0;color:#333;font-weight:700;' : 'background:#fff;color:#333;') + '">' +
         '<span>' + pdEsc(naam) + '</span><span style="font-size:11px;color:var(--muted);">' + (data[naam]||[]).length + '</span></div>';
     }).join('');
   }
