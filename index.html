@@ -23678,7 +23678,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.61';
+var DJ_BUILD = '2026-10-07.62';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -29996,7 +29996,7 @@ function pdRenderLijst(){
       var isContainer = naam === groep;
       var label = isContainer ? 'Algemeen (niet op naam)' : naam.replace(/ \([^)]+\)$/, '');
       return '<div onclick="pdSelecteer(\'' + naam.replace(/'/g, "\\'") + '\')" style="padding:9px 14px;cursor:pointer;border-bottom:1px solid #f0f2f5;font-size:13px;display:flex;justify-content:space-between;align-items:center;' + (actief ? 'background:var(--navy);color:#fff;font-weight:700;' : 'background:#fff;color:' + (isContainer?'#999;font-style:italic;':'#333;')) + '">' +
-        '<span>' + pdEsc(label) + '</span>' +
+        '<span>' + pdEsc(label) + (!isContainer && typeof pdVlBadges === 'function' ? pdVlBadges(naam) : '') + '</span>' +
         '<span style="display:flex;align-items:center;gap:10px;flex-shrink:0;">' +
         (isContainer ? '' : pdZiekBadge(_ziekTel, naam, actief)) +
         '<span style="font-size:11px;' + (actief ? 'color:#cfe0f2;' : 'color:var(--muted);') + '">' + (data[naam]||[]).length + '</span>' +
@@ -30020,7 +30020,7 @@ function pdRenderLijst(){
     var actief = naam === _pdGeselecteerd;
     var uitDienst = _pdCategorie === 'uit_dienst';
     return '<div onclick="pdSelecteer(\'' + naam.replace(/'/g, "\\'") + '\')" style="padding:9px 14px;cursor:pointer;border-bottom:1px solid #f0f2f5;font-size:13px;display:flex;justify-content:space-between;align-items:center;' + (actief ? 'background:var(--navy);color:#fff;font-weight:700;' : 'background:#fff;' + (uitDienst?'color:#999;font-style:italic;':'color:#333;')) + '">' +
-      '<span>' + pdEsc(naam) + '</span>' +
+      '<span>' + pdEsc(naam) + (typeof pdVlBadges === 'function' ? pdVlBadges(naam) : '') + '</span>' +
       '<span style="display:flex;align-items:center;gap:10px;flex-shrink:0;">' +
       pdZiekBadge(_ziekTel, naam, actief) +
       '<span style="font-size:11px;' + (actief ? 'color:#cfe0f2;' : 'color:var(--muted);') + '">' + (data[naam]||[]).length + '</span>' +
@@ -33879,6 +33879,20 @@ function pdVlStatusHtml(v){
   return '<span style="font-size:11.5px;color:#5a6b80;">' + p.map(function(x){
     var klaar = nu >= x.tot; return (klaar ? '<span style="color:#8795a8;text-decoration:line-through;">' : '<b style="color:#6b3fa0;">') + namen[x.soort] + (klaar ? ' voorbij' : ' t/m ' + caoFmt(x.tot)) + (klaar ? '</span>' : '</b>');
   }).join(' &middot; ') + '</span>';
+}
+</script>
+<script>
+// Personeelsdossier-lijst: 🍼 = geboorteverlof (of aanvullend) loopt nog, + = ouderschapsverlof loopt nog
+function pdVlBadges(naam){
+  try {
+    var v = (typeof pdVerlofGet === 'function' ? pdVerlofGet() : {})[naam]; if (!v) return '';
+    var nu = new Date(), geb = false, ouder = false, p = pdVlPerioden(v);
+    if (p) p.forEach(function(x){ if (nu >= x.van && nu < x.tot) { if (x.soort === 'ouder') ouder = true; else geb = true; } });
+    else if ((v.verlofJaar || 2026) === nu.getFullYear()) { geb = !!(v.geb || v.aanv); ouder = !!v.ouder; } // oude invoer zonder geboortedatum kind
+    if (!geb && !ouder) return '';
+    return ' <span style="font-size:12px;white-space:nowrap;" title="' + (geb ? 'Geboorteverlof loopt nog' : '') + (geb && ouder ? ' · ' : '') + (ouder ? 'Ouderschapsverlof loopt nog' : '') + '">' +
+      (geb ? '&#x1F37C;' : '') + (ouder ? '<b style="color:#6b3fa0;font-size:13px;">+</b>' : '') + '</span>';
+  } catch(e) { return ''; }
 }
 </script>
 </body>
