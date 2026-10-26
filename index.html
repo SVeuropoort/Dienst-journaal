@@ -3136,7 +3136,7 @@ async function spOphalenBestandRuw(bestandsnaam){
 //    nog aan vertrouwelijke sleutels in main stond, blijft ongemoeid staan.
 var DJ_VERTR_SLEUTELS = ['dienstjournaal_stena_v1', 'werkoverdracht_ziekmeldingen_v1',
   'personeelsdossier_v1', 'personeelsdossier_actief_v1',
-  'ma_loongroepen_v1', 'ma_medewerkers_v1', 'ma_hvh_v1', 'plan_sv_v1', 'startup_v1', 'kledingpunten_v1', 'bezetting_deeltijd_v1'];
+  'ma_loongroepen_v1', 'ma_medewerkers_v1', 'ma_hvh_v1', 'plan_sv_v1', 'startup_v1', 'kledingpunten_v1', 'bezetting_deeltijd_v1', 'pd_verlof_v1'];
 function djIsVertrSleutel(k){ return DJ_VERTR_SLEUTELS.indexOf(String(k).replace(/^(EP|HVH|IMM)_/, '')) >= 0; }
 function djVertrSplits(data){
   var vertr = {}, rest = {};
@@ -6947,6 +6947,7 @@ window.addEventListener('resize', () => {
     'dagplan_log_v1',
     'kledingpunten_v1',
     'bezetting_deeltijd_v1',
+    'pd_verlof_v1',
     'bezetting_instellingen_v1',
     'bezetting_samenvatting_v1',
     'tegel_links_v1',
@@ -7213,6 +7214,7 @@ window.addEventListener('resize', () => {
     'dagplan_log_v1',
     'kledingpunten_v1',
     'bezetting_deeltijd_v1',
+    'pd_verlof_v1',
     'bezetting_instellingen_v1',
     'bezetting_samenvatting_v1',
     'tegel_links_v1',
@@ -23676,7 +23678,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.44';
+var DJ_BUILD = '2026-10-07.47';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -33335,7 +33337,7 @@ var BEZ_EP_WEKEN = [
   ['S','V','L','L','L','L','V'],['S','V','D','D','D','D','V'],['V','L','L','L','L','L','V'],['S','V','D','D','D','V','S'],['S','L','V','D','D','D','V'],['V','L','L','L','L','L','V'],
   ['V','D','D','V','D','D','S'],['S','V','V','L','L','L','V'],['S','D','D','D','D','D','V'],['V','L','L','L','L','L','V'],['S','L','L','V','D','D','S'],['S','V','D','D','D','D','V']];
 var BEZ_DAGEN = ['Zo', 'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za'];
-function bezInstGet(){ var d = { ortTab: 'Europoort', ploeg: 3, snipper: 35, ziekte: 5, stag: 0, stagDagen: 3.5 };
+function bezInstGet(){ var d = { ortTab: 'Europoort', ploeg: 3, snipper: 35, adv: 0, ziekte: 5, stag: 0, stagDagen: 3.5 };
   try { return Object.assign(d, JSON.parse(localStorage.getItem(tk('bezetting_instellingen_v1')) || '{}')); } catch(e) { return d; } }
 function bezInstSet(x){ localStorage.setItem(tk('bezetting_instellingen_v1'), JSON.stringify(x)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }
 function bezDeeltijdGet(){ try { return JSON.parse(localStorage.getItem(tk('bezetting_deeltijd_v1')) || '{}') || {}; } catch(e) { return {}; } }
@@ -33344,9 +33346,12 @@ function bezDeeltijdSet(x){ localStorage.setItem(tk('bezetting_deeltijd_v1'), JS
 function bezRoosters(){
   var lijst = [];
   try { var st = JSON.parse(localStorage.getItem((sessionStorage.getItem('dj_terminal') || 'EP') + '_ortRekentoolState_v1') || 'null');
-    (st && st.tabs || []).forEach(function(t){ if (t && t.weeks && t.data) lijst.push({ naam: t.name, weken: t.weeks, werk: function(w, d){ var c = t.data[w + '_' + d]; return c && !c.vrij; } }); });
+    (st && st.tabs || []).forEach(function(t){ if (t && t.weeks && t.data) lijst.push({ naam: t.name, weken: t.weeks,
+      werk: function(w, d){ var c = t.data[w + '_' + d]; return c && !c.vrij; },
+      ochtend: function(w, d){ var c = t.data[w + '_' + d]; return !!(c && parseInt(String(c.start || '07'), 10) < 11); } }); });
   } catch(e) {}
-  if (!lijst.some(function(r){ return r.naam === 'Europoort'; })) lijst.unshift({ naam: 'Europoort', weken: 18, werk: function(w, d){ return BEZ_EP_WEKEN[w][d] !== 'V'; } });
+  if (!lijst.some(function(r){ return r.naam === 'Europoort'; })) lijst.unshift({ naam: 'Europoort', weken: 18, werk: function(w, d){ return BEZ_EP_WEKEN[w][d] !== 'V'; },
+    ochtend: function(w, d){ var c = BEZ_EP_WEKEN[w][d]; return c === 'D' || (c === 'S' && d === 6); } }); // zondag 12:00 = middag, zaterdag 07:00 = ochtend
   return lijst;
 }
 function bezMedewerkers(){
@@ -33360,24 +33365,57 @@ function bezVoorstelUitKleding(naam){
     if (p.length === 1 && p[0].dg) return Math.round(Math.min(5, Number(p[0].dg)) / 5 * 100);
   } catch(e) {} return null;
 }
+function bezZiekteAuto(){
+  try {
+    if (typeof VZ === 'undefined' || typeof vzBron !== 'function') return null;
+    var src = vzBron(), ms = [];
+    for (var i = 11; i >= 0; i--) { var d = new Date(src.jaar, src.maand - i, 1); ms.push({ jaar: d.getFullYear(), maand: d.getMonth(), key: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') }); }
+    var sv = VZ.samenvatting(src, ms);
+    return (sv && sv.pct !== null && sv.pct !== undefined && !isNaN(sv.pct)) ? Math.round(sv.pct * 10) / 10 : null;
+  } catch(e) { return null; }
+}
+function bezWeergave(){ var d = { stag: true, ziekte: true, geb: true, ouder: true }; try { return Object.assign(d, JSON.parse(localStorage.getItem('bez_weergave') || '{}')); } catch(e) { return d; } }
+window.bezWissel = function(k){ var w = bezWeergave(); w[k] = !w[k]; localStorage.setItem('bez_weergave', JSON.stringify(w)); bezRender(); };
 function bezBereken(){
   var inst = bezInstGet(), r = bezRoosters().find(function(x){ return x.naam === inst.ortTab; }) || bezRoosters()[0];
-  var perDag = [0, 0, 0, 0, 0, 0, 0], diensten = 0;
-  for (var w = 0; w < r.weken; w++) for (var d = 0; d < 7; d++) if (r.werk(w, d)) { perDag[d] += inst.ploeg; diensten++; }
+  var perDag = [0, 0, 0, 0, 0, 0, 0], diensten = 0, ochtend = [0, 0, 0, 0, 0, 0, 0], middag = [0, 0, 0, 0, 0, 0, 0];
+  for (var w = 0; w < r.weken; w++) for (var d = 0; d < 7; d++) if (r.werk(w, d)) { diensten++; if (r.ochtend(w, d)) ochtend[d] += inst.ploeg; else middag[d] += inst.ploeg; }
+  var roosterO = ochtend.slice(), roosterM = middag.slice();
+  // Zelf aangepast "nodig per dienst" gaat vóór het rooster
+  var ov = inst.nodig || {};
+  for (var d2 = 0; d2 < 7; d2++) {
+    if (ov[d2] && ov[d2].o !== undefined && ov[d2].o !== '') ochtend[d2] = Number(ov[d2].o) || 0;
+    if (ov[d2] && ov[d2].m !== undefined && ov[d2].m !== '') middag[d2] = Number(ov[d2].m) || 0;
+    perDag[d2] = ochtend[d2] + middag[d2];
+  }
   var nodigWeek = perDag.reduce(function(a, b){ return a + b; }, 0);
+  var aangepast = Object.keys(ov).some(function(k){ return ov[k] && ((ov[k].o !== undefined && ov[k].o !== '') || (ov[k].m !== undefined && ov[k].m !== '')); });
   var roosterPerJaar = diensten / r.weken * 52; // diensten per persoon per jaar volgens dit rooster
-  var dt = bezDeeltijdGet(), mw = bezMedewerkers(), som = 0, fte = 0, meetellen = 0;
+  var zAuto = bezZiekteAuto(), ziekte = zAuto !== null ? zAuto : inst.ziekte;
+  var vrijPerJaar = (Number(inst.snipper) || 0) + (Number(inst.adv) || 0);
+  var dt = bezDeeltijdGet(), mw = bezMedewerkers(), som0 = 0, fte = 0, meetellen = 0;
+  var wekelijks = roosterPerJaar / 52, verlof = { geb: 0, aanv: 0, ouder: 0 }, verlofN = { geb: 0, aanv: 0, ouder: 0 };
   mw.forEach(function(m){
-    var pct = (m.naam in dt) ? dt[m.naam] : (bezVoorstelUitKleding(m.naam) || 100);
+    var vl = (typeof bezVerlofVoor === 'function') ? bezVerlofVoor(m.naam) : null;
+    // Volgorde: "telt niet mee" in de KPI-lijst > % uit het personeelsdossier > % uit de KPI-lijst > voorstel kledingpunten > 100%
+    var pct = (dt[m.naam] === 0) ? 0 : ((vl && vl.pct) ? Number(vl.pct) : ((m.naam in dt) ? dt[m.naam] : (bezVoorstelUitKleding(m.naam) || 100)));
     if (!pct) return; meetellen++; fte += pct / 100;
-    som += (roosterPerJaar - inst.snipper) * (pct / 100) * (1 - inst.ziekte / 100);
+    som0 += (roosterPerJaar - vrijPerJaar) * (pct / 100); // zonder ziekte en zonder verlof
+    if (vl) { // verlof in werkweken × diensten per week van deze medewerker
+      var pw = wekelijks * pct / 100;
+      if (vl.geb) { verlof.geb += 1 * pw; verlofN.geb++; }
+      if (vl.aanv) { verlof.aanv += Number(vl.aanv) * pw; verlofN.aanv++; }
+      if (vl.ouder) { verlof.ouder += Number(vl.ouder) * pw; verlofN.ouder++; }
+    }
   });
+  var som = som0 * (1 - ziekte / 100);
   var stagJaar = inst.stag * inst.stagDagen * 52;
   var beschikbaar = som / 52, beschikbaarMet = (som + stagJaar) / 52;
-  var perFteWeek = (roosterPerJaar - inst.snipper) * (1 - inst.ziekte / 100) / 52;
-  return { inst: inst, rooster: r.naam, weken: r.weken, perDag: perDag, nodig: nodigWeek, roosterPerJaar: roosterPerJaar, medewerkers: meetellen, fte: fte,
+  var perFteWeek = (roosterPerJaar - vrijPerJaar) * (1 - ziekte / 100) / 52;
+  return { inst: inst, rooster: r.naam, weken: r.weken, perDag: perDag, ochtend: ochtend, middag: middag, roosterO: roosterO, roosterM: roosterM, aangepast: aangepast, nodig: nodigWeek, roosterPerJaar: roosterPerJaar, medewerkers: meetellen, fte: fte,
     beschikbaar: beschikbaar, beschikbaarMet: beschikbaarMet, graad: nodigWeek ? beschikbaar / nodigWeek : 0, graadMet: nodigWeek ? beschikbaarMet / nodigWeek : 0,
-    tekort: Math.max(0, nodigWeek - beschikbaarMet), perFteWeek: perFteWeek, berekend: Date.now() };
+    tekort: Math.max(0, nodigWeek - beschikbaarMet), perFteWeek: perFteWeek, berekend: Date.now(),
+    som0: som0, ziekte: ziekte, ziekteAuto: zAuto !== null, stagJaar: stagJaar, vrijPerJaar: vrijPerJaar, verlof: verlof, verlofN: verlofN };
 }
 function bezFmt(x, n){ return Number(x).toLocaleString('nl-NL', { minimumFractionDigits: n || 0, maximumFractionDigits: n || 0 }); }
 async function bezRender(){
@@ -33393,24 +33431,41 @@ async function bezRender(){
     if (!oud || JSON.stringify(Object.assign(JSON.parse(oud), { berekend: undefined })) !== nieuw) { localStorage.setItem(tk('bezetting_samenvatting_v1'), JSON.stringify(b)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }
   } else { try { b = JSON.parse(localStorage.getItem(tk('bezetting_samenvatting_v1')) || 'null'); } catch(e) { b = null; } }
   if (!b) { box.innerHTML = '<div style="font-weight:800;color:var(--navy);font-size:16px;">&#x1F4CA; Bezettingsgraad eigen medewerkers</div><div style="color:#8795a8;font-size:13px;margin-top:6px;">Nog niet berekend. Een supervisor (met toegang tot de Maandafsluiting) opent dit dashboard één keer, daarna is de uitkomst hier zichtbaar.</div>'; return; }
+  // Weergave volgens de knoppen (met/zonder stagiaires, met/zonder ziekteverzuim)
+  var wg = bezWeergave();
+  if (b.som0 !== undefined) {
+    var zf = wg.ziekte ? (1 - (b.ziekte || 0) / 100) : 1, vl = b.verlof || { geb: 0, aanv: 0, ouder: 0 };
+    var verlofJaar = (wg.geb ? vl.geb + vl.aanv : 0) + (wg.ouder ? vl.ouder : 0);
+    b.verlofWeek = verlofJaar / 52;
+    b.beschikbaar = (b.som0 - verlofJaar) * zf / 52; b.beschikbaarMet = ((b.som0 - verlofJaar) * zf + (wg.stag ? b.stagJaar : 0)) / 52;
+    b.graad = b.nodig ? b.beschikbaar / b.nodig : 0; b.graadMet = b.nodig ? b.beschikbaarMet / b.nodig : 0;
+    b.tekort = Math.max(0, b.nodig - b.beschikbaarMet); b.perFteWeek = (b.roosterPerJaar - (b.vrijPerJaar || 0)) * zf / 52;
+  }
+  var knopW = function(k, aan, uit){ var on = wg[k]; return '<button type="button" onclick="bezWissel(\'' + k + '\')" style="padding:6px 12px;border:1px solid ' + (on ? '#003366' : '#c8d7e8') + ';background:' + (on ? '#003366' : '#fff') + ';color:' + (on ? '#fff' : '#003366') + ';border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">' + (on ? '&#x2714; ' + aan : uit) + '</button>'; };
   var kleur = b.graadMet >= 0.95 ? '#1a7a40' : b.graadMet >= 0.85 ? '#b9770e' : '#c0392b';
   var tegel = function(t, w, sub, k){ return '<div style="flex:1;min-width:150px;background:#f5f8fc;border:1px solid #dbe5f0;border-radius:8px;padding:10px 12px;"><div style="font-size:11px;font-weight:700;color:#5a6b80;text-transform:uppercase;letter-spacing:.4px;">' + t + '</div><div style="font-size:24px;font-weight:800;color:' + (k || 'var(--navy)') + ';">' + w + '</div><div style="font-size:11.5px;color:#5a6b80;">' + (sub || '') + '</div></div>'; };
   var h = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><div style="font-weight:800;color:var(--navy);font-size:16px;flex:1;">&#x1F4CA; Bezettingsgraad eigen medewerkers</div>' +
-    '<span style="font-size:11.5px;color:#7a8696;">Rooster: <b>' + oplEsc(b.rooster) + '</b> (' + b.weken + ' ploegen \u00D7 ' + b.inst.ploeg + ') &middot; ziekte ' + bezFmt(b.inst.ziekte) + '% &middot; ' + bezFmt(b.inst.snipper) + ' snipperdagen</span></div>' +
+    '<span style="font-size:11.5px;color:#7a8696;">Rooster: <b>' + oplEsc(b.rooster) + '</b> (' + b.weken + ' ploegen \u00D7 ' + b.inst.ploeg + ') &middot; ' + bezFmt(b.inst.snipper) + ' snipperdagen' + (b.inst.adv ? ' + ' + bezFmt(b.inst.adv) + ' ADV' : '') + ' &middot; ziekte ' + bezFmt(b.ziekte !== undefined ? b.ziekte : b.inst.ziekte, 1) + '%' + (b.ziekteAuto ? ' (gem. 12 mnd)' : '') + '</span></div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">' + knopW('stag', 'Met stagiaires', 'Zonder stagiaires') + knopW('ziekte', 'Met ziekteverzuim', 'Zonder ziekteverzuim') +
+      knopW('geb', 'Met geboorteverlof', 'Zonder geboorteverlof') + knopW('ouder', 'Met ouderschapsverlof', 'Zonder ouderschapsverlof') + '</div>' +
     '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">' +
-      tegel('Bezettingsgraad', bezFmt(b.graadMet * 100, 1) + '%', b.inst.stag ? 'zonder stagiaires: ' + bezFmt(b.graad * 100, 1) + '%' : 'met eigen medewerkers', kleur) +
-      tegel('Nodig per week', bezFmt(b.nodig) + ' diensten', 'volgens het basisrooster') +
-      tegel('Beschikbaar per week', bezFmt(b.beschikbaarMet, 1) + ' diensten', b.medewerkers + ' medewerkers = ' + bezFmt(b.fte, 1) + ' fte' + (b.inst.stag ? ' + ' + b.inst.stag + ' stagiair(s)' : '')) +
+      tegel('Bezettingsgraad', bezFmt(b.graadMet * 100, 1) + '%', [wg.stag ? 'met stagiaires' : 'zonder stagiaires', wg.ziekte ? 'met ziekte' : 'zonder ziekte', wg.geb ? 'met geboorteverlof' : 'zonder geboorteverlof', wg.ouder ? 'met ouderschapsverlof' : 'zonder ouderschapsverlof'].join(', '), kleur) +
+      tegel('Nodig per week', bezFmt(b.nodig) + ' diensten', b.aangepast ? 'rooster, met eigen aanpassingen' : 'volgens het basisrooster') +
+      tegel('Beschikbaar per week', bezFmt(b.beschikbaarMet, 1) + ' diensten', b.medewerkers + ' medewerkers = ' + bezFmt(b.fte, 1) + ' fte' + (b.inst.stag && wg.stag ? ' + ' + b.inst.stag + ' stagiair(s)' : '')) +
       tegel('Flexibele pool nodig', bezFmt(b.tekort, 1) + ' diensten/wk', '\u2248 ' + bezFmt(b.perFteWeek ? b.tekort / b.perFteWeek : 0, 1) + ' fte (inhuur / overwerk)', b.tekort > 0 ? '#c0392b' : '#1a7a40') +
     '</div>' +
     '<div style="overflow-x:auto;margin-top:12px;"><table style="border-collapse:collapse;font-size:12.5px;min-width:520px;"><tr><th style="text-align:left;padding:4px 8px;color:#5a6b80;">Per dag</th>' + BEZ_DAGEN.map(function(d){ return '<th style="padding:4px 10px;color:#5a6b80;">' + d + '</th>'; }).join('') + '<th style="padding:4px 10px;color:#5a6b80;">Week</th></tr>' +
-    '<tr><td style="padding:4px 8px;">Nodig (op dienst)</td>' + b.perDag.map(function(x){ return '<td style="text-align:center;padding:4px 10px;font-weight:700;">' + x + '</td>'; }).join('') + '<td style="text-align:center;font-weight:800;">' + b.nodig + '</td></tr>' +
+    (b.ochtend ? '<tr><td style="padding:4px 8px;color:#5a6b80;">Nodig ochtend</td>' + b.ochtend.map(function(x){ return '<td style="text-align:center;padding:4px 10px;color:#5a6b80;">' + x + '</td>'; }).join('') + '<td style="text-align:center;color:#5a6b80;">' + b.ochtend.reduce(function(a, c){ return a + c; }, 0) + '</td></tr>' +
+      '<tr><td style="padding:4px 8px;color:#5a6b80;">Nodig middag</td>' + b.middag.map(function(x){ return '<td style="text-align:center;padding:4px 10px;color:#5a6b80;">' + x + '</td>'; }).join('') + '<td style="text-align:center;color:#5a6b80;">' + b.middag.reduce(function(a, c){ return a + c; }, 0) + '</td></tr>' : '') +
+    '<tr><td style="padding:4px 8px;">Nodig (op dienst)' + (b.aangepast ? ' <span title="Zelf aangepast t.o.v. het rooster" style="color:#b9770e;">&#x270F;&#xFE0F;</span>' : '') + '</td>' + b.perDag.map(function(x){ return '<td style="text-align:center;padding:4px 10px;font-weight:700;">' + x + '</td>'; }).join('') + '<td style="text-align:center;font-weight:800;">' + b.nodig + '</td></tr>' +
     '<tr><td style="padding:4px 8px;">Eigen mensen (gem.)</td>' + b.perDag.map(function(x){ return '<td style="text-align:center;padding:4px 10px;">' + bezFmt(x * b.graadMet, 1) + '</td>'; }).join('') + '<td style="text-align:center;font-weight:800;">' + bezFmt(b.beschikbaarMet, 1) + '</td></tr>' +
     '<tr><td style="padding:4px 8px;color:#c0392b;">Tekort (flex)</td>' + b.perDag.map(function(x){ return '<td style="text-align:center;padding:4px 10px;color:#c0392b;">' + bezFmt(Math.max(0, x * (1 - b.graadMet)), 1) + '</td>'; }).join('') + '<td style="text-align:center;font-weight:800;color:#c0392b;">' + bezFmt(b.tekort, 1) + '</td></tr></table></div>' +
     '<details style="margin-top:10px;font-size:12.5px;"><summary style="cursor:pointer;font-weight:700;color:var(--navy);">Hoe is dit berekend?</summary><div style="line-height:1.6;margin-top:6px;color:#333;">' +
-      'Per medewerker: (' + bezFmt(b.roosterPerJaar) + ' roosterdiensten per jaar \u2212 ' + bezFmt(b.inst.snipper) + ' snipperdagen) \u00D7 deeltijd% \u00D7 (1 \u2212 ' + bezFmt(b.inst.ziekte) + '% ziekte). ' +
+      'Per medewerker: (' + bezFmt(b.roosterPerJaar) + ' roosterdiensten per jaar \u2212 ' + bezFmt(b.inst.snipper) + ' snipperdagen' + (b.inst.adv ? ' \u2212 ' + bezFmt(b.inst.adv) + ' ADV-dagen' : '') + ') \u00D7 deeltijd%' + (wg.ziekte ? ' \u00D7 (1 \u2212 ' + bezFmt(b.ziekte !== undefined ? b.ziekte : b.inst.ziekte, 1) + '% ziekte' + (b.ziekteAuto ? ', gemiddelde verzuim afgelopen 12 maanden' : '') + ')' : ' (zonder ziekteverzuim)') + '. ' +
+      (b.verlof ? 'Verlof (uit het personeelsdossier): geboorteverlof ' + (b.verlofN.geb || 0) + ' mw, aanvullend geboorteverlof ' + (b.verlofN.aanv || 0) + ' mw, ouderschapsverlof ' + (b.verlofN.ouder || 0) + ' mw = ' + bezFmt(b.verlofWeek || 0, 1) + ' diensten per week minder' + ((wg.geb || wg.ouder) ? '' : ' (nu uitgezet)') + '. ' : '') +
       'Opgeteld voor alle ' + b.medewerkers + ' medewerkers uit de Maandafsluiting en gedeeld door 52 weken = <b>' + bezFmt(b.beschikbaar, 1) + '</b> diensten per week' +
-      (b.inst.stag ? ', plus ' + b.inst.stag + ' stagiair(s) \u00D7 ' + bezFmt(b.inst.stagDagen, 1) + ' dagen = <b>' + bezFmt(b.beschikbaarMet, 1) + '</b>' : '') + '. ' +
+      (b.inst.stag && wg.stag ? ', plus ' + b.inst.stag + ' stagiair(s) \u00D7 ' + bezFmt(b.inst.stagDagen, 1) + ' dagen = <b>' + bezFmt(b.beschikbaarMet, 1) + '</b>' : '') + '. ' +
+      '<br><span style="color:#5a6b80;">Regels 2026: geboorteverlof partner = 1 werkweek (100% doorbetaald); aanvullend geboorteverlof = max. 5 werkweken binnen 6 maanden (70% UWV); ouderschapsverlof = 26 werkweken tot het kind 8 jaar is, waarvan max. 9 weken (deels) betaald in het eerste jaar.</span><br>' +
       'Nodig: per dag de ploegen die volgens het rooster op dienst zijn \u00D7 ' + b.inst.ploeg + ' man = <b>' + b.nodig + '</b> diensten per week. Bezettingsgraad = beschikbaar \u00F7 nodig.</div></details>';
   if (mag) h += bezBeheerHtml(b);
   else h += '<div style="font-size:11px;color:#7a8696;margin-top:8px;">Berekend op ' + new Date(b.berekend || Date.now()).toLocaleString('nl-NL') + '. Instellingen en deeltijdpercentages zijn alleen voor supervisors.</div>';
@@ -33423,18 +33478,76 @@ function bezBeheerHtml(b){
   return '<details style="margin-top:10px;font-size:12.5px;"><summary style="cursor:pointer;font-weight:700;color:var(--navy);">&#x2699;&#xFE0F; Instellingen en deeltijd per medewerker (alleen supervisors)</summary>' +
     '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin:10px 0;">' +
       '<label style="display:flex;flex-direction:column;font-size:11px;font-weight:700;color:#5a6b80;gap:2px;">Rooster (uit ORT)<select onchange="bezZet(\'ortTab\',this.value)" style="padding:5px;border:1px solid #c8d7e8;border-radius:5px;">' + rs.map(function(r){ return '<option' + (r.naam === inst.ortTab ? ' selected' : '') + '>' + oplEsc(r.naam) + '</option>'; }).join('') + '</select></label>' +
-      inp('ploeg', 'Mensen per ploeg', 1) + inp('snipper', 'Snipperdagen/jaar', 1) + inp('ziekte', 'Ziekte %', 0.5) + inp('stag', 'Stagiaires', 1) + inp('stagDagen', 'Dagen/wk stagiair', 0.5) + '</div>' +
+      inp('ploeg', 'Mensen per ploeg', 1) + inp('snipper', 'Snipperdagen/jaar', 1) + inp('adv', 'ADV/jaar', 1) +
+      (b.ziekteAuto ? '<label style="display:flex;flex-direction:column;font-size:11px;font-weight:700;color:#5a6b80;gap:2px;">Ziekte %<span style="padding:6px 8px;background:#eef3fa;border:1px solid #c8d7e8;border-radius:5px;font-size:13px;color:var(--navy);" title="Automatisch: gemiddelde van Verzuim &amp; Bezetting over de afgelopen 12 maanden">' + bezFmt(b.ziekte, 1) + '% <span style="font-weight:400;color:#7a8696;font-size:11px;">auto</span></span></label>'
+        : inp('ziekte', 'Ziekte % (geen verzuimdata)', 0.5)) +
+      inp('stag', 'Stagiaires', 1) + inp('stagDagen', 'Dagen/wk stagiair', 0.5) + '</div>' +
+    '<div style="font-weight:700;color:var(--navy);margin:6px 0 4px;">Nodig per dienst</div>' +
+    '<div style="font-size:11.5px;color:#5a6b80;margin-bottom:4px;">Leeg = volgens het rooster (grijs voorgevuld). Vul een getal in als er op die dienst meer of minder mensen nodig zijn.</div>' +
+    '<div style="overflow-x:auto;margin-bottom:10px;"><table style="border-collapse:collapse;font-size:12.5px;"><tr><th></th>' + BEZ_DAGEN.map(function(d){ return '<th style="padding:3px 6px;color:#5a6b80;">' + d + '</th>'; }).join('') +
+      '<th><button type="button" onclick="bezNodigWissen()" style="font-size:11px;border:1px solid #c8d7e8;background:#fff;border-radius:4px;padding:2px 8px;cursor:pointer;">Terug naar rooster</button></th></tr>' +
+      [['o', 'Ochtend', b.roosterO || []], ['m', 'Middag', b.roosterM || []]].map(function(rij){
+        return '<tr><td style="padding:3px 8px;font-weight:700;">' + rij[1] + '</td>' + BEZ_DAGEN.map(function(_, d){
+          var ov = (inst.nodig || {})[d] || {}, v = (ov[rij[0]] !== undefined && ov[rij[0]] !== '') ? ov[rij[0]] : '';
+          return '<td style="padding:2px 3px;"><input type="number" min="0" step="1" value="' + v + '" placeholder="' + (rij[2][d] || 0) + '" onchange="bezNodig(' + d + ',\'' + rij[0] + '\',this.value)" style="width:52px;padding:4px;border:1px solid ' + (v !== '' ? '#e0a03a' : '#c8d7e8') + ';border-radius:4px;text-align:center;"></td>';
+        }).join('') + '<td></td></tr>';
+      }).join('') + '</table></div>' +
     '<div style="font-size:11.5px;color:#5a6b80;margin-bottom:6px;">Deeltijd: 0% = telt niet mee (bijv. supervisors of iemand die langdurig weg is). Nog niet ingevuld? Dan wordt het voorstel uit de kledingpunten (dagen/week) gebruikt, anders 100%.</div>' +
     '<div style="max-height:320px;overflow:auto;border:1px solid #e3eaf2;border-radius:6px;columns:2 260px;column-gap:18px;padding:6px 10px;">' +
     mw.map(function(m){ var ingevuld = m.naam in dt, pct = ingevuld ? dt[m.naam] : (bezVoorstelUitKleding(m.naam) || 100);
       return '<div style="display:flex;align-items:center;gap:6px;padding:2px 0;break-inside:avoid;"><span style="flex:1;' + (pct ? '' : 'color:#9aa6b4;text-decoration:line-through;') + '">' + oplEsc(m.naam) + '</span>' +
-        '<select onchange="bezPct(this.dataset.n,this.value)" data-n="' + oplEsc(m.naam) + '" style="padding:2px 4px;border:1px solid ' + (ingevuld ? '#c8d7e8' : '#f0c27a') + ';border-radius:4px;font-size:12px;" title="' + (ingevuld ? '' : 'Voorstel, nog niet bevestigd') + '">' +
+        '<select onchange="bezPct(this.dataset.n,this.value)" data-n="' + oplEsc(m.naam) + '" style="width:auto!important;flex:0 0 auto;padding:2px 4px;border:1px solid ' + (ingevuld ? '#c8d7e8' : '#f0c27a') + ';border-radius:4px;font-size:12px;" title="' + (ingevuld ? '' : 'Voorstel, nog niet bevestigd') + '">' +
         opties.concat(opties.indexOf(pct) < 0 ? [pct] : []).map(function(o){ return '<option value="' + o + '"' + (o === pct ? ' selected' : '') + '>' + (o ? o + '%' : 'telt niet mee') + '</option>'; }).join('') + '</select></div>';
     }).join('') + '</div></details>';
 }
 window.bezZet = function(k, v){ var i = bezInstGet(); i[k] = k === 'ortTab' ? v : (Number(String(v).replace(',', '.')) || 0); bezInstSet(i); bezRender(); };
+window.bezNodig = function(d, soort, v){ var i = bezInstGet(); i.nodig = i.nodig || {}; i.nodig[d] = i.nodig[d] || {}; i.nodig[d][soort] = (v === '' ? '' : Math.max(0, Number(v) || 0)); bezInstSet(i); bezRender().then(function(){ var dt = document.querySelector('#bez-kaart details:last-of-type'); if (dt) dt.open = true; }); };
+window.bezNodigWissen = function(){ if (!confirm('Alle aanpassingen bij "Nodig per dienst" wissen en weer het rooster gebruiken?')) return; var i = bezInstGet(); i.nodig = {}; bezInstSet(i); bezRender().then(function(){ var dt = document.querySelector('#bez-kaart details:last-of-type'); if (dt) dt.open = true; }); };
 window.bezPct = function(naam, v){ var d = bezDeeltijdGet(); d[naam] = Number(v); bezDeeltijdSet(d); bezRender(); };
 (function(){ if (typeof navTo !== 'function') return; var _n = navTo; navTo = function(view){ var r = _n.apply(this, arguments); if (view === 'archief') setTimeout(bezRender, 200); return r; }; window.navTo = navTo; })();
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// Werktijd & verlof per medewerker (Personeelsdossier, vertrouwelijk) — voor de bezettingsgraad
+// Regels (Wet arbeid en zorg, 2026):
+//  • Geboorteverlof partner: 1× de wekelijkse arbeidsduur (100% doorbetaald)
+//  • Aanvullend geboorteverlof: max. 5× de wekelijkse arbeidsduur, binnen 6 maanden na de geboorte (70% UWV)
+//  • Ouderschapsverlof: 26× de wekelijkse arbeidsduur tot het kind 8 jaar is; max. 9 weken (deels) betaald in het eerste jaar
+// ══════════════════════════════════════════════════════════════════
+function pdVerlofKey(){ return tk('pd_verlof_v1'); }
+function pdVerlofGet(){ try { return JSON.parse(localStorage.getItem(pdVerlofKey()) || '{}') || {}; } catch(e) { return {}; } }
+window.pdVerlofZet = function(naam, k, v){
+  var a = pdVerlofGet(); a[naam] = a[naam] || {};
+  a[naam][k] = (k === 'geb') ? !!v : (v === '' ? '' : Number(v));
+  if (!a[naam].geb && !a[naam].aanv && !a[naam].ouder && (a[naam].pct === undefined || a[naam].pct === '' || a[naam].pct === 100)) delete a[naam];
+  localStorage.setItem(pdVerlofKey(), JSON.stringify(a)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+};
+function pdVerlofHtml(naam){
+  var v = pdVerlofGet()[naam] || {}, n = String(naam).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  var sel = function(k, opties, waarde, fmt){ return '<select onchange="pdVerlofZet(\'' + n + '\',\'' + k + '\',this.value)" style="width:auto!important;padding:3px 6px;border:1px solid #c8d7e8;border-radius:5px;font-size:12px;">' +
+    opties.map(function(o){ return '<option value="' + o + '"' + (String(o) === String(waarde) ? ' selected' : '') + '>' + fmt(o) + '</option>'; }).join('') + '</select>'; };
+  var lbl = 'display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#24313f;text-transform:none;letter-spacing:normal;';
+  return '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:-6px 0 14px;padding:8px 12px;background:#f7f3fb;border:1px solid #e0d4ee;border-radius:6px;">' +
+    '<span style="font-size:14px;">&#x1F37C;</span><span style="font-size:12px;font-weight:700;color:var(--navy);">Werktijd &amp; verlof</span>' +
+    '<label style="' + lbl + '">Werkt ' + sel('pct', [100, 90, 80, 75, 70, 60, 50, 40], v.pct === undefined || v.pct === '' ? 100 : v.pct, function(o){ return o + '%'; }) + '</label>' +
+    '<label style="' + lbl + 'cursor:pointer;" title="1× de wekelijkse arbeidsduur, 100% doorbetaald"><input type="checkbox" style="width:auto;"' + (v.geb ? ' checked' : '') + ' onchange="pdVerlofZet(\'' + n + '\',\'geb\',this.checked)"> Geboorteverlof (1 week)</label>' +
+    '<label style="' + lbl + '" title="Max. 5 weken binnen 6 maanden na de geboorte (70% via UWV)">Aanvullend geboorteverlof ' + sel('aanv', [0, 1, 2, 3, 4, 5], v.aanv || 0, function(o){ return o ? o + ' wk' : 'nee'; }) + '</label>' +
+    '<label style="' + lbl + '" title="Totaal 26× de wekelijkse arbeidsduur tot het kind 8 is; max. 9 weken (deels) betaald in het eerste jaar. Vul in hoeveel werkweken dit jaar.">Ouderschapsverlof dit jaar ' +
+      sel('ouder', [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13, 17, 20, 26], v.ouder || 0, function(o){ return o ? o + ' wk' : 'nee'; }) + '</label></div>';
+}
+(function(){ if (typeof djFunctieVakjesHtml !== 'function') return; var _o = djFunctieVakjesHtml; djFunctieVakjesHtml = function(naam){ return _o(naam) + pdVerlofHtml(naam); }; window.djFunctieVakjesHtml = djFunctieVakjesHtml; })();
+// Verlof van een medewerker uit de Maandafsluiting opzoeken in het dossier (naam kan anders geschreven zijn)
+function bezVerlofVoor(maNaam){
+  var a = pdVerlofGet(); if (a[maNaam]) return a[maNaam];
+  if (typeof vakZelfdePersoon !== 'function') return null;
+  // Alleen als het dossier-naam en de Maandafsluiting-naam elkaar EENDUIDIG aanwijzen (geen naamgenoten)
+  var alleMa = (typeof bezMedewerkers === 'function' ? bezMedewerkers() : []).map(function(m){ return m.naam; });
+  var k = Object.keys(a).filter(function(n){ return vakZelfdePersoon(n, maNaam); });
+  if (k.length !== 1) return null;
+  var terug = alleMa.filter(function(x){ return vakZelfdePersoon(k[0], x); });
+  return (terug.length === 1 && terug[0] === maNaam) ? a[k[0]] : null;
+}
 </script>
 
 </body>
