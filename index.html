@@ -23678,7 +23678,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.52';
+var DJ_BUILD = '2026-10-07.54';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -33342,11 +33342,12 @@ var BEZ_EP_WEKEN = [
   ['V','D','D','V','D','D','S'],['S','V','V','L','L','L','V'],['S','D','D','D','D','D','V'],['V','L','L','L','L','L','V'],['S','L','L','V','D','D','S'],['S','V','D','D','D','D','V']];
 var BEZ_DAGEN = ['Zo', 'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za'];
 // Standaard volgens de CAO: A25 = 5 weken vakantie (3 vakantieweken + 10 snipperdagen = 25 dagen), B3 = ADV 5% = 11,5 dag per jaar
-var BEZ_CAO_VAKANTIE = 25, BEZ_CAO_ADV = 11.5;
+var BEZ_CAO_VAKANTIE = 28, BEZ_CAO_ADV = 11.5; // huidige afspraak: 28 snipperdagen + 11,5 ADV-dagen per jaar
 function bezInstGet(){ var d = { ortTab: 'Europoort', ploeg: 3, snipper: BEZ_CAO_VAKANTIE, adv: BEZ_CAO_ADV, ziekte: 5, stag: 0, stagDagen: 3.5 }, x = {};
   try { x = JSON.parse(localStorage.getItem(tk('bezetting_instellingen_v1')) || '{}') || {}; } catch(e) {}
   // Eenmalig: de oude standaard (35 snipperdagen, geen ADV) vervangen door de CAO-waarden
   if (!x.caoStandaard && (x.snipper === undefined || Number(x.snipper) === 35) && !Number(x.adv)) { x.snipper = BEZ_CAO_VAKANTIE; x.adv = BEZ_CAO_ADV; x.caoStandaard = 1; }
+  if (x.caoStandaard !== 2 && (x.snipper === undefined || Number(x.snipper) === 25) && (x.adv === undefined || Number(x.adv) === 11.5)) { x.snipper = BEZ_CAO_VAKANTIE; x.adv = BEZ_CAO_ADV; x.caoStandaard = 2; }
   return Object.assign(d, x); }
 function bezInstSet(x){ localStorage.setItem(tk('bezetting_instellingen_v1'), JSON.stringify(x)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }
 function bezDeeltijdGet(){ try { return JSON.parse(localStorage.getItem(tk('bezetting_deeltijd_v1')) || '{}') || {}; } catch(e) { return {}; } }
@@ -33410,12 +33411,13 @@ function bezBereken(){
     var dn = (typeof bezDossierNaam === 'function') ? bezDossierNaam(m.naam) : null;
     var cp = (dn && typeof caoPersoon === 'function') ? caoPersoon(dn) : null;
     // Volgorde: "telt niet mee" in de KPI-lijst > % uit het personeelsdossier > % uit de KPI-lijst > voorstel kledingpunten > 100%
-    var pct = (vl && vl.pct !== undefined && vl.pct !== '') ? Number(vl.pct) : ((m.naam in dt) ? dt[m.naam] : (bezVoorstelUitKleding(m.naam) || 100));
+    var pct = (vl && vl.sfr) ? 100 // SFR/eerder stoppen: percentage gaat automatisch via de SFR-factor
+      : (vl && vl.pct !== undefined && vl.pct !== '') ? Number(vl.pct) : ((m.naam in dt) ? dt[m.naam] : (bezVoorstelUitKleding(m.naam) || 100));
     if (!pct) return; meetellen++; fte += pct / 100;
     var caoExtra = cp ? cp.a26 + cp.jeugd : 0; // CAO A26 + A30: altijd van toepassing
     if (cp) { caoTot.a26 += cp.a26; caoTot.jeugd += cp.jeugd; if (!cp.gebBekend && !cp.indBekend) caoTot.onbekend++; } else caoTot.onbekend++;
     som0 += (roosterPerJaar - vrijPerJaar - caoExtra) * (pct / 100); // zonder ziekte en zonder verlof
-    if (cp && cp.a27) { verlof.sen += cp.a27 * pct / 100; verlofN.sen++; } // seniorendagen (tabel AOW & SFR)
+    if (cp && cp.a27) { verlof.sen += cp.a27 * pct / 100 * cp.sfrFactor; verlofN.sen++; } // seniorendagen (zoals AOW & SFR), naar rato SFR
     if (cp && cp.sfrFactor < 1) { verlof.sfr = (verlof.sfr || 0) + (roosterPerJaar - vrijPerJaar - caoExtra) * (pct / 100) * (1 - cp.sfrFactor); verlofN.sfr = (verlofN.sfr || 0) + 1; }
     if (vl) { // verlof in werkweken × diensten per week van deze medewerker
       var pw = wekelijks * pct / 100;
@@ -33496,7 +33498,7 @@ function bezBeheerHtml(b){
   return '<details style="margin-top:10px;font-size:12.5px;"><summary style="cursor:pointer;font-weight:700;color:var(--navy);">&#x2699;&#xFE0F; Instellingen en deeltijd per medewerker (alleen supervisors)</summary>' +
     '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin:10px 0;">' +
       '<label style="display:flex;flex-direction:column;font-size:11px;font-weight:700;color:#5a6b80;gap:2px;">Rooster (uit ORT)<select onchange="bezZet(\'ortTab\',this.value)" style="padding:5px;border:1px solid #c8d7e8;border-radius:5px;">' + rs.map(function(r){ return '<option' + (r.naam === inst.ortTab ? ' selected' : '') + '>' + oplEsc(r.naam) + '</option>'; }).join('') + '</select></label>' +
-      inp('ploeg', 'Mensen per ploeg', 1) + inp('snipper', 'Vakantie + snipperdagen/jaar (CAO: 25)', 1) + inp('adv', 'ADV/jaar (CAO: 11,5)', 0.5) +
+      inp('ploeg', 'Mensen per ploeg', 1) + inp('snipper', 'Snipperdagen/jaar (standaard 28)', 1) + inp('adv', 'ADV/jaar (standaard 11,5)', 0.5) +
       (b.ziekteAuto ? '<label style="display:flex;flex-direction:column;font-size:11px;font-weight:700;color:#5a6b80;gap:2px;">Ziekte %<span style="padding:6px 8px;background:#eef3fa;border:1px solid #c8d7e8;border-radius:5px;font-size:13px;color:var(--navy);" title="Automatisch: gemiddelde van Verzuim &amp; Bezetting over de afgelopen 12 maanden">' + bezFmt(b.ziekte, 1) + '% <span style="font-weight:400;color:#7a8696;font-size:11px;">auto</span></span></label>'
         : inp('ziekte', 'Ziekte % (geen verzuimdata)', 0.5)) +
       inp('stag', 'Stagiaires', 1) + inp('stagDagen', 'Dagen/wk stagiair', 0.5) + '</div>' +
@@ -33544,7 +33546,8 @@ function pdVerlofHtml(naam){
   var lbl = 'display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#24313f;text-transform:none;letter-spacing:normal;';
   return '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:-6px 0 14px;padding:8px 12px;background:#f7f3fb;border:1px solid #e0d4ee;border-radius:6px;">' +
     '<span style="font-size:14px;">&#x1F37C;</span><span style="font-size:12px;font-weight:700;color:var(--navy);">Werktijd &amp; verlof</span>' +
-    '<label style="' + lbl + '" title="Voor de bezettingsgraad in het KPI Dashboard. \'Telt niet mee\' = bijv. supervisors of langdurig afwezig.">Werkt ' + sel('pct', [100, 90, 80, 75, 70, 60, 50, 40, 0], v.pct === undefined || v.pct === '' ? 100 : v.pct, function(o){ return o ? o + '%' : 'telt niet mee (bezetting)'; }) + '</label>' +
+    (v.sfr ? '<span style="' + lbl + '" title="Bij SFR of eerder stoppen rekent de app het percentage automatisch (80% / 60%, na de pensioendatum 0%).">Werkt <b>automatisch via ' + (v.sfr === 'sfr' ? 'SFR' : 'eerder stoppen') + '</b></span>' :
+    '<label style="' + lbl + '" title="Voor de bezettingsgraad in het KPI Dashboard. \'Telt niet mee\' = bijv. supervisors of langdurig afwezig.">Werkt ' + sel('pct', [100, 90, 80, 75, 70, 60, 50, 40, 0], v.pct === undefined || v.pct === '' ? 100 : v.pct, function(o){ return o ? o + '%' : 'telt niet mee (bezetting)'; }) + '</label>') +
     '<label style="' + lbl + 'cursor:pointer;" title="1× de wekelijkse arbeidsduur, 100% doorbetaald"><input type="checkbox" style="width:auto;"' + (v.geb ? ' checked' : '') + ' onchange="pdVerlofZet(\'' + n + '\',\'geb\',this.checked)"> Geboorteverlof (1 week)</label>' +
     '<label style="' + lbl + '" title="Max. 5 weken binnen 6 maanden na de geboorte (70% via UWV)">Aanvullend geboorteverlof ' + sel('aanv', [0, 1, 2, 3, 4, 5], v.aanv || 0, function(o){ return o ? o + ' wk' : 'nee'; }) + '</label>' +
     '<label style="' + lbl + '" title="Totaal 26× de wekelijkse arbeidsduur tot het kind 8 is; max. 9 weken (deels) betaald in het eerste jaar. Vul in hoeveel werkweken dit jaar.">Ouderschapsverlof dit jaar ' +
@@ -33646,6 +33649,24 @@ window.pdIndienstZet = function(naam, el){
   localStorage.setItem(pdVerlofKey(), JSON.stringify(a)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
   if (typeof pdRenderDetail === 'function') pdRenderDetail();
 };
+function pdRechtHtml(naam, p, vl){
+  var inst = (typeof bezInstGet === 'function') ? bezInstGet() : { snipper: 28, adv: 11.5 };
+  var jaar = new Date().getFullYear();
+  var v = (typeof getVerjaardagen === 'function' ? getVerjaardagen() : {})[naam] || {};
+  var geb = (v.dag && v.maand && v.jaar) ? new Date(+v.jaar, +v.maand - 1, +v.dag) : null;
+  var f = caoSfrFactorJaar(vl, geb, jaar), pct = (vl.sfr || vl.pct === undefined || vl.pct === '') ? 100 : Number(vl.pct);
+  var fmt = function(x){ return Number(x).toLocaleString('nl-NL', { maximumFractionDigits: 1 }); };
+  var sn = Number(inst.snipper) || 0, adv = Number(inst.adv) || 0, a26 = p.a26 + p.jeugd, sen = caoSeniorDagen(geb, jaar);
+  // Snipperdagen, ADV en seniorendagen naar rato van SFR en deeltijd; extra dagen A26/A30 blijven volledig
+  var factor = f * (pct ? pct / 100 : 0);
+  var totaal = (sn + adv + sen) * factor + (pct ? a26 : 0);
+  var delen = [fmt(sn) + ' snipperdagen', fmt(adv) + ' ADV'];
+  if (a26) delen.push(a26 + ' extra (A26' + (p.jeugd ? '/A30' : '') + ')');
+  if (sen) delen.push(fmt(sen) + ' seniorendagen (A30)');
+  return '<div style="width:100%;margin-top:6px;padding-top:6px;border-top:1px dashed #cfe6d7;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">' +
+    '<span style="font-weight:800;color:var(--navy);">Recht in ' + jaar + ': ' + fmt(totaal) + ' dagen</span>' +
+    '<span style="color:#5a6b80;">= ' + delen.join(' + ') + (factor < 1 ? ' &mdash; snipper-, ADV- en seniorendagen naar rato: ' + (f < 1 ? 'SFR ' + Math.round(f * 100) + '%' : '') + (f < 1 && pct < 100 ? ' &times; ' : '') + (pct < 100 ? 'werkt ' + pct + '%' : '') : '') + '</span></div>';
+}
 function pdCaoHtml(naam){
   var p = caoPersoon(naam), vl = pdVerlofGet()[naam] || {}, n = String(naam).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
   var ind = caoParseDatum(vl.indienst), indTxt = ind ? String(ind.getDate()).padStart(2, '0') + '-' + String(ind.getMonth() + 1).padStart(2, '0') + '-' + ind.getFullYear() : '';
@@ -33658,12 +33679,13 @@ function pdCaoHtml(naam){
     '<span style="color:#5a6b80;">' + uitleg.join(' &middot; ') + '</span>' +
     '<span title="CAO artikel A26: dienstverband 10/25/30 jaar of leeftijd 45/50/55 jaar geeft 1/2/3 extra vakantiedagen; het hoogste telt." style="font-weight:700;color:' + (p.a26 ? '#1a7a40' : '#5a6b80') + ';">Extra vakantiedagen (A26): ' + p.a26 + '</span>' +
     (p.jeugd ? '<span style="font-weight:700;color:#1a7a40;" title="CAO artikel A30: jonger dan 20 jaar">+3 jeugddagen (A30)</span>' : '') +
-    (p.a27 ? '<span style="font-weight:700;color:#1a7a40;" title="Seniorendagen volgens de tabel in AOW &amp; SFR (leeftijd op 1 januari)">Seniorendagen: ' + p.a27 + '</span>' : '') +
+    (p.a27 ? '<span style="font-weight:700;color:#1a7a40;" title="Seniorendagen volgens de tabel in AOW &amp; SFR (leeftijd op 1 januari)">Seniorendagen: ' + Number(p.a27).toLocaleString('nl-NL', { maximumFractionDigits: 1 }) + '</span>' : '') +
     ((p.leeftijd !== null && p.leeftijd >= 55) || vl.sfr ? '<label style="display:inline-flex;align-items:center;gap:5px;text-transform:none;letter-spacing:normal;font-weight:400;">SFR ' +
       '<select onchange="pdVerlofZet(\'' + n + '\',\'sfr\',this.value);pdRenderDetail();" style="width:auto!important;padding:3px 6px;border:1px solid #c8d7e8;border-radius:5px;font-size:12px;">' +
       [['', 'geen'], ['sfr', 'SFR (2,5 jr 80% + 0,5 jr 60%)'], ['stoppen', 'Eerder stoppen (1 jr 80%)']].map(function(o){ return '<option value="' + o[0] + '"' + ((vl.sfr || '') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label>' +
       '<label style="display:inline-flex;align-items:center;gap:5px;text-transform:none;letter-spacing:normal;font-weight:400;" title="Leeg = AOW-datum volgens de SVB-tabel (zoals in AOW &amp; SFR)">Pensioendatum <input type="text" placeholder="' + (p.pensioen ? caoFmt(p.pensioen.d) : 'dd-mm-jjjj') + '" value="' + (vl.pensioen ? caoFmt(caoParseDatum(vl.pensioen)) : '') + '" onchange="pdPensioenZet(\'' + n + '\',this)" style="width:100px!important;padding:3px 6px;border:1px solid #c8d7e8;border-radius:5px;font-size:12px;"></label>' +
       (vl.sfr && p.sfrFactor < 1 ? '<span style="color:#b9770e;font-weight:700;">komende 12 mnd gem. ' + Math.round(p.sfrFactor * 100) + '% inzetbaar</span>' : '') : '') +
+    pdRechtHtml(naam, p, vl) +
     '</div>';
 }
 (function(){ if (typeof djFunctieVakjesHtml !== 'function') return; var _o = djFunctieVakjesHtml; djFunctieVakjesHtml = function(naam){ return _o(naam) + pdCaoHtml(naam); }; window.djFunctieVakjesHtml = djFunctieVakjesHtml; })();
@@ -33678,8 +33700,19 @@ function pdCaoHtml(naam){
 //  Pensioendatum = AOW-datum (SVB-tabel uit AOW & SFR), of zelf ingevuld
 // ══════════════════════════════════════════════════════════════════
 function caoSeniorDagen(geb, jaar){
-  if (!geb) return 0; var l = jaar - geb.getFullYear() - 1;
-  try { return (typeof A28_CAO !== 'undefined' && A28_CAO[l]) || 0; } catch(e) { return 0; }
+  if (!geb) return 0;
+  try { if (typeof calcA30VoorJaar === 'function') return calcA30VoorJaar(geb, jaar); } catch(e) {}
+  var l = jaar - geb.getFullYear() - 1; try { return (typeof A28_CAO !== 'undefined' && A28_CAO[l]) || 0; } catch(e) { return 0; }
+}
+// Werkfactor over een kalenderjaar (SFR 80%/60%, na pensioen 0) — voor de verlofrechten van dat jaar
+function caoSfrFactorJaar(vl, geb, jaar){
+  var p = caoPensioenDatum(geb, vl), soort = vl && vl.sfr; if (!p) return 1;
+  var van = new Date(jaar, 0, 1), tot = new Date(jaar + 1, 0, 1), per = [];
+  if (soort === 'sfr') { var s = new Date(p.d); s.setFullYear(s.getFullYear() - 3); var h = new Date(p.d); h.setMonth(h.getMonth() - 6); per = [[s, h, 0.8], [h, p.d, 0.6]]; }
+  else if (soort === 'stoppen') { var s2 = new Date(p.d); s2.setFullYear(s2.getFullYear() - 1); per = [[s2, p.d, 0.8]]; }
+  per.push([p.d, new Date(8640000000000000), 0]);
+  var verlies = 0; per.forEach(function(x){ var a = Math.max(x[0], van), b = Math.min(x[1], tot); if (b > a) verlies += (b - a) * (1 - x[2]); });
+  return Math.max(0, 1 - verlies / (tot - van));
 }
 function caoPensioenDatum(geb, vl){
   var eigen = caoParseDatum(vl && vl.pensioen); if (eigen) return { d: eigen, auto: false };
