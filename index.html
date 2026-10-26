@@ -23678,7 +23678,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.57';
+var DJ_BUILD = '2026-10-07.58';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -33473,7 +33473,7 @@ async function bezRender(){
   var h = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><div style="font-weight:800;color:var(--navy);font-size:16px;flex:1;">&#x1F4CA; Bezettingsgraad eigen medewerkers</div>' +
     '<span style="font-size:11.5px;color:#7a8696;">Rooster: <b>' + oplEsc(b.rooster) + '</b> (' + b.weken + ' ploegen \u00D7 ' + b.inst.ploeg + ') &middot; ' + bezFmt(b.inst.snipper) + ' vakantiedagen' + (b.inst.adv ? ' + ' + bezFmt(b.inst.adv, 1) + ' ADV' : '') + ' &middot; ziekte ' + bezFmt(b.ziekte !== undefined ? b.ziekte : b.inst.ziekte, 1) + '%' + (b.ziekteAuto ? ' (gem. 12 mnd)' : '') + '</span></div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">' + knopW('stag', 'Met stagiaires', 'Zonder stagiaires') + knopW('ziekte', 'Met ziekteverzuim', 'Zonder ziekteverzuim') +
-      knopW('geb', 'Met geboorteverlof', 'Zonder geboorteverlof') + knopW('ouder', 'Met ouderschapsverlof', 'Zonder ouderschapsverlof') + knopW('sen', 'Met seniorendagen', 'Zonder seniorendagen') + knopW('sfr', 'Met SFR / eerder stoppen', 'Zonder SFR') + '</div>' +
+      knopW('geb', 'Met geboorteverlof', 'Zonder geboorteverlof') + knopW('ouder', 'Met ouderschapsverlof', 'Zonder ouderschapsverlof') + knopW('sen', 'Met A30-dagen (senioren)', 'Zonder A30-dagen (senioren)') + knopW('sfr', 'Met SFR-dagen', 'Zonder SFR-dagen') + '</div>' +
     '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">' +
       tegel('Bezettingsgraad', bezFmt(b.graadMet * 100, 1) + '%', [wg.stag ? 'met stagiaires' : 'zonder stagiaires', wg.ziekte ? 'met ziekte' : 'zonder ziekte', wg.geb ? 'met geboorteverlof' : 'zonder geboorteverlof', wg.ouder ? 'met ouderschapsverlof' : 'zonder ouderschapsverlof'].join(', '), kleur) +
       tegel('Nodig per week', bezFmt(b.nodig) + ' diensten', b.aangepast ? 'rooster, met eigen aanpassingen' : 'volgens het basisrooster') +
