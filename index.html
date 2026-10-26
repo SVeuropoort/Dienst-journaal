@@ -23678,7 +23678,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.60';
+var DJ_BUILD = '2026-10-07.61';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -33439,9 +33439,11 @@ function bezBereken(){
     }
     if (vl) { // verlof in werkweken × diensten per week van deze medewerker
       var pw = wekelijks * pct / 100;
-      if (vl.geb) { verlof.geb += 1 * pw; verlofN.geb++; }
-      if (vl.aanv) { verlof.aanv += Number(vl.aanv) * pw; verlofN.aanv++; }
-      if (vl.ouder) { verlof.ouder += Number(vl.ouder) * pw; verlofN.ouder++; }
+      // Alleen het deel dat in dit kalenderjaar valt (op basis van de geboortedatum van het kind)
+      var wk = (typeof pdVlWekenInJaar === 'function') ? pdVlWekenInJaar(vl, new Date().getFullYear()) : { geb: vl.geb ? 1 : 0, aanv: Number(vl.aanv) || 0, ouder: Number(vl.ouder) || 0 };
+      if (wk.geb) { verlof.geb += wk.geb * pw; verlofN.geb++; }
+      if (wk.aanv) { verlof.aanv += wk.aanv * pw; verlofN.aanv++; }
+      if (wk.ouder) { verlof.ouder += wk.ouder * pw; verlofN.ouder++; }
     }
   });
   var som = som0 * (1 - ziekte / 100);
@@ -33554,7 +33556,7 @@ function pdVerlofGet(){ try { return JSON.parse(localStorage.getItem(pdVerlofKey
 window.pdVerlofZet = function(naam, k, v){
   var a = pdVerlofGet(); a[naam] = a[naam] || {};
   a[naam][k] = (k === 'geb' || k === 'senior') ? !!v : (k === 'sfr' ? String(v || '') : (v === '' ? '' : Number(v)));
-  if (!a[naam].geb && !a[naam].aanv && !a[naam].ouder && !a[naam].senior && !a[naam].indienst && !a[naam].sfr && !a[naam].pensioen && (a[naam].pct === undefined || a[naam].pct === '' || a[naam].pct === 100)) delete a[naam];
+  if (!a[naam].geb && !a[naam].aanv && !a[naam].ouder && !a[naam].senior && !a[naam].indienst && !a[naam].sfr && !a[naam].pensioen && !a[naam].kind && !a[naam].ouderTot && (a[naam].pct === undefined || a[naam].pct === '' || a[naam].pct === 100)) delete a[naam];
   localStorage.setItem(pdVerlofKey(), JSON.stringify(a)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
 };
 function pdVerlofHtml(naam){
@@ -33566,10 +33568,13 @@ function pdVerlofHtml(naam){
     '<span style="font-size:14px;">&#x1F37C;</span><span style="font-size:12px;font-weight:700;color:var(--navy);">Werktijd &amp; verlof</span>' +
     (v.sfr ? '<span style="' + lbl + '" title="Bij SFR of eerder stoppen rekent de app het percentage automatisch (80% / 60%, na de pensioendatum 0%).">Werkt <b>automatisch via ' + (v.sfr === 'sfr' ? 'SFR' : 'eerder stoppen') + '</b></span>' :
     '<label style="' + lbl + '" title="Voor de bezettingsgraad in het KPI Dashboard. \'Telt niet mee\' = bijv. supervisors of langdurig afwezig.">Werkt ' + sel('pct', [100, 90, 80, 75, 70, 60, 50, 40, 0], v.pct === undefined || v.pct === '' ? 100 : v.pct, function(o){ return o ? o + '%' : 'telt niet mee (bezetting)'; }) + '</label>') +
-    '<label style="' + lbl + 'cursor:pointer;" title="1× de wekelijkse arbeidsduur, 100% doorbetaald"><input type="checkbox" style="width:auto;"' + (v.geb ? ' checked' : '') + ' onchange="pdVerlofZet(\'' + n + '\',\'geb\',this.checked)"> Geboorteverlof (1 week)</label>' +
+    '<label style="' + lbl + '" title="Vanaf deze datum rekent de app zelf uit wanneer het verlof valt (en wanneer het voorbij is)">Geboortedatum kind <input type="text" placeholder="dd-mm-jjjj" value="' + (v.kind ? caoFmt(caoParseDatum(v.kind)) : '') + '" onchange="pdDatumZet(\'' + n + '\',\'kind\',this)" style="width:100px!important;padding:3px 6px;border:1px solid #c8d7e8;border-radius:5px;font-size:12px;"></label>' +
+    '<label style="' + lbl + 'cursor:pointer;" title="1× de wekelijkse arbeidsduur, binnen 4 weken na de geboorte (100% doorbetaald)"><input type="checkbox" style="width:auto;"' + (v.geb ? ' checked' : '') + ' onchange="pdVerlofZet(\'' + n + '\',\'geb\',this.checked);pdRenderDetail();"> Geboorteverlof (1 week)</label>' +
     '<label style="' + lbl + '" title="Max. 5 weken binnen 6 maanden na de geboorte (70% via UWV)">Aanvullend geboorteverlof ' + sel('aanv', [0, 1, 2, 3, 4, 5], v.aanv || 0, function(o){ return o ? o + ' wk' : 'nee'; }) + '</label>' +
-    '<label style="' + lbl + '" title="Totaal 26× de wekelijkse arbeidsduur tot het kind 8 is; max. 9 weken (deels) betaald in het eerste jaar. Vul in hoeveel werkweken dit jaar.">Ouderschapsverlof dit jaar ' +
-      sel('ouder', [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13, 17, 20, 26], v.ouder || 0, function(o){ return o ? o + ' wk' : 'nee'; }) + '</label></div>';
+    '<label style="' + lbl + '" title="Totaal 26× de wekelijkse arbeidsduur tot het kind 8 is; max. 9 weken (deels) betaald in het eerste levensjaar. Kies het totaal aantal werkweken en tot wanneer.">Ouderschapsverlof ' +
+      sel('ouder', [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13, 17, 20, 26], v.ouder || 0, function(o){ return o ? o + ' wk' : 'nee'; }) + '</label>' +
+    (v.ouder ? '<label style="' + lbl + '" title="Leeg = binnen het eerste levensjaar van het kind (het betaalde deel)">verspreid t/m <input type="text" placeholder="' + (v.kind ? caoFmt(pdVlEind(v)) : 'dd-mm-jjjj') + '" value="' + (v.ouderTot ? caoFmt(caoParseDatum(v.ouderTot)) : '') + '" onchange="pdDatumZet(\'' + n + '\',\'ouderTot\',this)" style="width:100px!important;padding:3px 6px;border:1px solid #c8d7e8;border-radius:5px;font-size:12px;"></label>' : '') +
+    pdVlStatusHtml(v) + '</div>';
 }
 (function(){ if (typeof djFunctieVakjesHtml !== 'function') return; var _o = djFunctieVakjesHtml; djFunctieVakjesHtml = function(naam){ return _o(naam) + pdVerlofHtml(naam); }; window.djFunctieVakjesHtml = djFunctieVakjesHtml; })();
 // Verlof van een medewerker uit de Maandafsluiting opzoeken in het dossier (naam kan anders geschreven zijn)
@@ -33828,6 +33833,53 @@ function bezSamenvattingBijwerken(){
 }
 setTimeout(bezSamenvattingBijwerken, 15000);
 setInterval(bezSamenvattingBijwerken, 30 * 60000);
+</script>
+<script>
+// ══════════════════════════════════════════════════════════════════
+// Geboorte- en ouderschapsverlof loopt vanzelf af — op basis van de geboortedatum van het kind
+//  Geboorteverlof (1 wk):           binnen 4 weken na de geboorte
+//  Aanvullend geboorteverlof (≤5):  in de 6 maanden na de geboorte (na het geboorteverlof)
+//  Ouderschapsverlof (weken):       verspreid tot de gekozen datum, standaard binnen het 1e levensjaar
+// Per kalenderjaar telt alleen het deel dat in dat jaar valt; daarna niets meer.
+// ══════════════════════════════════════════════════════════════════
+window.pdDatumZet = function(naam, veld, el){
+  var v = String(el.value || '').trim(), d = caoParseDatum(v);
+  if (v && !d) { el.style.borderColor = '#c0392b'; return; }
+  var a = pdVerlofGet(); a[naam] = a[naam] || {};
+  a[naam][veld] = d ? d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') : '';
+  localStorage.setItem(pdVerlofKey(), JSON.stringify(a)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); if (typeof pdRenderDetail === 'function') pdRenderDetail();
+};
+function pdVlPlus(d, dagen, maanden){ var r = new Date(d); if (maanden) r.setMonth(r.getMonth() + maanden); if (dagen) r.setDate(r.getDate() + dagen); return r; }
+function pdVlEind(v){ var k = caoParseDatum(v.kind); var t = caoParseDatum(v.ouderTot); return t || (k ? pdVlPlus(k, 0, 12) : null); }
+function pdVlPerioden(v){
+  var k = caoParseDatum(v && v.kind); if (!k) return null;
+  var p = [];
+  if (v.geb) p.push({ soort: 'geb', van: k, tot: pdVlPlus(k, 28), weken: 1 });
+  if (v.aanv) p.push({ soort: 'aanv', van: pdVlPlus(k, 7), tot: pdVlPlus(k, 0, 6), weken: Number(v.aanv) });
+  if (v.ouder) p.push({ soort: 'ouder', van: k, tot: pdVlEind(v), weken: Number(v.ouder) });
+  return p;
+}
+// Weken verlof die in een bepaald kalenderjaar vallen (naar rato van de periode)
+function pdVlWekenInJaar(v, jaar){
+  var r = { geb: 0, aanv: 0, ouder: 0 };
+  var p = pdVlPerioden(v);
+  if (!p) { // oude invoer zonder geboortedatum kind: alleen in het jaar van invoer meetellen
+    if ((v.verlofJaar || 2026) === jaar) { r.geb = v.geb ? 1 : 0; r.aanv = Number(v.aanv) || 0; r.ouder = Number(v.ouder) || 0; }
+    return r;
+  }
+  var van = new Date(jaar, 0, 1), tot = new Date(jaar + 1, 0, 1);
+  p.forEach(function(x){ var len = x.tot - x.van; if (len <= 0) return; var a = Math.max(x.van, van), b = Math.min(x.tot, tot); if (b > a) r[x.soort] += x.weken * (b - a) / len; });
+  return r;
+}
+function pdVlStatusHtml(v){
+  var p = pdVlPerioden(v), nu = new Date();
+  if (!p) return (v.geb || v.aanv || v.ouder) ? '<span style="font-size:11.5px;color:#b9770e;">Vul de geboortedatum van het kind in, dan stopt het verlof vanzelf.</span>' : '';
+  if (!p.length) return '';
+  var namen = { geb: 'geboorteverlof', aanv: 'aanvullend geboorteverlof', ouder: 'ouderschapsverlof' };
+  return '<span style="font-size:11.5px;color:#5a6b80;">' + p.map(function(x){
+    var klaar = nu >= x.tot; return (klaar ? '<span style="color:#8795a8;text-decoration:line-through;">' : '<b style="color:#6b3fa0;">') + namen[x.soort] + (klaar ? ' voorbij' : ' t/m ' + caoFmt(x.tot)) + (klaar ? '</span>' : '</b>');
+  }).join(' &middot; ') + '</span>';
+}
 </script>
 </body>
 </html>
