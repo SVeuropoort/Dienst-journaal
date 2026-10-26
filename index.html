@@ -3136,7 +3136,7 @@ async function spOphalenBestandRuw(bestandsnaam){
 //    nog aan vertrouwelijke sleutels in main stond, blijft ongemoeid staan.
 var DJ_VERTR_SLEUTELS = ['dienstjournaal_stena_v1', 'werkoverdracht_ziekmeldingen_v1',
   'personeelsdossier_v1', 'personeelsdossier_actief_v1',
-  'ma_loongroepen_v1', 'ma_medewerkers_v1', 'ma_hvh_v1', 'plan_sv_v1', 'startup_v1', 'kledingpunten_v1'];
+  'ma_loongroepen_v1', 'ma_medewerkers_v1', 'ma_hvh_v1', 'plan_sv_v1', 'startup_v1', 'kledingpunten_v1', 'bezetting_deeltijd_v1'];
 function djIsVertrSleutel(k){ return DJ_VERTR_SLEUTELS.indexOf(String(k).replace(/^(EP|HVH|IMM)_/, '')) >= 0; }
 function djVertrSplits(data){
   var vertr = {}, rest = {};
@@ -6946,6 +6946,9 @@ window.addEventListener('resize', () => {
     'opl_afgerond_v1',
     'dagplan_log_v1',
     'kledingpunten_v1',
+    'bezetting_deeltijd_v1',
+    'bezetting_instellingen_v1',
+    'bezetting_samenvatting_v1',
     'tegel_links_v1',
     'plan_sv_v1',
     'tugmasters_v1',
@@ -7209,6 +7212,9 @@ window.addEventListener('resize', () => {
     'opl_afgerond_v1',
     'dagplan_log_v1',
     'kledingpunten_v1',
+    'bezetting_deeltijd_v1',
+    'bezetting_instellingen_v1',
+    'bezetting_samenvatting_v1',
     'tegel_links_v1',
     'plan_sv_v1',
     'tugmasters_v1',
@@ -23670,7 +23676,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.43';
+var DJ_BUILD = '2026-10-07.44';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -33315,5 +33321,121 @@ function djGarageActSamen(oud, nieuw){
   return { gezien: nieuwste(oud.gezien, nieuw.gezien), gewijzigd: nieuwste(oud.gewijzigd, nieuw.gewijzigd), log: log.slice(-100) };
 }
 </script>
+<script>
+// ══════════════════════════════════════════════════════════════════
+// BEZETTINGSGRAAD (KPI Dashboard) — hoeveel van de benodigde diensten vullen we met eigen medewerkers?
+//  Nodig per week  = per dag: ploegen op dienst volgens het ORT-basisrooster × ploeggrootte
+//  Beschikbaar     = per medewerker: (roosterdiensten/jaar − snipperdagen) × deeltijd% × (1 − ziekte%), opgeteld, ÷ 52
+//                    + stagiaires (aantal × dagen/week)
+//  Bezettingsgraad = beschikbaar ÷ nodig. Tekort = flexibele pool (inhuur/overwerk) die nodig is.
+// Namen + deeltijd% staan vertrouwelijk (alleen supervisors); de uitkomst (zonder namen) is voor iedereen met KPI zichtbaar.
+// ══════════════════════════════════════════════════════════════════
+var BEZ_EP_WEKEN = [
+  ['V','L','L','L','L','L','V'],['V','D','D','D','V','V','S'],['S','V','L','L','L','L','V'],['V','D','D','D','D','D','V'],['V','L','L','L','L','L','V'],['V','D','D','D','V','D','S'],
+  ['S','V','L','L','L','L','V'],['S','V','D','D','D','D','V'],['V','L','L','L','L','L','V'],['S','V','D','D','D','V','S'],['S','L','V','D','D','D','V'],['V','L','L','L','L','L','V'],
+  ['V','D','D','V','D','D','S'],['S','V','V','L','L','L','V'],['S','D','D','D','D','D','V'],['V','L','L','L','L','L','V'],['S','L','L','V','D','D','S'],['S','V','D','D','D','D','V']];
+var BEZ_DAGEN = ['Zo', 'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za'];
+function bezInstGet(){ var d = { ortTab: 'Europoort', ploeg: 3, snipper: 35, ziekte: 5, stag: 0, stagDagen: 3.5 };
+  try { return Object.assign(d, JSON.parse(localStorage.getItem(tk('bezetting_instellingen_v1')) || '{}')); } catch(e) { return d; } }
+function bezInstSet(x){ localStorage.setItem(tk('bezetting_instellingen_v1'), JSON.stringify(x)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }
+function bezDeeltijdGet(){ try { return JSON.parse(localStorage.getItem(tk('bezetting_deeltijd_v1')) || '{}') || {}; } catch(e) { return {}; } }
+function bezDeeltijdSet(x){ localStorage.setItem(tk('bezetting_deeltijd_v1'), JSON.stringify(x)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }
+// Rooster uit de ORT-rekentool (tabbladen); anders het ingebouwde Europoort-rooster
+function bezRoosters(){
+  var lijst = [];
+  try { var st = JSON.parse(localStorage.getItem((sessionStorage.getItem('dj_terminal') || 'EP') + '_ortRekentoolState_v1') || 'null');
+    (st && st.tabs || []).forEach(function(t){ if (t && t.weeks && t.data) lijst.push({ naam: t.name, weken: t.weeks, werk: function(w, d){ var c = t.data[w + '_' + d]; return c && !c.vrij; } }); });
+  } catch(e) {}
+  if (!lijst.some(function(r){ return r.naam === 'Europoort'; })) lijst.unshift({ naam: 'Europoort', weken: 18, werk: function(w, d){ return BEZ_EP_WEKEN[w][d] !== 'V'; } });
+  return lijst;
+}
+function bezMedewerkers(){
+  var k = (sessionStorage.getItem('dj_terminal') || 'EP') === 'HVH' ? 'ma_hvh_v1' : 'ma_medewerkers_v1';
+  try { var l = JSON.parse(localStorage.getItem(k) || '[]'); return Array.isArray(l) ? l.filter(function(m){ return m && m.naam; }) : []; } catch(e) { return []; }
+}
+// Deeltijd voorstel uit de kledingpunten (dagen/week) als er nog niets is ingevuld
+function bezVoorstelUitKleding(naam){
+  try { var kp = JSON.parse(localStorage.getItem(tk('kledingpunten_v1')) || 'null'); if (!kp || !kp.people) return null;
+    var p = kp.people.filter(function(x){ var v = [x.vn, x.tv, x.an].filter(Boolean).join(' '); return typeof vakMatchSterkte === 'function' && vakMatchSterkte(naam, v) > 0; });
+    if (p.length === 1 && p[0].dg) return Math.round(Math.min(5, Number(p[0].dg)) / 5 * 100);
+  } catch(e) {} return null;
+}
+function bezBereken(){
+  var inst = bezInstGet(), r = bezRoosters().find(function(x){ return x.naam === inst.ortTab; }) || bezRoosters()[0];
+  var perDag = [0, 0, 0, 0, 0, 0, 0], diensten = 0;
+  for (var w = 0; w < r.weken; w++) for (var d = 0; d < 7; d++) if (r.werk(w, d)) { perDag[d] += inst.ploeg; diensten++; }
+  var nodigWeek = perDag.reduce(function(a, b){ return a + b; }, 0);
+  var roosterPerJaar = diensten / r.weken * 52; // diensten per persoon per jaar volgens dit rooster
+  var dt = bezDeeltijdGet(), mw = bezMedewerkers(), som = 0, fte = 0, meetellen = 0;
+  mw.forEach(function(m){
+    var pct = (m.naam in dt) ? dt[m.naam] : (bezVoorstelUitKleding(m.naam) || 100);
+    if (!pct) return; meetellen++; fte += pct / 100;
+    som += (roosterPerJaar - inst.snipper) * (pct / 100) * (1 - inst.ziekte / 100);
+  });
+  var stagJaar = inst.stag * inst.stagDagen * 52;
+  var beschikbaar = som / 52, beschikbaarMet = (som + stagJaar) / 52;
+  var perFteWeek = (roosterPerJaar - inst.snipper) * (1 - inst.ziekte / 100) / 52;
+  return { inst: inst, rooster: r.naam, weken: r.weken, perDag: perDag, nodig: nodigWeek, roosterPerJaar: roosterPerJaar, medewerkers: meetellen, fte: fte,
+    beschikbaar: beschikbaar, beschikbaarMet: beschikbaarMet, graad: nodigWeek ? beschikbaar / nodigWeek : 0, graadMet: nodigWeek ? beschikbaarMet / nodigWeek : 0,
+    tekort: Math.max(0, nodigWeek - beschikbaarMet), perFteWeek: perFteWeek, berekend: Date.now() };
+}
+function bezFmt(x, n){ return Number(x).toLocaleString('nl-NL', { minimumFractionDigits: n || 0, maximumFractionDigits: n || 0 }); }
+async function bezRender(){
+  var v = document.getElementById('view-archief'); if (!v) return;
+  var box = document.getElementById('bez-kaart');
+  if (!box) { box = document.createElement('div'); box.id = 'bez-kaart'; box.className = 'card'; box.style.cssText = 'padding:16px 20px;margin-bottom:16px;';
+    var na = document.getElementById('kpi-bekeken-balk') || v.querySelector('.page-header'); v.insertBefore(box, na ? na.nextSibling : v.firstChild); }
+  var T = sessionStorage.getItem('dj_terminal') || 'EP', mag = false;
+  try { mag = typeof djVertrHeeftToegang === 'function' ? await djVertrHeeftToegang(T) : false; } catch(e) {}
+  var b;
+  if (mag && bezMedewerkers().length) { b = bezBereken(); var oud = localStorage.getItem(tk('bezetting_samenvatting_v1'));
+    var nieuw = JSON.stringify(Object.assign({}, b, { inst: b.inst, berekend: undefined }));
+    if (!oud || JSON.stringify(Object.assign(JSON.parse(oud), { berekend: undefined })) !== nieuw) { localStorage.setItem(tk('bezetting_samenvatting_v1'), JSON.stringify(b)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }
+  } else { try { b = JSON.parse(localStorage.getItem(tk('bezetting_samenvatting_v1')) || 'null'); } catch(e) { b = null; } }
+  if (!b) { box.innerHTML = '<div style="font-weight:800;color:var(--navy);font-size:16px;">&#x1F4CA; Bezettingsgraad eigen medewerkers</div><div style="color:#8795a8;font-size:13px;margin-top:6px;">Nog niet berekend. Een supervisor (met toegang tot de Maandafsluiting) opent dit dashboard één keer, daarna is de uitkomst hier zichtbaar.</div>'; return; }
+  var kleur = b.graadMet >= 0.95 ? '#1a7a40' : b.graadMet >= 0.85 ? '#b9770e' : '#c0392b';
+  var tegel = function(t, w, sub, k){ return '<div style="flex:1;min-width:150px;background:#f5f8fc;border:1px solid #dbe5f0;border-radius:8px;padding:10px 12px;"><div style="font-size:11px;font-weight:700;color:#5a6b80;text-transform:uppercase;letter-spacing:.4px;">' + t + '</div><div style="font-size:24px;font-weight:800;color:' + (k || 'var(--navy)') + ';">' + w + '</div><div style="font-size:11.5px;color:#5a6b80;">' + (sub || '') + '</div></div>'; };
+  var h = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><div style="font-weight:800;color:var(--navy);font-size:16px;flex:1;">&#x1F4CA; Bezettingsgraad eigen medewerkers</div>' +
+    '<span style="font-size:11.5px;color:#7a8696;">Rooster: <b>' + oplEsc(b.rooster) + '</b> (' + b.weken + ' ploegen \u00D7 ' + b.inst.ploeg + ') &middot; ziekte ' + bezFmt(b.inst.ziekte) + '% &middot; ' + bezFmt(b.inst.snipper) + ' snipperdagen</span></div>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">' +
+      tegel('Bezettingsgraad', bezFmt(b.graadMet * 100, 1) + '%', b.inst.stag ? 'zonder stagiaires: ' + bezFmt(b.graad * 100, 1) + '%' : 'met eigen medewerkers', kleur) +
+      tegel('Nodig per week', bezFmt(b.nodig) + ' diensten', 'volgens het basisrooster') +
+      tegel('Beschikbaar per week', bezFmt(b.beschikbaarMet, 1) + ' diensten', b.medewerkers + ' medewerkers = ' + bezFmt(b.fte, 1) + ' fte' + (b.inst.stag ? ' + ' + b.inst.stag + ' stagiair(s)' : '')) +
+      tegel('Flexibele pool nodig', bezFmt(b.tekort, 1) + ' diensten/wk', '\u2248 ' + bezFmt(b.perFteWeek ? b.tekort / b.perFteWeek : 0, 1) + ' fte (inhuur / overwerk)', b.tekort > 0 ? '#c0392b' : '#1a7a40') +
+    '</div>' +
+    '<div style="overflow-x:auto;margin-top:12px;"><table style="border-collapse:collapse;font-size:12.5px;min-width:520px;"><tr><th style="text-align:left;padding:4px 8px;color:#5a6b80;">Per dag</th>' + BEZ_DAGEN.map(function(d){ return '<th style="padding:4px 10px;color:#5a6b80;">' + d + '</th>'; }).join('') + '<th style="padding:4px 10px;color:#5a6b80;">Week</th></tr>' +
+    '<tr><td style="padding:4px 8px;">Nodig (op dienst)</td>' + b.perDag.map(function(x){ return '<td style="text-align:center;padding:4px 10px;font-weight:700;">' + x + '</td>'; }).join('') + '<td style="text-align:center;font-weight:800;">' + b.nodig + '</td></tr>' +
+    '<tr><td style="padding:4px 8px;">Eigen mensen (gem.)</td>' + b.perDag.map(function(x){ return '<td style="text-align:center;padding:4px 10px;">' + bezFmt(x * b.graadMet, 1) + '</td>'; }).join('') + '<td style="text-align:center;font-weight:800;">' + bezFmt(b.beschikbaarMet, 1) + '</td></tr>' +
+    '<tr><td style="padding:4px 8px;color:#c0392b;">Tekort (flex)</td>' + b.perDag.map(function(x){ return '<td style="text-align:center;padding:4px 10px;color:#c0392b;">' + bezFmt(Math.max(0, x * (1 - b.graadMet)), 1) + '</td>'; }).join('') + '<td style="text-align:center;font-weight:800;color:#c0392b;">' + bezFmt(b.tekort, 1) + '</td></tr></table></div>' +
+    '<details style="margin-top:10px;font-size:12.5px;"><summary style="cursor:pointer;font-weight:700;color:var(--navy);">Hoe is dit berekend?</summary><div style="line-height:1.6;margin-top:6px;color:#333;">' +
+      'Per medewerker: (' + bezFmt(b.roosterPerJaar) + ' roosterdiensten per jaar \u2212 ' + bezFmt(b.inst.snipper) + ' snipperdagen) \u00D7 deeltijd% \u00D7 (1 \u2212 ' + bezFmt(b.inst.ziekte) + '% ziekte). ' +
+      'Opgeteld voor alle ' + b.medewerkers + ' medewerkers uit de Maandafsluiting en gedeeld door 52 weken = <b>' + bezFmt(b.beschikbaar, 1) + '</b> diensten per week' +
+      (b.inst.stag ? ', plus ' + b.inst.stag + ' stagiair(s) \u00D7 ' + bezFmt(b.inst.stagDagen, 1) + ' dagen = <b>' + bezFmt(b.beschikbaarMet, 1) + '</b>' : '') + '. ' +
+      'Nodig: per dag de ploegen die volgens het rooster op dienst zijn \u00D7 ' + b.inst.ploeg + ' man = <b>' + b.nodig + '</b> diensten per week. Bezettingsgraad = beschikbaar \u00F7 nodig.</div></details>';
+  if (mag) h += bezBeheerHtml(b);
+  else h += '<div style="font-size:11px;color:#7a8696;margin-top:8px;">Berekend op ' + new Date(b.berekend || Date.now()).toLocaleString('nl-NL') + '. Instellingen en deeltijdpercentages zijn alleen voor supervisors.</div>';
+  box.innerHTML = h;
+}
+function bezBeheerHtml(b){
+  var inst = b.inst, rs = bezRoosters(), dt = bezDeeltijdGet(), mw = bezMedewerkers().slice().sort(function(a, c){ return String(a.naam).localeCompare(String(c.naam), 'nl'); });
+  var inp = function(k, w, stap, br){ return '<label style="display:flex;flex-direction:column;font-size:11px;font-weight:700;color:#5a6b80;gap:2px;">' + w + '<input type="number" step="' + stap + '" value="' + inst[k] + '" onchange="bezZet(\'' + k + '\',this.value)" style="width:' + (br || 80) + 'px;padding:5px;border:1px solid #c8d7e8;border-radius:5px;"></label>'; };
+  var opties = [100, 90, 80, 75, 70, 60, 50, 40, 0];
+  return '<details style="margin-top:10px;font-size:12.5px;"><summary style="cursor:pointer;font-weight:700;color:var(--navy);">&#x2699;&#xFE0F; Instellingen en deeltijd per medewerker (alleen supervisors)</summary>' +
+    '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin:10px 0;">' +
+      '<label style="display:flex;flex-direction:column;font-size:11px;font-weight:700;color:#5a6b80;gap:2px;">Rooster (uit ORT)<select onchange="bezZet(\'ortTab\',this.value)" style="padding:5px;border:1px solid #c8d7e8;border-radius:5px;">' + rs.map(function(r){ return '<option' + (r.naam === inst.ortTab ? ' selected' : '') + '>' + oplEsc(r.naam) + '</option>'; }).join('') + '</select></label>' +
+      inp('ploeg', 'Mensen per ploeg', 1) + inp('snipper', 'Snipperdagen/jaar', 1) + inp('ziekte', 'Ziekte %', 0.5) + inp('stag', 'Stagiaires', 1) + inp('stagDagen', 'Dagen/wk stagiair', 0.5) + '</div>' +
+    '<div style="font-size:11.5px;color:#5a6b80;margin-bottom:6px;">Deeltijd: 0% = telt niet mee (bijv. supervisors of iemand die langdurig weg is). Nog niet ingevuld? Dan wordt het voorstel uit de kledingpunten (dagen/week) gebruikt, anders 100%.</div>' +
+    '<div style="max-height:320px;overflow:auto;border:1px solid #e3eaf2;border-radius:6px;columns:2 260px;column-gap:18px;padding:6px 10px;">' +
+    mw.map(function(m){ var ingevuld = m.naam in dt, pct = ingevuld ? dt[m.naam] : (bezVoorstelUitKleding(m.naam) || 100);
+      return '<div style="display:flex;align-items:center;gap:6px;padding:2px 0;break-inside:avoid;"><span style="flex:1;' + (pct ? '' : 'color:#9aa6b4;text-decoration:line-through;') + '">' + oplEsc(m.naam) + '</span>' +
+        '<select onchange="bezPct(this.dataset.n,this.value)" data-n="' + oplEsc(m.naam) + '" style="padding:2px 4px;border:1px solid ' + (ingevuld ? '#c8d7e8' : '#f0c27a') + ';border-radius:4px;font-size:12px;" title="' + (ingevuld ? '' : 'Voorstel, nog niet bevestigd') + '">' +
+        opties.concat(opties.indexOf(pct) < 0 ? [pct] : []).map(function(o){ return '<option value="' + o + '"' + (o === pct ? ' selected' : '') + '>' + (o ? o + '%' : 'telt niet mee') + '</option>'; }).join('') + '</select></div>';
+    }).join('') + '</div></details>';
+}
+window.bezZet = function(k, v){ var i = bezInstGet(); i[k] = k === 'ortTab' ? v : (Number(String(v).replace(',', '.')) || 0); bezInstSet(i); bezRender(); };
+window.bezPct = function(naam, v){ var d = bezDeeltijdGet(); d[naam] = Number(v); bezDeeltijdSet(d); bezRender(); };
+(function(){ if (typeof navTo !== 'function') return; var _n = navTo; navTo = function(view){ var r = _n.apply(this, arguments); if (view === 'archief') setTimeout(bezRender, 200); return r; }; window.navTo = navTo; })();
+</script>
+
 </body>
 </html>
