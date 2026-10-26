@@ -23678,7 +23678,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.63';
+var DJ_BUILD = '2026-10-07.64';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -33888,8 +33888,15 @@ function pdVlBadges(naam){
 }
 </script>
 <style>
-.pds{display:grid;grid-template-columns:140px 1fr;gap:8px 14px;align-items:start;padding:10px 14px;border:1px solid #dbe5f0;border-left:4px solid #8aa4c2;border-radius:8px;background:#fff;margin-bottom:10px}
-.pds-t{font-weight:800;color:var(--navy);font-size:12.5px;display:flex;gap:7px;align-items:center;padding-top:17px;font-family:'Barlow Condensed',sans-serif;letter-spacing:.4px;text-transform:uppercase}
+.pds{padding:0;border:1px solid #dbe5f0;border-left:4px solid #8aa4c2;border-radius:8px;background:#fff;margin-bottom:8px}
+.pds>summary{list-style:none;cursor:pointer;padding:9px 14px;display:flex;align-items:center;gap:10px}
+.pds>summary::-webkit-details-marker{display:none}
+.pds-t{font-weight:800;color:var(--navy);font-size:12.5px;display:flex;gap:7px;align-items:center;font-family:'Barlow Condensed',sans-serif;letter-spacing:.4px;text-transform:uppercase;width:150px;flex-shrink:0}
+.pds-sam{flex:1;font-size:12px;color:#5a6b80;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pds-pijl{color:#8795a8;font-size:11px;transition:transform .15s}
+.pds[open] .pds-pijl{transform:rotate(90deg)}
+.pds[open] .pds-sam{visibility:hidden}
+.pds-in{display:grid;grid-template-columns:150px 1fr;gap:8px 14px;padding:0 14px 10px}
 .pds-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px 14px}
 .pdv{display:flex;flex-direction:column;gap:3px;font-size:10.5px;font-weight:700;color:#5a6b80;text-transform:uppercase;letter-spacing:.3px;margin:0}
 .pdv input[type=text],.pdv input[type=number],.pdv select{width:100%!important;box-sizing:border-box;padding:5px 7px!important;border:1px solid #c8d7e8;border-radius:5px;font-size:12.5px!important;text-transform:none;font-weight:400;color:#24313f;min-height:0!important;height:30px}
@@ -33897,7 +33904,7 @@ function pdVlBadges(naam){
 .pdv-check{display:flex;align-items:center;gap:6px;font-size:12.5px;color:#24313f;text-transform:none;letter-spacing:normal;font-weight:400;cursor:pointer;min-height:30px;margin-top:16px}
 .pdv-check input{width:auto!important;margin:0}
 .pds-info{grid-column:2;font-size:11.5px;color:#5a6b80;margin-top:-2px}
-@media (max-width:700px){.pds{grid-template-columns:1fr}.pds-t{padding-top:0}.pds-info{grid-column:1}}
+@media (max-width:700px){.pds-in{grid-template-columns:1fr}.pds-info{grid-column:1}.pds-t{width:auto}}
 </style>
 <script>
 // Personeelsdossier: alle gegevens van de medewerker overzichtelijk in vaste blokken
@@ -33905,7 +33912,13 @@ function pdGegevensHtml(naam, verj, isGroepslid){
   var n = String(naam).replace(/\\/g, '\\\\').replace(/'/g, "\\'"), esc = typeof pdEsc === 'function' ? pdEsc : function(x){ return x; };
   var vl = (typeof pdVerlofGet === 'function' ? pdVerlofGet() : {})[naam] || {};
   var p = (typeof caoPersoon === 'function') ? caoPersoon(naam) : null;
-  var sectie = function(icoon, titel, kleur, inhoud, info){ return '<div class="pds" style="border-left-color:' + kleur + ';"><div class="pds-t"><span style="font-size:15px;">' + icoon + '</span>' + titel + '</div><div class="pds-g">' + inhoud + '</div>' + (info ? '<div class="pds-info">' + info + '</div>' : '') + '</div>'; };
+  // Blokken standaard dichtgevouwen; wat je openklapt blijft open zolang je in dit dossier werkt
+  window._pdOpen = window._pdOpen || {};
+  var sectie = function(icoon, titel, kleur, inhoud, info, samenvatting){
+    var k = titel.replace(/\W+/g, '');
+    return '<details class="pds" style="border-left-color:' + kleur + ';"' + (window._pdOpen[k] ? ' open' : '') + ' ontoggle="window._pdOpen[\'' + k + '\']=this.open">' +
+      '<summary><span class="pds-pijl">&#9654;</span><span class="pds-t"><span style="font-size:15px;">' + icoon + '</span>' + titel + '</span><span class="pds-sam">' + (samenvatting || '') + '</span></summary>' +
+      '<div class="pds-in"><div></div><div class="pds-g">' + inhoud + '</div>' + (info ? '<div class="pds-info">' + info + '</div>' : '') + '</div></details>'; };
   var veld = function(label, ctrl, titel){ return '<label class="pdv"' + (titel ? ' title="' + titel + '"' : '') + '><span>' + label + '</span>' + ctrl + '</label>'; };
   var sel = function(k, opties, waarde, fmt, extra){ return '<select onchange="pdVerlofZet(\'' + n + '\',\'' + k + '\',this.value);' + (extra || '') + '">' + opties.map(function(o){ return '<option value="' + o + '"' + (String(o) === String(waarde) ? ' selected' : '') + '>' + fmt(o) + '</option>'; }).join('') + '</select>'; };
   var datum = function(veldnaam, waarde, ph, fn){ return '<input type="text" placeholder="' + (ph || 'dd-mm-jjjj') + '" value="' + (waarde ? caoFmt(caoParseDatum(waarde)) : '') + '" onchange="' + (fn || 'pdDatumZet') + '(\'' + n + '\',' + (fn ? '' : '\'' + veldnaam + '\',') + 'this)">'; };
@@ -33918,12 +33931,14 @@ function pdGegevensHtml(naam, verj, isGroepslid){
   var info1 = []; if (p) { info1.push(p.leeftijd !== null ? p.leeftijd + ' jaar' : '<span style="color:#b9770e;">geboortejaar onbekend</span>'); if (!isGroepslid) info1.push(p.dienst !== null ? p.dienst + ' jaar in dienst' : '<span style="color:#b9770e;">datum in dienst onbekend</span>'); }
   h += sectie('&#x1F464;', 'Persoonlijk', '#d4a72c',
     veld('Verjaardag / geboortedatum', verjVelden) + (isGroepslid ? '' : veld('In dienst sinds', datum('', vl.indienst, '', 'pdIndienstZet'))),
-    info1.join(' &middot; ') + ' <span id="pd-verj-opgeslagen" style="font-size:11px;color:#166534;opacity:0;transition:opacity .4s;">&#10003; Opgeslagen</span>');
+    info1.join(' &middot; ') + ' <span id="pd-verj-opgeslagen" style="font-size:11px;color:#166534;opacity:0;transition:opacity .4s;">&#10003; Opgeslagen</span>',
+    (verj.dag && verj.maand ? verj.dag + '-' + verj.maand + (verj.jaar ? '-' + verj.jaar : '') + ' &middot; ' : '') + info1.join(' &middot; ').replace(/<[^>]+>/g, ''));
   if (isGroepslid) return h;
   // 2. Functie
   var f = (typeof djFunctiesGet === 'function' ? djFunctiesGet() : {})[naam] || {};
   h += sectie('&#x1F9BA;', 'Functie', '#0f6cbd', (typeof DJ_FUNCTIES !== 'undefined' ? DJ_FUNCTIES : []).map(function(x){
-    return '<label class="pdv-check" style="margin-top:0;"><input type="checkbox"' + (f[x.k] ? ' checked' : '') + ' onchange="djFunctieZet(\'' + n + '\',\'' + x.k + '\',this.checked)"> ' + x.l + '</label>'; }).join(''));
+    return '<label class="pdv-check" style="margin-top:0;"><input type="checkbox"' + (f[x.k] ? ' checked' : '') + ' onchange="djFunctieZet(\'' + n + '\',\'' + x.k + '\',this.checked)"> ' + x.l + '</label>'; }).join(''), '',
+    (typeof DJ_FUNCTIES !== 'undefined' ? DJ_FUNCTIES : []).filter(function(x){ return f[x.k]; }).map(function(x){ return x.l; }).join(', ') || 'geen functie aangevinkt');
   // 3. Werktijd
   var w = '';
   w += vl.sfr ? veld('Werkt', '<span class="wa">automatisch via ' + (vl.sfr === 'sfr' ? 'SFR' : 'eerder stoppen') + '</span>')
@@ -33932,7 +33947,8 @@ function pdGegevensHtml(naam, verj, isGroepslid){
     w += veld('SFR', sel('sfr', ['', 'sfr', 'stoppen'], vl.sfr || '', function(o){ return o === 'sfr' ? 'SFR (2,5 jr 80% + 0,5 jr 60%)' : o === 'stoppen' ? 'Eerder stoppen (1 jr 80%)' : 'geen'; }, 'pdRenderDetail();'));
     w += veld('Pensioendatum', '<input type="text" placeholder="' + (p.pensioen ? caoFmt(p.pensioen.d) : 'dd-mm-jjjj') + '" value="' + (vl.pensioen ? caoFmt(caoParseDatum(vl.pensioen)) : '') + '" onchange="pdPensioenZet(\'' + n + '\',this)">', 'Leeg = AOW-datum volgens de SVB-tabel');
   }
-  h += sectie('&#x23F1;&#xFE0F;', 'Werktijd', '#6b3fa0', w, (vl.sfr && p && p.sfrFactor < 1) ? '<b style="color:#b9770e;">Komende 12 maanden gemiddeld ' + Math.round(p.sfrFactor * 100) + '% inzetbaar</b>' : '');
+  h += sectie('&#x23F1;&#xFE0F;', 'Werktijd', '#6b3fa0', w, (vl.sfr && p && p.sfrFactor < 1) ? '<b style="color:#b9770e;">Komende 12 maanden gemiddeld ' + Math.round(p.sfrFactor * 100) + '% inzetbaar</b>' : '',
+    vl.sfr ? (vl.sfr === 'sfr' ? 'SFR' : 'Eerder stoppen') + (p && p.pensioen ? ' &middot; pensioen ' + caoFmt(p.pensioen.d) : '') : (vl.pct === 0 ? 'telt niet mee' : 'werkt ' + ((vl.pct === undefined || vl.pct === '') ? 100 : vl.pct) + '%'));
   // 4. Verlof (geboorte / ouderschap)
   var v = '';
   v += veld('Geboortedatum kind', datum('kind', vl.kind));
@@ -33940,7 +33956,8 @@ function pdGegevensHtml(naam, verj, isGroepslid){
   v += veld('Aanvullend geboorteverlof', sel('aanv', [0, 1, 2, 3, 4, 5], vl.aanv || 0, function(o){ return o ? o + ' weken' : 'nee'; }, 'pdRenderDetail();'), 'Max. 5 weken binnen 6 maanden na de geboorte');
   v += veld('Ouderschapsverlof', sel('ouder', [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13, 17, 20, 26], vl.ouder || 0, function(o){ return o ? o + ' weken' : 'nee'; }, 'pdRenderDetail();'), 'Totaal max. 26 weken tot het kind 8 is; max. 9 weken (deels) betaald in het 1e jaar');
   if (vl.ouder) v += veld('Ouderschapsverlof t/m', '<input type="text" placeholder="' + (vl.kind ? caoFmt(pdVlEind(vl)) : 'dd-mm-jjjj') + '" value="' + (vl.ouderTot ? caoFmt(caoParseDatum(vl.ouderTot)) : '') + '" onchange="pdDatumZet(\'' + n + '\',\'ouderTot\',this)">', 'Leeg = binnen het eerste levensjaar');
-  h += sectie('&#x1F37C;', 'Verlof', '#b06ac7', v, typeof pdVlStatusHtml === 'function' ? pdVlStatusHtml(vl) : '');
+  var vlSam = (typeof pdVlBadges === 'function' && pdVlBadges(naam)) ? 'loopt nog: ' + pdVlBadges(naam) : ((vl.kind || vl.geb || vl.aanv || vl.ouder) ? 'geen lopend verlof' : 'geen');
+  h += sectie('&#x1F37C;', 'Verlof', '#b06ac7', v, typeof pdVlStatusHtml === 'function' ? pdVlStatusHtml(vl) : '', vlSam);
   // 5. Rechten dit jaar
   if (p && typeof caoJaarOverzicht === 'function') {
     var jaar = new Date().getFullYear(), r = caoJaarOverzicht(naam, jaar);
@@ -33950,7 +33967,8 @@ function pdGegevensHtml(naam, verj, isGroepslid){
     h += sectie('&#x1F4C5;', 'Rechten ' + jaar, '#1a7a40',
       (r.pct === 0 && !r.sfrSoort) ? '<div class="pdv"><span class="wa">Telt niet mee voor de bezetting.</span></div>' :
       tegel('Verlofdagen', fm(r.verlof)) + tegel('A30-dagen', fm(r.a30)) + tegel('ADV-dagen', fm(r.adv)) + (r.sfr ? tegel('SFR-dagen', fm(r.sfr), '#1a7a40') : '') + tegel('Totaal', fm(r.totaal), 'var(--navy)'),
-      'Zelfde berekening als AOW &amp; SFR' + (extra.length ? ' &middot; verlofdagen ' + extra.join(', ') : '') + (r.dagen < r.jaarDagen ? ' &middot; ' + r.dagen + ' van de ' + r.jaarDagen + ' dagen in dienst' : '') + (r.pct < 100 && !r.sfrSoort ? ' &middot; werkt ' + r.pct + '%' : ''));
+      'Zelfde berekening als AOW &amp; SFR' + (extra.length ? ' &middot; verlofdagen ' + extra.join(', ') : '') + (r.dagen < r.jaarDagen ? ' &middot; ' + r.dagen + ' van de ' + r.jaarDagen + ' dagen in dienst' : '') + (r.pct < 100 && !r.sfrSoort ? ' &middot; werkt ' + r.pct + '%' : ''),
+      (r.pct === 0 && !r.sfrSoort) ? 'telt niet mee' : '<b style="color:var(--navy);">' + fm(r.totaal) + ' dagen</b> (verlof ' + fm(r.verlof) + (r.a30 ? ' &middot; A30 ' + fm(r.a30) : '') + ' &middot; ADV ' + fm(r.adv) + (r.sfr ? ' &middot; SFR ' + fm(r.sfr) : '') + ')');
   }
   return h;
 }
