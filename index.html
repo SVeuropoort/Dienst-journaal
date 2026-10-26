@@ -23678,7 +23678,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.47';
+var DJ_BUILD = '2026-10-07.48';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -33398,7 +33398,7 @@ function bezBereken(){
   mw.forEach(function(m){
     var vl = (typeof bezVerlofVoor === 'function') ? bezVerlofVoor(m.naam) : null;
     // Volgorde: "telt niet mee" in de KPI-lijst > % uit het personeelsdossier > % uit de KPI-lijst > voorstel kledingpunten > 100%
-    var pct = (dt[m.naam] === 0) ? 0 : ((vl && vl.pct) ? Number(vl.pct) : ((m.naam in dt) ? dt[m.naam] : (bezVoorstelUitKleding(m.naam) || 100)));
+    var pct = (vl && vl.pct !== undefined && vl.pct !== '') ? Number(vl.pct) : ((m.naam in dt) ? dt[m.naam] : (bezVoorstelUitKleding(m.naam) || 100));
     if (!pct) return; meetellen++; fte += pct / 100;
     som0 += (roosterPerJaar - vrijPerJaar) * (pct / 100); // zonder ziekte en zonder verlof
     if (vl) { // verlof in werkweken × diensten per week van deze medewerker
@@ -33492,14 +33492,10 @@ function bezBeheerHtml(b){
           return '<td style="padding:2px 3px;"><input type="number" min="0" step="1" value="' + v + '" placeholder="' + (rij[2][d] || 0) + '" onchange="bezNodig(' + d + ',\'' + rij[0] + '\',this.value)" style="width:52px;padding:4px;border:1px solid ' + (v !== '' ? '#e0a03a' : '#c8d7e8') + ';border-radius:4px;text-align:center;"></td>';
         }).join('') + '<td></td></tr>';
       }).join('') + '</table></div>' +
-    '<div style="font-size:11.5px;color:#5a6b80;margin-bottom:6px;">Deeltijd: 0% = telt niet mee (bijv. supervisors of iemand die langdurig weg is). Nog niet ingevuld? Dan wordt het voorstel uit de kledingpunten (dagen/week) gebruikt, anders 100%.</div>' +
-    '<div style="max-height:320px;overflow:auto;border:1px solid #e3eaf2;border-radius:6px;columns:2 260px;column-gap:18px;padding:6px 10px;">' +
-    mw.map(function(m){ var ingevuld = m.naam in dt, pct = ingevuld ? dt[m.naam] : (bezVoorstelUitKleding(m.naam) || 100);
-      return '<div style="display:flex;align-items:center;gap:6px;padding:2px 0;break-inside:avoid;"><span style="flex:1;' + (pct ? '' : 'color:#9aa6b4;text-decoration:line-through;') + '">' + oplEsc(m.naam) + '</span>' +
-        '<select onchange="bezPct(this.dataset.n,this.value)" data-n="' + oplEsc(m.naam) + '" style="width:auto!important;flex:0 0 auto;padding:2px 4px;border:1px solid ' + (ingevuld ? '#c8d7e8' : '#f0c27a') + ';border-radius:4px;font-size:12px;" title="' + (ingevuld ? '' : 'Voorstel, nog niet bevestigd') + '">' +
-        opties.concat(opties.indexOf(pct) < 0 ? [pct] : []).map(function(o){ return '<option value="' + o + '"' + (o === pct ? ' selected' : '') + '>' + (o ? o + '%' : 'telt niet mee') + '</option>'; }).join('') + '</select></div>';
-    }).join('') + '</div></details>';
+    '<div style="font-size:12px;color:#24313f;background:#f7f3fb;border:1px solid #e0d4ee;border-radius:6px;padding:8px 12px;">&#x1F37C; <b>Werktijd en verlof per medewerker</b> vul je in het <a href="#" onclick="navPersoneel(\'dossier\');return false;" style="color:#0f6cbd;font-weight:700;">Personeelsdossier</a> in (onder Functie): hoeveel procent iemand werkt, of hij niet meetelt (bijv. supervisors), en geboorte-/ouderschapsverlof. ' +
+      'Nu ingevuld voor <b>' + bezAantalIngevuld() + '</b> van de ' + bezMedewerkers().length + ' medewerkers; de rest telt als 100% (of het voorstel uit de kledingpunten).</div></details>';
 }
+function bezAantalIngevuld(){ return bezMedewerkers().filter(function(m){ var v = (typeof bezVerlofVoor === 'function') ? bezVerlofVoor(m.naam) : null; return v && v.pct !== undefined && v.pct !== ''; }).length; }
 window.bezZet = function(k, v){ var i = bezInstGet(); i[k] = k === 'ortTab' ? v : (Number(String(v).replace(',', '.')) || 0); bezInstSet(i); bezRender(); };
 window.bezNodig = function(d, soort, v){ var i = bezInstGet(); i.nodig = i.nodig || {}; i.nodig[d] = i.nodig[d] || {}; i.nodig[d][soort] = (v === '' ? '' : Math.max(0, Number(v) || 0)); bezInstSet(i); bezRender().then(function(){ var dt = document.querySelector('#bez-kaart details:last-of-type'); if (dt) dt.open = true; }); };
 window.bezNodigWissen = function(){ if (!confirm('Alle aanpassingen bij "Nodig per dienst" wissen en weer het rooster gebruiken?')) return; var i = bezInstGet(); i.nodig = {}; bezInstSet(i); bezRender().then(function(){ var dt = document.querySelector('#bez-kaart details:last-of-type'); if (dt) dt.open = true; }); };
@@ -33530,7 +33526,7 @@ function pdVerlofHtml(naam){
   var lbl = 'display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#24313f;text-transform:none;letter-spacing:normal;';
   return '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:-6px 0 14px;padding:8px 12px;background:#f7f3fb;border:1px solid #e0d4ee;border-radius:6px;">' +
     '<span style="font-size:14px;">&#x1F37C;</span><span style="font-size:12px;font-weight:700;color:var(--navy);">Werktijd &amp; verlof</span>' +
-    '<label style="' + lbl + '">Werkt ' + sel('pct', [100, 90, 80, 75, 70, 60, 50, 40], v.pct === undefined || v.pct === '' ? 100 : v.pct, function(o){ return o + '%'; }) + '</label>' +
+    '<label style="' + lbl + '" title="Voor de bezettingsgraad in het KPI Dashboard. \'Telt niet mee\' = bijv. supervisors of langdurig afwezig.">Werkt ' + sel('pct', [100, 90, 80, 75, 70, 60, 50, 40, 0], v.pct === undefined || v.pct === '' ? 100 : v.pct, function(o){ return o ? o + '%' : 'telt niet mee (bezetting)'; }) + '</label>' +
     '<label style="' + lbl + 'cursor:pointer;" title="1× de wekelijkse arbeidsduur, 100% doorbetaald"><input type="checkbox" style="width:auto;"' + (v.geb ? ' checked' : '') + ' onchange="pdVerlofZet(\'' + n + '\',\'geb\',this.checked)"> Geboorteverlof (1 week)</label>' +
     '<label style="' + lbl + '" title="Max. 5 weken binnen 6 maanden na de geboorte (70% via UWV)">Aanvullend geboorteverlof ' + sel('aanv', [0, 1, 2, 3, 4, 5], v.aanv || 0, function(o){ return o ? o + ' wk' : 'nee'; }) + '</label>' +
     '<label style="' + lbl + '" title="Totaal 26× de wekelijkse arbeidsduur tot het kind 8 is; max. 9 weken (deels) betaald in het eerste jaar. Vul in hoeveel werkweken dit jaar.">Ouderschapsverlof dit jaar ' +
@@ -33550,5 +33546,26 @@ function bezVerlofVoor(maNaam){
 }
 </script>
 
+<script>
+setTimeout(function(){
+  try {
+    var vlag = tk('pd_verlof_migratie_v1'); if (localStorage.getItem(vlag)) return;
+    if (typeof djVertrHeeftToegang !== 'function') return;
+    djVertrHeeftToegang(sessionStorage.getItem('dj_terminal') || 'EP').then(function(ok){
+      if (!ok) return;
+      var dt = bezDeeltijdGet(), a = pdVerlofGet(), dossier = Object.keys((typeof pdData === 'function' && pdData()) || {}), n = 0;
+      Object.keys(dt).forEach(function(maNaam){
+        if (dt[maNaam] === 100) return;
+        var doel = dossier.indexOf(maNaam) >= 0 ? maNaam : null;
+        if (!doel && typeof vakZelfdePersoon === 'function') { var k2 = dossier.filter(function(d){ return vakZelfdePersoon(d, maNaam); }); if (k2.length === 1) doel = k2[0]; }
+        if (!doel) return;
+        a[doel] = a[doel] || {}; if (a[doel].pct === undefined || a[doel].pct === '') { a[doel].pct = dt[maNaam]; n++; }
+      });
+      if (n) { localStorage.setItem(pdVerlofKey(), JSON.stringify(a)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }
+      localStorage.setItem(vlag, '1');
+    });
+  } catch(e) {}
+}, 8000);
+</script>
 </body>
 </html>
