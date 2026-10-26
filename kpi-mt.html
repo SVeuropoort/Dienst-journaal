@@ -2252,6 +2252,8 @@ function bezMtRender(){
   var en = MT_ENGELS, T = function(nl, e){ return en ? e : nl; };
   var b = null; try { b = JSON.parse(LS.getItem(mtTk('bezetting_samenvatting_v1')) || 'null'); } catch(e) {}
   if (!b || b.som0 === undefined) { el.innerHTML = '<div style="color:#5a7090;font-size:13px;">' + T('Nog niet berekend. Een supervisor opent het KPI Dashboard in Dienst Journaal één keer; daarna is de uitkomst hier zichtbaar.', 'Not calculated yet. A supervisor needs to open the KPI Dashboard in Dienst Journaal once; the result then appears here.') + '</div>'; return; }
+  // Hoek van Holland hoort op het eigen 13-weeks rooster (4 man per ploeg) te staan
+  if (mtTerminal === 'HVH' && /europoort/i.test(b.rooster || '')) { el.innerHTML = '<div style="color:#b9770e;font-size:13px;">' + T('Deze cijfers zijn nog berekend met het Europoort-rooster. Zodra een supervisor van Hoek van Holland Dienst Journaal opent, worden ze automatisch bijgewerkt naar het Hoek van Holland-rooster (13 ploegen \u00D7 4).', 'These figures were still calculated with the Europoort roster. As soon as a Hoek van Holland supervisor opens Dienst Journaal, they are updated automatically to the Hoek van Holland roster (13 teams \u00D7 4).') + '</div>'; return; }
   var wg = bezMtWeergave(), vl = b.verlof || {}, zf = wg.ziekte ? (1 - (b.ziekte || 0) / 100) : 1;
   var verlofJaar = (wg.geb ? (vl.geb || 0) + (vl.aanv || 0) : 0) + (wg.ouder ? (vl.ouder || 0) : 0) + (wg.sen ? (vl.sen || 0) : 0) + (wg.sfr ? (vl.sfr || 0) : 0);
   var besch = ((b.som0 - verlofJaar) * zf + (wg.stag ? (b.stagJaar || 0) : 0)) / 52;
@@ -2369,7 +2371,7 @@ function kpiOrden(ouder, buiten){
 //    (die instelling is gedeeld met Dienst Journaal zelf: zelfde vinkje, zelfde pc);
 //  - automatisch bijwerken naar de nieuwste versie, alleen als niemand bezig is.
 // ══════════════════════════════════════════════════════════════════
-var APP_BUILD = '2026-10-09.6';
+var APP_BUILD = '2026-10-09.7';
 var APP_AUTH_KEY = 'kpi_mt_auth';
 var APP_EN = true;
 function appGedeeldePc(){ return localStorage.getItem('dj_niet_uitloggen') !== '1'; }

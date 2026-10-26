@@ -23678,7 +23678,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.59';
+var DJ_BUILD = '2026-10-07.60';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -33812,5 +33812,22 @@ function caoSfrFactor(vl, geb, peil){
 }
 </script>
 
+<script>
+// Bezettingsgraad (uitkomst zonder namen) automatisch bijwerken voor het MT, ook als niemand het KPI Dashboard opent
+function bezSamenvattingBijwerken(){
+  try {
+    var T = sessionStorage.getItem('dj_terminal') || 'EP';
+    if (sessionStorage.getItem('dj_auth') !== '1' || typeof djVertrHeeftToegang !== 'function' || typeof bezBereken !== 'function') return;
+    djVertrHeeftToegang(T).then(function(ok){
+      if (!ok || !bezMedewerkers().length) return;
+      var b = bezBereken(), k = tk('bezetting_samenvatting_v1'), oud = localStorage.getItem(k);
+      var zonderTijd = function(x){ try { var o = typeof x === 'string' ? JSON.parse(x) : JSON.parse(JSON.stringify(x)); delete o.berekend; return JSON.stringify(o); } catch(e) { return ''; } };
+      if (!oud || zonderTijd(oud) !== zonderTijd(b)) { localStorage.setItem(k, JSON.stringify(b)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }
+    }).catch(function(){});
+  } catch(e) {}
+}
+setTimeout(bezSamenvattingBijwerken, 15000);
+setInterval(bezSamenvattingBijwerken, 30 * 60000);
+</script>
 </body>
 </html>
