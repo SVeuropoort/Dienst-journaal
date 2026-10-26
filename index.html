@@ -23678,7 +23678,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.51';
+var DJ_BUILD = '2026-10-07.52';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -33383,7 +33383,7 @@ function bezZiekteAuto(){
     return (sv && sv.pct !== null && sv.pct !== undefined && !isNaN(sv.pct)) ? Math.round(sv.pct * 10) / 10 : null;
   } catch(e) { return null; }
 }
-function bezWeergave(){ var d = { stag: true, ziekte: true, geb: true, ouder: true, sen: true }; try { return Object.assign(d, JSON.parse(localStorage.getItem('bez_weergave') || '{}')); } catch(e) { return d; } }
+function bezWeergave(){ var d = { stag: true, ziekte: true, geb: true, ouder: true, sen: true, sfr: true }; try { return Object.assign(d, JSON.parse(localStorage.getItem('bez_weergave') || '{}')); } catch(e) { return d; } }
 window.bezWissel = function(k){ var w = bezWeergave(); w[k] = !w[k]; localStorage.setItem('bez_weergave', JSON.stringify(w)); bezRender(); };
 function bezBereken(){
   var inst = bezInstGet(), r = bezRoosters().find(function(x){ return x.naam === inst.ortTab; }) || bezRoosters()[0];
@@ -33415,7 +33415,8 @@ function bezBereken(){
     var caoExtra = cp ? cp.a26 + cp.jeugd : 0; // CAO A26 + A30: altijd van toepassing
     if (cp) { caoTot.a26 += cp.a26; caoTot.jeugd += cp.jeugd; if (!cp.gebBekend && !cp.indBekend) caoTot.onbekend++; } else caoTot.onbekend++;
     som0 += (roosterPerJaar - vrijPerJaar - caoExtra) * (pct / 100); // zonder ziekte en zonder verlof
-    if (cp && cp.senior && cp.a27) { verlof.sen += cp.a27 * pct / 100; verlofN.sen++; } // A27 op verzoek
+    if (cp && cp.a27) { verlof.sen += cp.a27 * pct / 100; verlofN.sen++; } // seniorendagen (tabel AOW & SFR)
+    if (cp && cp.sfrFactor < 1) { verlof.sfr = (verlof.sfr || 0) + (roosterPerJaar - vrijPerJaar - caoExtra) * (pct / 100) * (1 - cp.sfrFactor); verlofN.sfr = (verlofN.sfr || 0) + 1; }
     if (vl) { // verlof in werkweken × diensten per week van deze medewerker
       var pw = wekelijks * pct / 100;
       if (vl.geb) { verlof.geb += 1 * pw; verlofN.geb++; }
@@ -33450,7 +33451,7 @@ async function bezRender(){
   var wg = bezWeergave();
   if (b.som0 !== undefined) {
     var zf = wg.ziekte ? (1 - (b.ziekte || 0) / 100) : 1, vl = b.verlof || { geb: 0, aanv: 0, ouder: 0 };
-    var verlofJaar = (wg.geb ? vl.geb + vl.aanv : 0) + (wg.ouder ? vl.ouder : 0) + (wg.sen ? (vl.sen || 0) : 0);
+    var verlofJaar = (wg.geb ? vl.geb + vl.aanv : 0) + (wg.ouder ? vl.ouder : 0) + (wg.sen ? (vl.sen || 0) : 0) + (wg.sfr ? (vl.sfr || 0) : 0);
     b.verlofWeek = verlofJaar / 52;
     b.beschikbaar = (b.som0 - verlofJaar) * zf / 52; b.beschikbaarMet = ((b.som0 - verlofJaar) * zf + (wg.stag ? b.stagJaar : 0)) / 52;
     b.graad = b.nodig ? b.beschikbaar / b.nodig : 0; b.graadMet = b.nodig ? b.beschikbaarMet / b.nodig : 0;
@@ -33462,7 +33463,7 @@ async function bezRender(){
   var h = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><div style="font-weight:800;color:var(--navy);font-size:16px;flex:1;">&#x1F4CA; Bezettingsgraad eigen medewerkers</div>' +
     '<span style="font-size:11.5px;color:#7a8696;">Rooster: <b>' + oplEsc(b.rooster) + '</b> (' + b.weken + ' ploegen \u00D7 ' + b.inst.ploeg + ') &middot; ' + bezFmt(b.inst.snipper) + ' vakantiedagen' + (b.inst.adv ? ' + ' + bezFmt(b.inst.adv, 1) + ' ADV' : '') + ' &middot; ziekte ' + bezFmt(b.ziekte !== undefined ? b.ziekte : b.inst.ziekte, 1) + '%' + (b.ziekteAuto ? ' (gem. 12 mnd)' : '') + '</span></div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">' + knopW('stag', 'Met stagiaires', 'Zonder stagiaires') + knopW('ziekte', 'Met ziekteverzuim', 'Zonder ziekteverzuim') +
-      knopW('geb', 'Met geboorteverlof', 'Zonder geboorteverlof') + knopW('ouder', 'Met ouderschapsverlof', 'Zonder ouderschapsverlof') + knopW('sen', 'Met seniorendagen', 'Zonder seniorendagen') + '</div>' +
+      knopW('geb', 'Met geboorteverlof', 'Zonder geboorteverlof') + knopW('ouder', 'Met ouderschapsverlof', 'Zonder ouderschapsverlof') + knopW('sen', 'Met seniorendagen', 'Zonder seniorendagen') + knopW('sfr', 'Met SFR / eerder stoppen', 'Zonder SFR') + '</div>' +
     '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">' +
       tegel('Bezettingsgraad', bezFmt(b.graadMet * 100, 1) + '%', [wg.stag ? 'met stagiaires' : 'zonder stagiaires', wg.ziekte ? 'met ziekte' : 'zonder ziekte', wg.geb ? 'met geboorteverlof' : 'zonder geboorteverlof', wg.ouder ? 'met ouderschapsverlof' : 'zonder ouderschapsverlof'].join(', '), kleur) +
       tegel('Nodig per week', bezFmt(b.nodig) + ' diensten', b.aangepast ? 'rooster, met eigen aanpassingen' : 'volgens het basisrooster') +
@@ -33477,7 +33478,8 @@ async function bezRender(){
     '<tr><td style="padding:4px 8px;color:#c0392b;">Tekort (flex)</td>' + b.perDag.map(function(x){ return '<td style="text-align:center;padding:4px 10px;color:#c0392b;">' + bezFmt(Math.max(0, x * (1 - b.graadMet)), 1) + '</td>'; }).join('') + '<td style="text-align:center;font-weight:800;color:#c0392b;">' + bezFmt(b.tekort, 1) + '</td></tr></table></div>' +
     '<details style="margin-top:10px;font-size:12.5px;"><summary style="cursor:pointer;font-weight:700;color:var(--navy);">Hoe is dit berekend?</summary><div style="line-height:1.6;margin-top:6px;color:#333;">' +
       'Per medewerker: (' + bezFmt(b.roosterPerJaar) + ' roosterdiensten per jaar \u2212 ' + bezFmt(b.inst.snipper) + ' vakantie- en snipperdagen' + (b.inst.adv ? ' \u2212 ' + bezFmt(b.inst.adv, 1) + ' ADV-dagen' : '') + ' \u2212 CAO-extra dagen per persoon) \u00D7 deeltijd%' + (wg.ziekte ? ' \u00D7 (1 \u2212 ' + bezFmt(b.ziekte !== undefined ? b.ziekte : b.inst.ziekte, 1) + '% ziekte' + (b.ziekteAuto ? ', gemiddelde verzuim afgelopen 12 maanden' : '') + ')' : ' (zonder ziekteverzuim)') + '. ' +
-      (b.cao ? 'CAO-dagen (uit het personeelsdossier): extra vakantiedagen A26 = <b>' + bezFmt(b.cao.a26) + '</b> dagen' + (b.cao.jeugd ? ', jeugddagen A30 = ' + b.cao.jeugd : '') + (b.verlofN && b.verlofN.sen ? ', seniorendagen A27 (' + b.verlofN.sen + ' mw) = ' + bezFmt(b.verlof.sen) + ' dagen' + (wg.sen ? '' : ' (nu uitgezet)') : '') + (b.cao.onbekend ? ' &mdash; <span style="color:#b9770e;">van ' + b.cao.onbekend + ' medewerkers zijn geboortedatum en datum in dienst nog onbekend</span>' : '') + '. ' : '') +
+      (b.cao ? 'CAO-dagen (uit het personeelsdossier): extra vakantiedagen A26 = <b>' + bezFmt(b.cao.a26) + '</b> dagen' + (b.cao.jeugd ? ', jeugddagen A30 = ' + b.cao.jeugd : '') + (b.verlofN && b.verlofN.sen ? ', seniorendagen (' + b.verlofN.sen + ' mw) = ' + bezFmt(b.verlof.sen) + ' dagen' + (wg.sen ? '' : ' (nu uitgezet)') : '') +
+        (b.verlofN && b.verlofN.sfr ? ', SFR/eerder stoppen (' + b.verlofN.sfr + ' mw) = ' + bezFmt(b.verlof.sfr) + ' diensten minder in de komende 12 maanden' + (wg.sfr ? '' : ' (nu uitgezet)') : '') + (b.cao.onbekend ? ' &mdash; <span style="color:#b9770e;">van ' + b.cao.onbekend + ' medewerkers zijn geboortedatum en datum in dienst nog onbekend</span>' : '') + '. ' : '') +
       (b.verlof ? 'Verlof (uit het personeelsdossier): geboorteverlof ' + (b.verlofN.geb || 0) + ' mw, aanvullend geboorteverlof ' + (b.verlofN.aanv || 0) + ' mw, ouderschapsverlof ' + (b.verlofN.ouder || 0) + ' mw = ' + bezFmt(b.verlofWeek || 0, 1) + ' diensten per week minder' + ((wg.geb || wg.ouder) ? '' : ' (nu uitgezet)') + '. ' : '') +
       'Opgeteld voor alle ' + b.medewerkers + ' medewerkers uit de Maandafsluiting en gedeeld door 52 weken = <b>' + bezFmt(b.beschikbaar, 1) + '</b> diensten per week' +
       (b.inst.stag && wg.stag ? ', plus ' + b.inst.stag + ' stagiair(s) \u00D7 ' + bezFmt(b.inst.stagDagen, 1) + ' dagen = <b>' + bezFmt(b.beschikbaarMet, 1) + '</b>' : '') + '. ' +
@@ -33531,8 +33533,8 @@ function pdVerlofKey(){ return tk('pd_verlof_v1'); }
 function pdVerlofGet(){ try { return JSON.parse(localStorage.getItem(pdVerlofKey()) || '{}') || {}; } catch(e) { return {}; } }
 window.pdVerlofZet = function(naam, k, v){
   var a = pdVerlofGet(); a[naam] = a[naam] || {};
-  a[naam][k] = (k === 'geb' || k === 'senior') ? !!v : (v === '' ? '' : Number(v));
-  if (!a[naam].geb && !a[naam].aanv && !a[naam].ouder && !a[naam].senior && !a[naam].indienst && (a[naam].pct === undefined || a[naam].pct === '' || a[naam].pct === 100)) delete a[naam];
+  a[naam][k] = (k === 'geb' || k === 'senior') ? !!v : (k === 'sfr' ? String(v || '') : (v === '' ? '' : Number(v)));
+  if (!a[naam].geb && !a[naam].aanv && !a[naam].ouder && !a[naam].senior && !a[naam].indienst && !a[naam].sfr && !a[naam].pensioen && (a[naam].pct === undefined || a[naam].pct === '' || a[naam].pct === 100)) delete a[naam];
   localStorage.setItem(pdVerlofKey(), JSON.stringify(a)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
 };
 function pdVerlofHtml(naam){
@@ -33613,7 +33615,10 @@ function caoPersoon(dossierNaam, peil){
   var vl = (typeof pdVerlofGet === 'function' ? pdVerlofGet() : {})[dossierNaam] || {};
   var ind = caoParseDatum(vl.indienst);
   var leeftijd = caoJaren(geb, peil), dienst = caoJaren(ind, peil);
-  return { leeftijd: leeftijd, dienst: dienst, a26: caoA26(dienst, leeftijd), jeugd: (leeftijd !== null && leeftijd < 20) ? 3 : 0, a27: caoA27(leeftijd), senior: !!vl.senior, gebBekend: !!geb, indBekend: !!ind };
+  var sen = (typeof caoSeniorDagen === 'function') ? caoSeniorDagen(geb, peil.getFullYear()) : caoA27(leeftijd);
+  var sf = (typeof caoSfrFactor === 'function') ? caoSfrFactor(vl, geb, peil) : { f: 1, p: null };
+  return { leeftijd: leeftijd, dienst: dienst, a26: caoA26(dienst, leeftijd), jeugd: (leeftijd !== null && leeftijd < 20) ? 3 : 0, a27: sen, senior: true,
+    sfr: vl.sfr || '', sfrFactor: sf.f, pensioen: sf.p, gebBekend: !!geb, indBekend: !!ind };
 }
 // Dossiernaam bij een naam uit de Maandafsluiting (alleen bij een eenduidige koppeling)
 function bezDossierNaam(maNaam){
@@ -33626,6 +33631,13 @@ function bezDossierNaam(maNaam){
   var terug = alleMa.filter(function(x){ return vakZelfdePersoon(k[0], x); });
   return (terug.length === 1 && terug[0] === maNaam) ? k[0] : null;
 }
+function caoFmt(d){ return d ? String(d.getDate()).padStart(2, '0') + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + d.getFullYear() : ''; }
+window.pdPensioenZet = function(naam, el){
+  var v = String(el.value || '').trim(), d = caoParseDatum(v);
+  if (v && !d) { el.style.borderColor = '#c0392b'; return; }
+  var a = pdVerlofGet(); a[naam] = a[naam] || {}; a[naam].pensioen = d ? d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') : '';
+  localStorage.setItem(pdVerlofKey(), JSON.stringify(a)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); if (typeof pdRenderDetail === 'function') pdRenderDetail();
+};
 window.pdIndienstZet = function(naam, el){
   var v = String(el.value || '').trim();
   if (v && !caoParseDatum(v)) { el.style.borderColor = '#c0392b'; el.title = 'Typ de datum als dd-mm-jjjj'; return; }
@@ -33646,10 +33658,48 @@ function pdCaoHtml(naam){
     '<span style="color:#5a6b80;">' + uitleg.join(' &middot; ') + '</span>' +
     '<span title="CAO artikel A26: dienstverband 10/25/30 jaar of leeftijd 45/50/55 jaar geeft 1/2/3 extra vakantiedagen; het hoogste telt." style="font-weight:700;color:' + (p.a26 ? '#1a7a40' : '#5a6b80') + ';">Extra vakantiedagen (A26): ' + p.a26 + '</span>' +
     (p.jeugd ? '<span style="font-weight:700;color:#1a7a40;" title="CAO artikel A30: jonger dan 20 jaar">+3 jeugddagen (A30)</span>' : '') +
-    (p.a27 ? '<label style="display:inline-flex;align-items:center;gap:5px;text-transform:none;letter-spacing:normal;font-weight:400;cursor:pointer;" title="CAO artikel A27: werknemers van 55 t/m 67 jaar kunnen op verzoek extra dagen vrijaf krijgen (90% doorbetaald)."><input type="checkbox" style="width:auto;"' + (vl.senior ? ' checked' : '') + ' onchange="pdVerlofZet(\'' + n + '\',\'senior\',this.checked);"> Maakt gebruik van seniorendagen (A27): <b>' + p.a27 + '</b> dagen</label>' : '') +
+    (p.a27 ? '<span style="font-weight:700;color:#1a7a40;" title="Seniorendagen volgens de tabel in AOW &amp; SFR (leeftijd op 1 januari)">Seniorendagen: ' + p.a27 + '</span>' : '') +
+    ((p.leeftijd !== null && p.leeftijd >= 55) || vl.sfr ? '<label style="display:inline-flex;align-items:center;gap:5px;text-transform:none;letter-spacing:normal;font-weight:400;">SFR ' +
+      '<select onchange="pdVerlofZet(\'' + n + '\',\'sfr\',this.value);pdRenderDetail();" style="width:auto!important;padding:3px 6px;border:1px solid #c8d7e8;border-radius:5px;font-size:12px;">' +
+      [['', 'geen'], ['sfr', 'SFR (2,5 jr 80% + 0,5 jr 60%)'], ['stoppen', 'Eerder stoppen (1 jr 80%)']].map(function(o){ return '<option value="' + o[0] + '"' + ((vl.sfr || '') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label>' +
+      '<label style="display:inline-flex;align-items:center;gap:5px;text-transform:none;letter-spacing:normal;font-weight:400;" title="Leeg = AOW-datum volgens de SVB-tabel (zoals in AOW &amp; SFR)">Pensioendatum <input type="text" placeholder="' + (p.pensioen ? caoFmt(p.pensioen.d) : 'dd-mm-jjjj') + '" value="' + (vl.pensioen ? caoFmt(caoParseDatum(vl.pensioen)) : '') + '" onchange="pdPensioenZet(\'' + n + '\',this)" style="width:100px!important;padding:3px 6px;border:1px solid #c8d7e8;border-radius:5px;font-size:12px;"></label>' +
+      (vl.sfr && p.sfrFactor < 1 ? '<span style="color:#b9770e;font-weight:700;">komende 12 mnd gem. ' + Math.round(p.sfrFactor * 100) + '% inzetbaar</span>' : '') : '') +
     '</div>';
 }
 (function(){ if (typeof djFunctieVakjesHtml !== 'function') return; var _o = djFunctieVakjesHtml; djFunctieVakjesHtml = function(naam){ return _o(naam) + pdCaoHtml(naam); }; window.djFunctieVakjesHtml = djFunctieVakjesHtml; })();
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// Seniorendagen + SFR (zelfde regels als het tabblad AOW & SFR)
+//  Seniorendagen: tabel A28 (leeftijd op 1 januari): 54=2 … 64+=20 dagen — automatisch voor iedereen vanaf 54
+//  SFR (Senioren Fit Regeling): 3 jaar vóór de pensioendatum — 2,5 jaar 80% + laatste half jaar 60%
+//  Eerder stoppen (ESMW): 1 jaar vóór de pensioendatum 80%
+//  Pensioendatum = AOW-datum (SVB-tabel uit AOW & SFR), of zelf ingevuld
+// ══════════════════════════════════════════════════════════════════
+function caoSeniorDagen(geb, jaar){
+  if (!geb) return 0; var l = jaar - geb.getFullYear() - 1;
+  try { return (typeof A28_CAO !== 'undefined' && A28_CAO[l]) || 0; } catch(e) { return 0; }
+}
+function caoPensioenDatum(geb, vl){
+  var eigen = caoParseDatum(vl && vl.pensioen); if (eigen) return { d: eigen, auto: false };
+  if (!geb || typeof getAOW !== 'function') return null;
+  var a = getAOW(geb.getFullYear(), geb.getMonth() + 1, geb.getDate());
+  var d = new Date(geb); d.setFullYear(d.getFullYear() + a[0]); d.setMonth(d.getMonth() + a[1]); return { d: d, auto: true };
+}
+// Gemiddelde werkfactor over de komende 12 maanden (1 = normaal, 0,8 = SFR, 0 = met pensioen)
+function caoSfrFactor(vl, geb, peil){
+  peil = peil || new Date(); var p = caoPensioenDatum(geb, vl), soort = vl && vl.sfr;
+  if (!p) return { f: 1, p: null };
+  var eind = new Date(peil); eind.setFullYear(eind.getFullYear() + 1);
+  var per = [];
+  if (soort === 'sfr') { var s = new Date(p.d); s.setFullYear(s.getFullYear() - 3); var h = new Date(p.d); h.setMonth(h.getMonth() - 6); per = [[s, h, 0.8], [h, p.d, 0.6]]; }
+  else if (soort === 'stoppen') { var s2 = new Date(p.d); s2.setFullYear(s2.getFullYear() - 1); per = [[s2, p.d, 0.8]]; }
+  per.push([p.d, new Date(8640000000000000), 0]); // na de pensioendatum: niet meer in dienst
+  var tot = eind - peil, verlies = 0;
+  per.forEach(function(x){ var a = Math.max(x[0], peil), b = Math.min(x[1], eind); if (b > a) verlies += (b - a) * (1 - x[2]); });
+  return { f: Math.max(0, 1 - verlies / tot), p: p };
+}
 </script>
 
 </body>
