@@ -23678,7 +23678,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.54';
+var DJ_BUILD = '2026-10-07.57';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -33416,9 +33416,17 @@ function bezBereken(){
     if (!pct) return; meetellen++; fte += pct / 100;
     var caoExtra = cp ? cp.a26 + cp.jeugd : 0; // CAO A26 + A30: altijd van toepassing
     if (cp) { caoTot.a26 += cp.a26; caoTot.jeugd += cp.jeugd; if (!cp.gebBekend && !cp.indBekend) caoTot.onbekend++; } else caoTot.onbekend++;
-    som0 += (roosterPerJaar - vrijPerJaar - caoExtra) * (pct / 100); // zonder ziekte en zonder verlof
-    if (cp && cp.a27) { verlof.sen += cp.a27 * pct / 100 * cp.sfrFactor; verlofN.sen++; } // seniorendagen (zoals AOW & SFR), naar rato SFR
-    if (cp && cp.sfrFactor < 1) { verlof.sfr = (verlof.sfr || 0) + (roosterPerJaar - vrijPerJaar - caoExtra) * (pct / 100) * (1 - cp.sfrFactor); verlofN.sfr = (verlofN.sfr || 0) + 1; }
+    if (dn && typeof caoJaarOverzicht === 'function') {
+      // Precies zoals AOW & SFR (en het personeelsdossier): dit kalenderjaar per medewerker
+      var jr = caoJaarOverzicht(dn, new Date().getFullYear()), inDienst = jr.dagen / jr.jaarDagen;
+      var basis = roosterPerJaar * inDienst * (vl && vl.sfr ? 1 : pct / 100);
+      som0 += basis - jr.verlof - jr.adv;                     // na snipperdagen (+A26/A30-extra) en ADV
+      if (jr.a30) { verlof.sen += jr.a30; verlofN.sen++; }    // seniorendagen (A30)
+      if (jr.sfr) { verlof.sfr = (verlof.sfr || 0) + jr.sfr; verlofN.sfr = (verlofN.sfr || 0) + 1; } // SFR-dagen
+      if (inDienst < 1) fte -= (pct / 100) * (1 - inDienst);
+    } else {
+      som0 += (roosterPerJaar - vrijPerJaar - caoExtra) * (pct / 100); // geen dossiergegevens: standaard
+    }
     if (vl) { // verlof in werkweken × diensten per week van deze medewerker
       var pw = wekelijks * pct / 100;
       if (vl.geb) { verlof.geb += 1 * pw; verlofN.geb++; }
@@ -33649,23 +33657,82 @@ window.pdIndienstZet = function(naam, el){
   localStorage.setItem(pdVerlofKey(), JSON.stringify(a)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
   if (typeof pdRenderDetail === 'function') pdRenderDetail();
 };
-function pdRechtHtml(naam, p, vl){
+// Verlofrechten per kalenderjaar — EXACT dezelfde methode als het tabblad AOW & SFR:
+//  per periode (kalenderdagen ÷ dagen in het jaar) × percentage:
+//   Verlofdagen (snipperdagen + A26/A30-extra) × %, A30-seniorendagen × %, ADV × %,
+//   SFR-dagen = 52 per jaar × (1 − %) ÷ 20%  (80% → 52/jaar, 60% → 104/jaar)
+//  Vóór de SFR 100%; na de pensioendatum niets meer.
+function caoJaarOverzicht(naam, jaar){
   var inst = (typeof bezInstGet === 'function') ? bezInstGet() : { snipper: 28, adv: 11.5 };
-  var jaar = new Date().getFullYear();
+  var vl = (typeof pdVerlofGet === 'function' ? pdVerlofGet() : {})[naam] || {};
   var v = (typeof getVerjaardagen === 'function' ? getVerjaardagen() : {})[naam] || {};
   var geb = (v.dag && v.maand && v.jaar) ? new Date(+v.jaar, +v.maand - 1, +v.dag) : null;
-  var f = caoSfrFactorJaar(vl, geb, jaar), pct = (vl.sfr || vl.pct === undefined || vl.pct === '') ? 100 : Number(vl.pct);
-  var fmt = function(x){ return Number(x).toLocaleString('nl-NL', { maximumFractionDigits: 1 }); };
-  var sn = Number(inst.snipper) || 0, adv = Number(inst.adv) || 0, a26 = p.a26 + p.jeugd, sen = caoSeniorDagen(geb, jaar);
-  // Snipperdagen, ADV en seniorendagen naar rato van SFR en deeltijd; extra dagen A26/A30 blijven volledig
-  var factor = f * (pct ? pct / 100 : 0);
-  var totaal = (sn + adv + sen) * factor + (pct ? a26 : 0);
-  var delen = [fmt(sn) + ' snipperdagen', fmt(adv) + ' ADV'];
-  if (a26) delen.push(a26 + ' extra (A26' + (p.jeugd ? '/A30' : '') + ')');
-  if (sen) delen.push(fmt(sen) + ' seniorendagen (A30)');
-  return '<div style="width:100%;margin-top:6px;padding-top:6px;border-top:1px dashed #cfe6d7;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">' +
-    '<span style="font-weight:800;color:var(--navy);">Recht in ' + jaar + ': ' + fmt(totaal) + ' dagen</span>' +
-    '<span style="color:#5a6b80;">= ' + delen.join(' + ') + (factor < 1 ? ' &mdash; snipper-, ADV- en seniorendagen naar rato: ' + (f < 1 ? 'SFR ' + Math.round(f * 100) + '%' : '') + (f < 1 && pct < 100 ? ' &times; ' : '') + (pct < 100 ? 'werkt ' + pct + '%' : '') : '') + '</span></div>';
+  var p = caoPersoon(naam, new Date(jaar, 0, 1)), pens = caoPensioenDatum(geb, vl);
+  var pct = (vl.sfr || vl.pct === undefined || vl.pct === '') ? 100 : Number(vl.pct);
+  var verlofPJ = (Number(inst.snipper) || 0) + p.a26 + p.jeugd, advPJ = Number(inst.adv) || 0, sfrPJ = 52;
+  var getA28 = function(y){ return caoSeniorDagen(geb, y); };
+  var dIP = function(a, b){ return Math.max(0, Math.round((b - a) / 86400000)); };
+  var dIY = function(y){ return (y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0)) ? 366 : 365; };
+  var all = [];
+  // ── Periodes opbouwen — letterlijk zoals calcSFR() in AOW & SFR ──
+  if (pens && vl.sfr === 'sfr') {
+    var pd = pens.d, sfrStart = new Date(pd); sfrStart.setFullYear(sfrStart.getFullYear() - 3);
+    var y2 = new Date(pd); y2.setFullYear(y2.getFullYear() - 2); var y3 = new Date(pd); y3.setFullYear(y3.getFullYear() - 1); var h2 = new Date(pd); h2.setMonth(h2.getMonth() - 6);
+    var sps = [{ from: sfrStart, to: y2, factor: 0.8 }, { from: y2, to: y3, factor: 0.8 }, { from: y3, to: h2, factor: 0.8 }, { from: h2, to: pd, factor: 0.6 }];
+    var st = new Date(sfrStart.getFullYear(), 0, 1), sd = dIP(st, sfrStart);
+    if (sd > 0) all.push({ year: sfrStart.getFullYear(), days: sd, totalDays: dIY(sfrStart.getFullYear()), factor: 1, isSFR: false, isH2: false, a30Override: getA28(sfrStart.getFullYear()), sfrOverride: null });
+    sps.forEach(function(sp){
+      var cur = new Date(sp.from);
+      while (cur < sp.to) {
+        var ye = new Date(cur.getFullYear() + 1, 0, 1), pe = ye < sp.to ? ye : sp.to, d = dIP(cur, pe);
+        if (d > 0) { var pdays = dIP(sp.from, sp.to); all.push({ year: cur.getFullYear(), days: d, totalDays: dIY(cur.getFullYear()), factor: sp.factor, isSFR: true, isH2: sp.factor < 0.7, a30Override: getA28(cur.getFullYear()), periodSfr: Math.round(sfrPJ * pdays / 365), periodLen: pdays }); }
+        cur = pe;
+      }
+    });
+  } else if (pens && vl.sfr === 'stoppen') {
+    var pd2 = pens.d, ss = new Date(pd2); ss.setFullYear(ss.getFullYear() - 1);
+    var periodDays = dIP(ss, pd2), sfrTotal = sfrPJ * periodDays / dIY(pd2.getFullYear());
+    var ys = new Date(ss.getFullYear(), 0, 1);
+    if (ss > ys) all.push({ year: ss.getFullYear(), days: dIP(ys, ss), totalDays: dIY(ss.getFullYear()), factor: 1, isSFR: false, isH2: false, a30Override: getA28(ss.getFullYear()), sfrOverride: null });
+    var c2 = new Date(ss);
+    while (c2 < pd2) {
+      var ye2 = new Date(c2.getFullYear() + 1, 0, 1), pe2 = ye2 < pd2 ? ye2 : pd2, d2 = dIP(c2, pe2);
+      if (d2 > 0) all.push({ year: c2.getFullYear(), days: d2, totalDays: dIY(c2.getFullYear()), factor: 0.8, isSFR: true, isH2: false, a30Override: getA28(c2.getFullYear()), sfrOverride: Math.round(sfrTotal * d2 / periodDays * 10) / 10 });
+      c2 = pe2;
+    }
+  }
+  var deze = all.filter(function(x){ return x.year === jaar; });
+  if (!deze.length) {
+    // Jaar zonder SFR: heel jaar (of tot de pensioendatum) standaard
+    var van = new Date(jaar, 0, 1), tot = new Date(jaar + 1, 0, 1);
+    if (pens && pens.d < tot) tot = pens.d;
+    var dg = dIP(van, tot); if (dg > 0) deze = [{ year: jaar, days: dg, totalDays: dIY(jaar), factor: 1, isSFR: false, isH2: false, a30Override: getA28(jaar), sfrOverride: null }];
+  }
+  // ── Dagen per periode — letterlijk zoals calcDaysForPeriod() ──
+  var r = { verlof: 0, a30: 0, adv: 0, sfr: 0, dagen: 0, jaarDagen: dIY(jaar), pct: pct, sfrSoort: vl.sfr || '' };
+  deze.forEach(function(x){
+    var ratio = x.days / x.totalDays, f = x.isSFR ? x.factor : 1, sfr = 0;
+    if (x.isSFR) {
+      if (x.sfrOverride != null) sfr = x.sfrOverride;
+      else if (x.isH2) sfr = sfrPJ;
+      else if (x.periodSfr != null && x.periodLen != null) sfr = Math.round(x.periodSfr * x.days / x.periodLen * 10) / 10;
+      else sfr = Math.round(sfrPJ * x.days / 365 * 10) / 10;
+    }
+    r.verlof += verlofPJ * ratio * f; r.a30 += (x.a30Override || 0) * ratio * f; r.adv += advPJ * ratio * f; r.sfr += sfr; r.dagen += x.days;
+  });
+  if (!vl.sfr && pct !== 100) ['verlof', 'a30', 'adv'].forEach(function(k){ r[k] *= pct / 100; }); // deeltijd (zonder SFR)
+  r.totaal = r.verlof + r.a30 + r.adv + r.sfr;
+  return r;
+}
+function pdRechtHtml(naam, p, vl){
+  var jaar = new Date().getFullYear(), r = caoJaarOverzicht(naam, jaar);
+  var fmt = function(x){ return Number(x).toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 }); };
+  var cel = 'padding:3px 10px;text-align:right;', kop = 'padding:3px 10px;text-align:right;color:#5a6b80;font-weight:700;';
+  if (r.pct === 0 && !r.sfrSoort) return '<div style="width:100%;margin-top:6px;padding-top:6px;border-top:1px dashed #cfe6d7;color:#5a6b80;">Telt niet mee voor de bezetting.</div>';
+  return '<div style="width:100%;margin-top:6px;padding-top:6px;border-top:1px dashed #cfe6d7;">' +
+    '<div style="font-weight:800;color:var(--navy);margin-bottom:4px;">Afwezigheidsrechten ' + jaar + ' <span style="font-weight:400;color:#5a6b80;">(zelfde berekening als AOW &amp; SFR' + (r.dagen < r.jaarDagen ? '; ' + r.dagen + ' van de ' + r.jaarDagen + ' dagen in dienst' : '') + (r.pct < 100 && !r.sfrSoort ? '; werkt ' + r.pct + '%' : '') + ')</span></div>' +
+    '<table style="border-collapse:collapse;font-size:12px;"><tr><th style="' + kop + '">Verlofdagen</th><th style="' + kop + '">A30-dagen</th><th style="' + kop + '">ADV-dagen</th>' + (r.sfr ? '<th style="' + kop + 'color:#1a7a40;">SFR-dagen</th>' : '') + '<th style="' + kop + 'color:var(--navy);">Totaal</th></tr>' +
+    '<tr><td style="' + cel + '">' + fmt(r.verlof) + '</td><td style="' + cel + '">' + fmt(r.a30) + '</td><td style="' + cel + '">' + fmt(r.adv) + '</td>' + (r.sfr ? '<td style="' + cel + 'color:#1a7a40;font-weight:700;">' + fmt(r.sfr) + '</td>' : '') + '<td style="' + cel + 'font-weight:800;color:var(--navy);">' + fmt(r.totaal) + '</td></tr></table></div>';
 }
 function pdCaoHtml(naam){
   var p = caoPersoon(naam), vl = pdVerlofGet()[naam] || {}, n = String(naam).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
