@@ -6946,6 +6946,7 @@ window.addEventListener('resize', () => {
     'opl_afgerond_v1',
     'dagplan_log_v1',
     'kledingpunten_v1',
+    'cursus_planning_v1',
     'bezetting_deeltijd_v1',
     'pd_verlof_v1',
     'bezetting_instellingen_v1',
@@ -7213,6 +7214,7 @@ window.addEventListener('resize', () => {
     'opl_afgerond_v1',
     'dagplan_log_v1',
     'kledingpunten_v1',
+    'cursus_planning_v1',
     'bezetting_deeltijd_v1',
     'pd_verlof_v1',
     'bezetting_instellingen_v1',
@@ -23678,7 +23680,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.64';
+var DJ_BUILD = '2026-10-07.66';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -33973,5 +33975,133 @@ function pdGegevensHtml(naam, verj, isGroepslid){
   return h;
 }
 </script>
+<script>
+// ══════════════════════════════════════════════════════════════════
+// GEPLANDE CURSUSSEN (Certificeringen) + melding in de Werkoverdracht op de cursusdag
+// ══════════════════════════════════════════════════════════════════
+function cpKey(){ return tk('cursus_planning_v1'); }
+function cpGet(){ try { var x = JSON.parse(localStorage.getItem(cpKey()) || 'null'); return (x && x.cursussen) ? x : { cursussen: [] }; } catch(e) { return { cursussen: [] }; } }
+function cpSet(x){ localStorage.setItem(cpKey(), JSON.stringify(x)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }
+function cpEsc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function cpNL(iso){ var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? m[3] + '-' + m[2] + '-' + m[1] : iso; }
+function cpAlleNamen(){ return ((typeof oplOverzichtGetData === 'function' ? oplOverzichtGetData() : []) || []).filter(function(r){ return r && r.naam && !/\(uit dienst\)\s*$/i.test(r.naam); }).map(function(r){ return r.naam; }); }
+// Naam uit de planning koppelen aan iemand uit Certificeringen (alleen als het eenduidig is)
+function cpZoek(tekst){
+  var namen = cpAlleNamen(); if (namen.indexOf(tekst) >= 0) return tekst;
+  if (typeof vakMatchSterkte !== 'function') return null;
+  var t = String(tekst).replace(/\bvd\b/i, 'van der').replace(/\bv\/d\b/i, 'van der');
+  var sc = namen.map(function(n){ return { n: n, s: vakMatchSterkte(n, t) }; }).filter(function(x){ return x.s > 0; });
+  if (!sc.length) {
+    // Alleen een achternaam opgegeven: zoek op achternaam
+    var an = t.trim().split(/\s+/).pop().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    var k = namen.filter(function(n){ var w = n.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z ]/g, ' ').split(/\s+/); return w.indexOf(an) >= 0; });
+    return k.length === 1 ? k[0] : null;
+  }
+  var max = Math.max.apply(null, sc.map(function(x){ return x.s; })), top = sc.filter(function(x){ return x.s === max; });
+  return top.length === 1 ? top[0].n : null;
+}
+window.cpImporteren = function(){
+  var inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json';
+  inp.onchange = function(){ var f = inp.files && inp.files[0]; if (!f) return; f.text().then(function(t){
+    var b; try { b = JSON.parse(t); } catch(e) { alert('Geen geldig bestand.'); return; }
+    if (!b || b.soort !== 'dienst-journaal-cursusplanning' || !Array.isArray(b.cursussen)) { alert('Dit is geen cursusplanning-bestand.'); return; }
+    var x = cpGet(), nieuw = 0, overgeslagen = 0;
+    b.cursussen.forEach(function(c){
+      // Al ingelezen (zelfde soort en datum)? Dan niet nog een keer toevoegen
+      if (x.cursussen.some(function(z){ return z.soort === c.soort && z.datum === c.datum; })) { overgeslagen++; return; }
+      var gezien = {};
+      x.cursussen.push({ id: 'c' + Date.now() + Math.random().toString(36).slice(2, 6), soort: c.soort, datum: c.datum, tijd: c.tijd || '', locatie: c.locatie || '',
+        deelnemers: (c.namen || []).filter(function(n){ var k = String(n).trim().toLowerCase(); if (gezien[k]) return false; gezien[k] = 1; return true; })
+          .map(function(n){ var m = cpZoek(String(n).trim()); return { naam: m || '', tekst: String(n).trim() }; }) });
+      nieuw++;
+    });
+    cpSet(x); cpVernieuw();
+    var open = 0; x.cursussen.forEach(function(c){ c.deelnemers.forEach(function(d){ if (!d.naam) open++; }); });
+    alert(nieuw + ' cursussen ingelezen.' + (overgeslagen ? ' ' + overgeslagen + ' stonden er al in en zijn overgeslagen.' : '') + (open ? '\n\n' + open + ' deelnemers konden niet eenduidig gekoppeld worden (bijv. alleen "Rodgers", of extern/Freight). Die staan oranje: kies daar de juiste persoon of laat ze als extern staan.' : ''));
+  }); };
+  inp.click();
+};
+window.cpKoppel = function(cid, i, naam){ var x = cpGet(), c = x.cursussen.find(function(z){ return z.id === cid; }); if (!c) return;
+  if (naam === '__weg') c.deelnemers.splice(i, 1); else if (naam === '__extern') c.deelnemers[i].extern = true; else { c.deelnemers[i].naam = naam; c.deelnemers[i].extern = false; }
+  cpSet(x); cpVernieuw(); };
+window.cpErbij = function(cid, naam){ if (!naam) return; var x = cpGet(), c = x.cursussen.find(function(z){ return z.id === cid; }); if (!c) return;
+  if (naam === '__tekst') { var t = prompt('Naam (bijv. iemand van Freight):'); if (!t) return; c.deelnemers.push({ naam: '', tekst: t.trim(), extern: true }); }
+  else c.deelnemers.push({ naam: naam, tekst: naam });
+  cpSet(x); cpVernieuw(); };
+window.cpNieuw = function(){
+  var soort = prompt('Soort cursus (bijv. BHV, EHBO, Ploegleider, Ademlucht, Gevaarlijke stoffen):', 'BHV'); if (!soort) return;
+  var d = prompt('Datum (dd-mm-jjjj):'); if (!d) return; var m = /^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/.exec(d.trim()); if (!m) { alert('Typ de datum als dd-mm-jjjj.'); return; }
+  var tijd = prompt('Tijd (optioneel):', '09:00-12:00 / 13:00-16:00') || '';
+  var x = cpGet(); x.cursussen.push({ id: 'c' + Date.now(), soort: soort.trim(), datum: m[3] + '-' + String(m[2]).padStart(2, '0') + '-' + String(m[1]).padStart(2, '0'), tijd: tijd, locatie: 'Europoort', deelnemers: [] });
+  cpSet(x); cpVernieuw(); };
+window.cpWeg = function(cid){ if (!confirm('Deze cursus verwijderen?')) return; var x = cpGet(); x.cursussen = x.cursussen.filter(function(c){ return c.id !== cid; }); cpSet(x); cpVernieuw(); };
+function cpPanelHtml(){
+  var x = cpGet(), namen = cpAlleNamen().sort(function(a, b){ return a.localeCompare(b, 'nl'); });
+  var vandaag = new Date().toISOString().slice(0, 10);
+  var lijst = x.cursussen.slice().sort(function(a, b){ return a.datum.localeCompare(b.datum); });
+  var komend = lijst.filter(function(c){ return c.datum >= vandaag; }), geweest = lijst.filter(function(c){ return c.datum < vandaag; });
+  var open = 0; komend.forEach(function(c){ c.deelnemers.forEach(function(d){ if (!d.naam && !d.extern) open++; }); });
+  var knop = 'background:#fff;border:1px solid #c8d7e8;color:#003366;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;font-weight:700;';
+  var cursus = function(c){
+    return '<div style="border:1px solid #e3eaf2;border-radius:8px;padding:8px 12px;margin-bottom:8px;background:#fff;">' +
+      '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><b style="color:#003366;">&#x1F393; ' + cpEsc(c.soort) + '</b><span style="font-weight:700;">' + cpNL(c.datum) + '</span>' +
+      '<span style="font-size:12px;color:#5a6b80;">' + [c.tijd, c.locatie].filter(Boolean).map(cpEsc).join(' &middot; ') + '</span><span style="flex:1;"></span>' +
+      '<span onclick="cpWeg(\'' + c.id + '\')" title="Cursus verwijderen" style="color:#c0392b;cursor:pointer;">&#x2715;</span></div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">' + c.deelnemers.map(function(d, i){
+        if (d.naam) return '<span style="background:#eaf3ff;border:1px solid #c8dcf5;border-radius:12px;padding:2px 8px;font-size:12px;">' + cpEsc(d.naam) + ' <span onclick="cpKoppel(\'' + c.id + '\',' + i + ',\'__weg\')" style="cursor:pointer;color:#c0392b;">&#x2715;</span></span>';
+        if (d.extern) return '<span style="background:#f3f5f8;border:1px solid #dde3ea;border-radius:12px;padding:2px 8px;font-size:12px;color:#5a6b80;" title="Extern (bijv. Freight)">' + cpEsc(d.tekst) + ' <i>(extern)</i> <span onclick="cpKoppel(\'' + c.id + '\',' + i + ',\'__weg\')" style="cursor:pointer;color:#c0392b;">&#x2715;</span></span>';
+        return '<select onchange="cpKoppel(\'' + c.id + '\',' + i + ',this.value)" style="width:auto!important;font-size:12px;padding:2px 6px;border:1px solid #f0b45a;background:#fff7e8;border-radius:12px;" title="Niet eenduidig gekoppeld — kies de juiste persoon">' +
+          '<option value="">&#x26A0;&#xFE0F; ' + cpEsc(d.tekst) + ' &mdash; kies&hellip;</option>' + namen.map(function(n){ return '<option>' + cpEsc(n) + '</option>'; }).join('') +
+          '<option value="__extern">is extern (Freight e.d.)</option><option value="__weg">verwijderen</option></select>';
+      }).join('') +
+      '<select onchange="cpErbij(\'' + c.id + '\',this.value)" style="width:auto!important;font-size:12px;padding:2px 6px;border:1px dashed #9fb3c8;border-radius:12px;color:#0f6cbd;"><option value="">+ deelnemer</option>' +
+        namen.map(function(n){ return '<option>' + cpEsc(n) + '</option>'; }).join('') + '<option value="__tekst">iemand extern&hellip;</option></select></div></div>';
+  };
+  return '<details id="cp-panel" style="margin-bottom:14px;border:1px solid #dbe5f0;border-left:4px solid #0f6cbd;border-radius:8px;background:#f8fbff;"' + (window._cpOpen ? ' open' : '') + ' ontoggle="window._cpOpen=this.open">' +
+    '<summary style="cursor:pointer;padding:9px 14px;font-weight:800;color:#003366;">&#x1F4C5; Geplande cursussen (' + komend.length + ')' + (open ? ' <span style="color:#b9770e;font-weight:700;font-size:12px;">&mdash; ' + open + ' deelnemers nog koppelen</span>' : '') + '</summary>' +
+    '<div style="padding:0 14px 12px;"><div style="display:flex;gap:8px;margin-bottom:10px;"><button type="button" onclick="cpNieuw()" style="' + knop + '">+ Cursus</button><button type="button" onclick="cpImporteren()" style="' + knop + '">&#x1F4E5; Planning inlezen</button></div>' +
+    (komend.length ? komend.map(cursus).join('') : '<div style="color:#8795a8;font-size:13px;">Geen geplande cursussen.</div>') +
+    (geweest.length ? '<details style="margin-top:6px;"><summary style="cursor:pointer;font-size:12px;color:#5a6b80;">Afgelopen cursussen (' + geweest.length + ')</summary><div style="margin-top:6px;opacity:.8;">' + geweest.map(cursus).join('') + '</div></details>' : '') +
+    '</div></details>';
+}
+function cpVernieuw(){ var p = document.getElementById('cp-panel'); if (p) { p.outerHTML = cpPanelHtml(); } cpBadges(); }
+// Achter de naam in de certificaten-tabel: 📅 BHV 11-02
+function cpBadges(){
+  var vandaag = new Date().toISOString().slice(0, 10), per = {};
+  cpGet().cursussen.forEach(function(c){ if (c.datum < vandaag) return; c.deelnemers.forEach(function(d){ if (d.naam) (per[d.naam] = per[d.naam] || []).push(c); }); });
+  document.querySelectorAll('#opl-content tbody tr').forEach(function(tr){
+    var td = tr.querySelector('td'); if (!td) return; var oud = td.querySelector('.cp-badge'); if (oud) oud.remove();
+    var naam = (tr.getAttribute('data-naam') || '').trim(); var lijst = per[naam]; if (!lijst) return;
+    var b = document.createElement('span'); b.className = 'cp-badge';
+    b.style.cssText = 'margin-left:6px;font-size:10.5px;background:#eaf3ff;color:#0f6cbd;border:1px solid #c8dcf5;border-radius:10px;padding:1px 6px;white-space:nowrap;';
+    b.textContent = '\uD83D\uDCC5 ' + lijst.map(function(c){ return c.soort + ' ' + cpNL(c.datum).slice(0, 5); }).join(', ');
+    td.appendChild(b);
+  });
+}
+(function(){
+  if (typeof oplOverzichtHtml !== 'function') return;
+  var _o = oplOverzichtHtml; oplOverzichtHtml = function(){ return cpPanelHtml() + _o.apply(this, arguments); }; window.oplOverzichtHtml = oplOverzichtHtml;
+  if (typeof oplToonTab === 'function') { var _t = oplToonTab; oplToonTab = function(id){ var r = _t.apply(this, arguments); if (id === 'overzicht') setTimeout(cpBadges, 50); return r; }; window.oplToonTab = oplToonTab; }
+})();
+// ── Werkoverdracht: melding op de cursusdag ──
+function cpWerkoverdracht(){
+  var kaart = document.querySelector('#nieuw-tab-overdracht .card'); if (!kaart) return;
+  var el = document.getElementById('wo-cursus');
+  var datum = (document.getElementById('f-datum') || {}).value || '';
+  var vandaag = cpGet().cursussen.filter(function(c){ return c.datum === datum; });
+  if (!vandaag.length) { if (el) el.remove(); return; }
+  if (!el) { el = document.createElement('div'); el.id = 'wo-cursus'; var zoek = document.getElementById('wo-zoek-blok'); kaart.insertBefore(el, zoek || null); }
+  el.style.cssText = 'margin-top:12px;padding:10px 14px;background:#eaf3ff;border:1px solid #c8dcf5;border-left:4px solid #0f6cbd;border-radius:8px;font-size:13px;color:#24313f;';
+  el.innerHTML = vandaag.map(function(c){
+    var namen = c.deelnemers.map(function(d){ return d.naam || (d.tekst + (d.extern ? ' (extern)' : '')); });
+    return '<div style="margin:2px 0;"><b style="color:#0f6cbd;">&#x1F393; Vandaag ' + cpEsc(c.soort) + '-cursus</b>' + (c.tijd || c.locatie ? ' <span style="color:#5a6b80;">(' + [c.tijd, c.locatie].filter(Boolean).map(cpEsc).join(' &middot; ') + ')</span>' : '') +
+      ': ' + cpEsc(namen.join(', ')) + ' &mdash; <i>niet beschikbaar voor de kade</i></div>';
+  }).join('');
+}
+window.cpWerkoverdracht = cpWerkoverdracht;
+(function(){ if (typeof laadDagData === 'function') { var _l = laadDagData; laadDagData = function(){ var r = _l.apply(this, arguments); try { cpWerkoverdracht(); } catch(e) {} return r; }; window.laadDagData = laadDagData; } })();
+document.addEventListener('DOMContentLoaded', function(){ setTimeout(cpWerkoverdracht, 3000); });
+</script>
+
 </body>
 </html>
