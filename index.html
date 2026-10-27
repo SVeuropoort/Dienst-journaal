@@ -23681,7 +23681,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.69';
+var DJ_BUILD = '2026-10-07.70';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -25588,7 +25588,7 @@ if(_sfrEd) _sfrEd.addEventListener('keypress', function(e){if(e.key==='Enter')ca
       (!bhv || bhv.style.display === 'none') ? [] : [{ l: 'BHV / EHBO', i: '&#x26D1;&#xFE0F;', f: function(){ matShowSubTab('bhv'); } }]); } },
     { knop: '#nav-btn-personeel', subs: function(){
       var namen = { dossier: ['&#x1F4C1;', en() ? 'File' : 'Dossier'], organogram: ['&#x1F465;', en() ? 'Organisation chart' : 'Organogram'], vakantie: ['&#x1F3D6;&#xFE0F;', 'Vakantierooster'], tugmaster: ['&#x1F69B;', 'Tugmasters'],
-        certificeringen: ['&#x1F4CB;', en() ? 'Certificates' : 'Certificeringen'], ontwikkelgesprek: ['&#x1F4AC;', en() ? 'Development interview' : 'Ontwikkelgesprek'], kleding: ['&#x1F455;', 'Kledingpunten \uD83D\uDD12'] };
+        certificeringen: ['&#x1F4CB;', en() ? 'Certificates' : 'Certificeringen'], ontwikkelgesprek: ['&#x1F4AC;', en() ? 'Development interview' : 'Ontwikkelgesprek'], kleding: ['&#x1F455;', 'Kledingpunten \uD83D\uDD12'], cursus: ['&#x1F4C5;', 'Cursusplanning \uD83D\uDD12'] };
       return DJ_PERS_TABS.filter(djPersMag).map(function(t){ return { l: namen[t][1], i: namen[t][0], f: function(){ pdSubTab(t); } }; }); } },
     { knop: '#nav-btn-werkoverdracht', eigen: true, subs: function(){ return [
       { l: en() ? 'Handover' : 'Overdracht', i: '&#x21C4;', sub: 'overdracht' },
@@ -27856,7 +27856,7 @@ function pdSubTab(t){
   if (t === 'personeelsdossier') t = 'dossier';
   if (typeof djPersMag === 'function' && !djPersMag(t)) t = djPersEersteTab() || 'dossier';
   if (document.getElementById('view-personeel') && !document.getElementById('view-personeel').classList.contains('active')) { navPersoneel(t); return; }
-  ['dossier', 'organogram', 'vakantie', 'tugmaster', 'certificeringen', 'ontwikkelgesprek', 'kleding'].forEach(function(x){
+  ['dossier', 'organogram', 'vakantie', 'tugmaster', 'certificeringen', 'ontwikkelgesprek', 'kleding', 'cursus'].forEach(function(x){
     var b = document.getElementById('pd-sub-btn-' + x); if (b && typeof djPersMag === 'function') b.style.display = djPersMag(x) ? '' : 'none';
   });
   var host = document.getElementById('pd-opl-host');
@@ -27867,11 +27867,12 @@ function pdSubTab(t){
     else if (el.id === 'nieuw-tab-vakantie') el.style.display = t === 'vakantie' ? 'block' : 'none';
     else if (el.id === 'nieuw-tab-tugmaster') el.style.display = t === 'tugmaster' ? 'block' : 'none';
     else if (el.id === 'nieuw-tab-kleding') el.style.display = t === 'kleding' ? 'block' : 'none';
+    else if (el.id === 'nieuw-tab-cursus') el.style.display = t === 'cursus' ? 'block' : 'none';
     else if (el.id === 'pd-opl-host') el.style.display = opl ? 'block' : 'none';
     else if (el.id === 'pd-verzuim') return; // regelt djVerzuimPaneel zelf
     else el.style.display = t === 'dossier' ? '' : 'none';
   });
-  [['dossier', 'pd-sub-btn-dossier'], ['organogram', 'pd-sub-btn-organogram'], ['vakantie', 'pd-sub-btn-vakantie'], ['tugmaster', 'pd-sub-btn-tugmaster'], ['kleding', 'pd-sub-btn-kleding'], ['certificeringen', 'pd-sub-btn-certificeringen'], ['ontwikkelgesprek', 'pd-sub-btn-ontwikkelgesprek']].forEach(function(x){
+  [['dossier', 'pd-sub-btn-dossier'], ['organogram', 'pd-sub-btn-organogram'], ['vakantie', 'pd-sub-btn-vakantie'], ['tugmaster', 'pd-sub-btn-tugmaster'], ['kleding', 'pd-sub-btn-kleding'], ['cursus', 'pd-sub-btn-cursus'], ['certificeringen', 'pd-sub-btn-certificeringen'], ['ontwikkelgesprek', 'pd-sub-btn-ontwikkelgesprek']].forEach(function(x){
     var b = document.getElementById(x[1]); if (!b) return;
     var actief = x[0] === t;
     b.style.background = actief ? 'var(--navy)' : '#fff'; b.style.color = actief ? '#fff' : 'var(--navy)'; b.style.borderColor = actief ? 'var(--navy)' : '#c8d7e8';
@@ -27880,6 +27881,7 @@ function pdSubTab(t){
   if (t === 'vakantie' && typeof vakRender === 'function') vakRender();
   if (t === 'tugmaster' && typeof tugRender === 'function') tugRender();
   if (t === 'kleding' && typeof kpRender === 'function') kpRender();
+  if (t === 'cursus' && typeof cpTabRender === 'function') cpTabRender();
   if (t === 'dossier' && typeof pdInit === 'function') pdInit();
   if (typeof djVerzuimPaneel === 'function') { if (t === 'dossier') djVerzuimPaneel(); else { var vz = document.getElementById('pd-verzuim'); if (vz) vz.style.display = 'none'; } }
   if (opl && host) {
@@ -32152,11 +32154,12 @@ function djPersMag(t){
   if (t === 'vakantie') return ep && (heeft('werkoverdracht') || heeft('ontwikkelgesprek'));
   if (t === 'tugmaster') return ep && (heeft('werkoverdracht') || heeft('certificeringen') || heeft('ontwikkelgesprek'));
   if (t === 'kleding') return heeft('kledingpunten');
+  if (t === 'cursus') return heeft('supervisor') || heeft('beheer');
   if (t === 'certificeringen') return heeft('certificeringen');
   if (t === 'ontwikkelgesprek') return typeof oplMagOntwikkelgesprek === 'function' ? oplMagOntwikkelgesprek() : heeft('ontwikkelgesprek');
   return false;
 }
-var DJ_PERS_TABS = ['dossier', 'organogram', 'vakantie', 'tugmaster', 'certificeringen', 'ontwikkelgesprek', 'kleding'];
+var DJ_PERS_TABS = ['dossier', 'organogram', 'vakantie', 'tugmaster', 'certificeringen', 'ontwikkelgesprek', 'kleding', 'cursus'];
 function djPersEersteTab(){ return DJ_PERS_TABS.find(djPersMag) || null; }
 window.navPersoneel = function(sub, btn){
   var t = sub && sub !== 'personeelsdossier' ? sub : (djPersMag('dossier') ? 'dossier' : djPersEersteTab());
@@ -34137,7 +34140,7 @@ function cpBadges(){
 }
 (function(){
   if (typeof oplOverzichtHtml !== 'function') return;
-  var _o = oplOverzichtHtml; oplOverzichtHtml = function(){ return cpPanelHtml() + _o.apply(this, arguments); }; window.oplOverzichtHtml = oplOverzichtHtml;
+  // (De cursusplanning staat nu als eigen subtabblad in het Personeelsdossier; hier alleen de labels achter de namen)
   if (typeof oplToonTab === 'function') { var _t = oplToonTab; oplToonTab = function(id){ var r = _t.apply(this, arguments); if (id === 'overzicht') setTimeout(cpBadges, 50); return r; }; window.oplToonTab = oplToonTab; }
 })();
 // ── Werkoverdracht: melding op de cursusdag ──
@@ -34161,5 +34164,21 @@ window.cpWerkoverdracht = cpWerkoverdracht;
 document.addEventListener('DOMContentLoaded', function(){ setTimeout(cpWerkoverdracht, 3000); });
 </script>
 
+<script>
+// Cursusplanning als eigen subtabblad (naast Kledingpunten) — voor alle supervisors
+function cpTabRender(){
+  var box = document.getElementById('nieuw-tab-cursus'); if (!box) return;
+  window._cpOpen = true; // in dit tabblad staat de planning altijd open
+  box.innerHTML = '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:var(--navy);margin-bottom:10px;">&#x1F4C5; Cursusplanning</div>' + cpPanelHtml();
+}
+window.cpTabRender = cpTabRender;
+document.addEventListener('DOMContentLoaded', function(){
+  var pd = document.getElementById('nieuw-tab-personeelsdossier'), bar = document.getElementById('pd-subtabs'); if (!pd || !bar) return;
+  var c = document.createElement('div'); c.id = 'nieuw-tab-cursus'; c.className = 'card'; c.style.cssText = 'display:none;padding:16px 20px;'; pd.appendChild(c);
+  var ref = document.getElementById('pd-sub-btn-organogram');
+  var b = document.createElement('button'); b.type = 'button'; b.id = 'pd-sub-btn-cursus'; b.innerHTML = '&#x1F4C5; Cursusplanning &#x1F512;';
+  b.setAttribute('style', ref.getAttribute('style')); b.style.order = '9'; b.onclick = function(){ pdSubTab('cursus'); }; bar.appendChild(b);
+});
+</script>
 </body>
 </html>
