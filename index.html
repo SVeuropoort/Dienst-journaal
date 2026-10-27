@@ -23681,7 +23681,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.70';
+var DJ_BUILD = '2026-10-07.71';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -34179,6 +34179,28 @@ document.addEventListener('DOMContentLoaded', function(){
   var b = document.createElement('button'); b.type = 'button'; b.id = 'pd-sub-btn-cursus'; b.innerHTML = '&#x1F4C5; Cursusplanning &#x1F512;';
   b.setAttribute('style', ref.getAttribute('style')); b.style.order = '9'; b.onclick = function(){ pdSubTab('cursus'); }; bar.appendChild(b);
 });
+</script>
+<script>
+// Dagplanning: melding als er op deze datum een cursus/opleiding gepland staat
+function dpCursusBalk(){
+  var cont = document.getElementById('dagplanning-container'); if (!cont || typeof cpGet !== 'function') return;
+  var datum = (typeof planDate !== 'undefined' && planDate) || '';
+  var el = document.getElementById('dp-cursus-balk');
+  var lijst = cpGet().cursussen.filter(function(c){ return datum && c.datum <= datum && datum <= cpEind(c); });
+  if (!lijst.length) { if (el) el.remove(); return; }
+  if (!el) { el = document.createElement('div'); el.id = 'dp-cursus-balk'; cont.insertBefore(el, cont.firstChild); }
+  el.style.cssText = 'margin:6px 0 8px;padding:8px 14px;background:#eaf3ff;border:1px solid #c8dcf5;border-left:4px solid #0f6cbd;border-radius:8px;font-size:13px;color:#24313f;';
+  el.innerHTML = lijst.map(function(c){
+    var dagNr = cpEind(c) !== c.datum ? ' (dag ' + (Math.round((new Date(datum + 'T12:00:00') - new Date(c.datum + 'T12:00:00')) / 864e5) + 1) + ' van ' + cpDagen(c) + ')' : '';
+    var namen = c.deelnemers.map(function(d){ return d.naam || (d.tekst + (d.extern ? ' (extern)' : '')); });
+    return '<div style="margin:2px 0;"><b style="color:#0f6cbd;">&#x1F393; ' + cpEsc(c.soort) + '-cursus' + dagNr + '</b>' +
+      (c.tijd || c.locatie ? ' <span style="color:#5a6b80;">(' + [c.tijd, c.locatie].filter(Boolean).map(cpEsc).join(' &middot; ') + ')</span>' : '') +
+      ': ' + cpEsc(namen.join(', ')) + ' &mdash; <i>niet inplannen</i></div>';
+  }).join('');
+}
+window.dpCursusBalk = dpCursusBalk;
+(function(){ if (typeof buildPanels !== 'function') return; var _bp = buildPanels; buildPanels = function(){ var r = _bp.apply(this, arguments); try { dpCursusBalk(); } catch(e) {} return r; }; })();
+document.addEventListener('DOMContentLoaded', function(){ setInterval(function(){ var v = document.getElementById('view-dagplanning'); if (v && v.classList.contains('active')) dpCursusBalk(); }, 20000); });
 </script>
 </body>
 </html>
