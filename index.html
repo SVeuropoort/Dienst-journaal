@@ -23680,7 +23680,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.66';
+var DJ_BUILD = '2026-10-07.67';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -33984,6 +33984,16 @@ function cpGet(){ try { var x = JSON.parse(localStorage.getItem(cpKey()) || 'nul
 function cpSet(x){ localStorage.setItem(cpKey(), JSON.stringify(x)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }
 function cpEsc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
 function cpNL(iso){ var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? m[3] + '-' + m[2] + '-' + m[1] : iso; }
+function cpEind(c){ return c.datumTot && c.datumTot > c.datum ? c.datumTot : c.datum; }
+function cpDagen(c){ return Math.round((new Date(cpEind(c) + 'T12:00:00') - new Date(c.datum + 'T12:00:00')) / 864e5) + 1; }
+function cpPeriodeTekst(c){ return cpEind(c) === c.datum ? cpNL(c.datum) : cpNL(c.datum).slice(0, 5) + ' t/m ' + cpNL(cpEind(c)) + ' (' + cpDagen(c) + ' dagen)'; }
+function cpParse(t){ var m = /^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/.exec(String(t || '').trim()); return m ? m[3] + '-' + String(m[2]).padStart(2, '0') + '-' + String(m[1]).padStart(2, '0') : null; }
+window.cpDatumWijzig = function(cid){
+  var x = cpGet(), c = x.cursussen.find(function(z){ return z.id === cid; }); if (!c) return;
+  var van = prompt('Eerste cursusdag (dd-mm-jjjj):', cpNL(c.datum)); if (van === null) return; var v = cpParse(van); if (!v) { alert('Typ de datum als dd-mm-jjjj.'); return; }
+  var tot = prompt('Laatste cursusdag (dd-mm-jjjj). Duurt de cursus één dag, laat dan dezelfde datum staan:', cpNL(cpEind(c) > v ? cpEind(c) : v)); if (tot === null) return; var t = cpParse(tot); if (!t || t < v) { alert('De laatste dag moet op of na de eerste dag liggen.'); return; }
+  c.datum = v; c.datumTot = t > v ? t : ''; cpSet(x); cpVernieuw();
+};
 function cpAlleNamen(){ return ((typeof oplOverzichtGetData === 'function' ? oplOverzichtGetData() : []) || []).filter(function(r){ return r && r.naam && !/\(uit dienst\)\s*$/i.test(r.naam); }).map(function(r){ return r.naam; }); }
 // Naam uit de planning koppelen aan iemand uit Certificeringen (alleen als het eenduidig is)
 function cpZoek(tekst){
@@ -34010,7 +34020,7 @@ window.cpImporteren = function(){
       // Al ingelezen (zelfde soort en datum)? Dan niet nog een keer toevoegen
       if (x.cursussen.some(function(z){ return z.soort === c.soort && z.datum === c.datum; })) { overgeslagen++; return; }
       var gezien = {};
-      x.cursussen.push({ id: 'c' + Date.now() + Math.random().toString(36).slice(2, 6), soort: c.soort, datum: c.datum, tijd: c.tijd || '', locatie: c.locatie || '',
+      x.cursussen.push({ id: 'c' + Date.now() + Math.random().toString(36).slice(2, 6), soort: c.soort, datum: c.datum, datumTot: c.datumTot || '', tijd: c.tijd || '', locatie: c.locatie || '',
         deelnemers: (c.namen || []).filter(function(n){ var k = String(n).trim().toLowerCase(); if (gezien[k]) return false; gezien[k] = 1; return true; })
           .map(function(n){ var m = cpZoek(String(n).trim()); return { naam: m || '', tekst: String(n).trim() }; }) });
       nieuw++;
@@ -34030,21 +34040,23 @@ window.cpErbij = function(cid, naam){ if (!naam) return; var x = cpGet(), c = x.
   cpSet(x); cpVernieuw(); };
 window.cpNieuw = function(){
   var soort = prompt('Soort cursus (bijv. BHV, EHBO, Ploegleider, Ademlucht, Gevaarlijke stoffen):', 'BHV'); if (!soort) return;
-  var d = prompt('Datum (dd-mm-jjjj):'); if (!d) return; var m = /^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/.exec(d.trim()); if (!m) { alert('Typ de datum als dd-mm-jjjj.'); return; }
+  var d = prompt('Eerste cursusdag (dd-mm-jjjj):'); if (!d) return; var m = /^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/.exec(d.trim()); if (!m) { alert('Typ de datum als dd-mm-jjjj.'); return; }
+  var vanIso = m[3] + '-' + String(m[2]).padStart(2, '0') + '-' + String(m[1]).padStart(2, '0');
+  var tot = prompt('Laatste cursusdag (dd-mm-jjjj). Eén dag? Laat dezelfde datum staan:', d.trim()); var totIso = cpParse(tot) || vanIso; if (totIso < vanIso) totIso = vanIso;
   var tijd = prompt('Tijd (optioneel):', '09:00-12:00 / 13:00-16:00') || '';
-  var x = cpGet(); x.cursussen.push({ id: 'c' + Date.now(), soort: soort.trim(), datum: m[3] + '-' + String(m[2]).padStart(2, '0') + '-' + String(m[1]).padStart(2, '0'), tijd: tijd, locatie: 'Europoort', deelnemers: [] });
+  var x = cpGet(); x.cursussen.push({ id: 'c' + Date.now(), soort: soort.trim(), datum: vanIso, datumTot: totIso > vanIso ? totIso : '', tijd: tijd, locatie: 'Europoort', deelnemers: [] });
   cpSet(x); cpVernieuw(); };
 window.cpWeg = function(cid){ if (!confirm('Deze cursus verwijderen?')) return; var x = cpGet(); x.cursussen = x.cursussen.filter(function(c){ return c.id !== cid; }); cpSet(x); cpVernieuw(); };
 function cpPanelHtml(){
   var x = cpGet(), namen = cpAlleNamen().sort(function(a, b){ return a.localeCompare(b, 'nl'); });
   var vandaag = new Date().toISOString().slice(0, 10);
   var lijst = x.cursussen.slice().sort(function(a, b){ return a.datum.localeCompare(b.datum); });
-  var komend = lijst.filter(function(c){ return c.datum >= vandaag; }), geweest = lijst.filter(function(c){ return c.datum < vandaag; });
+  var komend = lijst.filter(function(c){ return cpEind(c) >= vandaag; }), geweest = lijst.filter(function(c){ return cpEind(c) < vandaag; });
   var open = 0; komend.forEach(function(c){ c.deelnemers.forEach(function(d){ if (!d.naam && !d.extern) open++; }); });
   var knop = 'background:#fff;border:1px solid #c8d7e8;color:#003366;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;font-weight:700;';
   var cursus = function(c){
     return '<div style="border:1px solid #e3eaf2;border-radius:8px;padding:8px 12px;margin-bottom:8px;background:#fff;">' +
-      '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><b style="color:#003366;">&#x1F393; ' + cpEsc(c.soort) + '</b><span style="font-weight:700;">' + cpNL(c.datum) + '</span>' +
+      '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><b style="color:#003366;">&#x1F393; ' + cpEsc(c.soort) + '</b><span style="font-weight:700;cursor:pointer;text-decoration:underline dotted;" onclick="cpDatumWijzig(\'' + c.id + '\')" title="Datum wijzigen of meerdere dagen maken">' + cpPeriodeTekst(c) + '</span>' +
       '<span style="font-size:12px;color:#5a6b80;">' + [c.tijd, c.locatie].filter(Boolean).map(cpEsc).join(' &middot; ') + '</span><span style="flex:1;"></span>' +
       '<span onclick="cpWeg(\'' + c.id + '\')" title="Cursus verwijderen" style="color:#c0392b;cursor:pointer;">&#x2715;</span></div>' +
       '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">' + c.deelnemers.map(function(d, i){
@@ -34068,13 +34080,13 @@ function cpVernieuw(){ var p = document.getElementById('cp-panel'); if (p) { p.o
 // Achter de naam in de certificaten-tabel: 📅 BHV 11-02
 function cpBadges(){
   var vandaag = new Date().toISOString().slice(0, 10), per = {};
-  cpGet().cursussen.forEach(function(c){ if (c.datum < vandaag) return; c.deelnemers.forEach(function(d){ if (d.naam) (per[d.naam] = per[d.naam] || []).push(c); }); });
+  cpGet().cursussen.forEach(function(c){ if (cpEind(c) < vandaag) return; c.deelnemers.forEach(function(d){ if (d.naam) (per[d.naam] = per[d.naam] || []).push(c); }); });
   document.querySelectorAll('#opl-content tbody tr').forEach(function(tr){
     var td = tr.querySelector('td'); if (!td) return; var oud = td.querySelector('.cp-badge'); if (oud) oud.remove();
     var naam = (tr.getAttribute('data-naam') || '').trim(); var lijst = per[naam]; if (!lijst) return;
     var b = document.createElement('span'); b.className = 'cp-badge';
     b.style.cssText = 'margin-left:6px;font-size:10.5px;background:#eaf3ff;color:#0f6cbd;border:1px solid #c8dcf5;border-radius:10px;padding:1px 6px;white-space:nowrap;';
-    b.textContent = '\uD83D\uDCC5 ' + lijst.map(function(c){ return c.soort + ' ' + cpNL(c.datum).slice(0, 5); }).join(', ');
+    b.textContent = '\uD83D\uDCC5 ' + lijst.map(function(c){ return c.soort + ' ' + cpNL(c.datum).slice(0, 5) + (cpEind(c) !== c.datum ? '\u2013' + cpNL(cpEind(c)).slice(0, 5) : ''); }).join(', ');
     td.appendChild(b);
   });
 }
@@ -34088,13 +34100,14 @@ function cpWerkoverdracht(){
   var kaart = document.querySelector('#nieuw-tab-overdracht .card'); if (!kaart) return;
   var el = document.getElementById('wo-cursus');
   var datum = (document.getElementById('f-datum') || {}).value || '';
-  var vandaag = cpGet().cursussen.filter(function(c){ return c.datum === datum; });
+  var vandaag = cpGet().cursussen.filter(function(c){ return datum && c.datum <= datum && datum <= cpEind(c); });
   if (!vandaag.length) { if (el) el.remove(); return; }
   if (!el) { el = document.createElement('div'); el.id = 'wo-cursus'; var zoek = document.getElementById('wo-zoek-blok'); kaart.insertBefore(el, zoek || null); }
   el.style.cssText = 'margin-top:12px;padding:10px 14px;background:#eaf3ff;border:1px solid #c8dcf5;border-left:4px solid #0f6cbd;border-radius:8px;font-size:13px;color:#24313f;';
   el.innerHTML = vandaag.map(function(c){
     var namen = c.deelnemers.map(function(d){ return d.naam || (d.tekst + (d.extern ? ' (extern)' : '')); });
-    return '<div style="margin:2px 0;"><b style="color:#0f6cbd;">&#x1F393; Vandaag ' + cpEsc(c.soort) + '-cursus</b>' + (c.tijd || c.locatie ? ' <span style="color:#5a6b80;">(' + [c.tijd, c.locatie].filter(Boolean).map(cpEsc).join(' &middot; ') + ')</span>' : '') +
+    var dagNr = cpEind(c) !== c.datum ? ' (dag ' + (Math.round((new Date(datum + 'T12:00:00') - new Date(c.datum + 'T12:00:00')) / 864e5) + 1) + ' van ' + cpDagen(c) + ')' : '';
+    return '<div style="margin:2px 0;"><b style="color:#0f6cbd;">&#x1F393; Vandaag ' + cpEsc(c.soort) + '-cursus' + dagNr + '</b>' + (c.tijd || c.locatie ? ' <span style="color:#5a6b80;">(' + [c.tijd, c.locatie].filter(Boolean).map(cpEsc).join(' &middot; ') + ')</span>' : '') +
       ': ' + cpEsc(namen.join(', ')) + ' &mdash; <i>niet beschikbaar voor de kade</i></div>';
   }).join('');
 }
