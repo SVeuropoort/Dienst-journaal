@@ -7528,6 +7528,7 @@ window.addEventListener('resize', () => {
     Object.keys(lokaal).forEach(function(k){
       if (vuil && (k in cloudData) && !vuil[k]) return; // niet zelf gewijzigd: cloud-versie behouden
       if (/(^|_)vs_data_v1$/.test(k) && cloudData[k]) { data[k] = djVsSamenvoegen(cloudData[k], lokaal[k]); return; }
+      if (/(^|_)cursus_planning_v1$/.test(k) && cloudData[k]) { data[k] = djCpSamenvoegen(cloudData[k], lokaal[k]); return; }
       if (/(^|_)dagplan_log_v1$/.test(k) && cloudData[k]) { data[k] = djDpLogSamenvoegen(cloudData[k], lokaal[k]); return; }
       if (/(^|_)opl_afgerond_v1$/.test(k) && cloudData[k]) { data[k] = djOplAfgSamenvoegen(cloudData[k], lokaal[k]); return; }
       if (/(^|_)startup_v1$/.test(k) && cloudData[k]) { data[k] = djSuSamenvoegen(cloudData[k], lokaal[k]); return; }
@@ -23680,7 +23681,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.68';
+var DJ_BUILD = '2026-10-07.69';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -33981,7 +33982,22 @@ function pdGegevensHtml(naam, verj, isGroepslid){
 // ══════════════════════════════════════════════════════════════════
 function cpKey(){ return tk('cursus_planning_v1'); }
 function cpGet(){ try { var x = JSON.parse(localStorage.getItem(cpKey()) || 'null'); return (x && x.cursussen) ? x : { cursussen: [] }; } catch(e) { return { cursussen: [] }; } }
-function cpSet(x){ localStorage.setItem(cpKey(), JSON.stringify(x)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }
+function cpSet(x, gewijzigdId){
+  // Tijdstempel op de gewijzigde cursus(sen), zodat het samenvoegen met collega's per cursus kan
+  var nu = Date.now(); (x.cursussen || []).forEach(function(c){ if (!c.gw || c.id === gewijzigdId || gewijzigdId === '*') c.gw = nu; });
+  localStorage.setItem(cpKey(), JSON.stringify(x)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+}
+// Samenvoegen met de versie van collega's: per cursus wint de nieuwste; verwijderde cursussen blijven weg
+function djCpSamenvoegen(cloud, lok){
+  var p = function(x){ if (typeof x === 'string') { try { x = JSON.parse(x); } catch(e) { x = null; } } return (x && x.cursussen) ? x : null; };
+  var C = p(cloud), L = p(lok); if (!C) return lok; if (!L) return cloud;
+  var weg = {}; (C.weg || []).concat(L.weg || []).forEach(function(w){ if (!weg[w.id] || w.gw > weg[w.id]) weg[w.id] = w.gw; });
+  var best = {}, volg = [];
+  C.cursussen.concat(L.cursussen).forEach(function(c){ if (!c || !c.id) return; var b = best[c.id]; if (!b) volg.push(c.id); if (!b || (c.gw || 0) > (b.gw || 0)) best[c.id] = c; });
+  var uit = volg.map(function(id){ return best[id]; }).filter(function(c){ return !(weg[c.id] && weg[c.id] >= (c.gw || 0)); });
+  return { cursussen: uit, weg: Object.keys(weg).map(function(id){ return { id: id, gw: weg[id] }; }).filter(function(w){ return Date.now() - w.gw < 90 * 864e5; }) };
+}
+window.djCpSamenvoegen = djCpSamenvoegen;
 function cpEsc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
 function cpNL(iso){ var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? m[3] + '-' + m[2] + '-' + m[1] : iso; }
 function cpEind(c){ return c.datumTot && c.datumTot > c.datum ? c.datumTot : c.datum; }
@@ -34013,7 +34029,7 @@ window.cpBewerk = function(cid){
     if (!t || t < v) { fout.textContent = 'De laatste dag moet op of na de eerste dag liggen.'; return; }
     var x2 = cpGet(), c2 = x2.cursussen.find(function(z){ return z.id === cid; }); if (!c2) return;
     c2.soort = g('cpb-soort'); c2.datum = v; c2.datumTot = t > v ? t : ''; c2.tijd = g('cpb-tijd'); c2.locatie = g('cpb-loc');
-    cpSet(x2); o.remove(); cpVernieuw(); if (typeof cpWerkoverdracht === 'function') cpWerkoverdracht();
+    cpSet(x2, cid); o.remove(); cpVernieuw(); if (typeof cpWerkoverdracht === 'function') cpWerkoverdracht();
   };
 };
 window.cpDatumWijzig = function(cid){ cpBewerk(cid); return;
@@ -34061,11 +34077,11 @@ window.cpImporteren = function(){
 };
 window.cpKoppel = function(cid, i, naam){ var x = cpGet(), c = x.cursussen.find(function(z){ return z.id === cid; }); if (!c) return;
   if (naam === '__weg') c.deelnemers.splice(i, 1); else if (naam === '__extern') c.deelnemers[i].extern = true; else { c.deelnemers[i].naam = naam; c.deelnemers[i].extern = false; }
-  cpSet(x); cpVernieuw(); };
+  cpSet(x, cid); cpVernieuw(); };
 window.cpErbij = function(cid, naam){ if (!naam) return; var x = cpGet(), c = x.cursussen.find(function(z){ return z.id === cid; }); if (!c) return;
   if (naam === '__tekst') { var t = prompt('Naam (bijv. iemand van Freight):'); if (!t) return; c.deelnemers.push({ naam: '', tekst: t.trim(), extern: true }); }
   else c.deelnemers.push({ naam: naam, tekst: naam });
-  cpSet(x); cpVernieuw(); };
+  cpSet(x, cid); cpVernieuw(); };
 window.cpNieuw = function(){
   var soort = prompt('Soort cursus (bijv. BHV, EHBO, Ploegleider, Ademlucht, Gevaarlijke stoffen):', 'BHV'); if (!soort) return;
   var d = prompt('Eerste cursusdag (dd-mm-jjjj):'); if (!d) return; var m = /^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/.exec(d.trim()); if (!m) { alert('Typ de datum als dd-mm-jjjj.'); return; }
@@ -34074,7 +34090,7 @@ window.cpNieuw = function(){
   var tijd = prompt('Tijd (optioneel):', '09:00-12:00 / 13:00-16:00') || '';
   var x = cpGet(); x.cursussen.push({ id: 'c' + Date.now(), soort: soort.trim(), datum: vanIso, datumTot: totIso > vanIso ? totIso : '', tijd: tijd, locatie: 'Europoort', deelnemers: [] });
   cpSet(x); cpVernieuw(); };
-window.cpWeg = function(cid){ if (!confirm('Deze cursus verwijderen?')) return; var x = cpGet(); x.cursussen = x.cursussen.filter(function(c){ return c.id !== cid; }); cpSet(x); cpVernieuw(); };
+window.cpWeg = function(cid){ if (!confirm('Deze cursus verwijderen?')) return; var x = cpGet(); x.cursussen = x.cursussen.filter(function(c){ return c.id !== cid; }); x.weg = (x.weg || []).concat([{ id: cid, gw: Date.now() }]); cpSet(x); cpVernieuw(); };
 function cpPanelHtml(){
   var x = cpGet(), namen = cpAlleNamen().sort(function(a, b){ return a.localeCompare(b, 'nl'); });
   var vandaag = new Date().toISOString().slice(0, 10);
