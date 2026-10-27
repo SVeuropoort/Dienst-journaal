@@ -23680,7 +23680,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.67';
+var DJ_BUILD = '2026-10-07.68';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -33988,7 +33988,35 @@ function cpEind(c){ return c.datumTot && c.datumTot > c.datum ? c.datumTot : c.d
 function cpDagen(c){ return Math.round((new Date(cpEind(c) + 'T12:00:00') - new Date(c.datum + 'T12:00:00')) / 864e5) + 1; }
 function cpPeriodeTekst(c){ return cpEind(c) === c.datum ? cpNL(c.datum) : cpNL(c.datum).slice(0, 5) + ' t/m ' + cpNL(cpEind(c)) + ' (' + cpDagen(c) + ' dagen)'; }
 function cpParse(t){ var m = /^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/.exec(String(t || '').trim()); return m ? m[3] + '-' + String(m[2]).padStart(2, '0') + '-' + String(m[1]).padStart(2, '0') : null; }
-window.cpDatumWijzig = function(cid){
+// Venster om een cursus aan te passen (soort, datums, tijd, locatie)
+window.cpBewerk = function(cid){
+  var x = cpGet(), c = x.cursussen.find(function(z){ return z.id === cid; }); if (!c) return;
+  var oud = document.getElementById('cp-bewerk'); if (oud) oud.remove();
+  var o = document.createElement('div'); o.id = 'cp-bewerk';
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(0,20,40,.45);z-index:100005;display:flex;align-items:center;justify-content:center;padding:16px;';
+  var veld = function(id, label, waarde, ph){ return '<label style="display:flex;flex-direction:column;gap:3px;font-size:11px;font-weight:700;color:#5a6b80;text-transform:uppercase;">' + label + '<input id="' + id + '" value="' + cpEsc(waarde || '') + '" placeholder="' + (ph || '') + '" style="padding:7px;border:1px solid #c8d7e8;border-radius:5px;font-size:13px;text-transform:none;font-weight:400;color:#24313f;"></label>'; };
+  o.innerHTML = '<div style="background:#fff;border-radius:10px;padding:18px;width:460px;max-width:100%;">' +
+    '<div style="font-weight:800;color:#003366;font-size:15px;margin-bottom:12px;">&#x270F;&#xFE0F; Cursus aanpassen</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
+      '<div style="grid-column:1/-1;">' + veld('cpb-soort', 'Soort cursus', c.soort) + '</div>' +
+      veld('cpb-van', 'Eerste dag', cpNL(c.datum), 'dd-mm-jjjj') + veld('cpb-tot', 'Laatste dag', cpNL(cpEind(c)), 'dd-mm-jjjj') +
+      veld('cpb-tijd', 'Tijd', c.tijd, 'bijv. 09:00-16:00') + veld('cpb-loc', 'Locatie', c.locatie, 'bijv. Europoort') +
+    '</div><div id="cpb-fout" style="color:#c0392b;font-size:12px;min-height:16px;margin-top:6px;"></div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px;"><button type="button" onclick="document.getElementById(\'cp-bewerk\').remove()" style="padding:7px 12px;">Annuleren</button>' +
+    '<button type="button" id="cpb-ok" style="padding:7px 14px;background:#003366;color:#fff;border:none;border-radius:5px;font-weight:700;">Opslaan</button></div></div>';
+  document.body.appendChild(o);
+  document.getElementById('cpb-ok').onclick = function(){
+    var g = function(id){ return document.getElementById(id).value.trim(); };
+    var v = cpParse(g('cpb-van')), t = cpParse(g('cpb-tot') || g('cpb-van')), fout = document.getElementById('cpb-fout');
+    if (!g('cpb-soort')) { fout.textContent = 'Vul de soort cursus in.'; return; }
+    if (!v) { fout.textContent = 'Typ de eerste dag als dd-mm-jjjj.'; return; }
+    if (!t || t < v) { fout.textContent = 'De laatste dag moet op of na de eerste dag liggen.'; return; }
+    var x2 = cpGet(), c2 = x2.cursussen.find(function(z){ return z.id === cid; }); if (!c2) return;
+    c2.soort = g('cpb-soort'); c2.datum = v; c2.datumTot = t > v ? t : ''; c2.tijd = g('cpb-tijd'); c2.locatie = g('cpb-loc');
+    cpSet(x2); o.remove(); cpVernieuw(); if (typeof cpWerkoverdracht === 'function') cpWerkoverdracht();
+  };
+};
+window.cpDatumWijzig = function(cid){ cpBewerk(cid); return;
   var x = cpGet(), c = x.cursussen.find(function(z){ return z.id === cid; }); if (!c) return;
   var van = prompt('Eerste cursusdag (dd-mm-jjjj):', cpNL(c.datum)); if (van === null) return; var v = cpParse(van); if (!v) { alert('Typ de datum als dd-mm-jjjj.'); return; }
   var tot = prompt('Laatste cursusdag (dd-mm-jjjj). Duurt de cursus één dag, laat dan dezelfde datum staan:', cpNL(cpEind(c) > v ? cpEind(c) : v)); if (tot === null) return; var t = cpParse(tot); if (!t || t < v) { alert('De laatste dag moet op of na de eerste dag liggen.'); return; }
@@ -34058,6 +34086,7 @@ function cpPanelHtml(){
     return '<div style="border:1px solid #e3eaf2;border-radius:8px;padding:8px 12px;margin-bottom:8px;background:#fff;">' +
       '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><b style="color:#003366;">&#x1F393; ' + cpEsc(c.soort) + '</b><span style="font-weight:700;cursor:pointer;text-decoration:underline dotted;" onclick="cpDatumWijzig(\'' + c.id + '\')" title="Datum wijzigen of meerdere dagen maken">' + cpPeriodeTekst(c) + '</span>' +
       '<span style="font-size:12px;color:#5a6b80;">' + [c.tijd, c.locatie].filter(Boolean).map(cpEsc).join(' &middot; ') + '</span><span style="flex:1;"></span>' +
+      '<button type="button" onclick="cpBewerk(\'' + c.id + '\')" title="Datum, tijd of locatie aanpassen (bijv. als de cursus verschuift)" style="background:#fff;border:1px solid #c8d7e8;color:#003366;border-radius:5px;padding:2px 8px;cursor:pointer;font-size:11.5px;font-weight:700;">&#x270F;&#xFE0F; Aanpassen</button>' +
       '<span onclick="cpWeg(\'' + c.id + '\')" title="Cursus verwijderen" style="color:#c0392b;cursor:pointer;">&#x2715;</span></div>' +
       '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">' + c.deelnemers.map(function(d, i){
         if (d.naam) return '<span style="background:#eaf3ff;border:1px solid #c8dcf5;border-radius:12px;padding:2px 8px;font-size:12px;">' + cpEsc(d.naam) + ' <span onclick="cpKoppel(\'' + c.id + '\',' + i + ',\'__weg\')" style="cursor:pointer;color:#c0392b;">&#x2715;</span></span>';
