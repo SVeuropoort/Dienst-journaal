@@ -23684,7 +23684,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.73';
+var DJ_BUILD = '2026-10-07.74';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -34247,7 +34247,7 @@ function dmRender(){
     '<div style="border:1px solid #f3e3c8;border-radius:8px;overflow:hidden;margin-bottom:10px;"><div style="background:#fffaf2;padding:6px 10px;font-size:12px;font-weight:700;color:#7a4b00;">Meldingen voor ' + dmNL(datum) + ' (' + lijst.length + ')</div>' +
       (lijst.length ? lijst.map(rij).join('') : '<div style="padding:8px 10px;font-size:12.5px;color:#8795a8;border-top:1px solid #f3e3c8;">Geen meldingen voor deze dag.</div>') + '</div>' +
     '<div style="display:grid;grid-template-columns:1fr 120px 120px auto;gap:8px;align-items:end;">' +
-      '<label style="display:flex;flex-direction:column;gap:3px;font-size:11px;font-weight:700;color:#5a6b80;">MELDING<textarea id="dm-tekst" rows="2" placeholder="Bijv. slang gescheurd van de tank, wordt 30-11 vervangen" style="padding:6px;border:1px solid #c8d7e8;border-radius:5px;font-family:inherit;font-size:13px;"></textarea></label>' +
+      '<label style="display:flex;flex-direction:column;gap:3px;font-size:11px;font-weight:700;color:#5a6b80;">MELDING<textarea id="dm-tekst" rows="2" placeholder="Bijv. scheepswijziging, extra afvaart, afwijkende vertrektijd of werkzaamheden op de kade" style="padding:6px;border:1px solid #c8d7e8;border-radius:5px;font-family:inherit;font-size:13px;"></textarea></label>' +
       '<label style="display:flex;flex-direction:column;gap:3px;font-size:11px;font-weight:700;color:#5a6b80;">VAN<input id="dm-van" value="' + dmNL(datum) + '" style="padding:6px;border:1px solid #c8d7e8;border-radius:5px;"></label>' +
       '<label style="display:flex;flex-direction:column;gap:3px;font-size:11px;font-weight:700;color:#5a6b80;">T/M<input id="dm-tot" placeholder="(één dag)" style="padding:6px;border:1px solid #c8d7e8;border-radius:5px;"></label>' +
       '<button type="button" onclick="dmToevoegen()" style="height:34px;padding:0 14px;background:#e67e22;color:#fff;border:none;border-radius:6px;font-weight:800;cursor:pointer;">+ Toevoegen</button></div>' +
