@@ -23693,7 +23693,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.77';
+var DJ_BUILD = '2026-10-07.78';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -34349,6 +34349,23 @@ function puVakkenToepassen(){
         inp.style.background = uit ? 'repeating-linear-gradient(45deg,#eef1f5,#eef1f5 5px,#e3e8ef 5px,#e3e8ef 10px)' : '';
         inp.style.cursor = uit ? 'not-allowed' : '';
         inp.title = uit ? 'Staat op ' + dagNaam + ' uit bij Tijdnormen: geen aankomst/vertrek in dit dagdeel' + (inp.value ? ' — de eerder ingevulde tijd blijft bewaard' : '') : '';
+      });
+    });
+    // Units: geen aankomst (Klep neer uit) = geen inkomende units; geen vertrek (Vertrek uit) = geen uitgaande units
+    var rijen = v.querySelectorAll('.tijden-table tbody tr');
+    rijen.forEach(function(tr, ri){
+      var lbl = tr.querySelector('.tijden-route-label'); if (!lbl) return;
+      var route = lbl.textContent.trim(), n = ri + 1;
+      var inUit = puVakUit(nm, route, 1, dag), uitUit = puVakUit(nm, route, 7, dag);
+      [['in', inUit], ['out', uitUit]].forEach(function(x){
+        ['trailers', 'eigen', 'containers', 'trade'].forEach(function(col){
+          var el = v.querySelector('#u-' + x[0] + '-' + col + '-' + n); if (!el) return;
+          el.disabled = x[1];
+          el.placeholder = x[1] ? 'n.v.t.' : '0';
+          el.style.background = x[1] ? 'repeating-linear-gradient(45deg,#eef1f5,#eef1f5 5px,#e3e8ef 5px,#e3e8ef 10px)' : '';
+          el.style.cursor = x[1] ? 'not-allowed' : '';
+          el.title = x[1] ? (x[0] === 'in' ? 'Geen aankomst op ' + dagNaam + ' (Klep neer staat uit bij Tijdnormen)' : 'Geen vertrek op ' + dagNaam + ' (Vertrek staat uit bij Tijdnormen)') + (el.value && el.value !== '0' ? ' — het eerder ingevulde aantal blijft bewaard' : '') : '';
+        });
       });
     });
   } catch(e) {}
