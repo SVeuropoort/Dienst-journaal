@@ -22867,8 +22867,9 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
       html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">';
       _TC.forEach(function(col,ci){
         var k=rt+'_'+ci, nv=nm[k]||{};
-        html+='<div style="border:1px solid var(--border);border-radius:6px;padding:8px;background:#fafcff;'+(nv.uit?'opacity:.55;':'')+'" data-normkaart="'+k+'">';
-        html+='<div style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:'+(ci===KPINORM.KOLOM?'2':'6')+'px;"><span style="flex:1;">'+col+'</span>'+puNormSchakelaar(k, !nv.uit)+'</div>';
+        html+='<div style="border:1px solid var(--border);border-radius:6px;padding:8px;background:#fafcff;" data-normkaart="'+k+'">';
+        html+='<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:3px;">'+col+'</div>';
+        html+=puNormDagen(k, nm);
         if(ci===KPINORM.KOLOM) html+='<div style="font-size:9.5px;color:#5a7090;margin-bottom:4px;">'+(_immNormen?'minutes after ramp down':'minuten na klep neer')+'</div>';
         html+='<div style="display:flex;gap:4px;align-items:center;">';
         html+=(ci===KPINORM.KOLOM
@@ -22885,9 +22886,8 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
       html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">';
       _TC.forEach(function(col,ci){
         var kw=rt+'_'+ci+'_we', nv=nm[kw]||{}, wd=nm[rt+'_'+ci]||{};
-        var _weUit = (nv.uit !== undefined) ? nv.uit : wd.uit;
-        html+='<div style="border:1px solid #e8d080;border-radius:6px;padding:8px;background:#fffbf0;'+(_weUit?'opacity:.55;':'')+'" data-normkaart="'+kw+'">';
-        html+='<div style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:3px;"><span style="flex:1;">'+col+'</span>'+puNormSchakelaar(kw, !_weUit)+'</div>';
+        html+='<div style="border:1px solid #e8d080;border-radius:6px;padding:8px;background:#fffbf0;" data-normkaart="'+kw+'">';
+        html+='<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:3px;">'+col+'</div>';
         html+='<div style="font-size:9px;color:#bbb;margin-bottom:4px;">'+(_immNormen?'weekday':'werkdag')+': '+(ci===KPINORM.KOLOM?(KPINORM.isNaKlep(wd)?'+'+parseInt(wd.naKlep,10)+' min':'--'):(wd.tijd||'--:--'))+'</div>';
         html+='<div style="display:flex;gap:4px;align-items:center;">';
         html+=(ci===KPINORM.KOLOM
@@ -22936,12 +22936,13 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
         if(!nm[k].tijd && !nm[k].marge && !nm[k].naKlep && nm[k].uit === undefined) delete nm[k];
       }
     });
-    // Vakken aan/uit (geen aankomst/vertrek in dat dagdeel → vak uit in de Punctuality)
-    document.querySelectorAll('#kpi-normen-body input[data-normuit]').forEach(function(cb){
-      var k = cb.dataset.normuit; if (!k) return;
-      if (!cb.checked) { nm[k] = nm[k] || {}; nm[k].uit = true; }
-      else if (nm[k]) { if (k.indexOf('_we') > -1 && nm[k.replace('_we', '')] && nm[k.replace('_we', '')].uit) nm[k].uit = false; else delete nm[k].uit; if (!Object.keys(nm[k]).length) delete nm[k]; }
-      else if (k.indexOf('_we') > -1 && nm[k.replace('_we', '')] && nm[k.replace('_we', '')].uit) { nm[k] = { uit: false }; }
+    // Per vak: op welke dagen is het in gebruik? (geen aankomst/vertrek → vak uit in de Punctuality)
+    var _dagUit = {};
+    document.querySelectorAll('#kpi-normen-body input[data-normdag]').forEach(function(cb){ var k = cb.dataset.normdag; _dagUit[k] = _dagUit[k] || []; if (!cb.checked) _dagUit[k].push(+cb.dataset.dag); });
+    Object.keys(_dagUit).forEach(function(k){
+      if (nm[k]) delete nm[k].uit; if (nm[k + '_we']) { delete nm[k + '_we'].uit; if (!Object.keys(nm[k + '_we']).length) delete nm[k + '_we']; } // oude aan/uit-schakelaar vervalt
+      if (_dagUit[k].length) { nm[k] = nm[k] || {}; nm[k].uitDagen = _dagUit[k].sort(); }
+      else if (nm[k]) { delete nm[k].uitDagen; if (!Object.keys(nm[k]).length) delete nm[k]; }
     });
     // "Schip leeg" gebruikt nu minuten na klep neer: een oude kloktijd-norm daar vervalt.
     Object.keys(nm).forEach(function(k){ if(new RegExp('_'+KPINORM.KOLOM+'(_we)?$').test(k) && nm[k]){ delete nm[k].tijd; if(!nm[k].naKlep && !nm[k].marge && nm[k].uit === undefined) delete nm[k]; } });
@@ -23692,7 +23693,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.76';
+var DJ_BUILD = '2026-10-07.77';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -34314,28 +34315,40 @@ function puNormSchakelaar(k, aan){
     '<input type="checkbox" data-normuit="' + k + '"' + (aan ? ' checked' : '') + ' onchange="var c=this.closest(\'[data-normkaart]\'); if(c) c.style.opacity=this.checked?1:.55; this.parentNode.lastChild.textContent=this.checked?\'aan\':\'uit\'; this.parentNode.style.color=this.checked?\'#1a7a40\':\'#c0392b\';" style="width:auto;margin:0;"><span>' + (aan ? 'aan' : 'uit') + '</span></label>';
 }
 window.puNormSchakelaar = puNormSchakelaar;
-function puVakUit(normen, route, ci, weekend){
-  var wd = normen[route + '_' + ci] || {}, we = normen[route + '_' + ci + '_we'];
-  if (weekend && we && we.uit !== undefined) return !!we.uit;
-  return !!wd.uit;
+// Dagen waarop een vak UIT staat (JavaScript-dagnummers: 0 = zondag … 6 = zaterdag); ook oude aan/uit-instelling
+function puUitDagen(normen, k){
+  var n = normen[k] || {}; if (Array.isArray(n.uitDagen)) return n.uitDagen;
+  var u = []; if (n.uit) u = u.concat([1, 2, 3, 4, 5]);
+  var we = normen[k + '_we']; if ((we && we.uit !== undefined) ? we.uit : n.uit) u = u.concat([0, 6]);
+  return u;
 }
+function puVakUit(normen, route, ci, dag){ return puUitDagen(normen, route + '_' + ci).indexOf(dag) >= 0; }
+var PU_DAGEN = [[1, 'Ma'], [2, 'Di'], [3, 'Wo'], [4, 'Do'], [5, 'Vr'], [6, 'Za'], [0, 'Zo']];
+function puNormDagen(k, normen){
+  var uit = puUitDagen(normen || {}, k);
+  return '<div style="display:flex;gap:2px;margin-bottom:6px;" title="Op welke dagen wordt dit vak gebruikt? Uitvinken = geen aankomst/vertrek die dag: het vak is dan in de Punctuality niet in te vullen.">' +
+    PU_DAGEN.map(function(x){ var aan = uit.indexOf(x[0]) < 0;
+      return '<label style="cursor:pointer;"><input type="checkbox" data-normdag="' + k + '" data-dag="' + x[0] + '"' + (aan ? ' checked' : '') + ' onchange="this.nextSibling.style.background=this.checked?\'#1a7a40\':\'#e3e8ef\';this.nextSibling.style.color=this.checked?\'#fff\':\'#8795a8\';this.nextSibling.style.textDecoration=this.checked?\'none\':\'line-through\';" style="display:none;">' +
+        '<span style="display:inline-block;width:19px;text-align:center;font-size:9.5px;font-weight:800;border-radius:3px;padding:2px 0;background:' + (aan ? '#1a7a40' : '#e3e8ef') + ';color:' + (aan ? '#fff' : '#8795a8') + ';text-decoration:' + (aan ? 'none' : 'line-through') + ';">' + x[1] + '</span></label>'; }).join('') + '</div>';
+}
+window.puNormDagen = puNormDagen;
 function puVakkenToepassen(){
   try {
     var v = document.getElementById('view-punctuality'); if (!v) return;
     var nm = {}; try { nm = JSON.parse(localStorage.getItem('kpi_normen_v1') || '{}') || {}; } catch(e) {}
     var ds = (document.getElementById('vs-datum') || {}).value || '', d = ds ? new Date(ds + 'T12:00:00') : new Date();
     if (isNaN(d)) d = new Date();
-    var weekend = d.getDay() === 0 || d.getDay() === 6;
+    var dag = d.getDay(), dagNaam = ['zondag', 'maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag'][dag];
     v.querySelectorAll('.tijden-table tbody tr').forEach(function(tr){
       var lbl = tr.querySelector('.tijden-route-label'); if (!lbl) return;
       var route = lbl.textContent.trim();
       tr.querySelectorAll('input.tijden-input').forEach(function(inp, ci){
-        var uit = puVakUit(nm, route, ci, weekend);
+        var uit = puVakUit(nm, route, ci, dag);
         inp.disabled = uit;
         inp.placeholder = uit ? 'n.v.t.' : '--:--';
         inp.style.background = uit ? 'repeating-linear-gradient(45deg,#eef1f5,#eef1f5 5px,#e3e8ef 5px,#e3e8ef 10px)' : '';
         inp.style.cursor = uit ? 'not-allowed' : '';
-        inp.title = uit ? 'Staat uit bij Tijdnormen (' + (weekend ? 'weekend' : 'werkdag') + '): geen aankomst/vertrek in dit dagdeel' + (inp.value ? ' — de eerder ingevulde tijd blijft bewaard' : '') : '';
+        inp.title = uit ? 'Staat op ' + dagNaam + ' uit bij Tijdnormen: geen aankomst/vertrek in dit dagdeel' + (inp.value ? ' — de eerder ingevulde tijd blijft bewaard' : '') : '';
       });
     });
   } catch(e) {}
