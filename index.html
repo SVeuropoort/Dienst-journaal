@@ -6947,6 +6947,7 @@ window.addEventListener('resize', () => {
     'dagplan_log_v1',
     'kledingpunten_v1',
     'cursus_planning_v1',
+    'dagmeldingen_v1',
     'bezetting_deeltijd_v1',
     'pd_verlof_v1',
     'bezetting_instellingen_v1',
@@ -7215,6 +7216,7 @@ window.addEventListener('resize', () => {
     'dagplan_log_v1',
     'kledingpunten_v1',
     'cursus_planning_v1',
+    'dagmeldingen_v1',
     'bezetting_deeltijd_v1',
     'pd_verlof_v1',
     'bezetting_instellingen_v1',
@@ -7528,6 +7530,7 @@ window.addEventListener('resize', () => {
     Object.keys(lokaal).forEach(function(k){
       if (vuil && (k in cloudData) && !vuil[k]) return; // niet zelf gewijzigd: cloud-versie behouden
       if (/(^|_)vs_data_v1$/.test(k) && cloudData[k]) { data[k] = djVsSamenvoegen(cloudData[k], lokaal[k]); return; }
+      if (/(^|_)dagmeldingen_v1$/.test(k) && cloudData[k]) { data[k] = djDmSamenvoegen(cloudData[k], lokaal[k]); return; }
       if (/(^|_)cursus_planning_v1$/.test(k) && cloudData[k]) { data[k] = djCpSamenvoegen(cloudData[k], lokaal[k]); return; }
       if (/(^|_)dagplan_log_v1$/.test(k) && cloudData[k]) { data[k] = djDpLogSamenvoegen(cloudData[k], lokaal[k]); return; }
       if (/(^|_)opl_afgerond_v1$/.test(k) && cloudData[k]) { data[k] = djOplAfgSamenvoegen(cloudData[k], lokaal[k]); return; }
@@ -23681,7 +23684,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.72';
+var DJ_BUILD = '2026-10-07.73';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -34188,7 +34191,8 @@ function dpCursusBalk(){
   var datum = (typeof planDate !== 'undefined' && planDate) || '';
   var el = document.getElementById('dp-cursus-balk');
   var lijst = cpGet().cursussen.filter(function(c){ return datum && c.datum <= datum && datum <= cpEind(c); });
-  if (!lijst.length) { if (el) el.remove(); return; }
+  var meld = (typeof dmOpDatum === 'function') ? dmOpDatum(datum) : [];
+  if (!lijst.length && !meld.length) { if (el) el.remove(); return; }
   if (!el) { el = document.createElement('div'); el.id = 'dp-cursus-balk'; tabs.appendChild(el); tabs.style.display = 'flex'; tabs.style.alignItems = 'center'; }
   el.style.cssText = 'margin-left:12px;flex:1;align-self:center;padding:6px 12px;background:#fff3e0;border:2px solid #e67e22;border-radius:8px;font-size:12.5px;color:#5a3300;animation:dpCursusPuls 2s ease-in-out 3;';
   el.innerHTML = lijst.map(function(c){
@@ -34197,12 +34201,85 @@ function dpCursusBalk(){
     return '<div style="margin:1px 0;"><b style="color:#c0560b;">&#x1F393; ' + cpEsc(c.soort) + '-cursus' + dagNr + '</b>' +
       (c.tijd || c.locatie ? ' <span style="color:#5a6b80;">(' + [c.tijd, c.locatie].filter(Boolean).map(cpEsc).join(' &middot; ') + ')</span>' : '') +
       ': <b>' + cpEsc(namen.join(', ')) + '</b> &mdash; <i>niet inplannen</i></div>';
-  }).join('');
+  }).join('') + meld.map(function(m){ return '<div style="margin:1px 0;"><b style="color:#c0560b;">&#x1F4E2; Melding:</b> ' + cpEsc(m.tekst) + '</div>'; }).join('');
 }
 window.dpCursusBalk = dpCursusBalk;
 (function(){ var st = document.createElement('style'); st.textContent = '@keyframes dpCursusPuls{0%,100%{box-shadow:0 0 0 0 rgba(230,126,34,.0)}50%{box-shadow:0 0 0 5px rgba(230,126,34,.35)}}'; document.head.appendChild(st); })();
 (function(){ if (typeof buildPanels !== 'function') return; var _bp = buildPanels; buildPanels = function(){ var r = _bp.apply(this, arguments); try { dpCursusBalk(); } catch(e) {} return r; }; })();
 document.addEventListener('DOMContentLoaded', function(){ setInterval(function(){ var v = document.getElementById('view-dagplanning'); if (v && v.classList.contains('active')) dpCursusBalk(); }, 20000); });
 </script>
+<script>
+// ══════════════════════════════════════════════════════════════════
+// DAGMELDINGEN — invoeren in de Werkoverdracht (tussen Start-Up en Openstaande taken),
+// getoond in de Dagplanning naast OCHTEND / AVOND op de gekozen dag(en)
+// ══════════════════════════════════════════════════════════════════
+function dmKey(){ return tk('dagmeldingen_v1'); }
+function dmGet(){ try { var x = JSON.parse(localStorage.getItem(dmKey()) || 'null'); return (x && x.meldingen) ? x : { meldingen: [], weg: [] }; } catch(e) { return { meldingen: [], weg: [] }; } }
+function dmSet(x){ localStorage.setItem(dmKey(), JSON.stringify(x)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }
+function dmEind(m){ return m.datumTot && m.datumTot > m.datum ? m.datumTot : m.datum; }
+function dmOpDatum(datum){ return dmGet().meldingen.filter(function(m){ return datum && m.datum <= datum && datum <= dmEind(m); }); }
+function djDmSamenvoegen(cloud, lok){
+  var p = function(x){ if (typeof x === 'string') { try { x = JSON.parse(x); } catch(e) { x = null; } } return (x && x.meldingen) ? x : null; };
+  var C = p(cloud), L = p(lok); if (!C) return lok; if (!L) return cloud;
+  var weg = {}; (C.weg || []).concat(L.weg || []).forEach(function(w){ if (!weg[w.id] || w.gw > weg[w.id]) weg[w.id] = w.gw; });
+  var best = {}, volg = [];
+  C.meldingen.concat(L.meldingen).forEach(function(m){ if (!m || !m.id) return; var b = best[m.id]; if (!b) volg.push(m.id); if (!b || (m.gw || 0) > (b.gw || 0)) best[m.id] = m; });
+  return { meldingen: volg.map(function(id){ return best[id]; }).filter(function(m){ return !(weg[m.id] && weg[m.id] >= (m.gw || 0)); }),
+    weg: Object.keys(weg).map(function(id){ return { id: id, gw: weg[id] }; }).filter(function(w){ return Date.now() - w.gw < 90 * 864e5; }) };
+}
+window.djDmSamenvoegen = djDmSamenvoegen;
+function dmEsc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function dmNL(iso){ var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? m[3] + '-' + m[2] + '-' + m[1] : iso; }
+function dmParse(t){ var m = /^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/.exec(String(t || '').trim()); return m ? m[3] + '-' + String(m[2]).padStart(2, '0') + '-' + String(m[1]).padStart(2, '0') : null; }
+function dmRender(){
+  var box = document.getElementById('wo-dagmeldingen'); if (!box) return;
+  var datum = (document.getElementById('f-datum') || {}).value || '';
+  var lijst = dmOpDatum(datum), ik = localStorage.getItem('dj_sp_account_username') || '';
+  var komend = dmGet().meldingen.filter(function(m){ return m.datum > datum; }).sort(function(a, b){ return a.datum.localeCompare(b.datum); }).slice(0, 5);
+  var naam = function(e){ return typeof dpLogNaam === 'function' ? dpLogNaam(e) : e; };
+  var periode = function(m){ return dmEind(m) === m.datum ? dmNL(m.datum) : dmNL(m.datum).slice(0, 5) + ' t/m ' + dmNL(dmEind(m)); };
+  var rij = function(m){ return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 10px;border-top:1px solid #f3e3c8;">' +
+    '<span style="font-size:12px;font-weight:700;color:#a04000;flex:0 0 120px;">' + periode(m) + '</span>' +
+    '<span style="flex:1;font-size:13px;white-space:pre-wrap;">' + dmEsc(m.tekst) + '<span style="display:block;font-size:11px;color:#8795a8;">' + (m.door ? 'door ' + dmEsc(naam(m.door)) : '') + '</span></span>' +
+    '<span onclick="dmBewerk(\'' + m.id + '\')" title="Aanpassen" style="cursor:pointer;">&#x270F;&#xFE0F;</span><span onclick="dmWeg(\'' + m.id + '\')" title="Verwijderen" style="cursor:pointer;color:#c0392b;">&#x2715;</span></div>'; };
+  box.innerHTML =
+    '<div style="font-size:12px;color:#7a4b00;background:#fff4e5;border:1px solid #f5c27a;border-radius:6px;padding:6px 10px;margin-bottom:10px;">&#x1F4CC; Wat je hier zet, staat in de <b>Dagplanning</b> naast <b>OCHTEND / AVOND</b> op de gekozen dag(en), zodat iedereen die plant het ziet.</div>' +
+    '<div style="border:1px solid #f3e3c8;border-radius:8px;overflow:hidden;margin-bottom:10px;"><div style="background:#fffaf2;padding:6px 10px;font-size:12px;font-weight:700;color:#7a4b00;">Meldingen voor ' + dmNL(datum) + ' (' + lijst.length + ')</div>' +
+      (lijst.length ? lijst.map(rij).join('') : '<div style="padding:8px 10px;font-size:12.5px;color:#8795a8;border-top:1px solid #f3e3c8;">Geen meldingen voor deze dag.</div>') + '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 120px 120px auto;gap:8px;align-items:end;">' +
+      '<label style="display:flex;flex-direction:column;gap:3px;font-size:11px;font-weight:700;color:#5a6b80;">MELDING<textarea id="dm-tekst" rows="2" placeholder="Bijv. slang gescheurd van de tank, wordt 30-11 vervangen" style="padding:6px;border:1px solid #c8d7e8;border-radius:5px;font-family:inherit;font-size:13px;"></textarea></label>' +
+      '<label style="display:flex;flex-direction:column;gap:3px;font-size:11px;font-weight:700;color:#5a6b80;">VAN<input id="dm-van" value="' + dmNL(datum) + '" style="padding:6px;border:1px solid #c8d7e8;border-radius:5px;"></label>' +
+      '<label style="display:flex;flex-direction:column;gap:3px;font-size:11px;font-weight:700;color:#5a6b80;">T/M<input id="dm-tot" placeholder="(één dag)" style="padding:6px;border:1px solid #c8d7e8;border-radius:5px;"></label>' +
+      '<button type="button" onclick="dmToevoegen()" style="height:34px;padding:0 14px;background:#e67e22;color:#fff;border:none;border-radius:6px;font-weight:800;cursor:pointer;">+ Toevoegen</button></div>' +
+    (komend.length ? '<div style="margin-top:10px;font-size:12px;color:#5a6b80;"><b>Komende meldingen:</b> ' + komend.map(function(m){ return periode(m) + ': ' + dmEsc(String(m.tekst).slice(0, 50)) + (m.tekst.length > 50 ? '&hellip;' : ''); }).join(' &middot; ') + '</div>' : '');
+}
+window.dmRender = dmRender;
+window.dmToevoegen = function(){
+  var t = (document.getElementById('dm-tekst').value || '').trim(); if (!t) { document.getElementById('dm-tekst').focus(); return; }
+  var v = dmParse(document.getElementById('dm-van').value), tt = document.getElementById('dm-tot').value.trim() ? dmParse(document.getElementById('dm-tot').value) : v;
+  if (!v) { alert('Typ de datum als dd-mm-jjjj.'); return; } if (!tt || tt < v) { alert('De einddatum moet op of na de begindatum liggen.'); return; }
+  var x = dmGet(); x.meldingen.push({ id: 'm' + Date.now() + Math.random().toString(36).slice(2, 5), datum: v, datumTot: tt > v ? tt : '', tekst: t, door: localStorage.getItem('dj_sp_account_username') || '', gw: Date.now() });
+  dmSet(x); dmRender(); if (typeof dpCursusBalk === 'function') dpCursusBalk();
+};
+window.dmWeg = function(id){ if (!confirm('Deze melding verwijderen?')) return; var x = dmGet(); x.meldingen = x.meldingen.filter(function(m){ return m.id !== id; }); x.weg = (x.weg || []).concat([{ id: id, gw: Date.now() }]); dmSet(x); dmRender(); if (typeof dpCursusBalk === 'function') dpCursusBalk(); };
+window.dmBewerk = function(id){
+  var x = dmGet(), m = x.meldingen.find(function(z){ return z.id === id; }); if (!m) return;
+  var t = prompt('Melding:', m.tekst); if (t === null) return;
+  var v = prompt('Van (dd-mm-jjjj):', dmNL(m.datum)); if (v === null) return; var vi = dmParse(v); if (!vi) { alert('Typ de datum als dd-mm-jjjj.'); return; }
+  var tt = prompt('T/m (dd-mm-jjjj):', dmNL(dmEind(m) > vi ? dmEind(m) : vi)); if (tt === null) return; var ti = dmParse(tt) || vi; if (ti < vi) ti = vi;
+  m.tekst = t.trim(); m.datum = vi; m.datumTot = ti > vi ? ti : ''; m.gw = Date.now(); dmSet(x); dmRender(); if (typeof dpCursusBalk === 'function') dpCursusBalk();
+};
+document.addEventListener('DOMContentLoaded', function(){
+  var tab = document.getElementById('nieuw-tab-overdracht'); if (!tab) return;
+  var su = Array.prototype.find.call(tab.querySelectorAll('.card'), function(c){ var h = c.querySelector('h2'); return h && /^start-up/i.test(h.textContent.trim()); });
+  if (!su) return;
+  var k = document.createElement('div'); k.className = 'card'; k.id = 'wo-dagmeldingen-kaart';
+  k.innerHTML = '<div class="card-header"><div class="icon">&#x1F4E2;</div><h2>Dagmeldingen <span style="font-size:11px;font-weight:600;color:#a04000;text-transform:none;letter-spacing:normal;">&mdash; verschijnt in de Dagplanning</span></h2></div><div id="wo-dagmeldingen"></div>';
+  su.parentNode.insertBefore(k, su.nextSibling);
+  dmRender();
+});
+(function(){ if (typeof laadDagData === 'function') { var _l = laadDagData; laadDagData = function(){ var r = _l.apply(this, arguments); try { dmRender(); } catch(e) {} return r; }; window.laadDagData = laadDagData; } })();
+</script>
+
 </body>
 </html>
