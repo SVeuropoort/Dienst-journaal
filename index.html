@@ -22792,7 +22792,7 @@ var KPINORM = (function(){
   var KOLOM = 3, KLEP = 1; // _TC[3] = 'Schip leeg', _TC[1] = 'Klep neer'
   function t2m(t){ if (!t) return null; var p = String(t).split(':'); if (p.length !== 2) return null; var h = parseInt(p[0], 10), m = parseInt(p[1], 10); return (isNaN(h) || isNaN(m)) ? null : h * 60 + m; }
   function isNaKlep(nv){ return !!nv && nv.naKlep !== undefined && nv.naKlep !== null && nv.naKlep !== '' && !isNaN(parseInt(nv.naKlep, 10)); }
-  function heeft(nv, ti){ if (ti === KOLOM) return isNaKlep(nv); return !!nv && (isNaKlep(nv) || !!nv.tijd); }
+  function heeft(nv, ti){ if (nv && nv.uit) return false; if (ti === KOLOM) return isNaKlep(nv); return !!nv && (isNaKlep(nv) || !!nv.tijd); }
   function marge(nv){ return nv && nv.marge ? parseInt(nv.marge, 10) || 0 : 0; }
   function tekst(nv, en){ if (isNaKlep(nv)) return (en ? 'ramp +' : 'klep +') + parseInt(nv.naKlep, 10) + 'm'; return nv && nv.tijd ? nv.tijd : ''; }
   function duur(rij, ti){ var k = t2m(((rij && rij.tijden) || [])[KLEP]), t = t2m(((rij && rij.tijden) || [])[ti]); if (k === null || t === null) return null; var d = t - k; if (d < 0) d += 1440; return d; }
@@ -22867,8 +22867,8 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
       html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">';
       _TC.forEach(function(col,ci){
         var k=rt+'_'+ci, nv=nm[k]||{};
-        html+='<div style="border:1px solid var(--border);border-radius:6px;padding:8px;background:#fafcff;">';
-        html+='<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:'+(ci===KPINORM.KOLOM?'2':'6')+'px;">'+col+'</div>';
+        html+='<div style="border:1px solid var(--border);border-radius:6px;padding:8px;background:#fafcff;'+(nv.uit?'opacity:.55;':'')+'" data-normkaart="'+k+'">';
+        html+='<div style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:'+(ci===KPINORM.KOLOM?'2':'6')+'px;"><span style="flex:1;">'+col+'</span>'+puNormSchakelaar(k, !nv.uit)+'</div>';
         if(ci===KPINORM.KOLOM) html+='<div style="font-size:9.5px;color:#5a7090;margin-bottom:4px;">'+(_immNormen?'minutes after ramp down':'minuten na klep neer')+'</div>';
         html+='<div style="display:flex;gap:4px;align-items:center;">';
         html+=(ci===KPINORM.KOLOM
@@ -22885,8 +22885,9 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
       html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">';
       _TC.forEach(function(col,ci){
         var kw=rt+'_'+ci+'_we', nv=nm[kw]||{}, wd=nm[rt+'_'+ci]||{};
-        html+='<div style="border:1px solid #e8d080;border-radius:6px;padding:8px;background:#fffbf0;">';
-        html+='<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:3px;">'+col+'</div>';
+        var _weUit = (nv.uit !== undefined) ? nv.uit : wd.uit;
+        html+='<div style="border:1px solid #e8d080;border-radius:6px;padding:8px;background:#fffbf0;'+(_weUit?'opacity:.55;':'')+'" data-normkaart="'+kw+'">';
+        html+='<div style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:3px;"><span style="flex:1;">'+col+'</span>'+puNormSchakelaar(kw, !_weUit)+'</div>';
         html+='<div style="font-size:9px;color:#bbb;margin-bottom:4px;">'+(_immNormen?'weekday':'werkdag')+': '+(ci===KPINORM.KOLOM?(KPINORM.isNaKlep(wd)?'+'+parseInt(wd.naKlep,10)+' min':'--'):(wd.tijd||'--:--'))+'</div>';
         html+='<div style="display:flex;gap:4px;align-items:center;">';
         html+=(ci===KPINORM.KOLOM
@@ -22928,19 +22929,26 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
       } else if(f==='naKlep') {
         // "Schip leeg" (minuten na klep neer) leeggemaakt -> norm vervalt
         delete nm[k][f];
-        if(!nm[k].tijd && !nm[k].marge && !nm[k].naKlep) delete nm[k];
+        if(!nm[k].tijd && !nm[k].marge && !nm[k].naKlep && nm[k].uit === undefined) delete nm[k];
       } else if(nm[k][f] && k.indexOf('_we')>-1) {
         // Weekendveld leeggemaakt -> verwijder die key
         delete nm[k][f];
-        if(!nm[k].tijd && !nm[k].marge && !nm[k].naKlep) delete nm[k];
+        if(!nm[k].tijd && !nm[k].marge && !nm[k].naKlep && nm[k].uit === undefined) delete nm[k];
       }
     });
+    // Vakken aan/uit (geen aankomst/vertrek in dat dagdeel → vak uit in de Punctuality)
+    document.querySelectorAll('#kpi-normen-body input[data-normuit]').forEach(function(cb){
+      var k = cb.dataset.normuit; if (!k) return;
+      if (!cb.checked) { nm[k] = nm[k] || {}; nm[k].uit = true; }
+      else if (nm[k]) { if (k.indexOf('_we') > -1 && nm[k.replace('_we', '')] && nm[k.replace('_we', '')].uit) nm[k].uit = false; else delete nm[k].uit; if (!Object.keys(nm[k]).length) delete nm[k]; }
+      else if (k.indexOf('_we') > -1 && nm[k.replace('_we', '')] && nm[k.replace('_we', '')].uit) { nm[k] = { uit: false }; }
+    });
     // "Schip leeg" gebruikt nu minuten na klep neer: een oude kloktijd-norm daar vervalt.
-    Object.keys(nm).forEach(function(k){ if(new RegExp('_'+KPINORM.KOLOM+'(_we)?$').test(k) && nm[k]){ delete nm[k].tijd; if(!nm[k].naKlep && !nm[k].marge) delete nm[k]; } });
+    Object.keys(nm).forEach(function(k){ if(new RegExp('_'+KPINORM.KOLOM+'(_we)?$').test(k) && nm[k]){ delete nm[k].tijd; if(!nm[k].naKlep && !nm[k].marge && nm[k].uit === undefined) delete nm[k]; } });
     localStorage.setItem('kpi_normen_v1',JSON.stringify(nm));
     if (typeof window.autoCloudOpslaan === 'function') window.autoCloudOpslaan();
     document.getElementById('kpi-normen-msg').textContent=((sessionStorage.getItem('dj_terminal')||'EP')==='IMM') ? '\u2713 Saved!' : '\u2713 Opgeslagen!';
-    setTimeout(function(){closeKpiNormen();renderKPI();},700);
+    setTimeout(function(){closeKpiNormen();renderKPI(); if (typeof puVakkenToepassen === 'function') puVakkenToepassen();},700);
   }
   function resetKpiNormen(){localStorage.removeItem('kpi_normen_v1');document.querySelectorAll('#kpi-normen-body input[data-key]').forEach(function(i){i.value='';});}
 
@@ -23684,7 +23692,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.75';
+var DJ_BUILD = '2026-10-07.76';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -34295,6 +34303,49 @@ setTimeout(function(){
     localStorage.setItem(vlag, '1');
   } catch(e) {}
 }, 9000);
+</script>
+<script>
+// ══════════════════════════════════════════════════════════════════
+// Punctuality: vakken aan/uit per route, kolom en dagsoort (werkdag / weekend), in te stellen bij Tijdnormen.
+// Een vak dat uit staat (geen aankomst of vertrek in dat dagdeel) kan in de Punctuality niet worden ingevuld.
+// ══════════════════════════════════════════════════════════════════
+function puNormSchakelaar(k, aan){
+  return '<label title="Uitzetten als er in dit dagdeel geen aankomst of vertrek is: dan kan dit vak in de Punctuality niet worden ingevuld" style="display:inline-flex;align-items:center;gap:3px;cursor:pointer;text-transform:none;font-weight:600;color:' + (aan ? '#1a7a40' : '#c0392b') + ';">' +
+    '<input type="checkbox" data-normuit="' + k + '"' + (aan ? ' checked' : '') + ' onchange="var c=this.closest(\'[data-normkaart]\'); if(c) c.style.opacity=this.checked?1:.55; this.parentNode.lastChild.textContent=this.checked?\'aan\':\'uit\'; this.parentNode.style.color=this.checked?\'#1a7a40\':\'#c0392b\';" style="width:auto;margin:0;"><span>' + (aan ? 'aan' : 'uit') + '</span></label>';
+}
+window.puNormSchakelaar = puNormSchakelaar;
+function puVakUit(normen, route, ci, weekend){
+  var wd = normen[route + '_' + ci] || {}, we = normen[route + '_' + ci + '_we'];
+  if (weekend && we && we.uit !== undefined) return !!we.uit;
+  return !!wd.uit;
+}
+function puVakkenToepassen(){
+  try {
+    var v = document.getElementById('view-punctuality'); if (!v) return;
+    var nm = {}; try { nm = JSON.parse(localStorage.getItem('kpi_normen_v1') || '{}') || {}; } catch(e) {}
+    var ds = (document.getElementById('vs-datum') || {}).value || '', d = ds ? new Date(ds + 'T12:00:00') : new Date();
+    if (isNaN(d)) d = new Date();
+    var weekend = d.getDay() === 0 || d.getDay() === 6;
+    v.querySelectorAll('.tijden-table tbody tr').forEach(function(tr){
+      var lbl = tr.querySelector('.tijden-route-label'); if (!lbl) return;
+      var route = lbl.textContent.trim();
+      tr.querySelectorAll('input.tijden-input').forEach(function(inp, ci){
+        var uit = puVakUit(nm, route, ci, weekend);
+        inp.disabled = uit;
+        inp.placeholder = uit ? 'n.v.t.' : '--:--';
+        inp.style.background = uit ? 'repeating-linear-gradient(45deg,#eef1f5,#eef1f5 5px,#e3e8ef 5px,#e3e8ef 10px)' : '';
+        inp.style.cursor = uit ? 'not-allowed' : '';
+        inp.title = uit ? 'Staat uit bij Tijdnormen (' + (weekend ? 'weekend' : 'werkdag') + '): geen aankomst/vertrek in dit dagdeel' + (inp.value ? ' — de eerder ingevulde tijd blijft bewaard' : '') : '';
+      });
+    });
+  } catch(e) {}
+}
+window.puVakkenToepassen = puVakkenToepassen;
+(function(){
+  if (typeof wisselPunctualityDatum === 'function') { var _w = wisselPunctualityDatum; wisselPunctualityDatum = function(){ var r = _w.apply(this, arguments); setTimeout(puVakkenToepassen, 50); return r; }; window.wisselPunctualityDatum = wisselPunctualityDatum; }
+  if (typeof navTo === 'function') { var _n = navTo; navTo = function(view){ var r = _n.apply(this, arguments); if (view === 'punctuality') setTimeout(puVakkenToepassen, 150); return r; }; window.navTo = navTo; }
+  document.addEventListener('DOMContentLoaded', function(){ setTimeout(puVakkenToepassen, 2500); var vd = document.getElementById('vs-datum'); if (vd) vd.addEventListener('change', function(){ setTimeout(puVakkenToepassen, 100); }); });
+})();
 </script>
 </body>
 </html>
