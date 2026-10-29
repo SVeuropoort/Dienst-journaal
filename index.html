@@ -23684,7 +23684,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.74';
+var DJ_BUILD = '2026-10-07.75';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -34281,5 +34281,20 @@ document.addEventListener('DOMContentLoaded', function(){
 (function(){ if (typeof laadDagData === 'function') { var _l = laadDagData; laadDagData = function(){ var r = _l.apply(this, arguments); try { dmRender(); } catch(e) {} return r; }; window.laadDagData = laadDagData; } })();
 </script>
 
+<script>
+// Eenmalig: dienstregelingswijzigingen NRH/NRI 12-17 november 2026 (versie 27-10-2026) als dagmeldingen voor Europoort
+setTimeout(function(){
+  try {
+    if ((sessionStorage.getItem('dj_terminal') || 'EP') !== 'EP' || typeof dmGet !== 'function') return;
+    var vlag = 'EP_dm_seed_nrh_nri_2026_11'; if (localStorage.getItem(vlag)) return;
+    var x = dmGet(), weg = {}; (x.weg || []).forEach(function(w){ weg[w.id] = 1; });
+    var nieuw = [{"id": "nrh-nri-2026-11-alg", "datum": "2026-11-12", "datumTot": "2026-11-17", "tekst": "Aangepaste dienstregeling 12 t/m 17 november: Stena Foreteller gaat naar de werf (Damen Schiedam) en de Mistral vaart tijdelijk deels naar Immingham. Vanaf 18 november weer normaal."}, {"id": "nrh-nri-2026-11-12", "datum": "2026-11-12", "datumTot": "", "tekst": "Mistral: aankomst 07:30, vertrek 11:15 naar Harwich VERVALT; na lossen laden voor vertrek 18:45 naar Immingham. Stena Foreteller: aankomst 09:30, na lossen naar Damen Schiedam (dokken); vertrek 19:45 naar Immingham VERVALT. Thuleland normaal (17:00 / 21:00)."}, {"id": "nrh-nri-2026-11-13", "datum": "2026-11-13", "datumTot": "", "tekst": "Mistral: GEEN aankomst 07:30 en GEEN vertrek 11:15 naar Harwich. Thuleland (17:00 / 21:00) en Stena Forerunner (09:30 / 19:45) normaal."}, {"id": "nrh-nri-2026-11-14", "datum": "2026-11-14", "datumTot": "", "tekst": "Mistral komt om 09:30 aan uit Immingham (in plaats van Stena Foreteller). GEEN Mistral-aankomst 07:30 uit Harwich."}, {"id": "nrh-nri-2026-11-15", "datum": "2026-11-15", "datumTot": "", "tekst": "Mistral vertrekt om 16:30 naar Immingham (in plaats van Stena Foreteller 17:00). Mistral-vertrek 20:00 naar Harwich VERVALT."}, {"id": "nrh-nri-2026-11-17", "datum": "2026-11-17", "datumTot": "", "tekst": "Mistral: aankomst 07:30 uit Immingham (i.p.v. Harwich), na lossen laden voor vertrek 11:15 naar Harwich. Stena Foreteller terug van de werf: aankomst 12:00 (i.p.v. 09:30), vertrek 19:45 normaal. Thuleland normaal."}];
+    var n = 0;
+    nieuw.forEach(function(m){ if (weg[m.id] || x.meldingen.some(function(z){ return z.id === m.id; })) return; m.door = 'Dienstregeling NRH/NRI (27-10-2026)'; m.gw = Date.now(); x.meldingen.push(m); n++; });
+    if (n) { dmSet(x); if (typeof dmRender === 'function') dmRender(); if (typeof dpCursusBalk === 'function') dpCursusBalk(); }
+    localStorage.setItem(vlag, '1');
+  } catch(e) {}
+}, 9000);
+</script>
 </body>
 </html>
