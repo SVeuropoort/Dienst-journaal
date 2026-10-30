@@ -23703,7 +23703,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.81';
+var DJ_BUILD = '2026-10-07.82';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -34401,6 +34401,46 @@ window.puVakkenToepassen = puVakkenToepassen;
     setTimeout(kijk, 4000); setInterval(kijk, 60000);
   });
 })();
+</script>
+<script>
+// Nieuwe chatberichten: pop-up rechtsonder in het scherm (waar je ook bent in de app)
+(function(){
+  if (typeof djChatVerwerk !== 'function') return;
+  var _v = djChatVerwerk;
+  djChatVerwerk = function(lijst){ var r = _v.apply(this, arguments); try { djChatToasts(); } catch(e) {} return r; };
+  window.djChatVerwerk = djChatVerwerk;
+})();
+function djChatToastGezien(){ try { return JSON.parse(sessionStorage.getItem('dj_chat_getoast') || '{}') || {}; } catch(e) { return {}; } }
+function djChatToasts(){
+  if (typeof _djChatEigenEmail === 'undefined' || !_djChatEigenEmail || window.DJ_MEELEES) return;
+  var g = djChatGelezenGet(), al = djChatToastGezien(), nieuw = [];
+  (_djChatBerichten || []).forEach(function(b){
+    if (b.naar !== _djChatEigenEmail || al[b.id]) return;
+    if (g[b.van] && Date.parse(b.tijd) <= Date.parse(g[b.van])) return;          // al gelezen
+    if (typeof _djChatPartner !== 'undefined' && _djChatPartner === b.van) { al[b.id] = 1; return; } // gesprek staat al open
+    nieuw.push(b); al[b.id] = 1;
+  });
+  try { sessionStorage.setItem('dj_chat_getoast', JSON.stringify(al)); } catch(e) {}
+  nieuw.slice(-3).forEach(djChatToastToon);
+}
+function djChatToastToon(b){
+  var box = document.getElementById('dj-chat-toasts');
+  if (!box) { box = document.createElement('div'); box.id = 'dj-chat-toasts'; box.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:100006;display:flex;flex-direction:column;gap:10px;max-width:340px;'; document.body.appendChild(box); }
+  var esc = function(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
+  var naam = (typeof djChatNaam === 'function' ? djChatNaam(b.van) : b.van) || b.van;
+  var tekst = String(b.tekst || b.bericht || '').slice(0, 160);
+  var t = document.createElement('div');
+  t.style.cssText = 'background:#fff;border:1px solid #c8d7e8;border-left:5px solid #0f6cbd;border-radius:10px;box-shadow:0 10px 28px rgba(0,30,60,.28);padding:10px 12px;cursor:pointer;font-family:inherit;transform:translateX(120%);transition:transform .3s ease;';
+  t.innerHTML = '<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:18px;">&#x1F4AC;</span><b style="flex:1;color:#003366;font-size:13px;">' + esc(naam) + '</b>' +
+    '<span class="dj-toast-x" title="Sluiten" style="color:#8795a8;font-size:14px;padding:0 4px;">&#x2715;</span></div>' +
+    '<div style="font-size:13px;color:#24313f;margin:4px 0 0 26px;white-space:pre-wrap;">' + esc(tekst) + (String(b.tekst || b.bericht || '').length > 160 ? '&hellip;' : '') + '</div>' +
+    '<div style="font-size:11px;color:#0f6cbd;font-weight:700;margin:6px 0 0 26px;">Klik om te beantwoorden</div>';
+  var weg = function(){ t.style.transform = 'translateX(120%)'; setTimeout(function(){ t.remove(); }, 350); };
+  t.addEventListener('click', function(ev){ if (ev.target.classList.contains('dj-toast-x')) { weg(); return; } weg(); if (typeof djChatOpen === 'function') djChatOpen(b.van, naam); });
+  box.appendChild(t);
+  requestAnimationFrame(function(){ t.style.transform = 'translateX(0)'; });
+  setTimeout(weg, 20000);
+}
 </script>
 </body>
 </html>
