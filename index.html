@@ -23703,7 +23703,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.80';
+var DJ_BUILD = '2026-10-07.81';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -34387,6 +34387,19 @@ window.puVakkenToepassen = puVakkenToepassen;
   if (typeof wisselPunctualityDatum === 'function') { var _w = wisselPunctualityDatum; wisselPunctualityDatum = function(){ var r = _w.apply(this, arguments); setTimeout(puVakkenToepassen, 50); return r; }; window.wisselPunctualityDatum = wisselPunctualityDatum; }
   if (typeof navTo === 'function') { var _n = navTo; navTo = function(view){ var r = _n.apply(this, arguments); if (view === 'punctuality') setTimeout(puVakkenToepassen, 150); return r; }; window.navTo = navTo; }
   document.addEventListener('DOMContentLoaded', function(){ setTimeout(puVakkenToepassen, 2500); var vd = document.getElementById('vs-datum'); if (vd) vd.addEventListener('change', function(){ setTimeout(puVakkenToepassen, 100); }); });
+})();
+</script>
+<script>
+// KPI bekeken: ook vastleggen als het KPI Dashboard op een andere manier open gaat
+// (bijv. bij opstarten, via de tegel of via een submenu) — niet alleen via het hoofdmenu.
+(function(){
+  var v = null;
+  function kijk(){ v = v || document.getElementById('view-archief'); if (v && v.classList.contains('active') && document.visibilityState === 'visible' && typeof djKpiBekekenMelden === 'function') djKpiBekekenMelden(); }
+  document.addEventListener('DOMContentLoaded', function(){
+    v = document.getElementById('view-archief'); if (!v) return;
+    try { new MutationObserver(function(){ if (v.classList.contains('active')) setTimeout(kijk, 1500); }).observe(v, { attributes: true, attributeFilter: ['class'] }); } catch(e) {}
+    setTimeout(kijk, 4000); setInterval(kijk, 60000);
+  });
 })();
 </script>
 </body>
