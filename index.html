@@ -23703,7 +23703,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.83';
+var DJ_BUILD = '2026-10-07.84';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -32519,11 +32519,28 @@ window.tugHernoem = function(i){ var d = tugGet(), t = d.tugmasters[i];
   var lab = prompt('Omschrijving (optioneel, bijv. "Opleidings-TT"):', t.label || ''); if (lab === null) lab = t.label || '';
   t.nr = nr; t.label = lab.trim(); tugSet(d); tugRender(); };
 window.tugVoettekst = function(){ var d = tugGet(); var v = prompt('Tekst onderaan de indeling:', d.voettekst || ''); if (v === null) return; d.voettekst = v.trim(); tugSet(d); tugRender(); };
+// Koppeling met Materieel: status per truck (E26 ↔ Tugmaster No.26)
+function tugMatStatus(){
+  var st = {}; try { (JSON.parse(localStorage.getItem(tk('materieel_status_v1')) || '[]') || []).forEach(function(m){ if (m && m.type === 'Truck' && m.naam) st[String(m.naam).replace(/\D/g, '')] = m.status || 'OK'; }); } catch(e) {}
+  return st;
+}
+function tugIsNvt(t, st){ var nr = String(t.nr).replace(/\D/g, ''); return !!nr && st[nr] === 'N.V.T.'; }
+// Trucks uit Materieel (niet N.V.T.) die nog niet in de indeling staan, automatisch toevoegen
+function tugSyncMetMaterieel(d){
+  var st = tugMatStatus(), bekend = {}, nieuw = 0;
+  d.tugmasters.forEach(function(t){ bekend[String(t.nr).replace(/\D/g, '')] = 1; });
+  Object.keys(st).sort(function(a, b){ return a - b; }).forEach(function(nr){ if (!bekend[nr] && st[nr] !== 'N.V.T.') { d.tugmasters.push({ nr: nr, label: '', leden: [] }); nieuw++; } });
+  if (nieuw) tugSet(d);
+  return nieuw;
+}
 function tugBlokken(d, bewerken){
+  var _st = tugMatStatus();
   return d.tugmasters.map(function(t, i){
+    var nvt = tugIsNvt(t, _st);
+    if (nvt && !bewerken) return ''; // N.V.T. in Materieel: niet in de indeling (en niet op de print)
     var leden = (bewerken ? t.leden : t.leden.filter(vakIsGeldig));
-    return '<div class="tug-blok" style="break-inside:avoid;">' +
-      '<div style="font-size:15px;margin-bottom:8px;' + (bewerken ? 'cursor:pointer;text-decoration:underline dotted;' : '') + '"' + (bewerken ? ' onclick="tugHernoem(' + i + ')" title="Nummer/omschrijving wijzigen"' : '') + '>Tugmaster No.' + vakEsc(t.nr) + (t.label ? ' <span style="font-size:12px;color:#5a6b80;">(' + vakEsc(t.label) + ')</span>' : '') +
+    return '<div class="tug-blok" style="break-inside:avoid;' + (nvt ? 'opacity:.45;' : '') + '"' + (nvt ? ' title="Staat op N.V.T. in Materieel: wordt niet getoond en niet afgedrukt"' : '') + '>' +
+      '<div style="font-size:15px;margin-bottom:8px;' + (bewerken ? 'cursor:pointer;text-decoration:underline dotted;' : '') + '"' + (bewerken ? ' onclick="tugHernoem(' + i + ')" title="Nummer/omschrijving wijzigen"' : '') + '>Tugmaster No.' + vakEsc(t.nr) + (t.label ? ' <span style="font-size:12px;color:#5a6b80;">(' + vakEsc(t.label) + ')</span>' : '') + (nvt ? ' <span style="font-size:11px;color:#c0392b;">(N.V.T. in Materieel)</span>' : '') +
       (bewerken ? ' <span onclick="event.stopPropagation();tugWeg(' + i + ')" title="Tugmaster verwijderen" style="color:#c0392b;cursor:pointer;float:right;">&#x2715;</span>' : '') + '</div>' +
       leden.map(function(id, j){
         var geldig = vakIsGeldig(id);
@@ -32548,6 +32565,7 @@ window.tugAfdrukken = function(){
 function tugRender(){
   var box = document.getElementById('nieuw-tab-tugmaster'); if (!box) return;
   var d = tugGet(), mag = tugMag(); if (_tugBewerken && !mag) _tugBewerken = false;
+  if (d) tugSyncMetMaterieel(d);
   var knop = 'background:#fff;border:1px solid #c8d7e8;color:var(--navy);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px;font-weight:700;';
   var kop = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:var(--navy);flex:1;">&#x1F69B; ' + vakEsc(d ? d.titel : 'Indeling Tugmasters') + '</div>';
   if (!d) { box.innerHTML = kop + '</div><div style="color:#8795a8;font-size:13px;">Nog geen indeling. ' + (mag ? '<button type="button" onclick="tugImporteren()" style="' + knop + '">&#x1F4E5; Importeren</button>' : 'Een SV kan de indeling importeren.') + '</div>'; return; }
