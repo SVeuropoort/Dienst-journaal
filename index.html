@@ -23703,7 +23703,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.79';
+var DJ_BUILD = '2026-10-07.80';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -33268,7 +33268,7 @@ document.addEventListener('DOMContentLoaded', function(){
 function djIkBeheer(){ var e = localStorage.getItem('dj_sp_account_username'); return !!(e && typeof djToegangHeeft === 'function' && djToegangHeeft(e, 'beheer')); }
 async function djKpiBekekenMelden(){
   try {
-    if (window.DJ_MEELEES || djIkBeheer()) return; // beheerders zelf tellen niet mee
+    if (window.DJ_MEELEES) return; // iedereen telt mee (ook MT met beheerrechten); je eigen bezoeken worden bij het tonen weggelaten
     var ik = String(localStorage.getItem('dj_sp_account_username') || '').toLowerCase(); if (!ik) return;
     var k = 'kpi_bekeken_laatst_dj'; if (Date.now() - (+localStorage.getItem(k) || 0) < 30 * 60000) return;
     localStorage.setItem(k, String(Date.now()));
@@ -33287,6 +33287,8 @@ async function djKpiBalk(){
   el.style.cssText = 'margin:0 0 12px;padding:8px 14px;border-radius:8px;border-left:4px solid #6b3fa0;background:#f6f1fc;font-size:13px;color:#24313f;display:flex;gap:16px;flex-wrap:wrap;align-items:center;';
   el.innerHTML = '<b style="color:#6b3fa0;">&#x1F441;&#xFE0F; KPI bekeken</b> <span style="color:#7a6a93;">laden&hellip;</span>';
   try { var r = await spOphalenBestandRuw('kpi_bekeken.json'); _djKpiLog = (r && r.log) || []; } catch(e) { _djKpiLog = []; }
+  var _ik = String(localStorage.getItem('dj_sp_account_username') || '').toLowerCase();
+  _djKpiLog = _djKpiLog.filter(function(x){ return String(x.door || '').toLowerCase() !== _ik; }); // je eigen bezoeken niet meetellen
   var log = _djKpiLog, grens = Date.now() - 30 * 864e5, recent = log.filter(function(x){ return x.t >= grens; });
   var mensen = {}; recent.forEach(function(x){ mensen[x.door] = 1; });
   var l = log[log.length - 1], naam = function(e){ return typeof dpLogNaam === 'function' ? dpLogNaam(e) : e; }, wanneer = function(t){ return typeof dpTijd === 'function' ? dpTijd(t) : new Date(t).toLocaleString('nl-NL'); };
@@ -33295,7 +33297,7 @@ async function djKpiBalk(){
          '<span>Afgelopen 30 dagen: <b>' + recent.length + '\u00D7</b> door <b>' + Object.keys(mensen).length + '</b> ' + (Object.keys(mensen).length === 1 ? 'persoon' : 'personen') + '</span>' +
          '<a href="#" onclick="djKpiLogTonen();return false;" style="color:#6b3fa0;font-weight:700;margin-left:auto;">Wie heeft gekeken</a>'
        : '<span style="color:#7a6a93;font-style:italic;">Nog niets vastgelegd. Wordt bijgehouden vanaf nu (KPI Dashboard en MT-pagina).</span>') +
-    '<span style="font-size:11px;color:#7a6a93;width:100%;">Alleen zichtbaar voor beheerders.</span>';
+    '<span style="font-size:11px;color:#7a6a93;width:100%;">Alleen zichtbaar voor beheerders. Je eigen bezoeken tellen niet mee. Via = KPI Dashboard in Dienst Journaal of de MT-pagina.</span>';
 }
 window.djKpiLogTonen = function(){
   var log = (_djKpiLog || []).slice(), naam = function(e){ return typeof dpLogNaam === 'function' ? dpLogNaam(e) : e; }, wanneer = function(t){ return typeof dpTijd === 'function' ? dpTijd(t) : new Date(t).toLocaleString('nl-NL'); };
