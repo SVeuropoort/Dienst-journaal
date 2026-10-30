@@ -11294,7 +11294,17 @@ function isVerjaardag(naam) {
     // naam zoals die in de Dagplanning voorkomt (bijv. "R.A. Groenewegen" vs "Richard
     // Groenewegen", of "van der Berg" vs "vd Berg").
     if (key === naam) return true;
-    if (typeof certNaamMatch === 'function' && certNaamMatch(key, naam)) return true;
+    // Eerst de koppeling uit Certificeringen (🔗) gebruiken: die weet precies welke Rodgers welke is.
+    var rij = (typeof djPersoonRijNaam === 'function') ? djPersoonRijNaam(naam) : null;
+    if (rij) {
+      if (typeof djNaamGelijk === 'function' ? djNaamGelijk(key, rij) : key === rij) return true;
+      continue; // gekoppeld aan iemand anders: geen losse naam-gelijkenis meer
+    }
+    // Geen koppeling: alleen een losse naam-gelijkenis als die EENDUIDIG is (geen naamgenoten)
+    if (typeof certNaamMatch === 'function' && certNaamMatch(key, naam)) {
+      var andere = Object.keys(data).filter(function(k2){ return k2 !== key && certNaamMatch(k2, naam); });
+      if (!andere.length) return true;
+    }
   }
   return false;
 }
@@ -23693,7 +23703,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.78';
+var DJ_BUILD = '2026-10-07.79';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
