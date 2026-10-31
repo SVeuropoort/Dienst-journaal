@@ -23703,7 +23703,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.86';
+var DJ_BUILD = '2026-10-07.88';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -34476,6 +34476,58 @@ document.addEventListener('DOMContentLoaded', function(){
   var img = document.getElementById('tegel-kleding-logo'); if (!img) return;
   if ((sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM') { img.src = DJ_LOGO_CLOTHING; img.alt = 'Company Clothing'; }
 });
+</script>
+<script>
+// Dagplanning, gele LASHING-tabel: de tijden komen altijd uit de KPI-tijdnormen (Vertrek), per dag van de week
+//  regel 1 = Harwich Ochtend · regel 2 = Immingham · regel 3 = Harwich Middag
+//  zaterdag/zondag: de weekend-doeltijd (als die is ingevuld), anders de werkdag-tijd; vertrek uit die dag = "—"
+var DP_LASH_ROUTES = ['Harwich Ochtend', 'Immingham', 'Harwich Middag'];
+function dpLashTijden(){
+  if ((sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM') return;
+  var nm = {}; try { nm = JSON.parse(localStorage.getItem('kpi_normen_v1') || '{}') || {}; } catch(e) {}
+  var ds = (typeof planDate !== 'undefined' && planDate) || '', d = ds ? new Date(ds + 'T12:00:00') : new Date(); if (isNaN(d)) d = new Date();
+  var dag = d.getDay(), weekend = dag === 0 || dag === 6;
+  DP_LASH_ROUTES.forEach(function(route, i){
+    var wd = nm[route + '_7'] || {}, we = nm[route + '_7_we'] || {};
+    var tijd = (weekend && we.tijd) ? we.tijd : (wd.tijd || '');
+    var uit = (typeof puVakUit === 'function') ? puVakUit(nm, route, 7, dag) : false;
+    var tekst = uit ? '\u2014' : (tijd || '');
+    ['on', 'av'].forEach(function(pfx){
+      document.querySelectorAll('[data-cid="' + pfx + '_lash_t' + (i + 1) + '"]').forEach(function(el){
+        if (!tijd && !uit) return; // geen norm ingesteld: laat de cel zoals hij is
+        if (el.textContent !== tekst) el.textContent = tekst;
+        el.setAttribute('contenteditable', 'false');
+        el.style.cursor = 'default';
+        el.title = route + ' \u2014 vertrektijd uit de KPI-tijdnormen' + (weekend ? ' (weekend)' : '') + (uit ? ': op deze dag geen vertrek' : '') + '. Aanpassen via KPI Dashboard \u2192 Tijdnormen.';
+      });
+    });
+  });
+}
+window.dpLashTijden = dpLashTijden;
+(function(){
+  if (typeof buildPanels === 'function') { var _bp = buildPanels; buildPanels = function(){ var r = _bp.apply(this, arguments); try { dpLashTijden(); } catch(e) {} return r; }; }
+  if (typeof restoreTexts === 'function') { var _rt = restoreTexts; restoreTexts = function(){ var r = _rt.apply(this, arguments); try { dpLashTijden(); } catch(e) {} return r; }; window.restoreTexts = restoreTexts; }
+  document.addEventListener('DOMContentLoaded', function(){ setTimeout(dpLashTijden, 2500); setInterval(function(){ var v = document.getElementById('view-dagplanning'); if (v && v.classList.contains('active')) dpLashTijden(); }, 15000); });
+})();
+</script>
+<script>
+// Dagplanning: de dag van de week vóór de titels (bijv. "Maandag Ochtend", "Maandag Middag (na 12:00)")
+function dpDagTitels(){
+  var ds = (typeof planDate !== 'undefined' && planDate) || '', d = ds ? new Date(ds + 'T12:00:00') : new Date(); if (isNaN(d)) return;
+  var en = (sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM';
+  var dag = (en ? ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] : ['Zondag', 'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag'])[d.getDay()];
+  var titels = en ? { dp_title_ochtend: dag + ' Morning', dp_title_ochtend_onder: dag + ' Afternoon (after 12:00)', dp_title_avond: dag + ' Evening', dp_title_avond_onder: dag + ' Afternoon (before 17:00)' }
+                  : { dp_title_ochtend: dag + ' Ochtend', dp_title_ochtend_onder: dag + ' Middag (na 12:00)', dp_title_avond: dag + ' Avond', dp_title_avond_onder: dag + ' Middag (voor 17:00)' };
+  Object.keys(titels).forEach(function(cid){
+    document.querySelectorAll('[data-cid="' + cid + '"]').forEach(function(el){ if (el.textContent !== titels[cid]) el.textContent = titels[cid]; el.setAttribute('contenteditable', 'false'); });
+  });
+}
+window.dpDagTitels = dpDagTitels;
+(function(){
+  if (typeof buildPanels === 'function') { var _bp = buildPanels; buildPanels = function(){ var r = _bp.apply(this, arguments); try { dpDagTitels(); } catch(e) {} return r; }; }
+  if (typeof restoreTexts === 'function') { var _rt = restoreTexts; restoreTexts = function(){ var r = _rt.apply(this, arguments); try { dpDagTitels(); } catch(e) {} return r; }; window.restoreTexts = restoreTexts; }
+  document.addEventListener('DOMContentLoaded', function(){ setTimeout(dpDagTitels, 2500); setInterval(function(){ var v = document.getElementById('view-dagplanning'); if (v && v.classList.contains('active')) dpDagTitels(); }, 15000); });
+})();
 </script>
 </body>
 </html>
