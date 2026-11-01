@@ -16881,6 +16881,13 @@ function parsePayroll(wb) {
     }
     if (!naamVal &amp;&amp; !mannrVal &amp;&amp; !stypeRaw) { huidigMannr = null; continue; }
     if (huidigMannr == null) continue;
+    { const codeM = String(stypeRaw).match(/V\s*\d+/i);
+      if (codeM &amp;&amp; hoeveelheid != null) {
+        const pw0 = data[huidigMannr];
+        if (!pw0.__alle) Object.defineProperty(pw0, &#x27;__alle&#x27;, { value: [], enumerable: false, writable: true });
+        const aantal = parseFloat(String(hoeveelheid).replace(&#x27;,&#x27;, &#x27;.&#x27;));
+        if (!isNaN(aantal)) pw0.__alle.push({ code: codeM[0].replace(/\s+/g, &#x27;&#x27;).toUpperCase() + (/mutatie/i.test(stypeRaw) ? &#x27; mutatie&#x27; : &#x27;&#x27;), oms: String(row[8] || &#x27;&#x27;).trim(), aantal: aantal });
+      } }
     const stype = TYPE_MAP[stypeRaw];
     if (stype &amp;&amp; hoeveelheid != null) {
       const u = parseFloat(String(hoeveelheid).replace(&quot;,&quot;,&quot;.&quot;));
@@ -17634,7 +17641,9 @@ function maOnbekendLijst(){
   var uit = [];
   Object.keys(state.payroll).forEach(function(k){
     var nr = Number(k), pw = state.payroll[k] || {}; if (bekend.has(nr)) return;
-    var types = Object.keys(pw).filter(function(t){ return pw[t]; }); if (!types.length) return;
+    var types = Object.keys(pw).filter(function(t){ return pw[t]; });
+    (pw.__alle || []).forEach(function(r){ if (types.indexOf(r.code) &lt; 0 &amp;&amp; !/^V(175|176|177|301|430)/.test(r.code)) types.push(r.code); });
+    if (!types.length) return;
     var badge = pw.__badge || String(k), inhuur = /^0{3}/.test(badge) || String(pw.__naam || &#x27;&#x27;).indexOf(&#x27;*&#x27;) &gt;= 0;
     uit.push({ nr: nr, badge: badge, naam: String(pw.__naam || (&#x27;Nr &#x27; + k)).replace(/\*/g, &#x27;&#x27;).trim(), inhuur: inhuur, pw: pw, types: types });
   });
@@ -17643,7 +17652,9 @@ function maOnbekendLijst(){
 function maOnbekendHtml(){
   var l = maOnbekendLijst(); if (!l.length) return &#x27;&#x27;;
   var vast = l.filter(function(x){ return !x.inhuur; }), inh = l.filter(function(x){ return x.inhuur; });
-  var oms = function(x){ return x.types.map(function(t){ var v = x.pw[t]; return t.replace(&#x27;_MUTATIE&#x27;, &#x27; mutatie&#x27;) + &#x27;: &#x27; + (Math.round(v * 100) / 100).toString().replace(&#x27;.&#x27;, &#x27;,&#x27;); }).join(&#x27; · &#x27;); };
+  var oms = function(x){ return x.types.map(function(t){ var v = x.pw[t];
+    if (v === undefined) { var rs = (x.pw.__alle || []).filter(function(r){ return r.code === t; }); return rs.map(function(r){ return r.code + &#x27; &#x27; + r.oms + &#x27;: &#x27; + String(Math.round(r.aantal * 100) / 100).replace(&#x27;.&#x27;, &#x27;,&#x27;); }).join(&#x27; · &#x27;); }
+    return t.replace(&#x27;_MUTATIE&#x27;, &#x27; mutatie&#x27;) + &#x27;: &#x27; + (Math.round(v * 100) / 100).toString().replace(&#x27;.&#x27;, &#x27;,&#x27;); }).join(&#x27; · &#x27;); };
   var h = &#x27;&lt;div style=&quot;background:#fff4e5;border:1px solid #f0c27a;border-left:5px solid #e67e22;border-radius:8px;padding:12px 16px;margin:0 0 16px;font-size:13px;color:#4a3000;&quot;&gt;&#x27;;
   if (vast.length) {
     h += &#x27;&lt;div style=&quot;font-weight:800;margin-bottom:6px;&quot;&gt;\u26A0\uFE0F &#x27; + vast.length + &#x27; medewerker&#x27; + (vast.length === 1 ? &#x27;&#x27; : &#x27;s&#x27;) + &#x27; met uren in Quinyx staan niet in de medewerkerslijst en worden NIET meegenomen:&lt;/div&gt;&#x27;;
@@ -17693,6 +17704,7 @@ function maApartRijen(){
   var p = state.payroll || {};
   return maApartGet().map(function(x){
     var pw = p[x.mannr] || {}, z = { x: x, v175: pw.V175 || 0, v176: pw.V176 || 0, v177: pw.V177 || 0, v430: pw.V430 || 0, v430m: pw.V430_MUTATIE || 0, v301: pw.V301 || 0 };
+    z.overig = (pw.__alle || []).filter(function(r){ return !/^V(175|176|177|301|430)/.test(r.code); }); // bijv. V160 0-urencontract 100/125/150%, V193 gewerkte dagen
     // Bedragen met dezelfde codes en tarieven als de gewone maandafsluiting (zodra er een loongroep is gekozen)
     var sal = x.groep ? getSalaris(x.groep) : 0, mut = x.groep ? getMutatie(x.groep) : 0;
     z.totKm = (Number(x.km) || 0) * z.v301;
@@ -17714,10 +17726,11 @@ function maApartHtml(){
       &#x27;&lt;td&gt;&lt;input value=&quot;&#x27; + (z.x.km || &#x27;&#x27;) + &#x27;&quot; placeholder=&quot;0&quot; onchange=&quot;maApartZet(&#x27; + z.x.mannr + &#x27;,\&#x27;km\&#x27;,this.value)&quot; style=&quot;width:50px;padding:2px 6px;border:1px solid #d6c8ea;border-radius:4px;font-size:12px;&quot;&gt;&lt;/td&gt;&#x27; +
       &#x27;&lt;td style=&quot;text-align:right;&quot;&gt;&#x27; + u(z.v175) + &#x27;&lt;/td&gt;&lt;td style=&quot;text-align:right;&quot;&gt;&#x27; + u(z.v176) + &#x27;&lt;/td&gt;&lt;td style=&quot;text-align:right;&quot;&gt;&#x27; + u(z.v177) + &#x27;&lt;/td&gt;&lt;td style=&quot;text-align:right;&quot;&gt;&#x27; + u(z.v430) + &#x27;&lt;/td&gt;&lt;td style=&quot;text-align:right;&quot;&gt;&#x27; + u(z.v301) + &#x27;&lt;/td&gt;&#x27; +
       &#x27;&lt;td style=&quot;text-align:right;font-weight:800;color:#22543d;&quot;&gt;&#x27; + (z.x.groep ? new Intl.NumberFormat(&#x27;nl-NL&#x27;, { style: &#x27;currency&#x27;, currency: &#x27;EUR&#x27; }).format(z.totaal) : &#x27;&lt;span style=&quot;color:#e67e22;font-weight:600;&quot;&gt;kies loongroep&lt;/span&gt;&#x27;) + &#x27;&lt;/td&gt;&#x27; +
-      &#x27;&lt;td style=&quot;text-align:right;&quot;&gt;&lt;span onclick=&quot;maApartWeg(&#x27; + z.x.mannr + &#x27;)&quot; title=&quot;Niet meer apart melden&quot; style=&quot;cursor:pointer;color:#c0392b;&quot;&gt;&amp;#x2715;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&#x27;; }).join(&#x27;&#x27;) + &#x27;&lt;/table&gt;&lt;/div&gt;&#x27;;
+      &#x27;&lt;td style=&quot;text-align:right;&quot;&gt;&lt;span onclick=&quot;maApartWeg(&#x27; + z.x.mannr + &#x27;)&quot; title=&quot;Niet meer apart melden&quot; style=&quot;cursor:pointer;color:#c0392b;&quot;&gt;&amp;#x2715;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&#x27; +
+      (z.overig.length ? &#x27;&lt;tr&gt;&lt;td&gt;&lt;/td&gt;&lt;td colspan=&quot;11&quot; style=&quot;padding:2px 6px 6px;font-size:12px;color:#4b2a80;&quot;&gt;&#x27; + z.overig.map(function(r){ return &#x27;&lt;b&gt;&#x27; + r.code + &#x27;&lt;/b&gt; &#x27; + r.oms + &#x27;: &lt;b&gt;&#x27; + String(Math.round(r.aantal * 100) / 100).replace(&#x27;.&#x27;, &#x27;,&#x27;) + &#x27;&lt;/b&gt;&#x27;; }).join(&#x27; &amp;nbsp;&amp;middot;&amp;nbsp; &#x27;) + &#x27;&lt;/td&gt;&lt;/tr&gt;&#x27; : &#x27;&#x27;); }).join(&#x27;&#x27;) + &#x27;&lt;/table&gt;&lt;/div&gt;&#x27;;
 }
 function maApartSheetXml(cell, row){
-  var r = maApartRijen(), mentor = maMentorGet().filter(function(x){ return Number(x.bedrag) &gt; 0; });
+  var r = maApartRijen(), mentor = maMentorAlle().filter(function(x){ return Number(x.bedrag) &gt; 0; });
   if (!r.length &amp;&amp; !mentor.length) return &#x27;&#x27;;
   var mentorXml = maMentorSheetRows(cell, row, mentor);
   if (!r.length) return &#x27;&lt;Worksheet ss:Name=&quot;Apart melden&quot;&gt;&lt;Table&gt;&#x27; + mentorXml + &#x27;&lt;/Table&gt;&lt;/Worksheet&gt;&#x27;;
@@ -17733,13 +17746,34 @@ function maApartSheetXml(cell, row){
       cell(n(z.v176), &#x27;lblr_&#x27; + bg), cell(e(z.totV176), &#x27;r_&#x27; + bg), cell(n(z.v177), &#x27;lblr_&#x27; + bg), cell(e(z.totV177), &#x27;r_&#x27; + bg),
       cell(n(z.v430m), &#x27;lblr_&#x27; + bg), cell(e(z.totMut), &#x27;r_&#x27; + bg), cell(e(z.totaal), &#x27;rg_&#x27; + bg)); }).join(&#x27;&#x27;);
   var titel = row(cell(&#x27;Apart melden \u2014 niet in de totalen van het tabblad Maandafsluiting (bijv. 0-urencontract). Kleine getallen = uren/dagen uit Quinyx, bedragen volgens de loongroep.&#x27;, &#x27;totl&#x27;));
-  return &#x27;&lt;Worksheet ss:Name=&quot;Apart melden&quot;&gt;&lt;Table&gt;&#x27; + titel + kop + rijen + (mentorXml ? row(cell(&#x27;&#x27;)) + mentorXml : &#x27;&#x27;) + &#x27;&lt;/Table&gt;&lt;/Worksheet&gt;&#x27;;
+  var overigXml = &#x27;&#x27;;
+  var metOverig = r.filter(function(z){ return z.overig &amp;&amp; z.overig.length; });
+  if (metOverig.length) {
+    overigXml = row(cell(&#x27;&#x27;)) + row(cell(&#x27;Overige Quinyx-regels (bijv. 0-urencontract)&#x27;, &#x27;totl&#x27;)) +
+      row(cell(&#x27;Mannummer&#x27;, &#x27;hdrdark&#x27;), cell(&#x27;Naam&#x27;, &#x27;hdrdark&#x27;), cell(&#x27;Code&#x27;, &#x27;hdrdark&#x27;), cell(&#x27;Omschrijving&#x27;, &#x27;hdrdark&#x27;), cell(&#x27;Aantal&#x27;, &#x27;hdrblue&#x27;));
+    var ri = 0;
+    metOverig.forEach(function(z){ z.overig.forEach(function(o){ var bg = (ri++) % 2 === 0 ? &#x27;alt&#x27; : &#x27;white&#x27;;
+      overigXml += row(cell(z.x.badge, &#x27;l_&#x27; + bg), cell(z.x.naam, &#x27;lb_&#x27; + bg), cell(&#x27;\u2211 &#x27; + o.code, &#x27;l_&#x27; + bg), cell(o.oms, &#x27;l_&#x27; + bg), cell(Math.round(o.aantal * 100) / 100, &#x27;r_&#x27; + bg)); }); });
+  }
+  return &#x27;&lt;Worksheet ss:Name=&quot;Apart melden&quot;&gt;&lt;Table&gt;&#x27; + titel + kop + rijen + overigXml + (mentorXml ? row(cell(&#x27;&#x27;)) + mentorXml : &#x27;&#x27;) + &#x27;&lt;/Table&gt;&lt;/Worksheet&gt;&#x27;;
 }
 &lt;/script&gt;
 
 &lt;script&gt;
 // ── Mentortoeslag: vast bedrag in euro&#x27;s per mentor, apart gemeld (zelfde tabblad &quot;Apart melden&quot;) ──
 function maMentorGet(){ try { var l = JSON.parse(localStorage.getItem(&#x27;ma_mentor_v1&#x27;) || &#x27;[]&#x27;); return Array.isArray(l) ? l : []; } catch(e) { return []; } }
+// Mentortoeslag uit Quinyx: code V028 (bedrag in euro&#x27;s)
+function maMentorUitQuinyx(){
+  var p = (state &amp;&amp; state.payroll) || {}, alle = [].concat(MEDEWERKERS, MEDEWERKERS_HVH), uit = [];
+  Object.keys(p).forEach(function(k){ var pw = p[k] || {}, b = (pw.__alle || []).filter(function(r){ return r.code === &#x27;V028&#x27;; }).reduce(function(a, r){ return a + r.aantal; }, 0);
+    if (!b) return; var mw = alle.find(function(m){ return Number(m.mannr) === Number(k); });
+    uit.push({ mannr: Number(k), badge: pw.__badge || String(k), naam: mw ? mw.naam : String(pw.__naam || k), groep: mw ? (mw.groep || &#x27;&#x27;) : &#x27;&#x27;, bedrag: Math.round(b * 100) / 100, opm: &#x27;uit Quinyx (V028)&#x27;, quinyx: true }); });
+  return uit;
+}
+function maMentorAlle(){
+  var q = maMentorUitQuinyx(), h = maMentorGet().filter(function(x){ return !q.some(function(y){ return Number(y.mannr) === Number(x.mannr); }); });
+  return q.concat(h);
+}
 function maMentorSet(l){ try { localStorage.setItem(&#x27;ma_mentor_v1&#x27;, JSON.stringify(l)); } catch(e) {} try { window.parent.postMessage({type:&#x27;ma-medewerkers-sync&#x27;, opgeslagen:true, ep: MEDEWERKERS.map(function(m){ return m.naam; }), hvh: MEDEWERKERS_HVH.map(function(m){ return m.naam; })}, &#x27;*&#x27;); } catch(e) {} }
 function maMentorErbij(v){
   if (!v) return; var p = [].concat(MEDEWERKERS, MEDEWERKERS_HVH).find(function(m){ return String(m.mannr) === String(v); }); if (!p) return;
@@ -17751,17 +17785,18 @@ function maMentorZet(nr, veld, v){ var l = maMentorGet(); l.forEach(function(x){
 function maMentorWeg(nr){ maMentorSet(maMentorGet().filter(function(x){ return String(x.mannr) !== String(nr); })); render(); }
 function maMentorHtml(){
   if (!state || (state.step !== &#x27;preview&#x27; &amp;&amp; state.step !== &#x27;result&#x27;)) return &#x27;&#x27;;
-  var l = maMentorGet(), eur = function(v){ return new Intl.NumberFormat(&#x27;nl-NL&#x27;, { style: &#x27;currency&#x27;, currency: &#x27;EUR&#x27; }).format(Number(v) || 0); };
+  var l = maMentorAlle(), eur = function(v){ return new Intl.NumberFormat(&#x27;nl-NL&#x27;, { style: &#x27;currency&#x27;, currency: &#x27;EUR&#x27; }).format(Number(v) || 0); };
   var tot = l.reduce(function(a, x){ return a + (Number(x.bedrag) || 0); }, 0);
   var opties = [].concat(MEDEWERKERS, MEDEWERKERS_HVH).filter(function(m){ return !l.some(function(x){ return String(x.mannr) === String(m.mannr); }); })
     .sort(function(a, b){ return String(a.naam).localeCompare(String(b.naam), &#x27;nl&#x27;); }).map(function(m){ return &#x27;&lt;option value=&quot;&#x27; + m.mannr + &#x27;&quot;&gt;&#x27; + m.naam + &#x27; (&#x27; + m.mannr + &#x27;)&lt;/option&gt;&#x27;; }).join(&#x27;&#x27;);
   return &#x27;&lt;div style=&quot;background:#f7f3fb;border:1px solid #e0d4ee;border-left:5px solid #6b3fa0;border-radius:8px;padding:12px 16px;margin:0 0 16px;font-size:13px;&quot;&gt;&#x27; +
     &#x27;&lt;div style=&quot;font-weight:800;color:#4b2a80;margin-bottom:6px;&quot;&gt;&amp;#x1F9D1;&amp;#x200D;&amp;#x1F3EB; Mentortoeslag &amp;mdash; komt op het tabblad &quot;Apart melden&quot; in de Excel&lt;/div&gt;&#x27; +
     (l.length ? &#x27;&lt;table style=&quot;border-collapse:collapse;width:100%;font-size:12.5px;&quot;&gt;&lt;tr style=&quot;color:#5a6b80;text-align:left;&quot;&gt;&lt;th style=&quot;padding:3px 6px;&quot;&gt;Mentor&lt;/th&gt;&lt;th&gt;Nr&lt;/th&gt;&lt;th&gt;Loongroep&lt;/th&gt;&lt;th&gt;Bedrag (&amp;euro;)&lt;/th&gt;&lt;th&gt;Opmerking (bijv. mentor van&amp;hellip;)&lt;/th&gt;&lt;th&gt;&lt;/th&gt;&lt;/tr&gt;&#x27; +
-      l.map(function(x){ return &#x27;&lt;tr style=&quot;border-top:1px solid #e9e0f3;&quot;&gt;&lt;td style=&quot;padding:4px 6px;font-weight:700;&quot;&gt;&#x27; + x.naam + &#x27;&lt;/td&gt;&lt;td&gt;&#x27; + x.mannr + &#x27;&lt;/td&gt;&lt;td&gt;&#x27; + (x.groep || &#x27;&#x27;) + &#x27;&lt;/td&gt;&#x27; +
+      l.map(function(x){ return &#x27;&lt;tr style=&quot;border-top:1px solid #e9e0f3;&quot;&gt;&lt;td style=&quot;padding:4px 6px;font-weight:700;&quot;&gt;&#x27; + x.naam + &#x27;&lt;/td&gt;&lt;td&gt;&#x27; + (x.badge || x.mannr) + &#x27;&lt;/td&gt;&lt;td&gt;&#x27; + (x.groep || &#x27;&#x27;) + &#x27;&lt;/td&gt;&#x27; +
+        (x.quinyx ? &#x27;&lt;td style=&quot;font-weight:700;&quot;&gt;&#x27; + eur(x.bedrag) + &#x27;&lt;/td&gt;&lt;td style=&quot;color:#7a6a93;&quot;&gt;uit Quinyx (V028)&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;/tr&gt;&#x27; :
         &#x27;&lt;td&gt;&lt;input value=&quot;&#x27; + (x.bedrag === &#x27;&#x27; || x.bedrag == null ? &#x27;&#x27; : String(x.bedrag).replace(&#x27;.&#x27;, &#x27;,&#x27;)) + &#x27;&quot; placeholder=&quot;0,00&quot; onchange=&quot;maMentorZet(\&#x27;&#x27; + x.mannr + &#x27;\&#x27;,\&#x27;bedrag\&#x27;,this.value)&quot; style=&quot;width:80px;padding:2px 6px;border:1px solid &#x27; + (Number(x.bedrag) &gt; 0 ? &#x27;#d6c8ea&#x27; : &#x27;#e67e22&#x27;) + &#x27;;border-radius:4px;font-size:12px;text-align:right;&quot;&gt;&lt;/td&gt;&#x27; +
         &#x27;&lt;td&gt;&lt;input value=&quot;&#x27; + String(x.opm || &#x27;&#x27;).replace(/&quot;/g, &#x27;&amp;quot;&#x27;) + &#x27;&quot; onchange=&quot;maMentorZet(\&#x27;&#x27; + x.mannr + &#x27;\&#x27;,\&#x27;opm\&#x27;,this.value)&quot; style=&quot;width:100%;max-width:260px;padding:2px 6px;border:1px solid #d6c8ea;border-radius:4px;font-size:12px;&quot;&gt;&lt;/td&gt;&#x27; +
-        &#x27;&lt;td style=&quot;text-align:right;&quot;&gt;&lt;span onclick=&quot;maMentorWeg(\&#x27;&#x27; + x.mannr + &#x27;\&#x27;)&quot; title=&quot;Geen mentortoeslag meer&quot; style=&quot;cursor:pointer;color:#c0392b;&quot;&gt;&amp;#x2715;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&#x27;; }).join(&#x27;&#x27;) +
+        &#x27;&lt;td style=&quot;text-align:right;&quot;&gt;&lt;span onclick=&quot;maMentorWeg(\&#x27;&#x27; + x.mannr + &#x27;\&#x27;)&quot; title=&quot;Geen mentortoeslag meer&quot; style=&quot;cursor:pointer;color:#c0392b;&quot;&gt;&amp;#x2715;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&#x27;); }).join(&#x27;&#x27;) +
       &#x27;&lt;tr style=&quot;border-top:2px solid #d6c8ea;font-weight:800;&quot;&gt;&lt;td style=&quot;padding:4px 6px;&quot; colspan=&quot;3&quot;&gt;Totaal mentortoeslag&lt;/td&gt;&lt;td&gt;&#x27; + eur(tot) + &#x27;&lt;/td&gt;&lt;td colspan=&quot;2&quot;&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&#x27;
       : &#x27;&lt;div style=&quot;color:#8795a8;font-size:12.5px;margin-bottom:6px;&quot;&gt;Nog geen mentoren deze maand.&lt;/div&gt;&#x27;) +
     &#x27;&lt;div style=&quot;margin-top:8px;&quot;&gt;&lt;select onchange=&quot;maMentorErbij(this.value)&quot; style=&quot;padding:4px 8px;border:1px dashed #6b3fa0;border-radius:5px;font-size:12.5px;color:#4b2a80;&quot;&gt;&lt;option value=&quot;&quot;&gt;+ mentor toevoegen&amp;hellip;&lt;/option&gt;&#x27; + opties + &#x27;&lt;/select&gt;&#x27; +
@@ -17771,7 +17806,7 @@ function maMentorSheetRows(cell, row, l){
   if (!l || !l.length) return &#x27;&#x27;;
   var e = function(v){ return new Intl.NumberFormat(&#x27;nl-NL&#x27;, { style: &#x27;currency&#x27;, currency: &#x27;EUR&#x27;, minimumFractionDigits: 2 }).format(Number(v) || 0); };
   var tot = l.reduce(function(a, x){ return a + (Number(x.bedrag) || 0); }, 0);
-  return row(cell(&#x27;Mentortoeslag \u2014 vast bedrag per mentor (niet in de totalen van het tabblad Maandafsluiting)&#x27;, &#x27;totl&#x27;)) +
+  return row(cell(&#x27;Mentortoeslag \u2014 bedrag in euro&#x27;s (uit Quinyx: V028), niet in de totalen van het tabblad Maandafsluiting&#x27;, &#x27;totl&#x27;)) +
     row(cell(&#x27;Mannummer&#x27;, &#x27;hdrdark&#x27;), cell(&#x27;Naam&#x27;, &#x27;hdrdark&#x27;), cell(&#x27;Loongroep&#x27;, &#x27;hdrdark&#x27;), cell(&#x27;Mentortoeslag&#x27;, &#x27;hdrblue&#x27;), cell(&#x27;Opmerking&#x27;, &#x27;hdrdark&#x27;)) +
     l.map(function(x, i){ var bg = i % 2 === 0 ? &#x27;alt&#x27; : &#x27;white&#x27;; return row(cell(x.mannr, &#x27;l_&#x27; + bg), cell(x.naam, &#x27;lb_&#x27; + bg), cell(x.groep || &#x27;&#x27;, &#x27;l_&#x27; + bg), cell(e(x.bedrag), &#x27;rg_&#x27; + bg), cell(x.opm || &#x27;&#x27;, &#x27;l_&#x27; + bg)); }).join(&#x27;&#x27;) +
     row(cell(&#x27;TOTAAL&#x27;, &#x27;totl&#x27;), cell(&#x27;&#x27;, &#x27;totl&#x27;), cell(&#x27;&#x27;, &#x27;totl&#x27;), cell(e(tot), &#x27;totr&#x27;), cell(&#x27;&#x27;, &#x27;totl&#x27;));
@@ -23859,7 +23894,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.96';
+var DJ_BUILD = '2026-10-07.97';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
