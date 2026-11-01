@@ -2308,9 +2308,10 @@ function kpiOrden(ouder, buiten){
     d.textContent = tekst; return d; };
   var en = MT_ENGELS;
   var plan = [
-    [en ? 'Punctuality' : 'Punctualiteit', [['Punctuality per measuring point', 'kpi-chart-card'], ['Days outside the norms', 'kpi-normen-card'], ['Average Sailing Schedule Times']]],
-    [en ? 'Volume' : 'Volume', [['Total Loaded'], ['Daily overview'], ['Average Trucks per Shift'], ['Quay capacity']]],
-    [en ? 'Staff' : 'Personeel', [['Staffing per day'], ['Staff distribution', 'bez-chart-titel'], ['Absence', 'vz-card'], ['Overtime, agency', 'ow-card']]],
+    [en ? 'Punctuality' : 'Punctualiteit', [['Punctuality per measuring point', 'kpi-chart-card'], ['Daily overview'], ['Days outside the norms', 'kpi-normen-card'], ['Average Sailing Schedule Times']]],
+    [en ? 'Volume' : 'Volume', [['Total Loaded']]],
+    [en ? 'Staff' : 'Personeel', [['Staffing per day'], ['Staff distribution', 'bez-chart-titel'], ['Absence', 'vz-card'], ['Overtime, agency', 'ow-card'], ['Occupancy rate own staff']]],
+    [en ? 'Quay & equipment' : 'Kade & materieel', [['Quay capacity'], ['Average Trucks per Shift']]],
     [en ? 'Archive' : 'Archief', [['Saved monthly overviews']]]
   ];
   plan.forEach(function(blok){
@@ -2371,7 +2372,7 @@ function kpiOrden(ouder, buiten){
 //    (die instelling is gedeeld met Dienst Journaal zelf: zelfde vinkje, zelfde pc);
 //  - automatisch bijwerken naar de nieuwste versie, alleen als niemand bezig is.
 // ══════════════════════════════════════════════════════════════════
-var APP_BUILD = '2026-10-09.8';
+var APP_BUILD = '2026-10-09.9';
 var APP_AUTH_KEY = 'kpi_mt_auth';
 var APP_EN = true;
 function appGedeeldePc(){ return localStorage.getItem('dj_niet_uitloggen') !== '1'; }
@@ -2469,6 +2470,7 @@ var KPI_VOLGORDE = [/^scorekaart|^scorecard/i, /punctualit/i, /^dagenoverzicht|^
   /vaarschema|sailing schedule/i, /geladen|loaded/i, /^personeelsbezetting|^staffing per day/i, /personeelsverdeling|staff distribution/i,
   /^verzuim|^absence/i, /^overwerk|^overtime/i, /bezettingsgraad|occupancy/i, /kade capaciteit|quay capacity/i, /trucks/i, /opgeslagen|saved monthly/i];
 function kpiVolgordeToepassen(root){
+  return; // volgorde + tussenkopjes worden door kpiOrden() gedaan
   if (!root) return;
   var rangVan = function(t){ for (var i = 0; i < KPI_VOLGORDE.length; i++) if (KPI_VOLGORDE[i].test(t)) return i; return 99; };
   // De gemeenschappelijke bak: de ouder van de Scorekaart

@@ -16573,13 +16573,13 @@ function oplPrint(formId, staatOverride){
     </div>
     <iframe id="ma-iframe"
       style="width:100%;height:calc(100vh - 56px);border:none;display:none;"
-      srcdoc="<!DOCTYPE html>
-<html lang=&quot;nl&quot;>
-<head>
-<meta charset=&quot;UTF-8&quot;>
-<title>Maandafsluiting Dashboard – Europoort</title>
-<script src=&quot;https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js&quot;></script>
-<style>
+      srcdoc="&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;nl&quot;&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;UTF-8&quot;&gt;
+&lt;title&gt;Maandafsluiting Dashboard – Europoort&lt;/title&gt;
+&lt;script src=&quot;https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js&quot;&gt;&lt;/script&gt;
+&lt;style&gt;
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: Arial, sans-serif; background: #f0f4f8; color: #1a202c; font-size: 13px; }
 .header { background: linear-gradient(135deg, #1a365d, #2b6cb0); padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; }
@@ -16623,7 +16623,7 @@ tr:hover td { background:#f7fafc !important; }
 .sum-val { color:#2b6cb0; font-weight:bold; font-size:17px; }
 .sum-lbl { color:#718096; font-size:11px; }
 .period-row { display:flex; gap:12px; margin-bottom:22px; }
-.period-row > div { flex:1; }
+.period-row &gt; div { flex:1; }
 label { display:block; font-size:11px; color:#718096; margin-bottom:3px; }
 
 /* ── Settings overlay ───────────────────────────────── */
@@ -16652,117 +16652,117 @@ label { display:block; font-size:11px; color:#718096; margin-bottom:3px; }
 .btn-apply { background:#48bb78; color:#fff; border:none; border-radius:7px; padding:9px 22px; cursor:pointer; font-size:13px; font-weight:bold; margin-left:8px; }
 .saved-flash { color:#276749; font-size:12px; margin-left:12px; opacity:0; transition:opacity 0.3s; }
 .saved-flash.show { opacity:1; }
-</style>
-</head>
-<body>
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
 
-<div class=&quot;header&quot;>
-  <div class=&quot;header-left&quot;>
-    <div class=&quot;header-icon&quot;>📊</div>
-    <div>
-      <div class=&quot;header-title&quot;>Maandafsluiting Dashboard</div>
-      <div class=&quot;header-sub&quot;>Stevedoring Salarisbeheer</div>
-    </div>
-  </div>
-  <div id=&quot;header-btns&quot;></div>
-</div>
+&lt;div class=&quot;header&quot;&gt;
+  &lt;div class=&quot;header-left&quot;&gt;
+    &lt;div class=&quot;header-icon&quot;&gt;📊&lt;/div&gt;
+    &lt;div&gt;
+      &lt;div class=&quot;header-title&quot;&gt;Maandafsluiting Dashboard&lt;/div&gt;
+      &lt;div class=&quot;header-sub&quot;&gt;Stevedoring Salarisbeheer&lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+  &lt;div id=&quot;header-btns&quot;&gt;&lt;/div&gt;
+&lt;/div&gt;
 
-<!-- Settings overlay -->
-<div id=&quot;pw-modal&quot; style=&quot;display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:2000;align-items:center;justify-content:center;&quot;>
-  <div style=&quot;background:#fff;border-radius:12px;padding:32px 28px;min-width:300px;box-shadow:0 8px 32px rgba(0,0,0,0.2);text-align:center;&quot;>
-    <div style=&quot;font-size:32px;margin-bottom:12px;&quot;>🔒</div>
-    <div style=&quot;font-size:15px;font-weight:700;color:#1a365d;margin-bottom:6px;&quot;>Instellingen openen</div>
-    <div style=&quot;font-size:12px;color:#718096;margin-bottom:16px;&quot;>Voer het wachtwoord in</div>
-    <input id=&quot;pw-modal-input&quot; type=&quot;password&quot; placeholder=&quot;Wachtwoord...&quot;
-      onkeydown=&quot;if(event.key==='Enter')submitPwModal()&quot;
-      style=&quot;width:100%;padding:10px 14px;border:2px solid #e2e8f0;border-radius:8px;font-size:14px;outline:none;margin-bottom:8px;&quot;>
-    <div id=&quot;pw-modal-err&quot; style=&quot;color:#c0392b;font-size:12px;min-height:16px;margin-bottom:12px;&quot;></div>
-    <div style=&quot;display:flex;gap:10px;justify-content:center;&quot;>
-      <button onclick=&quot;closePwModal()&quot; style=&quot;padding:9px 20px;border:1px solid #e2e8f0;border-radius:7px;background:#f7fafc;cursor:pointer;font-size:13px;&quot;>Annuleren</button>
-      <button onclick=&quot;submitPwModal()&quot; style=&quot;padding:9px 20px;border:none;border-radius:7px;background:#1a365d;color:#fff;cursor:pointer;font-size:13px;font-weight:700;&quot;>Openen ➡</button>
-    </div>
-  </div>
-</div>
-<div class=&quot;overlay&quot; id=&quot;overlay&quot; onclick=&quot;if(event.target===this)closeSettings()&quot;>
-  <div class=&quot;panel&quot;>
-    <div class=&quot;panel-header&quot;>
-      <span class=&quot;panel-title&quot;>⚙️ Instellingen</span>
-      <button class=&quot;btn-close&quot; onclick=&quot;closeSettings()&quot;>✕ Sluiten</button>
-    </div>
-    <div class=&quot;panel-body&quot;>
-      <div class=&quot;tabs&quot;>
-        <div class=&quot;tab active&quot; onclick=&quot;switchTab('loongroepen')&quot;>Loongroepen &amp;amp; Salarissen</div>
-        <div class=&quot;tab&quot; onclick=&quot;switchTab('medewerkers')&quot;>Medewerkers Europoort</div>
-        <div class=&quot;tab&quot; onclick=&quot;switchTab('hvh')&quot;>Medewerkers Hoek van Holland</div>
-      </div>
+&lt;!-- Settings overlay --&gt;
+&lt;div id=&quot;pw-modal&quot; style=&quot;display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:2000;align-items:center;justify-content:center;&quot;&gt;
+  &lt;div style=&quot;background:#fff;border-radius:12px;padding:32px 28px;min-width:300px;box-shadow:0 8px 32px rgba(0,0,0,0.2);text-align:center;&quot;&gt;
+    &lt;div style=&quot;font-size:32px;margin-bottom:12px;&quot;&gt;🔒&lt;/div&gt;
+    &lt;div style=&quot;font-size:15px;font-weight:700;color:#1a365d;margin-bottom:6px;&quot;&gt;Instellingen openen&lt;/div&gt;
+    &lt;div style=&quot;font-size:12px;color:#718096;margin-bottom:16px;&quot;&gt;Voer het wachtwoord in&lt;/div&gt;
+    &lt;input id=&quot;pw-modal-input&quot; type=&quot;password&quot; placeholder=&quot;Wachtwoord...&quot;
+      onkeydown=&quot;if(event.key===&#x27;Enter&#x27;)submitPwModal()&quot;
+      style=&quot;width:100%;padding:10px 14px;border:2px solid #e2e8f0;border-radius:8px;font-size:14px;outline:none;margin-bottom:8px;&quot;&gt;
+    &lt;div id=&quot;pw-modal-err&quot; style=&quot;color:#c0392b;font-size:12px;min-height:16px;margin-bottom:12px;&quot;&gt;&lt;/div&gt;
+    &lt;div style=&quot;display:flex;gap:10px;justify-content:center;&quot;&gt;
+      &lt;button onclick=&quot;closePwModal()&quot; style=&quot;padding:9px 20px;border:1px solid #e2e8f0;border-radius:7px;background:#f7fafc;cursor:pointer;font-size:13px;&quot;&gt;Annuleren&lt;/button&gt;
+      &lt;button onclick=&quot;submitPwModal()&quot; style=&quot;padding:9px 20px;border:none;border-radius:7px;background:#1a365d;color:#fff;cursor:pointer;font-size:13px;font-weight:700;&quot;&gt;Openen ➡&lt;/button&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;div class=&quot;overlay&quot; id=&quot;overlay&quot; onclick=&quot;if(event.target===this)closeSettings()&quot;&gt;
+  &lt;div class=&quot;panel&quot;&gt;
+    &lt;div class=&quot;panel-header&quot;&gt;
+      &lt;span class=&quot;panel-title&quot;&gt;⚙️ Instellingen&lt;/span&gt;
+      &lt;button class=&quot;btn-close&quot; onclick=&quot;closeSettings()&quot;&gt;✕ Sluiten&lt;/button&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;panel-body&quot;&gt;
+      &lt;div class=&quot;tabs&quot;&gt;
+        &lt;div class=&quot;tab active&quot; onclick=&quot;switchTab(&#x27;loongroepen&#x27;)&quot;&gt;Loongroepen &amp;amp; Salarissen&lt;/div&gt;
+        &lt;div class=&quot;tab&quot; onclick=&quot;switchTab(&#x27;medewerkers&#x27;)&quot;&gt;Medewerkers Europoort&lt;/div&gt;
+        &lt;div class=&quot;tab&quot; onclick=&quot;switchTab(&#x27;hvh&#x27;)&quot;&gt;Medewerkers Hoek van Holland&lt;/div&gt;
+      &lt;/div&gt;
 
-      <!-- Tab: Loongroepen -->
-      <div class=&quot;tab-pane active&quot; id=&quot;tab-loongroepen&quot;>
-        <div class=&quot;note&quot;>💡 Pas alleen het <strong>salaris</strong> aan bij een CAO-verhoging. Het referentiesalaris en de mutatiewaarde worden <strong>automatisch herberekend</strong>:<br>Ref = C1-salaris (× % voor deelgroepen) &amp;nbsp;|&amp;nbsp; Mutatie = (Ref − Salaris) ÷ 21,75</div>
-        <table class=&quot;s-tbl&quot;>
-          <thead><tr>
-            <th style=&quot;width:55px&quot;>Groep</th>
-            <th>Salaris (€) ✏️</th>
-            <th>Toesl.%</th>
-            <th>Toeslag (€)</th>
-            <th>Ref.salaris ⟵ auto</th>
-            <th>Mutatie €/dag ⟵ auto</th>
-          </tr></thead>
-          <tbody id=&quot;lg-tbody&quot;></tbody>
-        </table>
-      </div>
+      &lt;!-- Tab: Loongroepen --&gt;
+      &lt;div class=&quot;tab-pane active&quot; id=&quot;tab-loongroepen&quot;&gt;
+        &lt;div class=&quot;note&quot;&gt;💡 Pas alleen het &lt;strong&gt;salaris&lt;/strong&gt; aan bij een CAO-verhoging. Het referentiesalaris en de mutatiewaarde worden &lt;strong&gt;automatisch herberekend&lt;/strong&gt;:&lt;br&gt;Ref = C1-salaris (× % voor deelgroepen) &amp;nbsp;|&amp;nbsp; Mutatie = (Ref − Salaris) ÷ 21,75&lt;/div&gt;
+        &lt;table class=&quot;s-tbl&quot;&gt;
+          &lt;thead&gt;&lt;tr&gt;
+            &lt;th style=&quot;width:55px&quot;&gt;Groep&lt;/th&gt;
+            &lt;th&gt;Salaris (€) ✏️&lt;/th&gt;
+            &lt;th&gt;Toesl.%&lt;/th&gt;
+            &lt;th&gt;Toeslag (€)&lt;/th&gt;
+            &lt;th&gt;Ref.salaris ⟵ auto&lt;/th&gt;
+            &lt;th&gt;Mutatie €/dag ⟵ auto&lt;/th&gt;
+          &lt;/tr&gt;&lt;/thead&gt;
+          &lt;tbody id=&quot;lg-tbody&quot;&gt;&lt;/tbody&gt;
+        &lt;/table&gt;
+      &lt;/div&gt;
 
-      <!-- Tab: Medewerkers -->
-      <div class=&quot;tab-pane&quot; id=&quot;tab-medewerkers&quot;>
-        <div class=&quot;note&quot;>💡 Pas de <strong>loongroep</strong> en <strong>kilometers</strong> aan, of voeg een nieuwe medewerker toe. Het salaris wordt automatisch overgenomen uit de loongroeptabel.</div>
-        <div style=&quot;display:flex;gap:8px;margin-bottom:12px&quot;>
-          <input type=&quot;text&quot; id=&quot;mw-zoek&quot; placeholder=&quot;Zoek medewerker...&quot; oninput=&quot;renderMwTable()&quot; style=&quot;flex:1&quot;>
-          <button onclick=&quot;addMedewerker()&quot; style=&quot;background:#2b6cb0;color:#fff;border:none;border-radius:7px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:bold;white-space:nowrap&quot;>＋ Toevoegen</button>
-        </div>
-        <table class=&quot;s-tbl&quot;>
-          <thead><tr>
-            <th>Mannr</th>
-            <th>Naam</th>
-            <th style=&quot;width:90px&quot;>Loongroep</th>
-            <th>Salaris (€)</th>
-            <th style=&quot;width:80px&quot;>KM</th>
-            <th style=&quot;width:36px&quot;></th>
-          </tr></thead>
-          <tbody id=&quot;mw-tbody&quot;></tbody>
-        </table>
-      </div>
+      &lt;!-- Tab: Medewerkers --&gt;
+      &lt;div class=&quot;tab-pane&quot; id=&quot;tab-medewerkers&quot;&gt;
+        &lt;div class=&quot;note&quot;&gt;💡 Pas de &lt;strong&gt;loongroep&lt;/strong&gt; en &lt;strong&gt;kilometers&lt;/strong&gt; aan, of voeg een nieuwe medewerker toe. Het salaris wordt automatisch overgenomen uit de loongroeptabel.&lt;/div&gt;
+        &lt;div style=&quot;display:flex;gap:8px;margin-bottom:12px&quot;&gt;
+          &lt;input type=&quot;text&quot; id=&quot;mw-zoek&quot; placeholder=&quot;Zoek medewerker...&quot; oninput=&quot;renderMwTable()&quot; style=&quot;flex:1&quot;&gt;
+          &lt;button onclick=&quot;addMedewerker()&quot; style=&quot;background:#2b6cb0;color:#fff;border:none;border-radius:7px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:bold;white-space:nowrap&quot;&gt;＋ Toevoegen&lt;/button&gt;
+        &lt;/div&gt;
+        &lt;table class=&quot;s-tbl&quot;&gt;
+          &lt;thead&gt;&lt;tr&gt;
+            &lt;th&gt;Mannr&lt;/th&gt;
+            &lt;th&gt;Naam&lt;/th&gt;
+            &lt;th style=&quot;width:90px&quot;&gt;Loongroep&lt;/th&gt;
+            &lt;th&gt;Salaris (€)&lt;/th&gt;
+            &lt;th style=&quot;width:80px&quot;&gt;KM&lt;/th&gt;
+            &lt;th style=&quot;width:36px&quot;&gt;&lt;/th&gt;
+          &lt;/tr&gt;&lt;/thead&gt;
+          &lt;tbody id=&quot;mw-tbody&quot;&gt;&lt;/tbody&gt;
+        &lt;/table&gt;
+      &lt;/div&gt;
 
-      <!-- Tab: Medewerkers Hoek van Holland -->
-      <div class=&quot;tab-pane&quot; id=&quot;tab-hvh&quot;>
-        <div class=&quot;note&quot;>💡 Pas de <strong>loongroep</strong> en <strong>kilometers</strong> aan, of voeg een nieuwe medewerker toe. Het salaris wordt automatisch overgenomen uit de loongroeptabel.</div>
-        <div style=&quot;display:flex;gap:8px;margin-bottom:12px&quot;>
-          <input type=&quot;text&quot; id=&quot;hvh-zoek&quot; placeholder=&quot;Zoek medewerker...&quot; oninput=&quot;renderHvhTable()&quot; style=&quot;flex:1&quot;>
-          <button onclick=&quot;addHvhMedewerker()&quot; style=&quot;background:#2b6cb0;color:#fff;border:none;border-radius:7px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:bold;white-space:nowrap&quot;>＋ Toevoegen</button>
-        </div>
-        <table class=&quot;s-tbl&quot;>
-          <thead><tr>
-            <th>Mannr</th>
-            <th>Naam</th>
-            <th style=&quot;width:90px&quot;>Loongroep</th>
-            <th>Salaris (€)</th>
-            <th style=&quot;width:80px&quot;>KM</th>
-            <th style=&quot;width:36px&quot;></th>
-          </tr></thead>
-          <tbody id=&quot;hvh-tbody&quot;></tbody>
-        </table>
-      </div>
+      &lt;!-- Tab: Medewerkers Hoek van Holland --&gt;
+      &lt;div class=&quot;tab-pane&quot; id=&quot;tab-hvh&quot;&gt;
+        &lt;div class=&quot;note&quot;&gt;💡 Pas de &lt;strong&gt;loongroep&lt;/strong&gt; en &lt;strong&gt;kilometers&lt;/strong&gt; aan, of voeg een nieuwe medewerker toe. Het salaris wordt automatisch overgenomen uit de loongroeptabel.&lt;/div&gt;
+        &lt;div style=&quot;display:flex;gap:8px;margin-bottom:12px&quot;&gt;
+          &lt;input type=&quot;text&quot; id=&quot;hvh-zoek&quot; placeholder=&quot;Zoek medewerker...&quot; oninput=&quot;renderHvhTable()&quot; style=&quot;flex:1&quot;&gt;
+          &lt;button onclick=&quot;addHvhMedewerker()&quot; style=&quot;background:#2b6cb0;color:#fff;border:none;border-radius:7px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:bold;white-space:nowrap&quot;&gt;＋ Toevoegen&lt;/button&gt;
+        &lt;/div&gt;
+        &lt;table class=&quot;s-tbl&quot;&gt;
+          &lt;thead&gt;&lt;tr&gt;
+            &lt;th&gt;Mannr&lt;/th&gt;
+            &lt;th&gt;Naam&lt;/th&gt;
+            &lt;th style=&quot;width:90px&quot;&gt;Loongroep&lt;/th&gt;
+            &lt;th&gt;Salaris (€)&lt;/th&gt;
+            &lt;th style=&quot;width:80px&quot;&gt;KM&lt;/th&gt;
+            &lt;th style=&quot;width:36px&quot;&gt;&lt;/th&gt;
+          &lt;/tr&gt;&lt;/thead&gt;
+          &lt;tbody id=&quot;hvh-tbody&quot;&gt;&lt;/tbody&gt;
+        &lt;/table&gt;
+      &lt;/div&gt;
 
-      <div style=&quot;display:flex;align-items:center;margin-top:20px;padding-top:16px;border-top:1px solid #e2e8f0&quot;>
-        <button class=&quot;btn-apply&quot; onclick=&quot;applySettings()&quot;>✓ Toepassen &amp;amp; herberekenen</button>
-        <span class=&quot;saved-flash&quot; id=&quot;saved-flash&quot;>✓ Wijzigingen opgeslagen!</span>
-      </div>
-    </div>
-  </div>
-</div>
+      &lt;div style=&quot;display:flex;align-items:center;margin-top:20px;padding-top:16px;border-top:1px solid #e2e8f0&quot;&gt;
+        &lt;button class=&quot;btn-apply&quot; onclick=&quot;applySettings()&quot;&gt;✓ Toepassen &amp;amp; herberekenen&lt;/button&gt;
+        &lt;span class=&quot;saved-flash&quot; id=&quot;saved-flash&quot;&gt;✓ Wijzigingen opgeslagen!&lt;/span&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
 
-<div class=&quot;content&quot; id=&quot;content&quot;></div>
+&lt;div class=&quot;content&quot; id=&quot;content&quot;&gt;&lt;/div&gt;
 
-<script>
+&lt;script&gt;
 // ── Loongroep stamdata (uit screenshot) ───────────────────────────────────────
 const MUTATIE_DAGEN = 21.75; // Werkdagen per maand (vast)
 
@@ -16810,22 +16810,22 @@ let MEDEWERKERS_HVH = []; // lijst staat in SharePoint (vertrouwelijk), niet mee
 // ── Herstel opgeslagen instellingen ──────────────────
 (function() {
   try {
-    var savedLg = localStorage.getItem('ma_loongroepen_v1');
+    var savedLg = localStorage.getItem(&#x27;ma_loongroepen_v1&#x27;);
     if (savedLg) {
       var lg = JSON.parse(savedLg);
-      Object.keys(lg).forEach(k => { if (LOONGROEPEN[k]) LOONGROEPEN[k] = lg[k]; });
+      Object.keys(lg).forEach(k =&gt; { if (LOONGROEPEN[k]) LOONGROEPEN[k] = lg[k]; });
     }
   } catch(e) {}
   try {
-    var savedMw = localStorage.getItem('ma_medewerkers_v1');
-    if (savedMw) { MEDEWERKERS.length = 0; JSON.parse(savedMw).forEach(m => MEDEWERKERS.push(m)); }
+    var savedMw = localStorage.getItem(&#x27;ma_medewerkers_v1&#x27;);
+    if (savedMw) { MEDEWERKERS.length = 0; JSON.parse(savedMw).forEach(m =&gt; MEDEWERKERS.push(m)); }
   } catch(e) {}
   try {
-    var savedHvh = localStorage.getItem('ma_hvh_v1');
-    if (savedHvh) { MEDEWERKERS_HVH.length = 0; JSON.parse(savedHvh).forEach(m => MEDEWERKERS_HVH.push(m)); }
+    var savedHvh = localStorage.getItem(&#x27;ma_hvh_v1&#x27;);
+    if (savedHvh) { MEDEWERKERS_HVH.length = 0; JSON.parse(savedHvh).forEach(m =&gt; MEDEWERKERS_HVH.push(m)); }
   } catch(e) {}
   try {
-    window.parent.postMessage({type:'ma-medewerkers-sync', ep: MEDEWERKERS.map(m => m.naam), hvh: MEDEWERKERS_HVH.map(m => m.naam)}, '*');
+    window.parent.postMessage({type:&#x27;ma-medewerkers-sync&#x27;, ep: MEDEWERKERS.map(m =&gt; m.naam), hvh: MEDEWERKERS_HVH.map(m =&gt; m.naam)}, &#x27;*&#x27;);
   } catch(e) {}
 })();
 
@@ -16838,10 +16838,10 @@ const GROEP_LIJST = Object.keys(LOONGROEPEN);
 let state = { step:&quot;upload&quot;, payroll:null, resultaten:null, maand:new Date().getMonth()+1, jaar:new Date().getFullYear(), filter:&quot;actief&quot;, zoek:&quot;&quot;, fileName:&quot;&quot;, rawWorkbook:null };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const eur2 = v => (v==null||isNaN(v)) ? &quot;—&quot; : new Intl.NumberFormat(&quot;nl-NL&quot;,{style:&quot;currency&quot;,currency:&quot;EUR&quot;,minimumFractionDigits:2}).format(v);
-const eur  = v => (v==null||isNaN(v)||v===0) ? &quot;—&quot; : eur2(v);
-const km   = v => (v==null||isNaN(v)||v===0) ? &quot;—&quot; : Math.round(v) + &quot; km&quot;;
-const num  = v => (v==null||isNaN(v)||v===0) ? &quot;—&quot; : new Intl.NumberFormat(&quot;nl-NL&quot;,{minimumFractionDigits:2,maximumFractionDigits:2}).format(v);
+const eur2 = v =&gt; (v==null||isNaN(v)) ? &quot;—&quot; : new Intl.NumberFormat(&quot;nl-NL&quot;,{style:&quot;currency&quot;,currency:&quot;EUR&quot;,minimumFractionDigits:2}).format(v);
+const eur  = v =&gt; (v==null||isNaN(v)||v===0) ? &quot;—&quot; : eur2(v);
+const km   = v =&gt; (v==null||isNaN(v)||v===0) ? &quot;—&quot; : Math.round(v) + &quot; km&quot;;
+const num  = v =&gt; (v==null||isNaN(v)||v===0) ? &quot;—&quot; : new Intl.NumberFormat(&quot;nl-NL&quot;,{minimumFractionDigits:2,maximumFractionDigits:2}).format(v);
 
 function getSalaris(groep)  { return LOONGROEPEN[groep]?.salaris  || 0; }
 function getC1Salaris() {
@@ -16850,17 +16850,17 @@ function getC1Salaris() {
 
 function getRefSalaris(groep) {
   const pct = AANPASSING_PCT[groep];
-  if (pct === false) return null;          // C2+ -> geen mutatie
-  if (typeof pct === &quot;string&quot;) return LOONGROEPEN[pct]?.salaris || null; // D1 -> ref = D2B
-  if (pct === null)  return getC1Salaris(); // hele groepen -> ref = C1
-  return getC1Salaris() * pct;             // deelgroepen -> ref = C1 * pct
+  if (pct === false) return null;          // C2+ -&gt; geen mutatie
+  if (typeof pct === &quot;string&quot;) return LOONGROEPEN[pct]?.salaris || null; // D1 -&gt; ref = D2B
+  if (pct === null)  return getC1Salaris(); // hele groepen -&gt; ref = C1
+  return getC1Salaris() * pct;             // deelgroepen -&gt; ref = C1 * pct
 }
 
 function getMutatie(groep) {
   const ref = getRefSalaris(groep);
   if (ref === null) return 0;
   const verschil = ref - (LOONGROEPEN[groep]?.salaris || 0);
-  return verschil > 0 ? verschil / MUTATIE_DAGEN : 0;
+  return verschil &gt; 0 ? verschil / MUTATIE_DAGEN : 0;
 }
 
 // ── Payroll parser ────────────────────────────────────────────────────────────
@@ -16875,7 +16875,7 @@ function parsePayroll(wb) {
   for (const row of rows) {
     const naamVal=row[0], mannrVal=row[1], stypeRaw=String(row[6]??&quot;&quot;).trim(), hoeveelheid=row[9];
     if (naamVal &amp;&amp; String(naamVal).trim() &amp;&amp; ![&quot;Volledige naam&quot;,&quot;nan&quot;].includes(String(naamVal).trim())) {
-      if (mannrVal != null) { try { huidigMannr=parseInt(String(mannrVal).trim()); if(!data[huidigMannr])data[huidigMannr]={}; } catch{} }
+      if (mannrVal != null) { try { huidigMannr=parseInt(String(mannrVal).trim()); if(!data[huidigMannr])data[huidigMannr]={}; Object.defineProperty(data[huidigMannr], &#x27;__naam&#x27;, { value: String(naamVal).trim(), enumerable: false, writable: true }); Object.defineProperty(data[huidigMannr], &#x27;__badge&#x27;, { value: String(mannrVal).trim(), enumerable: false, writable: true }); } catch{} }
     }
     if (!naamVal &amp;&amp; !mannrVal &amp;&amp; !stypeRaw) { huidigMannr = null; continue; }
     if (huidigMannr == null) continue;
@@ -16892,7 +16892,7 @@ function parsePayroll(wb) {
 function bereken(payroll) {
   // Combineer Europoort + Hoek van Holland medewerkers
   const alleMedewerkers = [...MEDEWERKERS, ...MEDEWERKERS_HVH];
-  return alleMedewerkers.map(p => {
+  return alleMedewerkers.map(p =&gt; {
     const sal    = getSalaris(p.groep);
     const mutVal = getMutatie(p.groep);
     const pw = payroll[p.mannr] || {};
@@ -16905,16 +16905,16 @@ function bereken(payroll) {
 }
 
 // ── Echte .xlsx in plaats van een XML-bestand met .xls-extensie (dat gaf de Excel-waarschuwing
-// &quot;file format and extension don't match&quot;). De bestaande opbouw (SpreadsheetML met kleuren en
+// &quot;file format and extension don&#x27;t match&quot;). De bestaande opbouw (SpreadsheetML met kleuren en
 // tabbladen) blijft gelijk; dit zet die om naar een echt Excel-bestand via ExcelJS.
 function djLaadExcelJS(){
   if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
-  var bronnen = ['https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js', 'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js'];
+  var bronnen = [&#x27;https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js&#x27;, &#x27;https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js&#x27;];
   return new Promise(function(resolve, reject){
     var i = 0;
     (function volgende(){
-      if (i >= bronnen.length) { reject(new Error('ExcelJS kon niet worden geladen')); return; }
-      var sc = document.createElement('script'); sc.src = bronnen[i++];
+      if (i &gt;= bronnen.length) { reject(new Error(&#x27;ExcelJS kon niet worden geladen&#x27;)); return; }
+      var sc = document.createElement(&#x27;script&#x27;); sc.src = bronnen[i++];
       sc.onload = function(){ window.ExcelJS ? resolve(window.ExcelJS) : volgende(); };
       sc.onerror = volgende;
       document.head.appendChild(sc);
@@ -16923,101 +16923,101 @@ function djLaadExcelJS(){
 }
 function djSpreadsheetMLNaarXlsx(xml){
   return djLaadExcelJS().then(function(ExcelJS){
-    var SS = 'urn:schemas-microsoft-com:office:spreadsheet';
-    var doc = new DOMParser().parseFromString(xml, 'application/xml');
-    if (doc.getElementsByTagName('parsererror').length) throw new Error('XML ongeldig');
-    var at = function(el, n){ return el.getAttributeNS(SS, n) || el.getAttribute('ss:' + n) || null; };
+    var SS = &#x27;urn:schemas-microsoft-com:office:spreadsheet&#x27;;
+    var doc = new DOMParser().parseFromString(xml, &#x27;application/xml&#x27;);
+    if (doc.getElementsByTagName(&#x27;parsererror&#x27;).length) throw new Error(&#x27;XML ongeldig&#x27;);
+    var at = function(el, n){ return el.getAttributeNS(SS, n) || el.getAttribute(&#x27;ss:&#x27; + n) || null; };
     var kind = function(el, n){ return Array.prototype.filter.call(el.childNodes, function(c){ return c.nodeType === 1 &amp;&amp; c.localName === n; }); };
-    var argb = function(c){ c = String(c || '').replace('#', ''); return c.length === 6 ? 'FF' + c.toUpperCase() : null; };
+    var argb = function(c){ c = String(c || &#x27;&#x27;).replace(&#x27;#&#x27;, &#x27;&#x27;); return c.length === 6 ? &#x27;FF&#x27; + c.toUpperCase() : null; };
     var stijlen = {};
-    Array.prototype.forEach.call(doc.getElementsByTagNameNS(SS, 'Style'), function(st){
-      var id = at(st, 'ID'); if (!id) return;
+    Array.prototype.forEach.call(doc.getElementsByTagNameNS(SS, &#x27;Style&#x27;), function(st){
+      var id = at(st, &#x27;ID&#x27;); if (!id) return;
       var s = {};
-      kind(st, 'Interior').forEach(function(x){ var c = argb(at(x, 'Color')); if (c) s.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c } }; });
-      kind(st, 'Font').forEach(function(x){ var f = { name: 'Calibri', size: parseFloat(at(x, 'Size')) || 11 };
-        if (at(x, 'Bold') === '1') f.bold = true; if (at(x, 'Italic') === '1') f.italic = true;
-        var c = argb(at(x, 'Color')); if (c) f.color = { argb: c }; s.font = f; });
-      kind(st, 'Alignment').forEach(function(x){ var h = (at(x, 'Horizontal') || '').toLowerCase(); if (h) s.alignment = { horizontal: h }; });
+      kind(st, &#x27;Interior&#x27;).forEach(function(x){ var c = argb(at(x, &#x27;Color&#x27;)); if (c) s.fill = { type: &#x27;pattern&#x27;, pattern: &#x27;solid&#x27;, fgColor: { argb: c } }; });
+      kind(st, &#x27;Font&#x27;).forEach(function(x){ var f = { name: &#x27;Calibri&#x27;, size: parseFloat(at(x, &#x27;Size&#x27;)) || 11 };
+        if (at(x, &#x27;Bold&#x27;) === &#x27;1&#x27;) f.bold = true; if (at(x, &#x27;Italic&#x27;) === &#x27;1&#x27;) f.italic = true;
+        var c = argb(at(x, &#x27;Color&#x27;)); if (c) f.color = { argb: c }; s.font = f; });
+      kind(st, &#x27;Alignment&#x27;).forEach(function(x){ var h = (at(x, &#x27;Horizontal&#x27;) || &#x27;&#x27;).toLowerCase(); if (h) s.alignment = { horizontal: h }; });
       stijlen[id] = s;
     });
     var wb = new ExcelJS.Workbook();
     var namen = {};
-    Array.prototype.forEach.call(doc.getElementsByTagNameNS(SS, 'Worksheet'), function(wsEl){
-      var naam = (at(wsEl, 'Name') || 'Blad').substring(0, 31), n = naam, k = 2;
-      while (namen[n.toLowerCase()]) n = naam.substring(0, 28) + ' ' + (k++);
+    Array.prototype.forEach.call(doc.getElementsByTagNameNS(SS, &#x27;Worksheet&#x27;), function(wsEl){
+      var naam = (at(wsEl, &#x27;Name&#x27;) || &#x27;Blad&#x27;).substring(0, 31), n = naam, k = 2;
+      while (namen[n.toLowerCase()]) n = naam.substring(0, 28) + &#x27; &#x27; + (k++);
       namen[n.toLowerCase()] = 1;
       var ws = wb.addWorksheet(n), breedte = {};
-      var tabel = kind(wsEl, 'Table')[0]; if (!tabel) return;
+      var tabel = kind(wsEl, &#x27;Table&#x27;)[0]; if (!tabel) return;
       var r = 0;
-      kind(tabel, 'Row').forEach(function(rowEl){
-        var ri = parseInt(at(rowEl, 'Index'), 10); r = ri > 0 ? ri : r + 1;
+      kind(tabel, &#x27;Row&#x27;).forEach(function(rowEl){
+        var ri = parseInt(at(rowEl, &#x27;Index&#x27;), 10); r = ri &gt; 0 ? ri : r + 1;
         var c = 0;
-        kind(rowEl, 'Cell').forEach(function(celEl){
-          var ci = parseInt(at(celEl, 'Index'), 10); c = ci > 0 ? ci : c + 1;
-          var cel = ws.getCell(r, c), data = kind(celEl, 'Data')[0];
+        kind(rowEl, &#x27;Cell&#x27;).forEach(function(celEl){
+          var ci = parseInt(at(celEl, &#x27;Index&#x27;), 10); c = ci &gt; 0 ? ci : c + 1;
+          var cel = ws.getCell(r, c), data = kind(celEl, &#x27;Data&#x27;)[0];
           if (data) {
             var t = data.textContent;
-            cel.value = (at(data, 'Type') === 'Number' &amp;&amp; t !== '' &amp;&amp; !isNaN(Number(t))) ? Number(t) : t;
+            cel.value = (at(data, &#x27;Type&#x27;) === &#x27;Number&#x27; &amp;&amp; t !== &#x27;&#x27; &amp;&amp; !isNaN(Number(t))) ? Number(t) : t;
             breedte[c] = Math.max(breedte[c] || 0, String(t).length);
           }
-          var st = stijlen[at(celEl, 'StyleID')];
+          var st = stijlen[at(celEl, &#x27;StyleID&#x27;)];
           if (st) { if (st.fill) cel.fill = st.fill; if (st.font) cel.font = st.font; if (st.alignment) cel.alignment = st.alignment; }
-          var m = parseInt(at(celEl, 'MergeAcross'), 10);
-          if (m > 0) { ws.mergeCells(r, c, r, c + m); c += m; }
+          var m = parseInt(at(celEl, &#x27;MergeAcross&#x27;), 10);
+          if (m &gt; 0) { ws.mergeCells(r, c, r, c + m); c += m; }
         });
       });
       Object.keys(breedte).forEach(function(c){ ws.getColumn(+c).width = Math.min(60, Math.max(8, breedte[c] + 2)); });
     });
     return wb.xlsx.writeBuffer().then(function(buf){
-      return new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      return new Blob([buf], { type: &#x27;application/vnd.openxmlformats-officedocument.spreadsheetml.sheet&#x27; });
     });
   });
 }
 
 // ── Excel export ──────────────────────────────────────────────────────────────
 function exportExcel() {
-  const res = state.resultaten.filter(r => r.totaal > 0 || r.totKm > 0);
+  const res = state.resultaten.filter(r =&gt; r.totaal &gt; 0 || r.totKm &gt; 0);
   const maandNaam = MAANDEN[state.maand-1], jaar = state.jaar;
-  const fmt = v => v > 0 ? new Intl.NumberFormat(&quot;nl-NL&quot;,{style:&quot;currency&quot;,currency:&quot;EUR&quot;,minimumFractionDigits:2}).format(v) : &quot;&quot;;
+  const fmt = v =&gt; v &gt; 0 ? new Intl.NumberFormat(&quot;nl-NL&quot;,{style:&quot;currency&quot;,currency:&quot;EUR&quot;,minimumFractionDigits:2}).format(v) : &quot;&quot;;
   // Kilometers als getal in de cel (zonder &quot;km&quot;): de kolomkop zegt al dat het km zijn.
-  const fmtKm = v => v > 0 ? Math.round(v) : &quot;&quot;;
+  const fmtKm = v =&gt; v &gt; 0 ? Math.round(v) : &quot;&quot;;
 
   // Totalen
-  const tKm   = res.reduce((s,r)=>s+r.totKm,0);
-  const tV430 = res.reduce((s,r)=>s+r.totV430,0);
-  const tV175 = res.reduce((s,r)=>s+r.totV175,0);
-  const tV176 = res.reduce((s,r)=>s+r.totV176,0);
-  const tV177 = res.reduce((s,r)=>s+r.totV177,0);
-  const tMut  = res.reduce((s,r)=>s+r.totMut,0);
-  const tTot  = res.reduce((s,r)=>s+r.totaal,0);
+  const tKm   = res.reduce((s,r)=&gt;s+r.totKm,0);
+  const tV430 = res.reduce((s,r)=&gt;s+r.totV430,0);
+  const tV175 = res.reduce((s,r)=&gt;s+r.totV175,0);
+  const tV176 = res.reduce((s,r)=&gt;s+r.totV176,0);
+  const tV177 = res.reduce((s,r)=&gt;s+r.totV177,0);
+  const tMut  = res.reduce((s,r)=&gt;s+r.totMut,0);
+  const tTot  = res.reduce((s,r)=&gt;s+r.totaal,0);
 
   // ── Excel XML Spreadsheet (SpreadsheetML) bouwen: behoudt kleuren EN staat
   // ── meerdere echte tabbladen toe in één bestand.
-  const xEsc = s => String(s==null?&quot;&quot;:s).replace(/&amp;/g,&quot;&amp;amp;&quot;).replace(/</g,&quot;&amp;lt;&quot;).replace(/>/g,&quot;&amp;gt;&quot;).replace(/&quot;/g,&quot;&amp;quot;&quot;).replace(/'/g,&quot;&amp;apos;&quot;);
-  const cell = (val, styleId, type) => {
+  const xEsc = s =&gt; String(s==null?&quot;&quot;:s).replace(/&amp;/g,&quot;&amp;amp;&quot;).replace(/&lt;/g,&quot;&amp;lt;&quot;).replace(/&gt;/g,&quot;&amp;gt;&quot;).replace(/&quot;/g,&quot;&amp;quot;&quot;).replace(/&#x27;/g,&quot;&amp;apos;&quot;);
+  const cell = (val, styleId, type) =&gt; {
     const t = type || (typeof val === &quot;number&quot; ? &quot;Number&quot; : &quot;String&quot;);
-    const data = val==null||val===&quot;&quot; ? &quot;&quot; : `<Data ss:Type=&quot;${t}&quot;>${xEsc(val)}</Data>`;
-    return `<Cell${styleId?` ss:StyleID=&quot;${styleId}&quot;`:&quot;&quot;}>${data}</Cell>`;
+    const data = val==null||val===&quot;&quot; ? &quot;&quot; : `&lt;Data ss:Type=&quot;${t}&quot;&gt;${xEsc(val)}&lt;/Data&gt;`;
+    return `&lt;Cell${styleId?` ss:StyleID=&quot;${styleId}&quot;`:&quot;&quot;}&gt;${data}&lt;/Cell&gt;`;
   };
-  const row = (...cells) => `<Row>${cells.join(&quot;&quot;)}</Row>`;
+  const row = (...cells) =&gt; `&lt;Row&gt;${cells.join(&quot;&quot;)}&lt;/Row&gt;`;
 
   // Vaste stijlen voor het overzicht (zelfde kleuren als voorheen)
   const sheet1Styles = `
-    <Style ss:ID=&quot;hdrdark&quot;><Interior ss:Color=&quot;#1F3864&quot; ss:Pattern=&quot;Solid&quot;/><Font ss:Color=&quot;#FFFFFF&quot; ss:Bold=&quot;1&quot;/><Alignment ss:Horizontal=&quot;Center&quot;/></Style>
-    <Style ss:ID=&quot;hdrteal&quot;><Interior ss:Color=&quot;#17A398&quot; ss:Pattern=&quot;Solid&quot;/><Font ss:Color=&quot;#FFFFFF&quot; ss:Bold=&quot;1&quot;/><Alignment ss:Horizontal=&quot;Center&quot;/></Style>
-    <Style ss:ID=&quot;hdrblue&quot;><Interior ss:Color=&quot;#2E75B6&quot; ss:Pattern=&quot;Solid&quot;/><Font ss:Color=&quot;#FFFFFF&quot; ss:Bold=&quot;1&quot;/><Alignment ss:Horizontal=&quot;Center&quot;/></Style>
-    <Style ss:ID=&quot;l_alt&quot;><Interior ss:Color=&quot;#D9E2F3&quot; ss:Pattern=&quot;Solid&quot;/><Alignment ss:Horizontal=&quot;Left&quot;/></Style>
-    <Style ss:ID=&quot;l_white&quot;><Interior ss:Color=&quot;#FFFFFF&quot; ss:Pattern=&quot;Solid&quot;/><Alignment ss:Horizontal=&quot;Left&quot;/></Style>
-    <Style ss:ID=&quot;lb_alt&quot;><Interior ss:Color=&quot;#D9E2F3&quot; ss:Pattern=&quot;Solid&quot;/><Font ss:Bold=&quot;1&quot;/><Alignment ss:Horizontal=&quot;Left&quot;/></Style>
-    <Style ss:ID=&quot;lb_white&quot;><Interior ss:Color=&quot;#FFFFFF&quot; ss:Pattern=&quot;Solid&quot;/><Font ss:Bold=&quot;1&quot;/><Alignment ss:Horizontal=&quot;Left&quot;/></Style>
-    <Style ss:ID=&quot;lblr_alt&quot;><Interior ss:Color=&quot;#D9E2F3&quot; ss:Pattern=&quot;Solid&quot;/><Font ss:Color=&quot;#6B7280&quot; ss:Size=&quot;9&quot;/><Alignment ss:Horizontal=&quot;Right&quot;/></Style>
-    <Style ss:ID=&quot;lblr_white&quot;><Interior ss:Color=&quot;#FFFFFF&quot; ss:Pattern=&quot;Solid&quot;/><Font ss:Color=&quot;#6B7280&quot; ss:Size=&quot;9&quot;/><Alignment ss:Horizontal=&quot;Right&quot;/></Style>
-    <Style ss:ID=&quot;r_alt&quot;><Interior ss:Color=&quot;#D9E2F3&quot; ss:Pattern=&quot;Solid&quot;/><Alignment ss:Horizontal=&quot;Right&quot;/></Style>
-    <Style ss:ID=&quot;r_white&quot;><Interior ss:Color=&quot;#FFFFFF&quot; ss:Pattern=&quot;Solid&quot;/><Alignment ss:Horizontal=&quot;Right&quot;/></Style>
-    <Style ss:ID=&quot;rg_alt&quot;><Interior ss:Color=&quot;#D9E2F3&quot; ss:Pattern=&quot;Solid&quot;/><Font ss:Color=&quot;#22543D&quot; ss:Bold=&quot;1&quot;/><Alignment ss:Horizontal=&quot;Right&quot;/></Style>
-    <Style ss:ID=&quot;rg_white&quot;><Interior ss:Color=&quot;#FFFFFF&quot; ss:Pattern=&quot;Solid&quot;/><Font ss:Color=&quot;#22543D&quot; ss:Bold=&quot;1&quot;/><Alignment ss:Horizontal=&quot;Right&quot;/></Style>
-    <Style ss:ID=&quot;totl&quot;><Interior ss:Color=&quot;#FFF2CC&quot; ss:Pattern=&quot;Solid&quot;/><Font ss:Color=&quot;#744210&quot; ss:Bold=&quot;1&quot;/><Alignment ss:Horizontal=&quot;Left&quot;/></Style>
-    <Style ss:ID=&quot;totr&quot;><Interior ss:Color=&quot;#FFF2CC&quot; ss:Pattern=&quot;Solid&quot;/><Font ss:Color=&quot;#744210&quot; ss:Bold=&quot;1&quot;/><Alignment ss:Horizontal=&quot;Right&quot;/></Style>
+    &lt;Style ss:ID=&quot;hdrdark&quot;&gt;&lt;Interior ss:Color=&quot;#1F3864&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Color=&quot;#FFFFFF&quot; ss:Bold=&quot;1&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Center&quot;/&gt;&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;hdrteal&quot;&gt;&lt;Interior ss:Color=&quot;#17A398&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Color=&quot;#FFFFFF&quot; ss:Bold=&quot;1&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Center&quot;/&gt;&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;hdrblue&quot;&gt;&lt;Interior ss:Color=&quot;#2E75B6&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Color=&quot;#FFFFFF&quot; ss:Bold=&quot;1&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Center&quot;/&gt;&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;l_alt&quot;&gt;&lt;Interior ss:Color=&quot;#D9E2F3&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Left&quot;/&gt;&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;l_white&quot;&gt;&lt;Interior ss:Color=&quot;#FFFFFF&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Left&quot;/&gt;&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;lb_alt&quot;&gt;&lt;Interior ss:Color=&quot;#D9E2F3&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Bold=&quot;1&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Left&quot;/&gt;&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;lb_white&quot;&gt;&lt;Interior ss:Color=&quot;#FFFFFF&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Bold=&quot;1&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Left&quot;/&gt;&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;lblr_alt&quot;&gt;&lt;Interior ss:Color=&quot;#D9E2F3&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Color=&quot;#6B7280&quot; ss:Size=&quot;9&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Right&quot;/&gt;&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;lblr_white&quot;&gt;&lt;Interior ss:Color=&quot;#FFFFFF&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Color=&quot;#6B7280&quot; ss:Size=&quot;9&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Right&quot;/&gt;&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;r_alt&quot;&gt;&lt;Interior ss:Color=&quot;#D9E2F3&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Right&quot;/&gt;&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;r_white&quot;&gt;&lt;Interior ss:Color=&quot;#FFFFFF&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Right&quot;/&gt;&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;rg_alt&quot;&gt;&lt;Interior ss:Color=&quot;#D9E2F3&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Color=&quot;#22543D&quot; ss:Bold=&quot;1&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Right&quot;/&gt;&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;rg_white&quot;&gt;&lt;Interior ss:Color=&quot;#FFFFFF&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Color=&quot;#22543D&quot; ss:Bold=&quot;1&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Right&quot;/&gt;&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;totl&quot;&gt;&lt;Interior ss:Color=&quot;#FFF2CC&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Color=&quot;#744210&quot; ss:Bold=&quot;1&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Left&quot;/&gt;&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;totr&quot;&gt;&lt;Interior ss:Color=&quot;#FFF2CC&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Color=&quot;#744210&quot; ss:Bold=&quot;1&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Right&quot;/&gt;&lt;/Style&gt;
   `;
 
   const headerRow = row(
@@ -17031,7 +17031,7 @@ function exportExcel() {
     cell(&quot;Totaal&quot;,&quot;hdrdark&quot;)
   );
 
-  const dataRows = res.map((r, i) => {
+  const dataRows = res.map((r, i) =&gt; {
     const bg = i % 2 === 0 ? &quot;alt&quot; : &quot;white&quot;;
     return row(
       cell(r.mannr, `l_${bg}`),
@@ -17058,47 +17058,47 @@ function exportExcel() {
     cell(fmt(tTot),&quot;totr&quot;)
   );
 
-  const sheet1Xml = `<Worksheet ss:Name=&quot;Maandafsluiting&quot;><Table>${headerRow}${dataRows}${totalRow}</Table></Worksheet>`;
+  const sheet1Xml = `&lt;Worksheet ss:Name=&quot;Maandafsluiting&quot;&gt;&lt;Table&gt;${headerRow}${dataRows}${totalRow}&lt;/Table&gt;&lt;/Worksheet&gt;`;
 
   // ── Extra tabblad(en): de originele geüploade Excel, zo dicht mogelijk bij
   // ── het origineel (celwaarden + achtergrondkleur + lettertype + uitlijning).
   let origSheetsXml = &quot;&quot;;
   let origStyles = &quot;&quot;;
-  if (typeof XLSX !== &quot;undefined&quot; && state.rawWorkbook) {
-    const styleMap = new Map(); // key -> id
+  if (typeof XLSX !== &quot;undefined&quot; &amp;&amp; state.rawWorkbook) {
+    const styleMap = new Map(); // key -&gt; id
     let styleCounter = 0;
-    const registerStyle = (attrs) => {
+    const registerStyle = (attrs) =&gt; {
       const key = JSON.stringify(attrs);
       if (styleMap.has(key)) return styleMap.get(key);
       const id = &quot;os&quot; + (styleCounter++);
       styleMap.set(key, id);
-      let xml = `<Style ss:ID=&quot;${id}&quot;>`;
-      if (attrs.bg) xml += `<Interior ss:Color=&quot;${attrs.bg}&quot; ss:Pattern=&quot;Solid&quot;/>`;
-      if (attrs.bold || attrs.color) xml += `<Font${attrs.color?` ss:Color=&quot;${attrs.color}&quot;`:&quot;&quot;}${attrs.bold?` ss:Bold=&quot;1&quot;`:&quot;&quot;}${attrs.italic?` ss:Italic=&quot;1&quot;`:&quot;&quot;}/>`;
-      if (attrs.align) xml += `<Alignment ss:Horizontal=&quot;${attrs.align}&quot;/>`;
-      xml += `</Style>`;
+      let xml = `&lt;Style ss:ID=&quot;${id}&quot;&gt;`;
+      if (attrs.bg) xml += `&lt;Interior ss:Color=&quot;${attrs.bg}&quot; ss:Pattern=&quot;Solid&quot;/&gt;`;
+      if (attrs.bold || attrs.color) xml += `&lt;Font${attrs.color?` ss:Color=&quot;${attrs.color}&quot;`:&quot;&quot;}${attrs.bold?` ss:Bold=&quot;1&quot;`:&quot;&quot;}${attrs.italic?` ss:Italic=&quot;1&quot;`:&quot;&quot;}/&gt;`;
+      if (attrs.align) xml += `&lt;Alignment ss:Horizontal=&quot;${attrs.align}&quot;/&gt;`;
+      xml += `&lt;/Style&gt;`;
       origStyles += xml;
       return id;
     };
 
-    const rgb = (c) => {
+    const rgb = (c) =&gt; {
       if (!c) return null;
       if (c.rgb) return &quot;#&quot; + c.rgb.substring(c.rgb.length-6);
       return null;
     };
     const HALIGN = { left:&quot;Left&quot;, center:&quot;Center&quot;, right:&quot;Right&quot; };
 
-    state.rawWorkbook.SheetNames.forEach((naam) => {
+    state.rawWorkbook.SheetNames.forEach((naam) =&gt; {
       const ws = state.rawWorkbook.Sheets[naam];
-      if (!ws || !ws[&quot;!ref&quot;]) { origSheetsXml += `<Worksheet ss:Name=&quot;${xEsc(naam.substring(0,31))}&quot;><Table></Table></Worksheet>`; return; }
+      if (!ws || !ws[&quot;!ref&quot;]) { origSheetsXml += `&lt;Worksheet ss:Name=&quot;${xEsc(naam.substring(0,31))}&quot;&gt;&lt;Table&gt;&lt;/Table&gt;&lt;/Worksheet&gt;`; return; }
       const range = XLSX.utils.decode_range(ws[&quot;!ref&quot;]);
       let rowsXml = &quot;&quot;;
-      for (let R = range.s.r; R <= range.e.r; R++) {
+      for (let R = range.s.r; R &lt;= range.e.r; R++) {
         let cellsXml = &quot;&quot;;
-        for (let C = range.s.c; C <= range.e.c; C++) {
+        for (let C = range.s.c; C &lt;= range.e.c; C++) {
           const addr = XLSX.utils.encode_cell({r:R, c:C});
           const c = ws[addr];
-          if (!c) { cellsXml += `<Cell></Cell>`; continue; }
+          if (!c) { cellsXml += `&lt;Cell&gt;&lt;/Cell&gt;`; continue; }
 
           const st = c.s || {};
           const bg = (st.patternType &amp;&amp; st.patternType !== &quot;none&quot;) ? (rgb(st.fgColor) || rgb(st.bgColor)) : null;
@@ -17116,43 +17116,43 @@ function exportExcel() {
 
           cellsXml += cell(val, styleId, type);
         }
-        rowsXml += `<Row>${cellsXml}</Row>`;
+        rowsXml += `&lt;Row&gt;${cellsXml}&lt;/Row&gt;`;
       }
       const veiligeNaam = xEsc(String(naam).replace(/[\\/?*\[\]:]/g,&quot; &quot;).substring(0,31).trim() || &quot;Blad&quot;);
-      origSheetsXml += `<Worksheet ss:Name=&quot;${veiligeNaam}&quot;><Table>${rowsXml}</Table></Worksheet>`;
+      origSheetsXml += `&lt;Worksheet ss:Name=&quot;${veiligeNaam}&quot;&gt;&lt;Table&gt;${rowsXml}&lt;/Table&gt;&lt;/Worksheet&gt;`;
     });
   }
 
-  const xmlContent = `<?xml version=&quot;1.0&quot;?>
-<?mso-application progid=&quot;Excel.Sheet&quot;?>
-<Workbook xmlns=&quot;urn:schemas-microsoft-com:office:spreadsheet&quot;
+  const xmlContent = `&lt;?xml version=&quot;1.0&quot;?&gt;
+&lt;?mso-application progid=&quot;Excel.Sheet&quot;?&gt;
+&lt;Workbook xmlns=&quot;urn:schemas-microsoft-com:office:spreadsheet&quot;
  xmlns:o=&quot;urn:schemas-microsoft-com:office:office&quot;
  xmlns:x=&quot;urn:schemas-microsoft-com:office:excel&quot;
- xmlns:ss=&quot;urn:schemas-microsoft-com:office:spreadsheet&quot;>
- <Styles>${sheet1Styles}${origStyles}</Styles>
+ xmlns:ss=&quot;urn:schemas-microsoft-com:office:spreadsheet&quot;&gt;
+ &lt;Styles&gt;${sheet1Styles}${origStyles}&lt;/Styles&gt;
  ${sheet1Xml}
  ${origSheetsXml}
-</Workbook>`;
+&lt;/Workbook&gt;`;
 
   // Bepaal terminal op basis van aanwezige medewerkers in resultaten
-  const hvhNummers = new Set(MEDEWERKERS_HVH.map(m => m.mannr));
-  const epNummers  = new Set(MEDEWERKERS.map(m => m.mannr));
-  const heeftHvH   = res.some(r => hvhNummers.has(r.mannr));
-  const heeftEp    = res.some(r => epNummers.has(r.mannr));
-  let terminal = 'Europoort';
-  if (heeftHvH && !heeftEp)  terminal = 'Hoek_van_Holland';
-  if (heeftHvH && heeftEp)   terminal = 'Europoort_en_Hoek_van_Holland';
+  const hvhNummers = new Set(MEDEWERKERS_HVH.map(m =&gt; m.mannr));
+  const epNummers  = new Set(MEDEWERKERS.map(m =&gt; m.mannr));
+  const heeftHvH   = res.some(r =&gt; hvhNummers.has(r.mannr));
+  const heeftEp    = res.some(r =&gt; epNummers.has(r.mannr));
+  let terminal = &#x27;Europoort&#x27;;
+  if (heeftHvH &amp;&amp; !heeftEp)  terminal = &#x27;Hoek_van_Holland&#x27;;
+  if (heeftHvH &amp;&amp; heeftEp)   terminal = &#x27;Europoort_en_Hoek_van_Holland&#x27;;
   const basisNaam = `Maandafsluiting_${maandNaam}_${jaar}_${terminal}`;
-  const download = (blob, naam) => {
+  const download = (blob, naam) =&gt; {
     const url = URL.createObjectURL(blob);
     const a = document.createElement(&quot;a&quot;);
     a.href = url; a.download = naam; document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    setTimeout(() =&gt; URL.revokeObjectURL(url), 2000);
   };
   // Echt Excel-bestand (.xlsx): geen waarschuwing meer bij het openen.
   djSpreadsheetMLNaarXlsx(xmlContent)
-    .then(blob => download(blob, basisNaam + &quot;.xlsx&quot;))
-    .catch(e => {
+    .then(blob =&gt; download(blob, basisNaam + &quot;.xlsx&quot;))
+    .catch(e =&gt; {
       console.warn(&quot;xlsx maken mislukt, terugval op .xls:&quot;, e);
       download(new Blob([xmlContent], {type: &quot;application/vnd.ms-excel;charset=utf-8&quot;}), basisNaam + &quot;.xls&quot;);
     });
@@ -17161,7 +17161,7 @@ function exportExcel() {
 // ── Settings paneel ───────────────────────────────────────────────────────────
 function checkWachtwoord() {
   if (window.parent &amp;&amp; window.parent.djToegangCheckOfPopup) {
-    window.parent.djToegangCheckOfPopup('salaris').then(function(ok){ if (ok) openSettings(); });
+    window.parent.djToegangCheckOfPopup(&#x27;salaris&#x27;).then(function(ok){ if (ok) openSettings(); });
     return;
   }
   document.getElementById(&quot;pw-modal&quot;).style.display = &quot;flex&quot;;
@@ -17186,14 +17186,14 @@ function openSettings() { renderLgTable(); renderMwTable(); renderHvhTable(); do
 function closeSettings() { document.getElementById(&quot;overlay&quot;).classList.remove(&quot;open&quot;); }
 
 function switchTab(tab) {
-  document.querySelectorAll(&quot;.tab&quot;).forEach((t,i) => t.classList.toggle(&quot;active&quot;, [&quot;loongroepen&quot;,&quot;medewerkers&quot;,&quot;hvh&quot;][i]===tab));
-  document.querySelectorAll(&quot;.tab-pane&quot;).forEach(p => p.classList.remove(&quot;active&quot;));
+  document.querySelectorAll(&quot;.tab&quot;).forEach((t,i) =&gt; t.classList.toggle(&quot;active&quot;, [&quot;loongroepen&quot;,&quot;medewerkers&quot;,&quot;hvh&quot;][i]===tab));
+  document.querySelectorAll(&quot;.tab-pane&quot;).forEach(p =&gt; p.classList.remove(&quot;active&quot;));
   document.getElementById(&quot;tab-&quot;+tab).classList.add(&quot;active&quot;);
 }
 
 function renderLgTable() {
   const c1sal = getC1Salaris();
-  document.getElementById(&quot;lg-tbody&quot;).innerHTML = Object.entries(LOONGROEPEN).map(([groep, d]) => {
+  document.getElementById(&quot;lg-tbody&quot;).innerHTML = Object.entries(LOONGROEPEN).map(([groep, d]) =&gt; {
     const toeslag = (d.salaris * d.toeslag_pct / 100).toFixed(2);
     const ref     = getRefSalaris(groep);
     const mutatie = getMutatie(groep);
@@ -17203,18 +17203,18 @@ function renderLgTable() {
        : pct === null ? `C1 (${new Intl.NumberFormat(&quot;nl-NL&quot;,{style:&quot;currency&quot;,currency:&quot;EUR&quot;}).format(ref)})`
                       : `C1 × ${(pct*100)}% = ${new Intl.NumberFormat(&quot;nl-NL&quot;,{style:&quot;currency&quot;,currency:&quot;EUR&quot;}).format(ref)}`)
       : &quot;—&quot;;
-    return `<tr>
-      <td><span class=&quot;badge&quot; style=&quot;background:#dbeafe;color:#1e40af;font-weight:bold&quot;>${groep}</span></td>
-      <td><input class=&quot;s-input&quot; type=&quot;number&quot; step=&quot;0.01&quot; value=&quot;${d.salaris}&quot;
-          onchange=&quot;LOONGROEPEN['${groep}'].salaris=parseFloat(this.value)||0; updateLgRow('${groep}')&quot;
-          style=&quot;width:95px&quot;></td>
-      <td style=&quot;color:#718096;text-align:right;font-size:11px&quot;>${d.toeslag_pct}%</td>
-      <td style=&quot;color:#4a5568;text-align:right;font-size:11px&quot; id=&quot;toeslag-${groep}&quot;>€ ${toeslag}</td>
-      <td style=&quot;color:#718096;font-size:11px;text-align:right&quot; id=&quot;ref-${groep}&quot;>${refLabel}</td>
-      <td style=&quot;text-align:right;font-size:12px;font-weight:bold;color:${mutatie>0?'#276749':'#a0aec0'}&quot; id=&quot;mutatie-${groep}&quot;>
-        ${mutatie>0 ? '€ ' + mutatie.toFixed(4) : '—'}
-      </td>
-    </tr>`;
+    return `&lt;tr&gt;
+      &lt;td&gt;&lt;span class=&quot;badge&quot; style=&quot;background:#dbeafe;color:#1e40af;font-weight:bold&quot;&gt;${groep}&lt;/span&gt;&lt;/td&gt;
+      &lt;td&gt;&lt;input class=&quot;s-input&quot; type=&quot;number&quot; step=&quot;0.01&quot; value=&quot;${d.salaris}&quot;
+          onchange=&quot;LOONGROEPEN[&#x27;${groep}&#x27;].salaris=parseFloat(this.value)||0; updateLgRow(&#x27;${groep}&#x27;)&quot;
+          style=&quot;width:95px&quot;&gt;&lt;/td&gt;
+      &lt;td style=&quot;color:#718096;text-align:right;font-size:11px&quot;&gt;${d.toeslag_pct}%&lt;/td&gt;
+      &lt;td style=&quot;color:#4a5568;text-align:right;font-size:11px&quot; id=&quot;toeslag-${groep}&quot;&gt;€ ${toeslag}&lt;/td&gt;
+      &lt;td style=&quot;color:#718096;font-size:11px;text-align:right&quot; id=&quot;ref-${groep}&quot;&gt;${refLabel}&lt;/td&gt;
+      &lt;td style=&quot;text-align:right;font-size:12px;font-weight:bold;color:${mutatie&gt;0?&#x27;#276749&#x27;:&#x27;#a0aec0&#x27;}&quot; id=&quot;mutatie-${groep}&quot;&gt;
+        ${mutatie&gt;0 ? &#x27;€ &#x27; + mutatie.toFixed(4) : &#x27;—&#x27;}
+      &lt;/td&gt;
+    &lt;/tr&gt;`;
   }).join(&quot;&quot;);
 }
 
@@ -17227,12 +17227,12 @@ function updateLgRow(groep) {
 
   // Als C1 verandert: update ALLE groepen (ref is afhankelijk van C1)
   if (groep === &quot;C1&quot;) {
-    Object.keys(LOONGROEPEN).forEach(g => {
+    Object.keys(LOONGROEPEN).forEach(g =&gt; {
       if (g !== &quot;C1&quot;) updateLgRowMutatie(g);
     });
   }
   // Als D2B verandert: D1 opnieuw berekenen (D1 muteert naar D2B)
-  Object.keys(AANPASSING_PCT).forEach(g => { if (AANPASSING_PCT[g] === groep) updateLgRowMutatie(g); });
+  Object.keys(AANPASSING_PCT).forEach(g =&gt; { if (AANPASSING_PCT[g] === groep) updateLgRowMutatie(g); });
   updateLgRowMutatie(groep);
 }
 
@@ -17241,7 +17241,7 @@ function updateLgRowMutatie(groep) {
   const m   = getMutatie(groep);
   const pct = AANPASSING_PCT[groep];
   const c1  = getC1Salaris();
-  const fmt = v => new Intl.NumberFormat(&quot;nl-NL&quot;,{style:&quot;currency&quot;,currency:&quot;EUR&quot;}).format(v);
+  const fmt = v =&gt; new Intl.NumberFormat(&quot;nl-NL&quot;,{style:&quot;currency&quot;,currency:&quot;EUR&quot;}).format(v);
 
   const el_ref = document.getElementById(&quot;ref-&quot;+groep);
   const el_mut = document.getElementById(&quot;mutatie-&quot;+groep);
@@ -17253,41 +17253,41 @@ function updateLgRowMutatie(groep) {
       : `C1 × ${pct*100}% = ${fmt(ref)}`;
   }
   if (el_mut) {
-    el_mut.textContent = m > 0 ? &quot;€ &quot; + m.toFixed(4) : &quot;—&quot;;
-    el_mut.style.color = m > 0 ? &quot;#276749&quot; : &quot;#a0aec0&quot;;
+    el_mut.textContent = m &gt; 0 ? &quot;€ &quot; + m.toFixed(4) : &quot;—&quot;;
+    el_mut.style.color = m &gt; 0 ? &quot;#276749&quot; : &quot;#a0aec0&quot;;
   }
 }
 
 function renderMwTable() {
   const zoek = (document.getElementById(&quot;mw-zoek&quot;)?.value || &quot;&quot;).toLowerCase();
   const sorted = [...MEDEWERKERS]
-    .map((p, origIdx) => ({...p, origIdx}))
-    .sort((a,b) => a.naam.localeCompare(b.naam))
-    .filter(p => !zoek || p.naam.toLowerCase().includes(zoek) || String(p.mannr).includes(zoek));
+    .map((p, origIdx) =&gt; ({...p, origIdx}))
+    .sort((a,b) =&gt; a.naam.localeCompare(b.naam))
+    .filter(p =&gt; !zoek || p.naam.toLowerCase().includes(zoek) || String(p.mannr).includes(zoek));
 
-  document.getElementById(&quot;mw-tbody&quot;).innerHTML = sorted.map(p => {
+  document.getElementById(&quot;mw-tbody&quot;).innerHTML = sorted.map(p =&gt; {
     const idx = p.origIdx;
     const sal = getSalaris(p.groep);
-    return `<tr>
-      <td><input class=&quot;s-input&quot; type=&quot;number&quot; value=&quot;${p.mannr}&quot;
-          onchange=&quot;MEDEWERKERS[${idx}].mannr=parseInt(this.value)&quot; style=&quot;width:70px&quot;></td>
-      <td><input class=&quot;s-input&quot; type=&quot;text&quot; value=&quot;${p.naam}&quot;
-          onchange=&quot;MEDEWERKERS[${idx}].naam=this.value&quot; style=&quot;width:150px&quot;></td>
-      <td>
-        <select class=&quot;s-select&quot; onchange=&quot;MEDEWERKERS[${idx}].groep=this.value; renderMwTable()&quot;>
-          ${GROEP_LIJST.map(g=>`<option value=&quot;${g}&quot;${p.groep===g?&quot; selected&quot;:&quot;&quot;}>${g}</option>`).join(&quot;&quot;)}
-        </select>
-      </td>
-      <td style=&quot;color:#276749;text-align:right&quot;>${eur2(sal)}</td>
-      <td><input class=&quot;s-input&quot; type=&quot;number&quot; step=&quot;0.1&quot; value=&quot;${p.km}&quot;
-          onchange=&quot;MEDEWERKERS[${idx}].km=parseFloat(this.value)||0&quot; style=&quot;width:58px&quot;></td>
-      <td style=&quot;text-align:center&quot;>
+    return `&lt;tr&gt;
+      &lt;td&gt;&lt;input class=&quot;s-input&quot; type=&quot;number&quot; value=&quot;${p.mannr}&quot;
+          onchange=&quot;MEDEWERKERS[${idx}].mannr=parseInt(this.value)&quot; style=&quot;width:70px&quot;&gt;&lt;/td&gt;
+      &lt;td&gt;&lt;input class=&quot;s-input&quot; type=&quot;text&quot; value=&quot;${p.naam}&quot;
+          onchange=&quot;MEDEWERKERS[${idx}].naam=this.value&quot; style=&quot;width:150px&quot;&gt;&lt;/td&gt;
+      &lt;td&gt;
+        &lt;select class=&quot;s-select&quot; onchange=&quot;MEDEWERKERS[${idx}].groep=this.value; renderMwTable()&quot;&gt;
+          ${GROEP_LIJST.map(g=&gt;`&lt;option value=&quot;${g}&quot;${p.groep===g?&quot; selected&quot;:&quot;&quot;}&gt;${g}&lt;/option&gt;`).join(&quot;&quot;)}
+        &lt;/select&gt;
+      &lt;/td&gt;
+      &lt;td style=&quot;color:#276749;text-align:right&quot;&gt;${eur2(sal)}&lt;/td&gt;
+      &lt;td&gt;&lt;input class=&quot;s-input&quot; type=&quot;number&quot; step=&quot;0.1&quot; value=&quot;${p.km}&quot;
+          onchange=&quot;MEDEWERKERS[${idx}].km=parseFloat(this.value)||0&quot; style=&quot;width:58px&quot;&gt;&lt;/td&gt;
+      &lt;td style=&quot;text-align:center&quot;&gt;
         ${idx === mwVerwijderPending
-          ? `<span style=&quot;display:inline-flex;gap:4px;&quot;><button onclick=&quot;bevestigVerwijderMedewerker(${idx})&quot; style=&quot;background:#c53030;color:#fff;border:none;border-radius:5px;padding:2px 8px;cursor:pointer;font-size:11px;font-weight:700;&quot;>Ja</button><button onclick=&quot;mwVerwijderPending=null;renderMwTable()&quot; style=&quot;background:#f7fafc;color:#4a5568;border:1px solid #e2e8f0;border-radius:5px;padding:2px 8px;cursor:pointer;font-size:11px;&quot;>Nee</button></span>`
-          : `<button onclick=&quot;mwVerwijderPending=${idx};renderMwTable()&quot; title=&quot;Verwijderen&quot; style=&quot;background:#fff5f5;color:#c53030;border:1px solid #fed7d7;border-radius:5px;padding:2px 7px;cursor:pointer;font-size:12px&quot;>✕</button>`
+          ? `&lt;span style=&quot;display:inline-flex;gap:4px;&quot;&gt;&lt;button onclick=&quot;bevestigVerwijderMedewerker(${idx})&quot; style=&quot;background:#c53030;color:#fff;border:none;border-radius:5px;padding:2px 8px;cursor:pointer;font-size:11px;font-weight:700;&quot;&gt;Ja&lt;/button&gt;&lt;button onclick=&quot;mwVerwijderPending=null;renderMwTable()&quot; style=&quot;background:#f7fafc;color:#4a5568;border:1px solid #e2e8f0;border-radius:5px;padding:2px 8px;cursor:pointer;font-size:11px;&quot;&gt;Nee&lt;/button&gt;&lt;/span&gt;`
+          : `&lt;button onclick=&quot;mwVerwijderPending=${idx};renderMwTable()&quot; title=&quot;Verwijderen&quot; style=&quot;background:#fff5f5;color:#c53030;border:1px solid #fed7d7;border-radius:5px;padding:2px 7px;cursor:pointer;font-size:12px&quot;&gt;✕&lt;/button&gt;`
         }
-      </td>
-    </tr>`;
+      &lt;/td&gt;
+    &lt;/tr&gt;`;
   }).join(&quot;&quot;);
 }
 
@@ -17298,7 +17298,7 @@ function addMedewerker() {
   if (zoekEl) zoekEl.value = &quot;&quot;;
   renderMwTable();
   // Scroll to bottom
-  setTimeout(() => document.getElementById(&quot;mw-tbody&quot;).lastElementChild?.scrollIntoView({behavior:&quot;smooth&quot;, block:&quot;center&quot;}), 50);
+  setTimeout(() =&gt; document.getElementById(&quot;mw-tbody&quot;).lastElementChild?.scrollIntoView({behavior:&quot;smooth&quot;, block:&quot;center&quot;}), 50);
 }
 
 let mwVerwijderPending = null;
@@ -17315,33 +17315,33 @@ function bevestigVerwijderMedewerker(idx) {
 function renderHvhTable() {
   const zoek = (document.getElementById(&quot;hvh-zoek&quot;)?.value || &quot;&quot;).toLowerCase();
   const sorted = [...MEDEWERKERS_HVH]
-    .map((p, origIdx) => ({...p, origIdx}))
-    .sort((a,b) => a.naam.localeCompare(b.naam))
-    .filter(p => !zoek || p.naam.toLowerCase().includes(zoek) || String(p.mannr).includes(zoek));
+    .map((p, origIdx) =&gt; ({...p, origIdx}))
+    .sort((a,b) =&gt; a.naam.localeCompare(b.naam))
+    .filter(p =&gt; !zoek || p.naam.toLowerCase().includes(zoek) || String(p.mannr).includes(zoek));
 
-  document.getElementById(&quot;hvh-tbody&quot;).innerHTML = sorted.map(p => {
+  document.getElementById(&quot;hvh-tbody&quot;).innerHTML = sorted.map(p =&gt; {
     const idx = p.origIdx;
     const sal = getSalaris(p.groep);
-    return `<tr>
-      <td><input class=&quot;s-input&quot; type=&quot;number&quot; value=&quot;${p.mannr}&quot;
-          onchange=&quot;MEDEWERKERS_HVH[${idx}].mannr=parseInt(this.value)&quot; style=&quot;width:70px&quot;></td>
-      <td><input class=&quot;s-input&quot; type=&quot;text&quot; value=&quot;${p.naam}&quot;
-          onchange=&quot;MEDEWERKERS_HVH[${idx}].naam=this.value&quot; style=&quot;width:150px&quot;></td>
-      <td>
-        <select class=&quot;s-select&quot; onchange=&quot;MEDEWERKERS_HVH[${idx}].groep=this.value; renderHvhTable()&quot;>
-          ${GROEP_LIJST.map(g=>`<option value=&quot;${g}&quot;${p.groep===g?&quot; selected&quot;:&quot;&quot;}>${g}</option>`).join(&quot;&quot;)}
-        </select>
-      </td>
-      <td style=&quot;color:#276749;text-align:right&quot;>${eur2(sal)}</td>
-      <td><input class=&quot;s-input&quot; type=&quot;number&quot; step=&quot;0.1&quot; value=&quot;${p.km}&quot;
-          onchange=&quot;MEDEWERKERS_HVH[${idx}].km=parseFloat(this.value)||0&quot; style=&quot;width:58px&quot;></td>
-      <td style=&quot;text-align:center&quot;>
+    return `&lt;tr&gt;
+      &lt;td&gt;&lt;input class=&quot;s-input&quot; type=&quot;number&quot; value=&quot;${p.mannr}&quot;
+          onchange=&quot;MEDEWERKERS_HVH[${idx}].mannr=parseInt(this.value)&quot; style=&quot;width:70px&quot;&gt;&lt;/td&gt;
+      &lt;td&gt;&lt;input class=&quot;s-input&quot; type=&quot;text&quot; value=&quot;${p.naam}&quot;
+          onchange=&quot;MEDEWERKERS_HVH[${idx}].naam=this.value&quot; style=&quot;width:150px&quot;&gt;&lt;/td&gt;
+      &lt;td&gt;
+        &lt;select class=&quot;s-select&quot; onchange=&quot;MEDEWERKERS_HVH[${idx}].groep=this.value; renderHvhTable()&quot;&gt;
+          ${GROEP_LIJST.map(g=&gt;`&lt;option value=&quot;${g}&quot;${p.groep===g?&quot; selected&quot;:&quot;&quot;}&gt;${g}&lt;/option&gt;`).join(&quot;&quot;)}
+        &lt;/select&gt;
+      &lt;/td&gt;
+      &lt;td style=&quot;color:#276749;text-align:right&quot;&gt;${eur2(sal)}&lt;/td&gt;
+      &lt;td&gt;&lt;input class=&quot;s-input&quot; type=&quot;number&quot; step=&quot;0.1&quot; value=&quot;${p.km}&quot;
+          onchange=&quot;MEDEWERKERS_HVH[${idx}].km=parseFloat(this.value)||0&quot; style=&quot;width:58px&quot;&gt;&lt;/td&gt;
+      &lt;td style=&quot;text-align:center&quot;&gt;
         ${idx === hvhVerwijderPending
-          ? `<span style=&quot;display:inline-flex;gap:4px;&quot;><button onclick=&quot;bevestigVerwijderHvhMedewerker(${idx})&quot; style=&quot;background:#c53030;color:#fff;border:none;border-radius:5px;padding:2px 8px;cursor:pointer;font-size:11px;font-weight:700;&quot;>Ja</button><button onclick=&quot;hvhVerwijderPending=null;renderHvhTable()&quot; style=&quot;background:#f7fafc;color:#4a5568;border:1px solid #e2e8f0;border-radius:5px;padding:2px 8px;cursor:pointer;font-size:11px;&quot;>Nee</button></span>`
-          : `<button onclick=&quot;hvhVerwijderPending=${idx};renderHvhTable()&quot; title=&quot;Verwijderen&quot; style=&quot;background:#fff5f5;color:#c53030;border:1px solid #fed7d7;border-radius:5px;padding:2px 7px;cursor:pointer;font-size:12px&quot;>✕</button>`
+          ? `&lt;span style=&quot;display:inline-flex;gap:4px;&quot;&gt;&lt;button onclick=&quot;bevestigVerwijderHvhMedewerker(${idx})&quot; style=&quot;background:#c53030;color:#fff;border:none;border-radius:5px;padding:2px 8px;cursor:pointer;font-size:11px;font-weight:700;&quot;&gt;Ja&lt;/button&gt;&lt;button onclick=&quot;hvhVerwijderPending=null;renderHvhTable()&quot; style=&quot;background:#f7fafc;color:#4a5568;border:1px solid #e2e8f0;border-radius:5px;padding:2px 8px;cursor:pointer;font-size:11px;&quot;&gt;Nee&lt;/button&gt;&lt;/span&gt;`
+          : `&lt;button onclick=&quot;hvhVerwijderPending=${idx};renderHvhTable()&quot; title=&quot;Verwijderen&quot; style=&quot;background:#fff5f5;color:#c53030;border:1px solid #fed7d7;border-radius:5px;padding:2px 7px;cursor:pointer;font-size:12px&quot;&gt;✕&lt;/button&gt;`
         }
-      </td>
-    </tr>`;
+      &lt;/td&gt;
+    &lt;/tr&gt;`;
   }).join(&quot;&quot;);
 }
 
@@ -17350,7 +17350,7 @@ function addHvhMedewerker() {
   const zoekEl = document.getElementById(&quot;hvh-zoek&quot;);
   if (zoekEl) zoekEl.value = &quot;&quot;;
   renderHvhTable();
-  setTimeout(() => document.getElementById(&quot;hvh-tbody&quot;).lastElementChild?.scrollIntoView({behavior:&quot;smooth&quot;, block:&quot;center&quot;}), 50);
+  setTimeout(() =&gt; document.getElementById(&quot;hvh-tbody&quot;).lastElementChild?.scrollIntoView({behavior:&quot;smooth&quot;, block:&quot;center&quot;}), 50);
 }
 
 let hvhVerwijderPending = null;
@@ -17366,7 +17366,7 @@ function bevestigVerwijderHvhMedewerker(idx) {
 
 function applySettings() {
   // Herbereken salaris en mutatie voor alle medewerkers vanuit de loongroeptabel
-  MEDEWERKERS.forEach(p => {
+  MEDEWERKERS.forEach(p =&gt; {
     p.salaris = getSalaris(p.groep);
     p.mutVal  = getMutatie(p.groep);
   });
@@ -17378,16 +17378,16 @@ function applySettings() {
   renderMwTable();
   // Persist to localStorage so changes survive reload
   try {
-    localStorage.setItem('ma_loongroepen_v1', JSON.stringify(LOONGROEPEN));
-    localStorage.setItem('ma_medewerkers_v1', JSON.stringify(MEDEWERKERS));
-    localStorage.setItem('ma_hvh_v1', JSON.stringify(MEDEWERKERS_HVH));
+    localStorage.setItem(&#x27;ma_loongroepen_v1&#x27;, JSON.stringify(LOONGROEPEN));
+    localStorage.setItem(&#x27;ma_medewerkers_v1&#x27;, JSON.stringify(MEDEWERKERS));
+    localStorage.setItem(&#x27;ma_hvh_v1&#x27;, JSON.stringify(MEDEWERKERS_HVH));
   } catch(e) {}
   try {
-    window.parent.postMessage({type:'ma-medewerkers-sync', opgeslagen:true, ep: MEDEWERKERS.map(m => m.naam), hvh: MEDEWERKERS_HVH.map(m => m.naam)}, '*');
+    window.parent.postMessage({type:&#x27;ma-medewerkers-sync&#x27;, opgeslagen:true, ep: MEDEWERKERS.map(m =&gt; m.naam), hvh: MEDEWERKERS_HVH.map(m =&gt; m.naam)}, &#x27;*&#x27;);
   } catch(e) {}
   const f = document.getElementById(&quot;saved-flash&quot;);
   f.classList.add(&quot;show&quot;);
-  setTimeout(() => f.classList.remove(&quot;show&quot;), 2500);
+  setTimeout(() =&gt; f.classList.remove(&quot;show&quot;), 2500);
 }
 
 // Verbergt het instellingen-tandwiel voor accounts zonder &quot;Salaris&quot;-toestemming in
@@ -17404,102 +17404,102 @@ function _saMagInstellingen(){
 // ── Hoofd render ──────────────────────────────────────────────────────────────
 function render() {
   const {step, resultaten, maand, jaar, filter, zoek, payroll, fileName} = state;
-  document.getElementById(&quot;header-btns&quot;).innerHTML = `<div style=&quot;display:flex;align-items:center;gap:6px&quot;>
-    ${_saMagInstellingen() ? `<button class=&quot;btn-gear&quot; onclick=&quot;checkWachtwoord()&quot; title=&quot;Instellingen&quot;>⚙️</button>` : &quot;&quot;}
-    ${step===&quot;result&quot; ? `<button class=&quot;btn-ghost&quot; onclick=&quot;reset()&quot;>↩ Nieuwe import</button><button class=&quot;btn-green&quot; onclick=&quot;exportExcel()&quot;>⬇ Download Excel</button>` : &quot;&quot;}
-  </div>`;
+  document.getElementById(&quot;header-btns&quot;).innerHTML = `&lt;div style=&quot;display:flex;align-items:center;gap:6px&quot;&gt;
+    ${_saMagInstellingen() ? `&lt;button class=&quot;btn-gear&quot; onclick=&quot;checkWachtwoord()&quot; title=&quot;Instellingen&quot;&gt;⚙️&lt;/button&gt;` : &quot;&quot;}
+    ${step===&quot;result&quot; ? `&lt;button class=&quot;btn-ghost&quot; onclick=&quot;reset()&quot;&gt;↩ Nieuwe import&lt;/button&gt;&lt;button class=&quot;btn-green&quot; onclick=&quot;exportExcel()&quot;&gt;⬇ Download Excel&lt;/button&gt;` : &quot;&quot;}
+  &lt;/div&gt;`;
 
   let html = &quot;&quot;;
 
   if (step === &quot;upload&quot;) {
-    html = `<div style=&quot;max-width:520px;margin:60px auto&quot;><div class=&quot;card&quot;>
-      <h2 style=&quot;margin-bottom:8px;font-size:21px;color:#2d3748&quot;>PayrollSummary importeren</h2>
-        <p style=&quot;color:#2b6cb0;font-size:13px;font-weight:bold;margin-bottom:0&quot;>vanuit QUINYX</p>
-      <p style=&quot;color:#718096;font-size:13px;margin-bottom:26px&quot;>Sleep je PayrollSummary.xlsx hiernaartoe of klik om te uploaden</p>
-      <div class=&quot;drop-zone&quot; id=&quot;dropzone&quot; onclick=&quot;document.getElementById('fi').click()&quot;
-        ondragover=&quot;event.preventDefault();this.classList.add('dragover')&quot;
-        ondragleave=&quot;this.classList.remove('dragover')&quot; ondrop=&quot;handleDrop(event)&quot;>
-        <div style=&quot;font-size:52px;margin-bottom:14px&quot;>📂</div>
-        <div style=&quot;color:#2b6cb0;font-weight:bold;font-size:15px&quot;>Klik of sleep bestand</div>
-        <div style=&quot;color:#a0aec0;font-size:12px;margin-top:5px&quot;>PayrollSummary_*.xlsx</div>
-      </div>
-      <input id=&quot;fi&quot; type=&quot;file&quot; accept=&quot;.xlsx,.xls&quot; style=&quot;display:none&quot; onchange=&quot;handleFile(this.files[0])&quot;>
+    html = `&lt;div style=&quot;max-width:520px;margin:60px auto&quot;&gt;&lt;div class=&quot;card&quot;&gt;
+      &lt;h2 style=&quot;margin-bottom:8px;font-size:21px;color:#2d3748&quot;&gt;PayrollSummary importeren&lt;/h2&gt;
+        &lt;p style=&quot;color:#2b6cb0;font-size:13px;font-weight:bold;margin-bottom:0&quot;&gt;vanuit QUINYX&lt;/p&gt;
+      &lt;p style=&quot;color:#718096;font-size:13px;margin-bottom:26px&quot;&gt;Sleep je PayrollSummary.xlsx hiernaartoe of klik om te uploaden&lt;/p&gt;
+      &lt;div class=&quot;drop-zone&quot; id=&quot;dropzone&quot; onclick=&quot;document.getElementById(&#x27;fi&#x27;).click()&quot;
+        ondragover=&quot;event.preventDefault();this.classList.add(&#x27;dragover&#x27;)&quot;
+        ondragleave=&quot;this.classList.remove(&#x27;dragover&#x27;)&quot; ondrop=&quot;handleDrop(event)&quot;&gt;
+        &lt;div style=&quot;font-size:52px;margin-bottom:14px&quot;&gt;📂&lt;/div&gt;
+        &lt;div style=&quot;color:#2b6cb0;font-weight:bold;font-size:15px&quot;&gt;Klik of sleep bestand&lt;/div&gt;
+        &lt;div style=&quot;color:#a0aec0;font-size:12px;margin-top:5px&quot;&gt;PayrollSummary_*.xlsx&lt;/div&gt;
+      &lt;/div&gt;
+      &lt;input id=&quot;fi&quot; type=&quot;file&quot; accept=&quot;.xlsx,.xls&quot; style=&quot;display:none&quot; onchange=&quot;handleFile(this.files[0])&quot;&gt;
 
-      <!-- Quinyx uitleg -->
-      <div style=&quot;margin-top:22px;border-top:2px solid #e2e8f0;padding-top:18px&quot;>
-        <div style=&quot;font-weight:bold;color:#1a365d;font-size:13px;margin-bottom:14px;display:flex;align-items:center;gap:8px&quot;>
-          <span style=&quot;background:#ebf8ff;border:1px solid #bee3f8;color:#2b6cb0;border-radius:6px;padding:3px 10px;font-size:11px&quot;>ℹ️ Hoe download je de PayrollSummary uit Quinyx?</span>
-        </div>
+      &lt;!-- Quinyx uitleg --&gt;
+      &lt;div style=&quot;margin-top:22px;border-top:2px solid #e2e8f0;padding-top:18px&quot;&gt;
+        &lt;div style=&quot;font-weight:bold;color:#1a365d;font-size:13px;margin-bottom:14px;display:flex;align-items:center;gap:8px&quot;&gt;
+          &lt;span style=&quot;background:#ebf8ff;border:1px solid #bee3f8;color:#2b6cb0;border-radius:6px;padding:3px 10px;font-size:11px&quot;&gt;ℹ️ Hoe download je de PayrollSummary uit Quinyx?&lt;/span&gt;
+        &lt;/div&gt;
 
-        <div style=&quot;margin-bottom:16px&quot;>
-          <div style=&quot;font-weight:bold;color:#fff;background:#1a365d;font-size:11px;padding:4px 10px;border-radius:5px;margin-bottom:8px;display:inline-flex;align-items:center;gap:6px&quot;>
-            <span style=&quot;background:#fff;color:#1a365d;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:bold;flex-shrink:0&quot;>1</span>
+        &lt;div style=&quot;margin-bottom:16px&quot;&gt;
+          &lt;div style=&quot;font-weight:bold;color:#fff;background:#1a365d;font-size:11px;padding:4px 10px;border-radius:5px;margin-bottom:8px;display:inline-flex;align-items:center;gap:6px&quot;&gt;
+            &lt;span style=&quot;background:#fff;color:#1a365d;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:bold;flex-shrink:0&quot;&gt;1&lt;/span&gt;
             Planning afsluiten
-          </div>
-          <ol style=&quot;margin:0 0 0 16px;padding:0;font-size:12px;color:#4a5568;line-height:2&quot;>
-            <li>Druk op <strong>Planning</strong> en selecteer de maand via de <strong>maand knop</strong></li>
-            <li>Druk op de <strong>3 stippen</strong> rechtsboven → kies <strong>&quot;Alles bevestigen&quot;</strong> <span style=&quot;color:#718096;font-size:11px&quot;>(elk vakje krijgt een blauw vinkje — dit duurt even)</span></li>
-            <li>Druk bovenin op <strong>TIJD</strong> → selecteer de af te sluiten <strong>maand</strong></li>
-            <li>Vul in: <strong>District</strong> = <em>Stena Line Stevedoring BV</em></li>
-            <li>Vul in: <strong>Kostenplaats</strong> = <em>Hoek van Holland</em> of <em>Europoort</em></li>
-            <li>Vul in: <strong>Payroll-bestand</strong> = <em>Mintra</em>  |  <strong>Status Loonlijstitems</strong> = <em>Klaar</em></li>
-            <li>Controleer: elke medewerker heeft een <span style=&quot;color:#276749;font-weight:bold&quot;>groen vinkje ✓</span> — zo niet, ga terug naar Planning en herhaal</li>
-            <li>Vink <strong>NAAM</strong> aan → iedereen aangevinkt → druk op <strong>&quot;Salarisbestand Maken&quot;</strong></li>
-            <li>Druk op het <strong>vergrendel-vinkje</strong> → <strong>OK</strong></li>
-          </ol>
-        </div>
+          &lt;/div&gt;
+          &lt;ol style=&quot;margin:0 0 0 16px;padding:0;font-size:12px;color:#4a5568;line-height:2&quot;&gt;
+            &lt;li&gt;Druk op &lt;strong&gt;Planning&lt;/strong&gt; en selecteer de maand via de &lt;strong&gt;maand knop&lt;/strong&gt;&lt;/li&gt;
+            &lt;li&gt;Druk op de &lt;strong&gt;3 stippen&lt;/strong&gt; rechtsboven → kies &lt;strong&gt;&quot;Alles bevestigen&quot;&lt;/strong&gt; &lt;span style=&quot;color:#718096;font-size:11px&quot;&gt;(elk vakje krijgt een blauw vinkje — dit duurt even)&lt;/span&gt;&lt;/li&gt;
+            &lt;li&gt;Druk bovenin op &lt;strong&gt;TIJD&lt;/strong&gt; → selecteer de af te sluiten &lt;strong&gt;maand&lt;/strong&gt;&lt;/li&gt;
+            &lt;li&gt;Vul in: &lt;strong&gt;District&lt;/strong&gt; = &lt;em&gt;Stena Line Stevedoring BV&lt;/em&gt;&lt;/li&gt;
+            &lt;li&gt;Vul in: &lt;strong&gt;Kostenplaats&lt;/strong&gt; = &lt;em&gt;Hoek van Holland&lt;/em&gt; of &lt;em&gt;Europoort&lt;/em&gt;&lt;/li&gt;
+            &lt;li&gt;Vul in: &lt;strong&gt;Payroll-bestand&lt;/strong&gt; = &lt;em&gt;Mintra&lt;/em&gt;  |  &lt;strong&gt;Status Loonlijstitems&lt;/strong&gt; = &lt;em&gt;Klaar&lt;/em&gt;&lt;/li&gt;
+            &lt;li&gt;Controleer: elke medewerker heeft een &lt;span style=&quot;color:#276749;font-weight:bold&quot;&gt;groen vinkje ✓&lt;/span&gt; — zo niet, ga terug naar Planning en herhaal&lt;/li&gt;
+            &lt;li&gt;Vink &lt;strong&gt;NAAM&lt;/strong&gt; aan → iedereen aangevinkt → druk op &lt;strong&gt;&quot;Salarisbestand Maken&quot;&lt;/strong&gt;&lt;/li&gt;
+            &lt;li&gt;Druk op het &lt;strong&gt;vergrendel-vinkje&lt;/strong&gt; → &lt;strong&gt;OK&lt;/strong&gt;&lt;/li&gt;
+          &lt;/ol&gt;
+        &lt;/div&gt;
 
-        <div>
-          <div style=&quot;font-weight:bold;color:#fff;background:#1a365d;font-size:11px;padding:4px 10px;border-radius:5px;margin-bottom:8px;display:inline-flex;align-items:center;gap:6px&quot;>
-            <span style=&quot;background:#fff;color:#1a365d;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:bold;flex-shrink:0&quot;>2</span>
+        &lt;div&gt;
+          &lt;div style=&quot;font-weight:bold;color:#fff;background:#1a365d;font-size:11px;padding:4px 10px;border-radius:5px;margin-bottom:8px;display:inline-flex;align-items:center;gap:6px&quot;&gt;
+            &lt;span style=&quot;background:#fff;color:#1a365d;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:bold;flex-shrink:0&quot;&gt;2&lt;/span&gt;
             PayrollSummary downloaden
-          </div>
-          <ol style=&quot;margin:0 0 0 16px;padding:0;font-size:12px;color:#4a5568;line-height:2&quot;>
-            <li>Druk op <strong>Analytics</strong> → <strong>Salarisgegevens</strong> → <strong>Aanmaken</strong></li>
-            <li>Selecteer de <strong>maand</strong> en vul bij <strong>UNIT</strong> de terminal in: <em>Hoek van Holland</em> of <em>Europoort</em></li>
-            <li>Bij <strong>&quot;Inclusief alle gegevens voor&quot;</strong>: kies <em>&quot;Alle tijd gewerkt in unit&quot;</em></li>
-            <li>Controleer of alle medewerkers zichtbaar zijn — zo niet: druk op <strong>&quot;Selecteer alle&quot;</strong></li>
-            <li>Vink onderaan <strong>alleen</strong> aan: <span style=&quot;color:#276749;font-weight:bold&quot;>✓ Types absenties toevoegen   ✓ Inclusief kostenplaats   ✓ Alleen totalen</span></li>
-            <li>Druk op <strong>Aanmaken</strong> → wacht tot status wijzigt naar <strong>&quot;Downloaden&quot;</strong> → druk op <strong>Downloaden</strong></li>
-            <li style=&quot;color:#2b6cb0;font-weight:bold&quot;>↑ Sleep het gedownloade bestand in het vak hierboven</li>
-          </ol>
-        </div>
-      </div>
+          &lt;/div&gt;
+          &lt;ol style=&quot;margin:0 0 0 16px;padding:0;font-size:12px;color:#4a5568;line-height:2&quot;&gt;
+            &lt;li&gt;Druk op &lt;strong&gt;Analytics&lt;/strong&gt; → &lt;strong&gt;Salarisgegevens&lt;/strong&gt; → &lt;strong&gt;Aanmaken&lt;/strong&gt;&lt;/li&gt;
+            &lt;li&gt;Selecteer de &lt;strong&gt;maand&lt;/strong&gt; en vul bij &lt;strong&gt;UNIT&lt;/strong&gt; de terminal in: &lt;em&gt;Hoek van Holland&lt;/em&gt; of &lt;em&gt;Europoort&lt;/em&gt;&lt;/li&gt;
+            &lt;li&gt;Bij &lt;strong&gt;&quot;Inclusief alle gegevens voor&quot;&lt;/strong&gt;: kies &lt;em&gt;&quot;Alle tijd gewerkt in unit&quot;&lt;/em&gt;&lt;/li&gt;
+            &lt;li&gt;Controleer of alle medewerkers zichtbaar zijn — zo niet: druk op &lt;strong&gt;&quot;Selecteer alle&quot;&lt;/strong&gt;&lt;/li&gt;
+            &lt;li&gt;Vink onderaan &lt;strong&gt;alleen&lt;/strong&gt; aan: &lt;span style=&quot;color:#276749;font-weight:bold&quot;&gt;✓ Types absenties toevoegen   ✓ Inclusief kostenplaats   ✓ Alleen totalen&lt;/span&gt;&lt;/li&gt;
+            &lt;li&gt;Druk op &lt;strong&gt;Aanmaken&lt;/strong&gt; → wacht tot status wijzigt naar &lt;strong&gt;&quot;Downloaden&quot;&lt;/strong&gt; → druk op &lt;strong&gt;Downloaden&lt;/strong&gt;&lt;/li&gt;
+            &lt;li style=&quot;color:#2b6cb0;font-weight:bold&quot;&gt;↑ Sleep het gedownloade bestand in het vak hierboven&lt;/li&gt;
+          &lt;/ol&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
 
-    </div></div>`;
+    &lt;/div&gt;&lt;/div&gt;`;
   }
 
   else if (step === &quot;preview&quot;) {
     const counts = {};
-    [&quot;V175&quot;,&quot;V176&quot;,&quot;V177&quot;,&quot;V301&quot;,&quot;V430&quot;,&quot;V430_MUTATIE&quot;].forEach(t => { counts[t] = Object.values(payroll).filter(p=>p[t]>0).length; });
+    [&quot;V175&quot;,&quot;V176&quot;,&quot;V177&quot;,&quot;V301&quot;,&quot;V430&quot;,&quot;V430_MUTATIE&quot;].forEach(t =&gt; { counts[t] = Object.values(payroll).filter(p=&gt;p[t]&gt;0).length; });
     const labels = {V175:&quot;Overwerk ma-vr&quot;,V176:&quot;Overwerk za&quot;,V177:&quot;Overwerk zo&quot;,V301:&quot;Reisvergoeding&quot;,V430:&quot;Verschoven dienst&quot;,V430_MUTATIE:&quot;Mutatieloon&quot;};
-    const maandOpts = MAANDEN.map((m,i)=>`<option value=&quot;${i+1}&quot;${maand===i+1?&quot; selected&quot;:&quot;&quot;}>${m}</option>`).join(&quot;&quot;);
-    html = `<div style=&quot;max-width:580px;margin:40px auto&quot;><div class=&quot;card&quot;>
-      <div style=&quot;display:flex;align-items:center;gap:12px;margin-bottom:24px&quot;>
-        <div style=&quot;background:#c6f6d5;border-radius:8px;padding:8px 12px;font-size:22px&quot;>✅</div>
-        <div><div style=&quot;font-weight:bold;font-size:15px;color:#2d3748&quot;>${fileName}</div><div style=&quot;color:#718096;font-size:12px&quot;>Bestand succesvol ingeladen</div></div>
-      </div>
-      <div style=&quot;font-weight:bold;color:#4a5568;font-size:12px;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px&quot;>Gedetecteerde mutaties</div>
-      <div class=&quot;summary-grid&quot;>
-        ${[&quot;V175&quot;,&quot;V176&quot;,&quot;V177&quot;,&quot;V301&quot;,&quot;V430&quot;,&quot;V430_MUTATIE&quot;].map(t=>`<div class=&quot;sum-item&quot;><div class=&quot;sum-val&quot;>${counts[t]}</div><div class=&quot;sum-lbl&quot;>${labels[t]}</div></div>`).join(&quot;&quot;)}
-      </div>
-      <div style=&quot;font-weight:bold;color:#4a5568;font-size:12px;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px&quot;>Periode bevestigen</div>
-      <div class=&quot;period-row&quot;>
-        <div><label>Maand</label><select onchange=&quot;state.maand=parseInt(this.value)&quot; style=&quot;width:100%&quot;>${maandOpts}</select></div>
-        <div><label>Jaar</label><input type=&quot;number&quot; value=&quot;${jaar}&quot; onchange=&quot;state.jaar=parseInt(this.value)&quot; style=&quot;width:100%&quot;></div>
-      </div>
-      <div style=&quot;display:flex;gap:10px;margin-top:6px&quot;>
-        <button class=&quot;btn-back&quot; onclick=&quot;reset()&quot;>← Terug</button>
-        <button class=&quot;btn-blue&quot; onclick=&quot;doBereken()&quot;>🔢 Bereken Maandafsluiting</button>
-      </div>
-    </div></div>`;
+    const maandOpts = MAANDEN.map((m,i)=&gt;`&lt;option value=&quot;${i+1}&quot;${maand===i+1?&quot; selected&quot;:&quot;&quot;}&gt;${m}&lt;/option&gt;`).join(&quot;&quot;);
+    html = `&lt;div style=&quot;max-width:580px;margin:40px auto&quot;&gt;&lt;div class=&quot;card&quot;&gt;
+      &lt;div style=&quot;display:flex;align-items:center;gap:12px;margin-bottom:24px&quot;&gt;
+        &lt;div style=&quot;background:#c6f6d5;border-radius:8px;padding:8px 12px;font-size:22px&quot;&gt;✅&lt;/div&gt;
+        &lt;div&gt;&lt;div style=&quot;font-weight:bold;font-size:15px;color:#2d3748&quot;&gt;${fileName}&lt;/div&gt;&lt;div style=&quot;color:#718096;font-size:12px&quot;&gt;Bestand succesvol ingeladen&lt;/div&gt;&lt;/div&gt;
+      &lt;/div&gt;
+      &lt;div style=&quot;font-weight:bold;color:#4a5568;font-size:12px;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px&quot;&gt;Gedetecteerde mutaties&lt;/div&gt;
+      &lt;div class=&quot;summary-grid&quot;&gt;
+        ${[&quot;V175&quot;,&quot;V176&quot;,&quot;V177&quot;,&quot;V301&quot;,&quot;V430&quot;,&quot;V430_MUTATIE&quot;].map(t=&gt;`&lt;div class=&quot;sum-item&quot;&gt;&lt;div class=&quot;sum-val&quot;&gt;${counts[t]}&lt;/div&gt;&lt;div class=&quot;sum-lbl&quot;&gt;${labels[t]}&lt;/div&gt;&lt;/div&gt;`).join(&quot;&quot;)}
+      &lt;/div&gt;
+      &lt;div style=&quot;font-weight:bold;color:#4a5568;font-size:12px;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px&quot;&gt;Periode bevestigen&lt;/div&gt;
+      &lt;div class=&quot;period-row&quot;&gt;
+        &lt;div&gt;&lt;label&gt;Maand&lt;/label&gt;&lt;select onchange=&quot;state.maand=parseInt(this.value)&quot; style=&quot;width:100%&quot;&gt;${maandOpts}&lt;/select&gt;&lt;/div&gt;
+        &lt;div&gt;&lt;label&gt;Jaar&lt;/label&gt;&lt;input type=&quot;number&quot; value=&quot;${jaar}&quot; onchange=&quot;state.jaar=parseInt(this.value)&quot; style=&quot;width:100%&quot;&gt;&lt;/div&gt;
+      &lt;/div&gt;
+      &lt;div style=&quot;display:flex;gap:10px;margin-top:6px&quot;&gt;
+        &lt;button class=&quot;btn-back&quot; onclick=&quot;reset()&quot;&gt;← Terug&lt;/button&gt;
+        &lt;button class=&quot;btn-blue&quot; onclick=&quot;doBereken()&quot;&gt;🔢 Bereken Maandafsluiting&lt;/button&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;&lt;/div&gt;`;
   }
 
   else if (step === &quot;result&quot;) {
-    const actief = resultaten.filter(r=>r.totaal>0).length;
-    const totBedrag = resultaten.reduce((s,r)=>s+r.totaal, 0);
-    const gefilterd = resultaten.filter(r => {
-      const mf = filter===&quot;alle&quot;||(filter===&quot;actief&quot;?r.totaal>0:r.totaal===0);
+    const actief = resultaten.filter(r=&gt;r.totaal&gt;0).length;
+    const totBedrag = resultaten.reduce((s,r)=&gt;s+r.totaal, 0);
+    const gefilterd = resultaten.filter(r =&gt; {
+      const mf = filter===&quot;alle&quot;||(filter===&quot;actief&quot;?r.totaal&gt;0:r.totaal===0);
       const mz = !zoek||r.naam.toLowerCase().includes(zoek.toLowerCase())||String(r.mannr).includes(zoek);
       return mf&amp;&amp;mz;
     });
@@ -17512,78 +17512,78 @@ function render() {
       {lbl:&quot;Medewerkers Hoek v. Holland&quot;,val:MEDEWERKERS_HVH.length,icon:&quot;👥&quot;,kleur:&quot;#2d6a4f&quot;},
     ];
 
-    const rijHTML = gefilterd.map((r,i) => {
-      const bg = r.totaal>0?(i%2===0?&quot;#f0fff4&quot;:&quot;#fff&quot;):(i%2===0?&quot;#f7fafc&quot;:&quot;#fff&quot;);
-      const m2 = v => v>0?`<span class=&quot;mutatie-tag&quot;>${num(v)}</span>`:`<span class=&quot;muted&quot;>—</span>`;
-      const e  = v => v>0?`<span style=&quot;color:#276749&quot;>${eur(v)}</span>`:`<span class=&quot;muted&quot;>—</span>`;
-      const k  = v => v>0?`<span style=&quot;color:#2b6cb0;font-weight:bold&quot;>${km(v)}</span>`:`<span class=&quot;muted&quot;>—</span>`;
-      return `<tr style=&quot;background:${bg}&quot;>
-        <td>${r.mannr}</td>
-        <td class=&quot;left&quot; style=&quot;font-weight:${r.totaal>0?&quot;bold&quot;:&quot;normal&quot;};color:${r.totaal>0?&quot;#1a202c&quot;:&quot;#a0aec0&quot;}&quot;>${r.naam}</td>
-        <td class=&quot;center&quot;><span class=&quot;badge&quot;>${r.groep}</span></td>
-        <td>${eur2(r.salaris)}</td>
-        <td style=&quot;text-align:right;color:#4a5568&quot;>${r.km} km</td>
-        <td>${m2(r.v301)}</td><td>${k(r.totKm)}</td>
-        <td>${m2(r.v430)}</td><td>${e(r.totV430)}</td>
-        <td>${m2(r.v175)}</td><td>${e(r.totV175)}</td>
-        <td>${m2(r.v176)}</td><td>${e(r.totV176)}</td>
-        <td>${m2(r.v177)}</td><td>${e(r.totV177)}</td>
-        <td>${m2(r.v430m)}</td><td>${e(r.totMut)}</td>
-        <td class=&quot;totcol&quot; style=&quot;background:${r.totaal>0?&quot;rgba(72,187,120,0.08)&quot;:&quot;transparent&quot;}&quot;>${r.totaal>0?eur(r.totaal):`<span class=&quot;muted&quot;>—</span>`}</td>
-      </tr>`;
+    const rijHTML = gefilterd.map((r,i) =&gt; {
+      const bg = r.totaal&gt;0?(i%2===0?&quot;#f0fff4&quot;:&quot;#fff&quot;):(i%2===0?&quot;#f7fafc&quot;:&quot;#fff&quot;);
+      const m2 = v =&gt; v&gt;0?`&lt;span class=&quot;mutatie-tag&quot;&gt;${num(v)}&lt;/span&gt;`:`&lt;span class=&quot;muted&quot;&gt;—&lt;/span&gt;`;
+      const e  = v =&gt; v&gt;0?`&lt;span style=&quot;color:#276749&quot;&gt;${eur(v)}&lt;/span&gt;`:`&lt;span class=&quot;muted&quot;&gt;—&lt;/span&gt;`;
+      const k  = v =&gt; v&gt;0?`&lt;span style=&quot;color:#2b6cb0;font-weight:bold&quot;&gt;${km(v)}&lt;/span&gt;`:`&lt;span class=&quot;muted&quot;&gt;—&lt;/span&gt;`;
+      return `&lt;tr style=&quot;background:${bg}&quot;&gt;
+        &lt;td&gt;${r.mannr}&lt;/td&gt;
+        &lt;td class=&quot;left&quot; style=&quot;font-weight:${r.totaal&gt;0?&quot;bold&quot;:&quot;normal&quot;};color:${r.totaal&gt;0?&quot;#1a202c&quot;:&quot;#a0aec0&quot;}&quot;&gt;${r.naam}&lt;/td&gt;
+        &lt;td class=&quot;center&quot;&gt;&lt;span class=&quot;badge&quot;&gt;${r.groep}&lt;/span&gt;&lt;/td&gt;
+        &lt;td&gt;${eur2(r.salaris)}&lt;/td&gt;
+        &lt;td style=&quot;text-align:right;color:#4a5568&quot;&gt;${r.km} km&lt;/td&gt;
+        &lt;td&gt;${m2(r.v301)}&lt;/td&gt;&lt;td&gt;${k(r.totKm)}&lt;/td&gt;
+        &lt;td&gt;${m2(r.v430)}&lt;/td&gt;&lt;td&gt;${e(r.totV430)}&lt;/td&gt;
+        &lt;td&gt;${m2(r.v175)}&lt;/td&gt;&lt;td&gt;${e(r.totV175)}&lt;/td&gt;
+        &lt;td&gt;${m2(r.v176)}&lt;/td&gt;&lt;td&gt;${e(r.totV176)}&lt;/td&gt;
+        &lt;td&gt;${m2(r.v177)}&lt;/td&gt;&lt;td&gt;${e(r.totV177)}&lt;/td&gt;
+        &lt;td&gt;${m2(r.v430m)}&lt;/td&gt;&lt;td&gt;${e(r.totMut)}&lt;/td&gt;
+        &lt;td class=&quot;totcol&quot; style=&quot;background:${r.totaal&gt;0?&quot;rgba(72,187,120,0.08)&quot;:&quot;transparent&quot;}&quot;&gt;${r.totaal&gt;0?eur(r.totaal):`&lt;span class=&quot;muted&quot;&gt;—&lt;/span&gt;`}&lt;/td&gt;
+      &lt;/tr&gt;`;
     }).join(&quot;&quot;);
 
-    const tKm=gefilterd.reduce((s,r)=>s+r.totKm,0);
-    const tV430=gefilterd.reduce((s,r)=>s+r.totV430,0);
-    const tV175=gefilterd.reduce((s,r)=>s+r.totV175,0);
-    const tV176=gefilterd.reduce((s,r)=>s+r.totV176,0);
-    const tV177=gefilterd.reduce((s,r)=>s+r.totV177,0);
-    const tMut=gefilterd.reduce((s,r)=>s+r.totMut,0);
-    const tTot=gefilterd.reduce((s,r)=>s+r.totaal,0);
+    const tKm=gefilterd.reduce((s,r)=&gt;s+r.totKm,0);
+    const tV430=gefilterd.reduce((s,r)=&gt;s+r.totV430,0);
+    const tV175=gefilterd.reduce((s,r)=&gt;s+r.totV175,0);
+    const tV176=gefilterd.reduce((s,r)=&gt;s+r.totV176,0);
+    const tV177=gefilterd.reduce((s,r)=&gt;s+r.totV177,0);
+    const tMut=gefilterd.reduce((s,r)=&gt;s+r.totMut,0);
+    const tTot=gefilterd.reduce((s,r)=&gt;s+r.totaal,0);
 
     html = `
-      <div class=&quot;kpi-grid&quot;>${kpis.map(k2=>`<div class=&quot;kpi&quot; style=&quot;border-left:4px solid ${k2.kleur}&quot;><div style=&quot;font-size:24px;margin-bottom:5px&quot;>${k2.icon}</div><div class=&quot;kpi-val&quot;>${k2.val}</div><div class=&quot;kpi-lbl&quot;>${k2.lbl}</div></div>`).join(&quot;&quot;)}</div>
-      <div class=&quot;filter-bar&quot;>
-        <button class=&quot;filt-btn${filter===&quot;actief&quot;?&quot; active&quot;:&quot;&quot;}&quot; onclick=&quot;setFilter('actief')&quot;>Actief</button>
-        <button class=&quot;filt-btn${filter===&quot;alle&quot;?&quot; active&quot;:&quot;&quot;}&quot; onclick=&quot;setFilter('alle')&quot;>Alle medewerkers</button>
-        <button class=&quot;filt-btn${filter===&quot;inactief&quot;?&quot; active&quot;:&quot;&quot;}&quot; onclick=&quot;setFilter('inactief')&quot;>Geen mutaties</button>
-        <input type=&quot;text&quot; placeholder=&quot;Zoek op naam of mannummer...&quot; value=&quot;${zoek}&quot; oninput=&quot;state.zoek=this.value;render()&quot; style=&quot;flex:1;min-width:200px&quot;>
-        <span style=&quot;color:#718096;font-size:12px&quot;>${gefilterd.length} rijen</span>
-      </div>
-      <div class=&quot;tbl-wrap&quot;><div style=&quot;overflow-x:auto&quot;><table>
-        <thead><tr>
-          <th>Mannr</th><th class=&quot;left&quot;>Naam</th><th>Groep</th><th>Salaris</th><th>KM</th>
-          <th>V301</th><th>KM totaal</th>
-          <th>V430 ×</th><th>V430 tot.</th>
-          <th>V175 u.</th><th>V175 tot.</th>
-          <th>V176 u.</th><th>V176 tot.</th>
-          <th>V177 u.</th><th>V177 tot.</th>
-          <th>V430m ×</th><th>Mut. tot.</th>
-          <th>TOTAAL</th>
-        </tr></thead>
-        <tbody>${rijHTML}
-          <tr class=&quot;tot-row&quot;>
-            <td colspan=&quot;4&quot; class=&quot;left&quot; style=&quot;color:#744210&quot;>TOTAAL</td><td></td>
-            <td></td><td style=&quot;color:#2b6cb0;font-weight:bold&quot;>${km(tKm)}</td>
-            <td></td><td style=&quot;color:#744210&quot;>${eur2(tV430)}</td>
-            <td></td><td style=&quot;color:#744210&quot;>${eur2(tV175)}</td>
-            <td></td><td style=&quot;color:#744210&quot;>${eur2(tV176)}</td>
-            <td></td><td style=&quot;color:#744210&quot;>${eur2(tV177)}</td>
-            <td></td><td style=&quot;color:#744210&quot;>${eur2(tMut)}</td>
-            <td style=&quot;color:#22543d;font-size:13px&quot;>${eur2(tTot)}</td>
-          </tr>
-        </tbody>
-      </table></div></div>`;
+      &lt;div class=&quot;kpi-grid&quot;&gt;${kpis.map(k2=&gt;`&lt;div class=&quot;kpi&quot; style=&quot;border-left:4px solid ${k2.kleur}&quot;&gt;&lt;div style=&quot;font-size:24px;margin-bottom:5px&quot;&gt;${k2.icon}&lt;/div&gt;&lt;div class=&quot;kpi-val&quot;&gt;${k2.val}&lt;/div&gt;&lt;div class=&quot;kpi-lbl&quot;&gt;${k2.lbl}&lt;/div&gt;&lt;/div&gt;`).join(&quot;&quot;)}&lt;/div&gt;
+      &lt;div class=&quot;filter-bar&quot;&gt;
+        &lt;button class=&quot;filt-btn${filter===&quot;actief&quot;?&quot; active&quot;:&quot;&quot;}&quot; onclick=&quot;setFilter(&#x27;actief&#x27;)&quot;&gt;Actief&lt;/button&gt;
+        &lt;button class=&quot;filt-btn${filter===&quot;alle&quot;?&quot; active&quot;:&quot;&quot;}&quot; onclick=&quot;setFilter(&#x27;alle&#x27;)&quot;&gt;Alle medewerkers&lt;/button&gt;
+        &lt;button class=&quot;filt-btn${filter===&quot;inactief&quot;?&quot; active&quot;:&quot;&quot;}&quot; onclick=&quot;setFilter(&#x27;inactief&#x27;)&quot;&gt;Geen mutaties&lt;/button&gt;
+        &lt;input type=&quot;text&quot; placeholder=&quot;Zoek op naam of mannummer...&quot; value=&quot;${zoek}&quot; oninput=&quot;state.zoek=this.value;render()&quot; style=&quot;flex:1;min-width:200px&quot;&gt;
+        &lt;span style=&quot;color:#718096;font-size:12px&quot;&gt;${gefilterd.length} rijen&lt;/span&gt;
+      &lt;/div&gt;
+      &lt;div class=&quot;tbl-wrap&quot;&gt;&lt;div style=&quot;overflow-x:auto&quot;&gt;&lt;table&gt;
+        &lt;thead&gt;&lt;tr&gt;
+          &lt;th&gt;Mannr&lt;/th&gt;&lt;th class=&quot;left&quot;&gt;Naam&lt;/th&gt;&lt;th&gt;Groep&lt;/th&gt;&lt;th&gt;Salaris&lt;/th&gt;&lt;th&gt;KM&lt;/th&gt;
+          &lt;th&gt;V301&lt;/th&gt;&lt;th&gt;KM totaal&lt;/th&gt;
+          &lt;th&gt;V430 ×&lt;/th&gt;&lt;th&gt;V430 tot.&lt;/th&gt;
+          &lt;th&gt;V175 u.&lt;/th&gt;&lt;th&gt;V175 tot.&lt;/th&gt;
+          &lt;th&gt;V176 u.&lt;/th&gt;&lt;th&gt;V176 tot.&lt;/th&gt;
+          &lt;th&gt;V177 u.&lt;/th&gt;&lt;th&gt;V177 tot.&lt;/th&gt;
+          &lt;th&gt;V430m ×&lt;/th&gt;&lt;th&gt;Mut. tot.&lt;/th&gt;
+          &lt;th&gt;TOTAAL&lt;/th&gt;
+        &lt;/tr&gt;&lt;/thead&gt;
+        &lt;tbody&gt;${rijHTML}
+          &lt;tr class=&quot;tot-row&quot;&gt;
+            &lt;td colspan=&quot;4&quot; class=&quot;left&quot; style=&quot;color:#744210&quot;&gt;TOTAAL&lt;/td&gt;&lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;&lt;td style=&quot;color:#2b6cb0;font-weight:bold&quot;&gt;${km(tKm)}&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;&lt;td style=&quot;color:#744210&quot;&gt;${eur2(tV430)}&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;&lt;td style=&quot;color:#744210&quot;&gt;${eur2(tV175)}&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;&lt;td style=&quot;color:#744210&quot;&gt;${eur2(tV176)}&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;&lt;td style=&quot;color:#744210&quot;&gt;${eur2(tV177)}&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;&lt;td style=&quot;color:#744210&quot;&gt;${eur2(tMut)}&lt;/td&gt;
+            &lt;td style=&quot;color:#22543d;font-size:13px&quot;&gt;${eur2(tTot)}&lt;/td&gt;
+          &lt;/tr&gt;
+        &lt;/tbody&gt;
+      &lt;/table&gt;&lt;/div&gt;&lt;/div&gt;`;
   }
 
-  document.getElementById(&quot;content&quot;).innerHTML = html;
+  document.getElementById(&quot;content&quot;).innerHTML = (typeof maOnbekendHtml === &#x27;function&#x27; ? maOnbekendHtml() : &#x27;&#x27;) + html;
 }
 
 function handleFile(file) {
   if (!file) return;
   state.fileName = file.name;
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = e =&gt; {
     const wb = XLSX.read(e.target.result, {type:&quot;array&quot;, cellStyles:true, cellNF:true});
     const {data, jaar, maand} = parsePayroll(wb);
     state.payroll=data; state.maand=maand; state.jaar=jaar; state.step=&quot;preview&quot;;
@@ -17600,20 +17600,20 @@ function setFilter(f) { state.filter = f; render(); }
 try {
   render();
 } catch(e) {
-  console.error('Maandafsluiting render mislukt:', e);
-  var _fc = document.getElementById('content');
+  console.error(&#x27;Maandafsluiting render mislukt:&#x27;, e);
+  var _fc = document.getElementById(&#x27;content&#x27;);
   if (_fc) {
-    var _fmsg = ((e && e.message) || String(e)).split('&').join('&amp;').split('<').join('&lt;').split('>').join('&gt;');
-    var _fstack = ((e && e.stack) || '').split('&').join('&amp;').split('<').join('&lt;').split('>').join('&gt;');
-    _fc.innerHTML = '<div style=\'max-width:600px;margin:60px auto;text-align:center;\'>' +
-      '<div style=\'font-size:40px;margin-bottom:16px;\'>\u26A0\uFE0F</div>' +
-      '<h2 style=\'color:#c0392b;margin-bottom:12px;\'>Er ging iets mis bij het laden van dit scherm</h2>' +
-      '<p style=\'color:#666;font-size:13px;margin-bottom:8px;\'>De opgeslagen gegevens konden niet worden weergegeven. Geef deze technische melding door zodat het gericht opgelost kan worden:</p>' +
-      '<code style=\'display:block;background:#f5f5f5;color:#c0392b;padding:10px 14px;border-radius:6px;font-size:12px;text-align:left;white-space:pre-wrap;\'>' + _fmsg + (_fstack ? String.fromCharCode(10,10) + _fstack : '') + '</code>' +
-      '</div>';
+    var _fmsg = ((e &amp;&amp; e.message) || String(e)).split(&#x27;&amp;&#x27;).join(&#x27;&amp;&#x27;).split(&#x27;&lt;&#x27;).join(&#x27;&lt;&#x27;).split(&#x27;&gt;&#x27;).join(&#x27;&gt;&#x27;);
+    var _fstack = ((e &amp;&amp; e.stack) || &#x27;&#x27;).split(&#x27;&amp;&#x27;).join(&#x27;&amp;&#x27;).split(&#x27;&lt;&#x27;).join(&#x27;&lt;&#x27;).split(&#x27;&gt;&#x27;).join(&#x27;&gt;&#x27;);
+    _fc.innerHTML = &#x27;&lt;div style=\&#x27;max-width:600px;margin:60px auto;text-align:center;\&#x27;&gt;&#x27; +
+      &#x27;&lt;div style=\&#x27;font-size:40px;margin-bottom:16px;\&#x27;&gt;\u26A0\uFE0F&lt;/div&gt;&#x27; +
+      &#x27;&lt;h2 style=\&#x27;color:#c0392b;margin-bottom:12px;\&#x27;&gt;Er ging iets mis bij het laden van dit scherm&lt;/h2&gt;&#x27; +
+      &#x27;&lt;p style=\&#x27;color:#666;font-size:13px;margin-bottom:8px;\&#x27;&gt;De opgeslagen gegevens konden niet worden weergegeven. Geef deze technische melding door zodat het gericht opgelost kan worden:&lt;/p&gt;&#x27; +
+      &#x27;&lt;code style=\&#x27;display:block;background:#f5f5f5;color:#c0392b;padding:10px 14px;border-radius:6px;font-size:12px;text-align:left;white-space:pre-wrap;\&#x27;&gt;&#x27; + _fmsg + (_fstack ? String.fromCharCode(10,10) + _fstack : &#x27;&#x27;) + &#x27;&lt;/code&gt;&#x27; +
+      &#x27;&lt;/div&gt;&#x27;;
   }
 }
-</script>
+&lt;/script&gt;
 
 
 
@@ -17621,8 +17621,56 @@ try {
 
 
 
-</body>
-</html>
+
+&lt;script&gt;
+// Staan in de Quinyx-lijst (met overwerk/km) maar NIET in de medewerkerslijst van de Maandafsluiting:
+// die werden stilletjes overgeslagen. Nu zichtbaar, met een knop om ze toe te voegen.
+function maOnbekendLijst(){
+  if (!state || !state.payroll || (state.step !== &#x27;preview&#x27; &amp;&amp; state.step !== &#x27;result&#x27;)) return [];
+  var bekend = new Set([].concat(MEDEWERKERS, MEDEWERKERS_HVH).map(function(m){ return Number(m.mannr); }));
+  var uit = [];
+  Object.keys(state.payroll).forEach(function(k){
+    var nr = Number(k), pw = state.payroll[k] || {}; if (bekend.has(nr)) return;
+    var types = Object.keys(pw).filter(function(t){ return pw[t]; }); if (!types.length) return;
+    var badge = pw.__badge || String(k), inhuur = /^0{3}/.test(badge) || String(pw.__naam || &#x27;&#x27;).indexOf(&#x27;*&#x27;) &gt;= 0;
+    uit.push({ nr: nr, badge: badge, naam: String(pw.__naam || (&#x27;Nr &#x27; + k)).replace(/\*/g, &#x27;&#x27;).trim(), inhuur: inhuur, pw: pw, types: types });
+  });
+  return uit;
+}
+function maOnbekendHtml(){
+  var l = maOnbekendLijst(); if (!l.length) return &#x27;&#x27;;
+  var vast = l.filter(function(x){ return !x.inhuur; }), inh = l.filter(function(x){ return x.inhuur; });
+  var oms = function(x){ return x.types.map(function(t){ var v = x.pw[t]; return t.replace(&#x27;_MUTATIE&#x27;, &#x27; mutatie&#x27;) + &#x27;: &#x27; + (Math.round(v * 100) / 100).toString().replace(&#x27;.&#x27;, &#x27;,&#x27;); }).join(&#x27; · &#x27;); };
+  var h = &#x27;&lt;div style=&quot;background:#fff4e5;border:1px solid #f0c27a;border-left:5px solid #e67e22;border-radius:8px;padding:12px 16px;margin:0 0 16px;font-size:13px;color:#4a3000;&quot;&gt;&#x27;;
+  if (vast.length) {
+    h += &#x27;&lt;div style=&quot;font-weight:800;margin-bottom:6px;&quot;&gt;\u26A0\uFE0F &#x27; + vast.length + &#x27; medewerker&#x27; + (vast.length === 1 ? &#x27;&#x27; : &#x27;s&#x27;) + &#x27; met uren in Quinyx staan niet in de medewerkerslijst en worden NIET meegenomen:&lt;/div&gt;&#x27;;
+    h += vast.map(function(x){ return &#x27;&lt;div style=&quot;display:flex;align-items:center;gap:10px;padding:4px 0;border-top:1px dashed #f0c27a;&quot;&gt;&#x27; +
+      &#x27;&lt;span style=&quot;flex:1;&quot;&gt;&lt;b&gt;&#x27; + x.naam + &#x27;&lt;/b&gt; &lt;span style=&quot;color:#8a6a2a;&quot;&gt;(nr &#x27; + x.badge + &#x27;)&lt;/span&gt; &amp;mdash; &#x27; + oms(x) + &#x27;&lt;/span&gt;&#x27; +
+      &#x27;&lt;button onclick=&quot;maOnbekendToevoegen(&#x27; + x.nr + &#x27;,\&#x27;ep\&#x27;)&quot; style=&quot;padding:4px 10px;border:1px solid #003366;background:#003366;color:#fff;border-radius:5px;cursor:pointer;font-size:12px;&quot;&gt;+ Europoort&lt;/button&gt;&#x27; +
+      &#x27;&lt;button onclick=&quot;maOnbekendToevoegen(&#x27; + x.nr + &#x27;,\&#x27;hvh\&#x27;)&quot; style=&quot;padding:4px 10px;border:1px solid #003366;background:#fff;color:#003366;border-radius:5px;cursor:pointer;font-size:12px;&quot;&gt;+ Hoek van Holland&lt;/button&gt;&lt;/div&gt;&#x27;; }).join(&#x27;&#x27;);
+    h += &#x27;&lt;div style=&quot;font-size:11.5px;color:#8a6a2a;margin-top:6px;&quot;&gt;Na toevoegen staat de medewerker in de lijst (loongroep C1, 0 km): pas loongroep en km aan bij de instellingen.&lt;/div&gt;&#x27;;
+  }
+  if (inh.length) {
+    h += &#x27;&lt;div style=&quot;margin-top:&#x27; + (vast.length ? &#x27;10&#x27; : &#x27;0&#x27;) + &#x27;px;font-weight:700;&quot;&gt;Met een 000-nummer (leerlingen/BBL of inhuur) &amp;mdash; controleer of ze in de maandafsluiting horen:&lt;/div&gt;&#x27;;
+    h += inh.map(function(x){ return &#x27;&lt;div style=&quot;display:flex;align-items:center;gap:10px;padding:4px 0;border-top:1px dashed #f0c27a;font-size:12.5px;&quot;&gt;&#x27; +
+      &#x27;&lt;span style=&quot;flex:1;&quot;&gt;&lt;b&gt;&#x27; + x.naam + &#x27;&lt;/b&gt; &lt;span style=&quot;color:#8a6a2a;&quot;&gt;(nr &#x27; + x.badge + &#x27;)&lt;/span&gt; &amp;mdash; &#x27; + oms(x) + &#x27;&lt;/span&gt;&#x27; +
+      &#x27;&lt;button onclick=&quot;maOnbekendToevoegen(&#x27; + x.nr + &#x27;,\&#x27;ep\&#x27;)&quot; style=&quot;padding:3px 9px;border:1px solid #003366;background:#fff;color:#003366;border-radius:5px;cursor:pointer;font-size:11.5px;&quot;&gt;+ Europoort&lt;/button&gt;&lt;/div&gt;&#x27;; }).join(&#x27;&#x27;);
+  }
+  return h + &#x27;&lt;/div&gt;&#x27;;
+}
+function maOnbekendToevoegen(nr, waar){
+  var x = maOnbekendLijst().find(function(y){ return y.nr === nr; }); if (!x) return;
+  var delen = x.naam.split(&#x27;,&#x27;), an = (delen[0] || &#x27;&#x27;).trim(), vn = (delen[1] || &#x27;&#x27;).trim();
+  var naam = (vn ? vn.charAt(0).toUpperCase() + &#x27;. &#x27; : &#x27;&#x27;) + an;
+  (waar === &#x27;hvh&#x27; ? MEDEWERKERS_HVH : MEDEWERKERS).push({ mannr: nr, naam: naam, groep: &#x27;C1&#x27;, km: 0 });
+  try { localStorage.setItem(&#x27;ma_medewerkers_v1&#x27;, JSON.stringify(MEDEWERKERS)); localStorage.setItem(&#x27;ma_hvh_v1&#x27;, JSON.stringify(MEDEWERKERS_HVH)); } catch(e) {}
+  try { window.parent.postMessage({type:&#x27;ma-medewerkers-sync&#x27;, opgeslagen:true, ep: MEDEWERKERS.map(function(m){ return m.naam; }), hvh: MEDEWERKERS_HVH.map(function(m){ return m.naam; })}, &#x27;*&#x27;); } catch(e) {}
+  if (state.step === &#x27;result&#x27;) state.resultaten = bereken(state.payroll);
+  render(); if (typeof renderMwTable === &#x27;function&#x27;) renderMwTable(); if (typeof renderHvhTable === &#x27;function&#x27;) renderHvhTable();
+}
+&lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
 "
       style="width:100%;height:calc(100vh - 56px);border:none;display:block;"
       sandbox="allow-scripts allow-same-origin allow-downloads"
@@ -23703,7 +23751,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.89';
+var DJ_BUILD = '2026-10-07.92';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -29303,9 +29351,10 @@ function kpiOrden(ouder, buiten){
     d.textContent = tekst; return d; };
   var en = (sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM' || (typeof mtTerminal !== 'undefined' && mtTerminal === 'IMM');
   var plan = [
-    [en ? 'Punctuality' : 'Punctualiteit', [['Punctualiteit per meetpunt', 'kpi-chart-card'], ['Dagen buiten de normen', 'kpi-normen-card'], ['Gemiddelde Vaarschema Tijden']]],
-    [en ? 'Volume' : 'Volume', [['Totaal Geladen'], ['Dagenoverzicht'], ['Gemiddeld Trucks per Dienst'], ['Kade capaciteit']]],
-    [en ? 'Staff' : 'Personeel', [['Personeelsbezetting per dag'], ['Personeelsverdeling', 'bez-chart-titel'], ['Verzuim', 'vz-card'], ['Overwerk, inhuur', 'ow-card']]],
+    [en ? 'Punctuality' : 'Punctualiteit', [['Punctualiteit per meetpunt', 'kpi-chart-card'], ['Dagenoverzicht'], ['Dagen buiten de normen', 'kpi-normen-card'], ['Gemiddelde Vaarschema Tijden']]],
+    [en ? 'Volume' : 'Volume', [['Totaal Geladen']]],
+    [en ? 'Staff' : 'Personeel', [['Personeelsbezetting per dag'], ['Personeelsverdeling', 'bez-chart-titel'], ['Verzuim', 'vz-card'], ['Overwerk, inhuur', 'ow-card'], ['Bezettingsgraad', 'bez-kaart']]],
+    [en ? 'Quay & equipment' : 'Kade & materieel', [['Kade capaciteit'], ['Gemiddeld Trucks per Dienst']]],
     [en ? 'Archive' : 'Archief', [['Opgeslagen maandoverzichten']]]
   ];
   plan.forEach(function(blok){
@@ -34538,6 +34587,7 @@ var KPI_VOLGORDE = [/^scorekaart|^scorecard/i, /punctualit/i, /^dagenoverzicht|^
   /vaarschema|sailing schedule/i, /geladen|loaded/i, /^personeelsbezetting|^staffing per day/i, /personeelsverdeling|staff distribution/i,
   /^verzuim|^absence/i, /^overwerk|^overtime/i, /bezettingsgraad|occupancy/i, /kade capaciteit|quay capacity/i, /trucks/i, /opgeslagen|saved monthly/i];
 function kpiVolgordeToepassen(root){
+  return; // volgorde + tussenkopjes worden nu door kpiOrden() gedaan
   if (!root) return;
   var rangVan = function(t){ for (var i = 0; i < KPI_VOLGORDE.length; i++) if (KPI_VOLGORDE[i].test(t)) return i; return 99; };
   // De gemeenschappelijke bak: de ouder van de Scorekaart
@@ -34564,7 +34614,7 @@ window.kpiVolgordeToepassen = kpiVolgordeToepassen;
 </script>
 <script>
 (function(){
-  var doe = function(){ try { kpiVolgordeToepassen(document.getElementById('view-archief')); } catch(e) {} };
+  var doe = function(){ try { var b = document.getElementById('bez-kaart'), o = document.getElementById('ow-card'); if (b && o && o.parentNode && b.previousElementSibling !== o) o.parentNode.insertBefore(b, o.nextSibling); } catch(e) {} };
   document.addEventListener('DOMContentLoaded', function(){ setTimeout(doe, 1500); });
   if (typeof navTo === 'function') { var _n = navTo; navTo = function(view){ var r = _n.apply(this, arguments); if (view === 'archief') { setTimeout(doe, 400); setTimeout(doe, 1500); } return r; }; window.navTo = navTo; }
   if (typeof bezRender === 'function') { var _b = bezRender; bezRender = function(){ var r = _b.apply(this, arguments); Promise.resolve(r).then(function(){ setTimeout(doe, 50); }); return r; }; window.bezRender = bezRender; }
