@@ -17681,12 +17681,13 @@ function maApartSet(l){ try { localStorage.setItem(&#x27;ma_apart_v1&#x27;, JSON
 function maApartToevoegen(nr){
   var pw = (state.payroll || {})[nr] || {};
   var naam = String(pw.__naam || (&#x27;Nr &#x27; + nr)).replace(/\*/g, &#x27;&#x27;).trim();
-  var reden = prompt(&#x27;Waarom apart melden? (komt op de aparte pagina in de Excel)&#x27;, &#x27;0-urencontract&#x27;); if (reden === null) return;
+  // (geen prompt(): werkt niet in dit afgeschermde venster) — reden is daarna in het paarse blok aan te passen
   var l = maApartGet().filter(function(x){ return Number(x.mannr) !== Number(nr); });
-  l.push({ mannr: Number(nr), badge: pw.__badge || String(nr), naam: naam, reden: reden.trim() || &#x27;0-urencontract&#x27; });
+  l.push({ mannr: Number(nr), badge: pw.__badge || String(nr), naam: naam, reden: &#x27;0-urencontract&#x27; });
   maApartSet(l); render();
 }
-function maApartWeg(nr){ if (!confirm(&#x27;Niet meer apart melden?&#x27;)) return; maApartSet(maApartGet().filter(function(x){ return Number(x.mannr) !== Number(nr); })); render(); }
+function maApartWeg(nr){ maApartSet(maApartGet().filter(function(x){ return Number(x.mannr) !== Number(nr); })); render(); }
+function maApartReden(nr, v){ var l = maApartGet(); l.forEach(function(x){ if (Number(x.mannr) === Number(nr)) x.reden = String(v || &#x27;&#x27;).trim() || &#x27;0-urencontract&#x27;; }); maApartSet(l); }
 function maApartRijen(){
   var p = state.payroll || {};
   return maApartGet().map(function(x){ var pw = p[x.mannr] || {}; return { x: x, v175: pw.V175 || 0, v176: pw.V176 || 0, v177: pw.V177 || 0, v430: pw.V430 || 0, v430m: pw.V430_MUTATIE || 0, v301: pw.V301 || 0 }; });
@@ -17698,7 +17699,7 @@ function maApartHtml(){
   return &#x27;&lt;div style=&quot;background:#f7f3fb;border:1px solid #e0d4ee;border-left:5px solid #6b3fa0;border-radius:8px;padding:12px 16px;margin:0 0 16px;font-size:13px;&quot;&gt;&#x27; +
     &#x27;&lt;div style=&quot;font-weight:800;color:#4b2a80;margin-bottom:6px;&quot;&gt;&amp;#x1F4C4; Apart melden &amp;mdash; staan op een eigen tabblad &quot;Apart melden&quot; in de Excel (niet in de berekening)&lt;/div&gt;&#x27; +
     &#x27;&lt;table style=&quot;border-collapse:collapse;width:100%;font-size:12.5px;&quot;&gt;&lt;tr style=&quot;color:#5a6b80;text-align:left;&quot;&gt;&lt;th style=&quot;padding:3px 6px;&quot;&gt;Naam&lt;/th&gt;&lt;th&gt;Nr&lt;/th&gt;&lt;th&gt;Reden&lt;/th&gt;&lt;th style=&quot;text-align:right;&quot;&gt;Uur 0,74%&lt;/th&gt;&lt;th style=&quot;text-align:right;&quot;&gt;Uur 0,89%&lt;/th&gt;&lt;th style=&quot;text-align:right;&quot;&gt;Uur 1,20%&lt;/th&gt;&lt;th style=&quot;text-align:right;&quot;&gt;Verschoven&lt;/th&gt;&lt;th style=&quot;text-align:right;&quot;&gt;Reisdagen&lt;/th&gt;&lt;th&gt;&lt;/th&gt;&lt;/tr&gt;&#x27; +
-    r.map(function(z){ return &#x27;&lt;tr style=&quot;border-top:1px solid #e9e0f3;&quot;&gt;&lt;td style=&quot;padding:4px 6px;font-weight:700;&quot;&gt;&#x27; + z.x.naam + &#x27;&lt;/td&gt;&lt;td&gt;&#x27; + z.x.badge + &#x27;&lt;/td&gt;&lt;td&gt;&#x27; + z.x.reden + &#x27;&lt;/td&gt;&lt;td style=&quot;text-align:right;&quot;&gt;&#x27; + u(z.v175) + &#x27;&lt;/td&gt;&lt;td style=&quot;text-align:right;&quot;&gt;&#x27; + u(z.v176) + &#x27;&lt;/td&gt;&lt;td style=&quot;text-align:right;&quot;&gt;&#x27; + u(z.v177) + &#x27;&lt;/td&gt;&lt;td style=&quot;text-align:right;&quot;&gt;&#x27; + u(z.v430) + &#x27;&lt;/td&gt;&lt;td style=&quot;text-align:right;&quot;&gt;&#x27; + u(z.v301) + &#x27;&lt;/td&gt;&#x27; +
+    r.map(function(z){ return &#x27;&lt;tr style=&quot;border-top:1px solid #e9e0f3;&quot;&gt;&lt;td style=&quot;padding:4px 6px;font-weight:700;&quot;&gt;&#x27; + z.x.naam + &#x27;&lt;/td&gt;&lt;td&gt;&#x27; + z.x.badge + &#x27;&lt;/td&gt;&lt;td&gt;&lt;input value=&quot;&#x27; + String(z.x.reden).replace(/&quot;/g, &#x27;&amp;quot;&#x27;) + &#x27;&quot; onchange=&quot;maApartReden(&#x27; + z.x.mannr + &#x27;,this.value)&quot; title=&quot;Reden aanpassen&quot; style=&quot;width:130px;padding:2px 6px;border:1px solid #d6c8ea;border-radius:4px;font-size:12px;&quot;&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right;&quot;&gt;&#x27; + u(z.v175) + &#x27;&lt;/td&gt;&lt;td style=&quot;text-align:right;&quot;&gt;&#x27; + u(z.v176) + &#x27;&lt;/td&gt;&lt;td style=&quot;text-align:right;&quot;&gt;&#x27; + u(z.v177) + &#x27;&lt;/td&gt;&lt;td style=&quot;text-align:right;&quot;&gt;&#x27; + u(z.v430) + &#x27;&lt;/td&gt;&lt;td style=&quot;text-align:right;&quot;&gt;&#x27; + u(z.v301) + &#x27;&lt;/td&gt;&#x27; +
       &#x27;&lt;td style=&quot;text-align:right;&quot;&gt;&lt;span onclick=&quot;maApartWeg(&#x27; + z.x.mannr + &#x27;)&quot; title=&quot;Niet meer apart melden&quot; style=&quot;cursor:pointer;color:#c0392b;&quot;&gt;&amp;#x2715;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&#x27;; }).join(&#x27;&#x27;) + &#x27;&lt;/table&gt;&lt;/div&gt;&#x27;;
 }
 function maApartSheetXml(cell, row){
@@ -23793,7 +23794,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.93';
+var DJ_BUILD = '2026-10-07.94';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
