@@ -23703,7 +23703,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.88';
+var DJ_BUILD = '2026-10-07.89';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -34527,6 +34527,47 @@ window.dpDagTitels = dpDagTitels;
   if (typeof buildPanels === 'function') { var _bp = buildPanels; buildPanels = function(){ var r = _bp.apply(this, arguments); try { dpDagTitels(); } catch(e) {} return r; }; }
   if (typeof restoreTexts === 'function') { var _rt = restoreTexts; restoreTexts = function(){ var r = _rt.apply(this, arguments); try { dpDagTitels(); } catch(e) {} return r; }; window.restoreTexts = restoreTexts; }
   document.addEventListener('DOMContentLoaded', function(){ setTimeout(dpDagTitels, 2500); setInterval(function(){ var v = document.getElementById('view-dagplanning'); if (v && v.classList.contains('active')) dpDagTitels(); }, 15000); });
+})();
+</script>
+<script>
+// Vaste volgorde van de KPI-blokken (ook in de MT-versie):
+// Scorekaart · Punctualiteit · Dagenoverzicht · Dagen buiten de normen · Gemiddelde vaarschema · Totaal geladen & gelost ·
+// Personeelsbezetting · Personeelsverdeling · Verzuim & bezetting · Overwerk & productiviteit · Bezettingsgraad ·
+// Kade capaciteit · Trucks · Opgeslagen maandoverzichten
+var KPI_VOLGORDE = [/^scorekaart|^scorecard/i, /punctualit/i, /^dagenoverzicht|^daily overview/i, /buiten de normen|outside the norms/i,
+  /vaarschema|sailing schedule/i, /geladen|loaded/i, /^personeelsbezetting|^staffing per day/i, /personeelsverdeling|staff distribution/i,
+  /^verzuim|^absence/i, /^overwerk|^overtime/i, /bezettingsgraad|occupancy/i, /kade capaciteit|quay capacity/i, /trucks/i, /opgeslagen|saved monthly/i];
+function kpiVolgordeToepassen(root){
+  if (!root) return;
+  var rangVan = function(t){ for (var i = 0; i < KPI_VOLGORDE.length; i++) if (KPI_VOLGORDE[i].test(t)) return i; return 99; };
+  // De gemeenschappelijke bak: de ouder van de Scorekaart
+  var sc = Array.prototype.find.call(root.querySelectorAll('h2'), function(h){ return KPI_VOLGORDE[0].test(h.textContent.trim()); });
+  if (!sc) return;
+  var bak = sc; while (bak.parentNode && bak.parentNode !== root && !bak.parentNode.querySelectorAll || false) bak = bak.parentNode;
+  // klim tot het blok waarvan de ouder meerdere KPI-blokken bevat
+  var blokVan = function(h){ var el = h; while (el.parentNode && el.parentNode !== root) { var p = el.parentNode; if (p.querySelectorAll('h2').length > 3) return el; el = p; } return el; };
+  var scBlok = blokVan(sc), ouder = scBlok.parentNode;
+  var blokken = [], gezien = [];
+  Array.prototype.forEach.call(root.querySelectorAll('h2'), function(h){
+    var r = rangVan(h.textContent.trim()); if (r === 99) return;
+    var b = blokVan(h); if (b.parentNode !== ouder || gezien.indexOf(b) >= 0) return; gezien.push(b); blokken.push({ el: b, r: r });
+  });
+  var bez = document.getElementById('bez-kaart');
+  if (bez && root.contains(bez) && gezien.indexOf(bez) < 0) blokken.push({ el: bez, r: rangVan('Bezettingsgraad') });
+  if (blokken.length < 2) return;
+  var eerste = blokken.map(function(x){ return x.el; }).filter(function(e){ return e.parentNode === ouder; })[0];
+  var plek = document.createComment('kpi-volgorde'); ouder.insertBefore(plek, eerste);
+  blokken.sort(function(a, b){ return a.r - b.r; }).forEach(function(x){ ouder.insertBefore(x.el, plek); });
+  plek.remove();
+}
+window.kpiVolgordeToepassen = kpiVolgordeToepassen;
+</script>
+<script>
+(function(){
+  var doe = function(){ try { kpiVolgordeToepassen(document.getElementById('view-archief')); } catch(e) {} };
+  document.addEventListener('DOMContentLoaded', function(){ setTimeout(doe, 1500); });
+  if (typeof navTo === 'function') { var _n = navTo; navTo = function(view){ var r = _n.apply(this, arguments); if (view === 'archief') { setTimeout(doe, 400); setTimeout(doe, 1500); } return r; }; window.navTo = navTo; }
+  if (typeof bezRender === 'function') { var _b = bezRender; bezRender = function(){ var r = _b.apply(this, arguments); Promise.resolve(r).then(function(){ setTimeout(doe, 50); }); return r; }; window.bezRender = bezRender; }
 })();
 </script>
 </body>
