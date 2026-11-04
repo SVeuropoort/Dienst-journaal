@@ -16930,8 +16930,15 @@ function djLaadExcelJS(){
     })();
   });
 }
-function djSpreadsheetMLNaarXlsx(xml){
+function djSpreadsheetMLNaarXlsx(xml, opties){
+  opties = opties || {};
   return djLaadExcelJS().then(function(ExcelJS){
+    var wb0 = new ExcelJS.Workbook();
+    return (opties.basis ? wb0.xlsx.load(opties.basis).then(function(){ return wb0; }) : Promise.resolve(wb0)).then(function(wbBasis){ return djSpreadsheetMLVullen(ExcelJS, wbBasis, xml, opties); });
+  });
+}
+function djSpreadsheetMLVullen(ExcelJS, wb, xml, opties){
+  {
     var SS = &#x27;urn:schemas-microsoft-com:office:spreadsheet&#x27;;
     var doc = new DOMParser().parseFromString(xml, &#x27;application/xml&#x27;);
     if (doc.getElementsByTagName(&#x27;parsererror&#x27;).length) throw new Error(&#x27;XML ongeldig&#x27;);
@@ -16949,10 +16956,13 @@ function djSpreadsheetMLNaarXlsx(xml){
       kind(st, &#x27;Alignment&#x27;).forEach(function(x){ var h = (at(x, &#x27;Horizontal&#x27;) || &#x27;&#x27;).toLowerCase(); if (h) s.alignment = { horizontal: h }; });
       stijlen[id] = s;
     });
-    var wb = new ExcelJS.Workbook();
     var namen = {};
+    wb.worksheets.forEach(function(w){ namen[String(w.name).toLowerCase()] = 1; }); // bladen uit het originele bestand
     Array.prototype.forEach.call(doc.getElementsByTagNameNS(SS, &#x27;Worksheet&#x27;), function(wsEl){
-      var naam = (at(wsEl, &#x27;Name&#x27;) || &#x27;Blad&#x27;).substring(0, 31), n = naam, k = 2;
+      var naam = (at(wsEl, &#x27;Name&#x27;) || &#x27;Blad&#x27;).substring(0, 31);
+      if (opties.hernoem &amp;&amp; opties.hernoem[naam]) naam = opties.hernoem[naam];
+      if (opties.basis &amp;&amp; namen[naam.toLowerCase()] &amp;&amp; opties.slaOverAlsBestaat) return; // origineel blad blijft ongewijzigd
+      var n = naam, k = 2;
       while (namen[n.toLowerCase()]) n = naam.substring(0, 28) + &#x27; &#x27; + (k++);
       namen[n.toLowerCase()] = 1;
       var ws = wb.addWorksheet(n), breedte = {};
@@ -16980,7 +16990,7 @@ function djSpreadsheetMLNaarXlsx(xml){
     return wb.xlsx.writeBuffer().then(function(buf){
       return new Blob([buf], { type: &#x27;application/vnd.openxmlformats-officedocument.spreadsheetml.sheet&#x27; });
     });
-  });
+  }
 }
 
 // ── Excel export ──────────────────────────────────────────────────────────────
@@ -17160,7 +17170,16 @@ function exportExcel() {
     setTimeout(() =&gt; URL.revokeObjectURL(url), 2000);
   };
   // Echt Excel-bestand (.xlsx): geen waarschuwing meer bij het openen.
-  djSpreadsheetMLNaarXlsx(xmlContent)
+  // Opbouw zoals de oude versie (die salarisadministratie kan inlezen):
+  //   blad 1 = PayrollSummary precies zoals uit Quinyx (originele bestand, ongewijzigd)
+  //   blad 2 = Berekening (de maandafsluiting), blad 3 = Apart melden (0-urencontract, mentortoeslag)
+  const xmlOnzeBladen = `&lt;?xml version=&quot;1.0&quot;?&gt;
+&lt;Workbook xmlns=&quot;urn:schemas-microsoft-com:office:spreadsheet&quot; xmlns:o=&quot;urn:schemas-microsoft-com:office:office&quot; xmlns:x=&quot;urn:schemas-microsoft-com:office:excel&quot; xmlns:ss=&quot;urn:schemas-microsoft-com:office:spreadsheet&quot;&gt;
+ &lt;Styles&gt;${sheet1Styles}${origStyles}&lt;/Styles&gt;
+ ${state.rawBuffer ? &#x27;&#x27; : origSheetsXml}
+ ${sheet1Xml}
+&lt;/Workbook&gt;`;
+  djSpreadsheetMLNaarXlsx(xmlOnzeBladen, { basis: state.rawBuffer || null, hernoem: { &#x27;Maandafsluiting&#x27;: &#x27;Berekening&#x27; }, slaOverAlsBestaat: true })
     .then(blob =&gt; download(blob, basisNaam + &quot;.xlsx&quot;))
     .catch(e =&gt; {
       console.warn(&quot;xlsx maken mislukt, terugval op .xls:&quot;, e);
@@ -17598,6 +17617,7 @@ function handleFile(file) {
     const {data, jaar, maand} = parsePayroll(wb);
     state.payroll=data; state.maand=maand; state.jaar=jaar; state.step=&quot;preview&quot;;
     state.rawWorkbook = wb; // originele upload bewaren voor extra tabblad bij export
+    try { state.rawBuffer = e.target.result.slice(0); } catch(x) { state.rawBuffer = null; } // exacte kopie van het Quinyx-bestand
     render();
   };
   reader.readAsArrayBuffer(file);
@@ -23906,7 +23926,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.98';
+var DJ_BUILD = '2026-10-07.99';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
