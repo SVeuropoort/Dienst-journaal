@@ -24130,7 +24130,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.105';
+var DJ_BUILD = '2026-10-07.106';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -35018,8 +35018,16 @@ async function djMaVersturen(T, b){
   var token = await spGetToken(), siteId = await spGetSiteId();
   var up = await fetch(djMaPadUrl(siteId, pad, true), { method: 'PUT', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }, body: b.blob });
   if (!up.ok) throw new Error('opslaan in de vertrouwelijke map mislukt (status ' + up.status + ')');
-  var item = await up.json(), bestandPad = '';
-  try { bestandPad = decodeURIComponent(new URL(item.webUrl).pathname).replace(/^\/sites\/[^\/]+/, ''); } catch(e) {}
+  await up.json();
+  // Pad voor de flow ("Bestandsinhoud ophalen via het pad"): /<bibliotheek>/Data/... — NIET de webUrl van het bestand,
+  // want die is bij Office-bestanden een Doc.aspx-link (dan geeft de flow "File not found").
+  var bestandPad = '';
+  try {
+    var dr = await fetch('https://graph.microsoft.com/v1.0/sites/' + siteId + '/drive?$select=webUrl', { headers: { 'Authorization': 'Bearer ' + token } });
+    var drive = await dr.json();
+    var bib = decodeURIComponent(new URL(drive.webUrl).pathname).replace(/^\/sites\/[^\/]+/, ''); // bijv. "/Shared Documents"
+    bestandPad = bib.replace(/\/$/, '') + '/' + pad;
+  } catch(e) { bestandPad = '/Shared Documents/' + pad; }
   var tNaam = { EP: 'Europoort', HVH: 'Hoek van Holland', IMM: 'Immingham' }[T] || T;
   var ik = localStorage.getItem('dj_sp_account_username') || '', ikNaam = typeof dpLogNaam === 'function' ? dpLogNaam(ik) : ik;
   var cc = String(inst.cc || '').split(/[;,\s]+/).filter(Boolean).join(';');
