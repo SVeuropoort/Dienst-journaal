@@ -3136,7 +3136,7 @@ async function spOphalenBestandRuw(bestandsnaam){
 //    nog aan vertrouwelijke sleutels in main stond, blijft ongemoeid staan.
 var DJ_VERTR_SLEUTELS = ['dienstjournaal_stena_v1', 'werkoverdracht_ziekmeldingen_v1',
   'personeelsdossier_v1', 'personeelsdossier_actief_v1',
-  'ma_loongroepen_v1', 'ma_medewerkers_v1', 'ma_hvh_v1', 'ma_apart_v1', 'ma_mentor_v1', 'plan_sv_v1', 'startup_v1', 'kledingpunten_v1', 'bezetting_deeltijd_v1', 'pd_verlof_v1'];
+  'ma_loongroepen_v1', 'ma_medewerkers_v1', 'ma_hvh_v1', 'ma_apart_v1', 'ma_mentor_v1', 'ma_verzonden_v1', 'ma_mail_v1', 'plan_sv_v1', 'startup_v1', 'kledingpunten_v1', 'bezetting_deeltijd_v1', 'pd_verlof_v1'];
 function djIsVertrSleutel(k){ return DJ_VERTR_SLEUTELS.indexOf(String(k).replace(/^(EP|HVH|IMM)_/, '')) >= 0; }
 function djVertrSplits(data){
   var vertr = {}, rest = {};
@@ -7181,6 +7181,8 @@ window.addEventListener('resize', () => {
     'ma_hvh_v1',
     'ma_apart_v1',
     'ma_mentor_v1',
+    'ma_verzonden_v1',
+    'ma_mail_v1',
     'dj_verjaardagen_v1',
     'dagpl_cert_v1',
     'dagpl_cert_v2',
@@ -15622,7 +15624,7 @@ window.addEventListener('message', function(ev){
     // app de wijziging niet als "eigen wijziging" zag en hem niet altijd naar SharePoint stuurde.
     // Nu wel: de drie lijsten opnieuw zetten via de app zelf → gemarkeerd als gewijzigd → opgeslagen.
     if (d.opgeslagen) {
-      ['ma_loongroepen_v1', 'ma_medewerkers_v1', 'ma_hvh_v1', 'ma_apart_v1', 'ma_mentor_v1'].forEach(function(k){
+      ['ma_loongroepen_v1', 'ma_medewerkers_v1', 'ma_hvh_v1', 'ma_apart_v1', 'ma_mentor_v1', 'ma_verzonden_v1', 'ma_mail_v1'].forEach(function(k){
         var v = localStorage.getItem(k); if (v !== null) localStorage.setItem(k, v);
       });
       if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
@@ -16696,6 +16698,7 @@ label { display:block; font-size:11px; color:#718096; margin-bottom:3px; }
         &lt;div class=&quot;tab active&quot; onclick=&quot;switchTab(&#x27;loongroepen&#x27;)&quot;&gt;Loongroepen &amp;amp; Salarissen&lt;/div&gt;
         &lt;div class=&quot;tab&quot; onclick=&quot;switchTab(&#x27;medewerkers&#x27;)&quot;&gt;Medewerkers Europoort&lt;/div&gt;
         &lt;div class=&quot;tab&quot; onclick=&quot;switchTab(&#x27;hvh&#x27;)&quot;&gt;Medewerkers Hoek van Holland&lt;/div&gt;
+        &lt;div class=&quot;tab&quot; onclick=&quot;switchTab(&#x27;verzonden&#x27;)&quot;&gt;Verzonden maandafsluitingen&lt;/div&gt;
       &lt;/div&gt;
 
       &lt;!-- Tab: Loongroepen --&gt;
@@ -16733,6 +16736,9 @@ label { display:block; font-size:11px; color:#718096; margin-bottom:3px; }
           &lt;tbody id=&quot;mw-tbody&quot;&gt;&lt;/tbody&gt;
         &lt;/table&gt;
       &lt;/div&gt;
+
+      &lt;!-- Tab: Verzonden maandafsluitingen + ontvangers --&gt;
+      &lt;div class=&quot;tab-pane&quot; id=&quot;tab-verzonden&quot;&gt;&lt;div id=&quot;ma-verzonden-inhoud&quot;&gt;&lt;/div&gt;&lt;/div&gt;
 
       &lt;!-- Tab: Medewerkers Hoek van Holland --&gt;
       &lt;div class=&quot;tab-pane&quot; id=&quot;tab-hvh&quot;&gt;
@@ -17006,7 +17012,7 @@ function djSpreadsheetMLVullen(ExcelJS, wb, xml, opties){
 }
 
 // ── Excel export ──────────────────────────────────────────────────────────────
-function exportExcel() {
+function exportExcel(alleenBestand) {
   const res = state.resultaten.filter(r =&gt; r.totaal &gt; 0 || r.totKm &gt; 0);
   const maandNaam = MAANDEN[state.maand-1], jaar = state.jaar;
   const fmt = v =&gt; v &gt; 0 ? new Intl.NumberFormat(&quot;nl-NL&quot;,{style:&quot;currency&quot;,currency:&quot;EUR&quot;,minimumFractionDigits:2}).format(v) : &quot;&quot;;
@@ -17212,10 +17218,11 @@ function exportExcel() {
  &lt;Styles&gt;${sheet1Styles}${oudStijlen}&lt;/Styles&gt;
  ${sheet1Xml}
 &lt;/Workbook&gt;`;
-  (state.rawBuffer
+  const maak = (state.rawBuffer
     ? djSpreadsheetMLNaarXlsx(xmlAlleenOnze, { hernoem: { &#x27;Maandafsluiting&#x27;: &#x27;Berekening&#x27; } }).then(extra =&gt; djVoegBladenToeAanOrigineel(state.rawBuffer, extra))
-    : djSpreadsheetMLNaarXlsx(xmlOnzeBladen, { hernoem: { &#x27;Maandafsluiting&#x27;: &#x27;Berekening&#x27; }, quinyxOpmaak: true }))
-    .then(blob =&gt; download(blob, basisNaam + &quot;.xlsx&quot;))
+    : djSpreadsheetMLNaarXlsx(xmlOnzeBladen, { hernoem: { &#x27;Maandafsluiting&#x27;: &#x27;Berekening&#x27; }, quinyxOpmaak: true }));
+  if (alleenBestand) return maak.then(blob =&gt; ({ blob: blob, naam: basisNaam + &quot;.xlsx&quot;, terminal: terminal, maand: state.maand, jaar: state.jaar, maandNaam: maandNaam }));
+  maak.then(blob =&gt; download(blob, basisNaam + &quot;.xlsx&quot;))
     .catch(e =&gt; {
       console.warn(&quot;xlsx maken mislukt, terugval op .xls:&quot;, e);
       download(new Blob([xmlContent], {type: &quot;application/vnd.ms-excel;charset=utf-8&quot;}), basisNaam + &quot;.xls&quot;);
@@ -17250,7 +17257,8 @@ function openSettings() { renderLgTable(); renderMwTable(); renderHvhTable(); do
 function closeSettings() { document.getElementById(&quot;overlay&quot;).classList.remove(&quot;open&quot;); }
 
 function switchTab(tab) {
-  document.querySelectorAll(&quot;.tab&quot;).forEach((t,i) =&gt; t.classList.toggle(&quot;active&quot;, [&quot;loongroepen&quot;,&quot;medewerkers&quot;,&quot;hvh&quot;][i]===tab));
+  document.querySelectorAll(&quot;.tab&quot;).forEach((t,i) =&gt; t.classList.toggle(&quot;active&quot;, [&quot;loongroepen&quot;,&quot;medewerkers&quot;,&quot;hvh&quot;,&quot;verzonden&quot;][i]===tab));
+  if (tab === &#x27;verzonden&#x27; &amp;&amp; typeof maVerzondenRender === &#x27;function&#x27;) maVerzondenRender();
   document.querySelectorAll(&quot;.tab-pane&quot;).forEach(p =&gt; p.classList.remove(&quot;active&quot;));
   document.getElementById(&quot;tab-&quot;+tab).classList.add(&quot;active&quot;);
 }
@@ -17470,7 +17478,7 @@ function render() {
   const {step, resultaten, maand, jaar, filter, zoek, payroll, fileName} = state;
   document.getElementById(&quot;header-btns&quot;).innerHTML = `&lt;div style=&quot;display:flex;align-items:center;gap:6px&quot;&gt;
     ${_saMagInstellingen() ? `&lt;button class=&quot;btn-gear&quot; onclick=&quot;checkWachtwoord()&quot; title=&quot;Instellingen&quot;&gt;⚙️&lt;/button&gt;` : &quot;&quot;}
-    ${step===&quot;result&quot; ? `&lt;button class=&quot;btn-ghost&quot; onclick=&quot;reset()&quot;&gt;↩ Nieuwe import&lt;/button&gt;&lt;button class=&quot;btn-green&quot; onclick=&quot;exportExcel()&quot;&gt;⬇ Download Excel&lt;/button&gt;` : &quot;&quot;}
+    ${step===&quot;result&quot; ? `&lt;button class=&quot;btn-ghost&quot; onclick=&quot;reset()&quot;&gt;↩ Nieuwe import&lt;/button&gt;&lt;button class=&quot;btn-green&quot; onclick=&quot;exportExcel()&quot;&gt;⬇ Download Excel&lt;/button&gt;&lt;button class=&quot;btn-green&quot; id=&quot;ma-verstuur-knop&quot; onclick=&quot;maVersturen(this)&quot; style=&quot;background:#0f6cbd&quot;&gt;&amp;#x2709;&amp;#xFE0F; Versturen naar salarisadministratie&lt;/button&gt;` : &quot;&quot;}
   &lt;/div&gt;`;
 
   let html = &quot;&quot;;
@@ -17987,6 +17995,57 @@ function djVoegBladenToeAanOrigineel(origBuf, extraBlob){
       });
     });
   });
+}
+&lt;/script&gt;
+&lt;script&gt;
+// ══════════════════════════════════════════════════════════════════
+// Maandafsluiting automatisch versturen (zoals de andere formulieren) + archief &quot;Verzonden maandafsluitingen&quot;
+// Het Excel-bestand staat in de vertrouwelijke map; de mail gaat via de Power Automate-flow
+// &quot;Maandafsluiting versturen&quot; (markeerbestand maandafsluiting_&lt;T&gt;_&lt;stempel&gt;.json in Data).
+// ══════════════════════════════════════════════════════════════════
+function maP(){ return window.parent || window; }
+function maEsc(t){ return String(t == null ? &#x27;&#x27; : t).replace(/[&amp;&lt;&gt;&quot;]/g, function(c){ return {&#x27;&amp;&#x27;:&#x27;&amp;amp;&#x27;,&#x27;&lt;&#x27;:&#x27;&amp;lt;&#x27;,&#x27;&gt;&#x27;:&#x27;&amp;gt;&#x27;,&#x27;&quot;&#x27;:&#x27;&amp;quot;&#x27;}[c]; }); }
+var _maBevestig = 0;
+function maKnopTerug(knop){ knop.innerHTML = &#x27;&amp;#x2709;&amp;#xFE0F; Versturen naar salarisadministratie&#x27;; knop.style.background = &#x27;#0f6cbd&#x27;; knop.disabled = false; }
+function maVersturen(knop){
+  var P = maP(); if (typeof P.djMaMailGet !== &#x27;function&#x27;) { knop.textContent = &#x27;Versturen is hier niet beschikbaar&#x27;; return; }
+  var T = P.sessionStorage.getItem(&#x27;dj_terminal&#x27;) || &#x27;EP&#x27;, inst = P.djMaMailGet(T);
+  if (!inst.aan) { knop.textContent = &#x27;\u26A0\uFE0F Stel eerst de ontvangers in (\u2699\uFE0F \u2192 Verzonden maandafsluitingen)&#x27;; knop.style.background = &#x27;#e67e22&#x27;; setTimeout(function(){ maKnopTerug(knop); }, 5000); return; }
+  // twee stappen (geen pop-up, die blokkeert de browser): eerst bevestigen
+  if (Date.now() - _maBevestig &gt; 6000) { _maBevestig = Date.now(); knop.innerHTML = &#x27;\u2714 Klik nogmaals om te versturen naar &#x27; + maEsc(inst.aan); knop.style.background = &#x27;#e67e22&#x27;; setTimeout(function(){ if (_maBevestig &amp;&amp; Date.now() - _maBevestig &gt;= 6000) maKnopTerug(knop); }, 6100); return; }
+  _maBevestig = 0; knop.disabled = true; knop.textContent = &#x27;Bezig met versturen\u2026&#x27;; knop.style.background = &#x27;#5a6b80&#x27;;
+  exportExcel(true).then(function(b){ return P.djMaVersturen(T, b); }).then(function(rec){
+    knop.textContent = &#x27;\u2714 Verstuurd naar &#x27; + rec.aan + (rec.cc ? &#x27; (+ CC)&#x27; : &#x27;&#x27;); knop.style.background = &#x27;#1a7a40&#x27;;
+  }).catch(function(e){
+    knop.disabled = false; knop.textContent = &#x27;\u2717 Versturen mislukt: &#x27; + ((e &amp;&amp; e.message) || e); knop.style.background = &#x27;#c0392b&#x27;;
+  });
+}
+function maVerzondenRender(){
+  var P = maP(), box = document.getElementById(&#x27;ma-verzonden-inhoud&#x27;); if (!box || typeof P.djMaVerzondenGet !== &#x27;function&#x27;) return;
+  var T = P.sessionStorage.getItem(&#x27;dj_terminal&#x27;) || &#x27;EP&#x27;, inst = P.djMaMailGet(T), lijst = P.djMaVerzondenGet().slice().sort(function(a, b){ return b.tijd - a.tijd; });
+  var naam = function(e){ return typeof P.dpLogNaam === &#x27;function&#x27; ? P.dpLogNaam(e) : e; };
+  var veld = function(id, label, w, ph){ return &#x27;&lt;label style=&quot;display:flex;flex-direction:column;gap:3px;font-size:11px;font-weight:700;color:#5a6b80;text-transform:uppercase;&quot;&gt;&#x27; + label + &#x27;&lt;input id=&quot;&#x27; + id + &#x27;&quot; value=&quot;&#x27; + maEsc(w || &#x27;&#x27;) + &#x27;&quot; placeholder=&quot;&#x27; + (ph || &#x27;&#x27;) + &#x27;&quot; style=&quot;padding:6px 8px;border:1px solid #c8d7e8;border-radius:5px;font-size:13px;text-transform:none;font-weight:400;&quot;&gt;&lt;/label&gt;&#x27;; };
+  box.innerHTML =
+    &#x27;&lt;div class=&quot;note&quot;&gt;\u2709\uFE0F Met &lt;b&gt;Versturen naar salarisadministratie&lt;/b&gt; (bij het resultaat) gaat het Excel-bestand automatisch per mail, net als de andere formulieren. Elk verstuurd bestand wordt hieronder bewaard (in de vertrouwelijke map), zodat je het later terugvindt.&lt;/div&gt;&#x27; +
+    &#x27;&lt;div style=&quot;display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:10px;align-items:end;margin:10px 0 16px;&quot;&gt;&#x27; +
+      veld(&#x27;ma-mail-aan&#x27;, &#x27;Aan (salarisadministratie)&#x27;, inst.aan, &#x27;naam@stenaline.com&#x27;) + veld(&#x27;ma-mail-cc&#x27;, &#x27;CC (bijv. supervisors)&#x27;, inst.cc, &#x27;adres1; adres2&#x27;) + veld(&#x27;ma-mail-van&#x27;, &#x27;Van (verzenden als)&#x27;, inst.van, &#x27;supervisors.europoort@stenaline.com&#x27;) +
+      &#x27;&lt;button onclick=&quot;maMailOpslaan(this)&quot; style=&quot;background:#003366;color:#fff;border:none;border-radius:6px;padding:8px 14px;cursor:pointer;font-weight:700;&quot;&gt;Opslaan&lt;/button&gt;&lt;/div&gt;&#x27; +
+    &#x27;&lt;table class=&quot;s-tbl&quot;&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Maand&lt;/th&gt;&lt;th&gt;Terminal&lt;/th&gt;&lt;th&gt;Verstuurd door&lt;/th&gt;&lt;th&gt;Datum / tijd&lt;/th&gt;&lt;th&gt;Naar&lt;/th&gt;&lt;th&gt;Status&lt;/th&gt;&lt;th&gt;&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&#x27; +
+    (lijst.length ? lijst.map(function(r){ return &#x27;&lt;tr&gt;&lt;td&gt;&lt;b&gt;&#x27; + maEsc(r.maandNaam + &#x27; &#x27; + r.jaar) + &#x27;&lt;/b&gt;&lt;/td&gt;&lt;td&gt;&#x27; + maEsc(r.terminalNaam || r.T) + &#x27;&lt;/td&gt;&lt;td&gt;&#x27; + maEsc(naam(r.door)) + &#x27;&lt;/td&gt;&lt;td&gt;&#x27; + new Date(r.tijd).toLocaleString(&#x27;nl-NL&#x27;, { dateStyle: &#x27;short&#x27;, timeStyle: &#x27;short&#x27; }) + &#x27;&lt;/td&gt;&lt;td style=&quot;font-size:12px;&quot;&gt;&#x27; + maEsc(r.aan) + (r.cc ? &#x27;&lt;br&gt;&lt;span style=&quot;color:#5a6b80;&quot;&gt;CC: &#x27; + maEsc(r.cc) + &#x27;&lt;/span&gt;&#x27; : &#x27;&#x27;) + &#x27;&lt;/td&gt;&lt;td&gt;&#x27; + (r.status === &#x27;verzonden&#x27; ? &#x27;&lt;span style=&quot;color:#1a7a40;font-weight:700;&quot;&gt;\u2714 verstuurd&lt;/span&gt;&#x27; : &#x27;&lt;span style=&quot;color:#b9770e;&quot;&gt;&#x27; + maEsc(r.status) + &#x27;&lt;/span&gt;&#x27;) + &#x27;&lt;/td&gt;&#x27; +
+        &#x27;&lt;td&gt;&lt;button onclick=&quot;maArchiefDownload(\&#x27;&#x27; + r.id + &#x27;\&#x27;, this)&quot; style=&quot;background:#fff;border:1px solid #c8d7e8;color:#003366;border-radius:5px;padding:4px 10px;cursor:pointer;font-weight:700;font-size:12px;&quot;&gt;\u2B07 Excel&lt;/button&gt;&lt;/td&gt;&lt;/tr&gt;&#x27;; }).join(&#x27;&#x27;)
+      : &#x27;&lt;tr&gt;&lt;td colspan=&quot;7&quot; style=&quot;color:#8795a8;text-align:center;padding:14px;&quot;&gt;Nog geen maandafsluitingen verstuurd.&lt;/td&gt;&lt;/tr&gt;&#x27;) + &#x27;&lt;/tbody&gt;&lt;/table&gt;&#x27;;
+}
+function maMailOpslaan(knop){
+  var P = maP(), T = P.sessionStorage.getItem(&#x27;dj_terminal&#x27;) || &#x27;EP&#x27;;
+  P.djMaMailZet(T, { aan: document.getElementById(&#x27;ma-mail-aan&#x27;).value.trim(), cc: document.getElementById(&#x27;ma-mail-cc&#x27;).value.trim(), van: document.getElementById(&#x27;ma-mail-van&#x27;).value.trim() });
+  maVerzondenRender();
+}
+function maArchiefDownload(id, knop){
+  var P = maP(); knop.disabled = true; knop.textContent = &#x27;Ophalen\u2026&#x27;;
+  P.djMaArchiefOphalen(id).then(function(r){
+    var url = URL.createObjectURL(r.blob), a = document.createElement(&#x27;a&#x27;); a.href = url; a.download = r.naam; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+    knop.disabled = false; knop.textContent = &#x27;\u2B07 Excel&#x27;;
+  }).catch(function(e){ knop.disabled = false; knop.textContent = &#x27;\u2717 &#x27; + ((e &amp;&amp; e.message) || e); });
 }
 &lt;/script&gt;
 &lt;/body&gt;
@@ -24071,7 +24130,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.104';
+var DJ_BUILD = '2026-10-07.105';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -34939,6 +34998,52 @@ window.kpiVolgordeToepassen = kpiVolgordeToepassen;
   if (typeof navTo === 'function') { var _n = navTo; navTo = function(view){ var r = _n.apply(this, arguments); if (view === 'archief') { setTimeout(doe, 400); setTimeout(doe, 1500); } return r; }; window.navTo = navTo; }
   if (typeof bezRender === 'function') { var _b = bezRender; bezRender = function(){ var r = _b.apply(this, arguments); Promise.resolve(r).then(function(){ setTimeout(doe, 50); }); return r; }; window.bezRender = bezRender; }
 })();
+</script>
+<script>
+// ══════════════════════════════════════════════════════════════════
+// Maandafsluiting: versturen naar de salarisadministratie + archief (vertrouwelijke map)
+// ══════════════════════════════════════════════════════════════════
+function djMaMailGet(T){ var a = {}; try { a = JSON.parse(localStorage.getItem('ma_mail_v1') || '{}') || {}; } catch(e) {} return Object.assign({ aan: '', cc: '', van: '' }, a[T] || {}); }
+function djMaMailZet(T, w){ var a = {}; try { a = JSON.parse(localStorage.getItem('ma_mail_v1') || '{}') || {}; } catch(e) {} a[T] = w; localStorage.setItem('ma_mail_v1', JSON.stringify(a)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }
+function djMaVerzondenGet(){ try { var l = JSON.parse(localStorage.getItem('ma_verzonden_v1') || '[]'); return Array.isArray(l) ? l : []; } catch(e) { return []; } }
+function djMaPadUrl(siteId, pad, inhoud){ return 'https://graph.microsoft.com/v1.0/sites/' + siteId + '/drive/root:/' + pad.split('/').map(encodeURIComponent).join('/') + (inhoud ? ':/content' : ''); }
+async function djMaVersturen(T, b){
+  if (window.DJ_MEELEES) throw new Error('niet in meelees-modus');
+  if (typeof spIngelogdAsync === 'function' && !(await spIngelogdAsync())) throw new Error('niet ingelogd');
+  var inst = djMaMailGet(T); if (!inst.aan) throw new Error('geen ontvanger ingesteld');
+  var nu = new Date(), stempel = nu.getFullYear() + String(nu.getMonth() + 1).padStart(2, '0') + String(nu.getDate()).padStart(2, '0') + '_' + String(nu.getHours()).padStart(2, '0') + String(nu.getMinutes()).padStart(2, '0') + String(nu.getSeconds()).padStart(2, '0');
+  var bestand = stempel + '_' + String(b.naam).replace(/[\\\/:*?"<>|#%]+/g, '_');
+  var pad = 'Data/Vertrouwelijk/' + T + '/Maandafsluitingen/' + bestand;
+  // 1) Excel-bestand in de vertrouwelijke map (archief; alleen supervisors van deze terminal)
+  var token = await spGetToken(), siteId = await spGetSiteId();
+  var up = await fetch(djMaPadUrl(siteId, pad, true), { method: 'PUT', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }, body: b.blob });
+  if (!up.ok) throw new Error('opslaan in de vertrouwelijke map mislukt (status ' + up.status + ')');
+  var item = await up.json(), bestandPad = '';
+  try { bestandPad = decodeURIComponent(new URL(item.webUrl).pathname).replace(/^\/sites\/[^\/]+/, ''); } catch(e) {}
+  var tNaam = { EP: 'Europoort', HVH: 'Hoek van Holland', IMM: 'Immingham' }[T] || T;
+  var ik = localStorage.getItem('dj_sp_account_username') || '', ikNaam = typeof dpLogNaam === 'function' ? dpLogNaam(ik) : ik;
+  var cc = String(inst.cc || '').split(/[;,\s]+/).filter(Boolean).join(';');
+  // 2) markeerbestand voor de flow "Maandafsluiting versturen" (zelfde velden als bij de werkorder-flow)
+  await spOpslaanBestandRuw('maandafsluiting_' + T + '_' + stempel + '.json', {
+    soort: 'maandafsluiting', terminal: T, van: inst.van, aan: inst.aan, cc: cc,
+    onderwerp: 'Maandafsluiting ' + b.maandNaam + ' ' + b.jaar + ' - Stena Line ' + tNaam,
+    tekst: '<p>Beste,</p><p>Bijgevoegd de maandafsluiting van <b>' + b.maandNaam + ' ' + b.jaar + '</b> van Stena Line ' + tNaam + '.</p><p>Met vriendelijke groet,<br>' + (ikNaam || 'Supervisors') + '<br>Supervisors ' + tNaam + '</p>',
+    pdfPad: bestandPad, pdfNaam: b.naam, aangemaakt: nu.toISOString()
+  });
+  // 3) archief (wie, wanneer, naar wie)
+  var rec = { id: 'ma' + stempel, T: T, terminalNaam: tNaam, maand: b.maand, jaar: b.jaar, maandNaam: b.maandNaam, naam: b.naam, pad: pad, door: ik, tijd: nu.getTime(), aan: inst.aan, cc: cc, status: 'verzonden' };
+  var l = djMaVerzondenGet(); l.push(rec); localStorage.setItem('ma_verzonden_v1', JSON.stringify(l)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+  return rec;
+}
+async function djMaArchiefOphalen(id){
+  var r = djMaVerzondenGet().find(function(x){ return x.id === id; }); if (!r) throw new Error('niet gevonden');
+  var token = await spGetToken(), siteId = await spGetSiteId();
+  var resp = await fetch(djMaPadUrl(siteId, r.pad, true), { headers: { 'Authorization': 'Bearer ' + token }, cache: 'no-store' });
+  if (resp.status === 404) throw new Error('bestand niet meer aanwezig');
+  if (!resp.ok) throw new Error('ophalen mislukt (status ' + resp.status + ')');
+  return { blob: await resp.blob(), naam: r.naam };
+}
+window.djMaMailGet = djMaMailGet; window.djMaMailZet = djMaMailZet; window.djMaVerzondenGet = djMaVerzondenGet; window.djMaVersturen = djMaVersturen; window.djMaArchiefOphalen = djMaArchiefOphalen;
 </script>
 </body>
 </html>
