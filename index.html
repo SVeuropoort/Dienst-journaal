@@ -16953,7 +16953,10 @@ function djSpreadsheetMLVullen(ExcelJS, wb, xml, opties){
       kind(st, &#x27;Font&#x27;).forEach(function(x){ var f = { name: &#x27;Calibri&#x27;, size: parseFloat(at(x, &#x27;Size&#x27;)) || 11 };
         if (at(x, &#x27;Bold&#x27;) === &#x27;1&#x27;) f.bold = true; if (at(x, &#x27;Italic&#x27;) === &#x27;1&#x27;) f.italic = true;
         var c = argb(at(x, &#x27;Color&#x27;)); if (c) f.color = { argb: c }; s.font = f; });
-      kind(st, &#x27;Alignment&#x27;).forEach(function(x){ var h = (at(x, &#x27;Horizontal&#x27;) || &#x27;&#x27;).toLowerCase(); if (h) s.alignment = { horizontal: h }; });
+      kind(st, &#x27;Alignment&#x27;).forEach(function(x){ var h = (at(x, &#x27;Horizontal&#x27;) || &#x27;&#x27;).toLowerCase(), v = (at(x, &#x27;Vertical&#x27;) || &#x27;&#x27;).toLowerCase(), w = at(x, &#x27;WrapText&#x27;) === &#x27;1&#x27;;
+        if (h || v || w) { s.alignment = {}; if (h) s.alignment.horizontal = h; if (v) s.alignment.vertical = v; if (w) s.alignment.wrapText = true; } });
+      kind(st, &#x27;Borders&#x27;).forEach(function(b){ var rand = {}; kind(b, &#x27;Border&#x27;).forEach(function(x){ var pos = (at(x, &#x27;Position&#x27;) || &#x27;&#x27;).toLowerCase(); var c = argb(at(x, &#x27;Color&#x27;)) || &#x27;FFBFBFBF&#x27;; if (pos) rand[pos] = { style: &#x27;thin&#x27;, color: { argb: c } }; }); if (Object.keys(rand).length) s.border = rand; });
+      kind(st, &#x27;NumberFormat&#x27;).forEach(function(x){ var f = at(x, &#x27;Format&#x27;); if (f) s.numFmt = f; });
       stijlen[id] = s;
     });
     var namen = {};
@@ -16968,8 +16971,11 @@ function djSpreadsheetMLVullen(ExcelJS, wb, xml, opties){
       var ws = wb.addWorksheet(n), breedte = {};
       var tabel = kind(wsEl, &#x27;Table&#x27;)[0]; if (!tabel) return;
       var r = 0;
+      var vasteBreedte = {}, ci0 = 0;
+      kind(tabel, &#x27;Column&#x27;).forEach(function(colEl){ var ix = parseInt(at(colEl, &#x27;Index&#x27;), 10); ci0 = ix &gt; 0 ? ix : ci0 + 1; var w = parseFloat(at(colEl, &#x27;Width&#x27;)); if (w &gt; 0) vasteBreedte[ci0] = w / 5.6; });
       kind(tabel, &#x27;Row&#x27;).forEach(function(rowEl){
         var ri = parseInt(at(rowEl, &#x27;Index&#x27;), 10); r = ri &gt; 0 ? ri : r + 1;
+        var rh = parseFloat(at(rowEl, &#x27;Height&#x27;)); if (rh &gt; 0) ws.getRow(r).height = rh;
         var c = 0;
         kind(rowEl, &#x27;Cell&#x27;).forEach(function(celEl){
           var ci = parseInt(at(celEl, &#x27;Index&#x27;), 10); c = ci &gt; 0 ? ci : c + 1;
@@ -16980,12 +16986,18 @@ function djSpreadsheetMLVullen(ExcelJS, wb, xml, opties){
             breedte[c] = Math.max(breedte[c] || 0, String(t).length);
           }
           var st = stijlen[at(celEl, &#x27;StyleID&#x27;)];
-          if (st) { if (st.fill) cel.fill = st.fill; if (st.font) cel.font = st.font; if (st.alignment) cel.alignment = st.alignment; }
+          if (st) { if (st.fill) cel.fill = st.fill; if (st.font) cel.font = st.font; if (st.alignment) cel.alignment = st.alignment; if (st.numFmt) cel.numFmt = st.numFmt; if (st.border) cel.border = st.border; }
           var m = parseInt(at(celEl, &#x27;MergeAcross&#x27;), 10);
           if (m &gt; 0) { ws.mergeCells(r, c, r, c + m); c += m; }
         });
       });
       Object.keys(breedte).forEach(function(c){ ws.getColumn(+c).width = Math.min(60, Math.max(8, breedte[c] + 2)); });
+      Object.keys(vasteBreedte).forEach(function(c){ ws.getColumn(+c).width = vasteBreedte[c]; });
+      if (opties.quinyxOpmaak &amp;&amp; /^PayrollSummary$/i.test(n)) {
+        // zoals het originele Quinyx-bestand: kopregels (1-2) vast, Hoeveelheid (kolom J) als getal met 2 decimalen
+        ws.views = [{ state: &#x27;frozen&#x27;, xSplit: 0, ySplit: 2, topLeftCell: &#x27;A3&#x27;, activeCell: &#x27;A3&#x27; }];
+        ws.getColumn(10).eachCell({ includeEmpty: false }, function(c, r){ if (r &gt;= 2) c.numFmt = &#x27;#,##0.00&#x27;; });
+      }
     });
     return wb.xlsx.writeBuffer().then(function(buf){
       return new Blob([buf], { type: &#x27;application/vnd.openxmlformats-officedocument.spreadsheetml.sheet&#x27; });
@@ -17037,47 +17049,61 @@ function exportExcel() {
     &lt;Style ss:ID=&quot;rg_white&quot;&gt;&lt;Interior ss:Color=&quot;#FFFFFF&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Color=&quot;#22543D&quot; ss:Bold=&quot;1&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Right&quot;/&gt;&lt;/Style&gt;
     &lt;Style ss:ID=&quot;totl&quot;&gt;&lt;Interior ss:Color=&quot;#FFF2CC&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Color=&quot;#744210&quot; ss:Bold=&quot;1&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Left&quot;/&gt;&lt;/Style&gt;
     &lt;Style ss:ID=&quot;totr&quot;&gt;&lt;Interior ss:Color=&quot;#FFF2CC&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Color=&quot;#744210&quot; ss:Bold=&quot;1&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Right&quot;/&gt;&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;eur_alt&quot;&gt;&lt;Interior ss:Color=&quot;#D9E2F3&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Bold=&quot;1&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Right&quot;/&gt;&lt;NumberFormat ss:Format=&quot;&amp;quot;€ &amp;quot;#,##0.00&quot;/&gt;&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;eur_white&quot;&gt;&lt;Interior ss:Color=&quot;#FFFFFF&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Bold=&quot;1&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Right&quot;/&gt;&lt;NumberFormat ss:Format=&quot;&amp;quot;€ &amp;quot;#,##0.00&quot;/&gt;&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;eur0_alt&quot;&gt;&lt;Interior ss:Color=&quot;#D9E2F3&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Color=&quot;#BFBFBF&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Right&quot;/&gt;&lt;NumberFormat ss:Format=&quot;&amp;quot;€ &amp;quot;#,##0.00&quot;/&gt;&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;eur0_white&quot;&gt;&lt;Interior ss:Color=&quot;#FFFFFF&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Color=&quot;#BFBFBF&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Right&quot;/&gt;&lt;NumberFormat ss:Format=&quot;&amp;quot;€ &amp;quot;#,##0.00&quot;/&gt;&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;km_alt&quot;&gt;&lt;Interior ss:Color=&quot;#D9E2F3&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Bold=&quot;1&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Right&quot;/&gt;&lt;NumberFormat ss:Format=&quot;General&quot;/&gt;&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;km_white&quot;&gt;&lt;Interior ss:Color=&quot;#FFFFFF&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Bold=&quot;1&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Right&quot;/&gt;&lt;NumberFormat ss:Format=&quot;General&quot;/&gt;&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;km0_alt&quot;&gt;&lt;Interior ss:Color=&quot;#D9E2F3&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Color=&quot;#BFBFBF&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Right&quot;/&gt;&lt;NumberFormat ss:Format=&quot;General&quot;/&gt;&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;km0_white&quot;&gt;&lt;Interior ss:Color=&quot;#FFFFFF&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Color=&quot;#BFBFBF&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Right&quot;/&gt;&lt;NumberFormat ss:Format=&quot;General&quot;/&gt;&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;toteur&quot;&gt;&lt;Interior ss:Color=&quot;#FFF2CC&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Color=&quot;#744210&quot; ss:Bold=&quot;1&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Right&quot;/&gt;&lt;NumberFormat ss:Format=&quot;&amp;quot;€ &amp;quot;#,##0.00&quot;/&gt;&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;totkm&quot;&gt;&lt;Interior ss:Color=&quot;#FFF2CC&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Color=&quot;#744210&quot; ss:Bold=&quot;1&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Right&quot;/&gt;&lt;NumberFormat ss:Format=&quot;General&quot;/&gt;&lt;/Style&gt;
   `;
+  // Getallen zoals in het oude document: bedragen als getal met €-notatie (0 = grijs &quot;€ 0,00&quot;), km als getal
+  const r2 = v =&gt; Math.round((Number(v) || 0) * 100) / 100;
+  const eurCel = (v, bg) =&gt; cell(r2(v), (r2(v) ? &#x27;eur_&#x27; : &#x27;eur0_&#x27;) + bg, &#x27;Number&#x27;);
+  const kmCel  = (v, bg) =&gt; cell(Math.round((Number(v) || 0) * 10) / 10, ((Number(v) || 0) ? &#x27;km_&#x27; : &#x27;km0_&#x27;) + bg, &#x27;Number&#x27;);
 
-  const headerRow = row(
-    cell(&quot;Mannummer&quot;,&quot;hdrdark&quot;), cell(&quot;Naam Personeelszaken&quot;,&quot;hdrdark&quot;), cell(&quot;Loongroep Personeelszaken&quot;,&quot;hdrdark&quot;),
-    cell(&quot;&quot;,&quot;hdrdark&quot;), cell(&quot;totaal km&quot;,&quot;hdrteal&quot;),
-    cell(&quot;&quot;,&quot;hdrdark&quot;), cell(&quot;Totaal verschoven&quot;,&quot;hdrblue&quot;),
-    cell(&quot;&quot;,&quot;hdrdark&quot;), cell(&quot;Totaal uur 0,74%&quot;,&quot;hdrblue&quot;),
-    cell(&quot;&quot;,&quot;hdrdark&quot;), cell(&quot;Aantal uur 0,89%&quot;,&quot;hdrblue&quot;),
-    cell(&quot;&quot;,&quot;hdrdark&quot;), cell(&quot;Totaal uur 1,20%&quot;,&quot;hdrblue&quot;),
-    cell(&quot;&quot;,&quot;hdrdark&quot;), cell(&quot;Mutatie Totaal&quot;,&quot;hdrblue&quot;),
-    cell(&quot;Totaal&quot;,&quot;hdrdark&quot;)
-  );
-
-  const dataRows = res.map((r, i) =&gt; {
-    const bg = i % 2 === 0 ? &quot;alt&quot; : &quot;white&quot;;
-    return row(
-      cell(r.mannr, `l_${bg}`),
-      cell(r.naam, `lb_${bg}`),
-      cell(r.groep, `l_${bg}`),
-      cell(&quot;\u2211 V301&quot;, `lblr_${bg}`), cell(fmtKm(r.totKm), `r_${bg}`),
-      cell(&quot;\u2211 V430&quot;, `lblr_${bg}`), cell(fmt(r.totV430), `r_${bg}`),
-      cell(&quot;\u2211 V175&quot;, `lblr_${bg}`), cell(fmt(r.totV175), `r_${bg}`),
-      cell(&quot;\u2211 V176&quot;, `lblr_${bg}`), cell(fmt(r.totV176), `r_${bg}`),
-      cell(&quot;\u2211 V177&quot;, `lblr_${bg}`), cell(fmt(r.totV177), `r_${bg}`),
-      cell(&quot;\u2211 V430 mutatie&quot;, `lblr_${bg}`), cell(fmt(r.totMut), `r_${bg}`),
-      cell(fmt(r.totaal), `rg_${bg}`)
-    );
-  }).join(&quot;&quot;);
-
-  const totalRow = row(
-    cell(&quot;TOTAAL&quot;,&quot;totl&quot;), cell(&quot;&quot;,&quot;totl&quot;), cell(&quot;&quot;,&quot;totl&quot;),
-    cell(&quot;&quot;,&quot;totl&quot;), cell(fmtKm(tKm),&quot;totr&quot;),
-    cell(&quot;&quot;,&quot;totl&quot;), cell(fmt(tV430),&quot;totr&quot;),
-    cell(&quot;&quot;,&quot;totl&quot;), cell(fmt(tV175),&quot;totr&quot;),
-    cell(&quot;&quot;,&quot;totl&quot;), cell(fmt(tV176),&quot;totr&quot;),
-    cell(&quot;&quot;,&quot;totl&quot;), cell(fmt(tV177),&quot;totr&quot;),
-    cell(&quot;&quot;,&quot;totl&quot;), cell(fmt(tMut),&quot;totr&quot;),
-    cell(fmt(tTot),&quot;totr&quot;)
-  );
-
-  const sheet1Xml = `&lt;Worksheet ss:Name=&quot;Maandafsluiting&quot;&gt;&lt;Table&gt;${headerRow}${dataRows}${totalRow}&lt;/Table&gt;&lt;/Worksheet&gt;`
+  // ── Layout exact zoals het oude document (dat de salarisadministratie kan inlezen) ──
+  //  lichtblauwe kop met tekstterugloop; ∑-codes in lichtblauwe cellen; bedragen als getal (€), 0 = grijs;
+  //  gesorteerd op achternaam; geen extra totaalkolom of totaalregel.
+  const RAND = &#x27;&lt;Borders&gt;&lt;Border ss:Position=&quot;Left&quot; ss:LineStyle=&quot;Continuous&quot; ss:Weight=&quot;1&quot; ss:Color=&quot;#9BB1D4&quot;/&gt;&lt;Border ss:Position=&quot;Right&quot; ss:LineStyle=&quot;Continuous&quot; ss:Weight=&quot;1&quot; ss:Color=&quot;#9BB1D4&quot;/&gt;&lt;Border ss:Position=&quot;Top&quot; ss:LineStyle=&quot;Continuous&quot; ss:Weight=&quot;1&quot; ss:Color=&quot;#9BB1D4&quot;/&gt;&lt;Border ss:Position=&quot;Bottom&quot; ss:LineStyle=&quot;Continuous&quot; ss:Weight=&quot;1&quot; ss:Color=&quot;#9BB1D4&quot;/&gt;&lt;/Borders&gt;&#x27;;
+  const oudStijlen = `
+    &lt;Style ss:ID=&quot;o_kop&quot;&gt;&lt;Interior ss:Color=&quot;#B4C6E7&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Bold=&quot;1&quot; ss:Size=&quot;9&quot; ss:Color=&quot;#1F2937&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Center&quot; ss:Vertical=&quot;Bottom&quot; ss:WrapText=&quot;1&quot;/&gt;${RAND}&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;o_nr&quot;&gt;&lt;Interior ss:Color=&quot;#FFFFFF&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Bold=&quot;1&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Right&quot;/&gt;${RAND}&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;o_tekst&quot;&gt;&lt;Interior ss:Color=&quot;#FFFFFF&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Left&quot;/&gt;${RAND}&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;o_code&quot;&gt;&lt;Interior ss:Color=&quot;#B4C6E7&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Left&quot;/&gt;${RAND}&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;o_eur&quot;&gt;&lt;Interior ss:Color=&quot;#FFFFFF&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Bold=&quot;1&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Right&quot;/&gt;&lt;NumberFormat ss:Format=&quot;&amp;quot;€ &amp;quot;#,##0.00&quot;/&gt;${RAND}&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;o_eur0&quot;&gt;&lt;Interior ss:Color=&quot;#FFFFFF&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Color=&quot;#BFBFBF&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Right&quot;/&gt;&lt;NumberFormat ss:Format=&quot;&amp;quot;€ &amp;quot;#,##0.00&quot;/&gt;${RAND}&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;o_km&quot;&gt;&lt;Interior ss:Color=&quot;#FFFFFF&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Bold=&quot;1&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Right&quot;/&gt;&lt;NumberFormat ss:Format=&quot;General&quot;/&gt;${RAND}&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;o_km0&quot;&gt;&lt;Interior ss:Color=&quot;#FFFFFF&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Color=&quot;#BFBFBF&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Right&quot;/&gt;&lt;NumberFormat ss:Format=&quot;General&quot;/&gt;${RAND}&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;o_titel&quot;&gt;&lt;Font ss:Bold=&quot;1&quot; ss:Size=&quot;11&quot; ss:Color=&quot;#1F3864&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Left&quot;/&gt;&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;o_totl&quot;&gt;&lt;Interior ss:Color=&quot;#B4C6E7&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Bold=&quot;1&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Left&quot;/&gt;${RAND}&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;o_toteur&quot;&gt;&lt;Interior ss:Color=&quot;#B4C6E7&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Bold=&quot;1&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Right&quot;/&gt;&lt;NumberFormat ss:Format=&quot;&amp;quot;€ &amp;quot;#,##0.00&quot;/&gt;${RAND}&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;o_uren&quot;&gt;&lt;Interior ss:Color=&quot;#FFFFFF&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Right&quot;/&gt;&lt;NumberFormat ss:Format=&quot;#,##0.00&quot;/&gt;${RAND}&lt;/Style&gt;
+    &lt;Style ss:ID=&quot;o_uren0&quot;&gt;&lt;Interior ss:Color=&quot;#FFFFFF&quot; ss:Pattern=&quot;Solid&quot;/&gt;&lt;Font ss:Color=&quot;#BFBFBF&quot;/&gt;&lt;Alignment ss:Horizontal=&quot;Right&quot;/&gt;&lt;NumberFormat ss:Format=&quot;#,##0.00&quot;/&gt;${RAND}&lt;/Style&gt;`;
+  const oEur = v =&gt; cell(r2(v), r2(v) ? &#x27;o_eur&#x27; : &#x27;o_eur0&#x27;, &#x27;Number&#x27;);
+  const oKm  = v =&gt; { const k = Math.round((Number(v) || 0) * 10) / 10; return cell(k, k ? &#x27;o_km&#x27; : &#x27;o_km0&#x27;, &#x27;Number&#x27;); };
+  const kolommen = [52, 62, 52, 52, 52, 52, 56, 52, 64, 52, 64, 52, 64, 52, 56].map(w =&gt; `&lt;Column ss:Width=&quot;${w}&quot;/&gt;`).join(&#x27;&#x27;);
+  const headerRow = `&lt;Row ss:Height=&quot;48&quot;&gt;` + [
+    &quot;Mannummer&quot;, &quot;Naam Personeelszaken&quot;, &quot;Loongroep Personeelszaken&quot;, &quot;&quot;, &quot;totaal km&quot;, &quot;&quot;, &quot;Totaal verschoven&quot;,
+    &quot;&quot;, &quot;Totaal uur 0,74%&quot;, &quot;&quot;, &quot;Aantal uur 0,89%&quot;, &quot;&quot;, &quot;Totaal uur 1,20%&quot;, &quot;&quot;, &quot;Mutatie Totaal&quot;
+  ].map(t =&gt; cell(t, &quot;o_kop&quot;)).join(&quot;&quot;) + `&lt;/Row&gt;`;
+  // Achternaam zonder voorletters (&quot;J.C.M.T.H.&quot;, &quot;D &quot;) en zonder tussenvoegsel (&quot;van der&quot;, &quot;de&quot;)
+  const achternaam = n =&gt; String(n || &quot;&quot;).trim().replace(/^(?:[A-Z]\.)+\s*/, &quot;&quot;).replace(/^[A-Z]\s+/, &quot;&quot;).replace(/^(van der|van den|van de|van|de|der|den|ter|te)\s+/i, &quot;&quot;).trim().toLowerCase();
+  const resOud = res.slice().sort((a, b) =&gt; achternaam(a.naam).localeCompare(achternaam(b.naam), &quot;nl&quot;));
+  const dataRows = resOud.map(r =&gt; row(
+    cell(r.mannr, &quot;o_nr&quot;, &quot;Number&quot;), cell(r.naam, &quot;o_tekst&quot;), cell(r.groep, &quot;o_tekst&quot;),
+    cell(&quot;\u2211 V301&quot;, &quot;o_code&quot;), oKm(r.totKm),
+    cell(&quot;\u2211 V430&quot;, &quot;o_code&quot;), oEur(r.totV430),
+    cell(&quot;\u2211 V175&quot;, &quot;o_code&quot;), oEur(r.totV175),
+    cell(&quot;\u2211 V176&quot;, &quot;o_code&quot;), oEur(r.totV176),
+    cell(&quot;\u2211 V177&quot;, &quot;o_code&quot;), oEur(r.totV177),
+    cell(&quot;\u2211 V430 mutatie&quot;, &quot;o_code&quot;), oEur(r.totMut)
+  )).join(&quot;&quot;);
+  const totalRow = &quot;&quot;;
+  const sheet1Xml = `&lt;Worksheet ss:Name=&quot;Maandafsluiting&quot;&gt;&lt;Table&gt;${kolommen}${headerRow}${dataRows}${totalRow}&lt;/Table&gt;&lt;/Worksheet&gt;`
     + (typeof maApartSheetXml === &#x27;function&#x27; ? maApartSheetXml(cell, row) : &#x27;&#x27;);
 
   // ── Extra tabblad(en): de originele geüploade Excel, zo dicht mogelijk bij
@@ -17175,11 +17201,20 @@ function exportExcel() {
   //   blad 2 = Berekening (de maandafsluiting), blad 3 = Apart melden (0-urencontract, mentortoeslag)
   const xmlOnzeBladen = `&lt;?xml version=&quot;1.0&quot;?&gt;
 &lt;Workbook xmlns=&quot;urn:schemas-microsoft-com:office:spreadsheet&quot; xmlns:o=&quot;urn:schemas-microsoft-com:office:office&quot; xmlns:x=&quot;urn:schemas-microsoft-com:office:excel&quot; xmlns:ss=&quot;urn:schemas-microsoft-com:office:spreadsheet&quot;&gt;
- &lt;Styles&gt;${sheet1Styles}${origStyles}&lt;/Styles&gt;
- ${state.rawBuffer ? &#x27;&#x27; : origSheetsXml}
+ &lt;Styles&gt;${sheet1Styles}${oudStijlen}${origStyles}&lt;/Styles&gt;
+ ${origSheetsXml}
  ${sheet1Xml}
 &lt;/Workbook&gt;`;
-  djSpreadsheetMLNaarXlsx(xmlOnzeBladen, { basis: state.rawBuffer || null, hernoem: { &#x27;Maandafsluiting&#x27;: &#x27;Berekening&#x27; }, slaOverAlsBestaat: true })
+  // Heeft de app het originele Quinyx-bestand? Dan blijft dat blad 100% zoals aangeleverd en voegen we
+  // alleen onze bladen toe (op bestandsniveau, zonder het origineel te herschrijven).
+  const xmlAlleenOnze = `&lt;?xml version=&quot;1.0&quot;?&gt;
+&lt;Workbook xmlns=&quot;urn:schemas-microsoft-com:office:spreadsheet&quot; xmlns:o=&quot;urn:schemas-microsoft-com:office:office&quot; xmlns:x=&quot;urn:schemas-microsoft-com:office:excel&quot; xmlns:ss=&quot;urn:schemas-microsoft-com:office:spreadsheet&quot;&gt;
+ &lt;Styles&gt;${sheet1Styles}${oudStijlen}&lt;/Styles&gt;
+ ${sheet1Xml}
+&lt;/Workbook&gt;`;
+  (state.rawBuffer
+    ? djSpreadsheetMLNaarXlsx(xmlAlleenOnze, { hernoem: { &#x27;Maandafsluiting&#x27;: &#x27;Berekening&#x27; } }).then(extra =&gt; djVoegBladenToeAanOrigineel(state.rawBuffer, extra))
+    : djSpreadsheetMLNaarXlsx(xmlOnzeBladen, { hernoem: { &#x27;Maandafsluiting&#x27;: &#x27;Berekening&#x27; }, quinyxOpmaak: true }))
     .then(blob =&gt; download(blob, basisNaam + &quot;.xlsx&quot;))
     .catch(e =&gt; {
       console.warn(&quot;xlsx maken mislukt, terugval op .xls:&quot;, e);
@@ -17762,32 +17797,41 @@ function maApartHtml(){
 function maApartSheetXml(cell, row){
   var r = maApartRijen(), mentor = maMentorAlle().filter(function(x){ return Number(x.bedrag) &gt; 0; });
   if (!r.length &amp;&amp; !mentor.length) return &#x27;&#x27;;
-  var mentorXml = maMentorSheetRows(cell, row, mentor);
-  if (!r.length) return &#x27;&lt;Worksheet ss:Name=&quot;Apart melden&quot;&gt;&lt;Table&gt;&#x27; + mentorXml + &#x27;&lt;/Table&gt;&lt;/Worksheet&gt;&#x27;;
-  var n = function(v){ return v ? Math.round(v * 100) / 100 : &#x27;&#x27;; };
-  var e = function(v){ return v &gt; 0 ? new Intl.NumberFormat(&#x27;nl-NL&#x27;, { style: &#x27;currency&#x27;, currency: &#x27;EUR&#x27;, minimumFractionDigits: 2 }).format(v) : &#x27;&#x27;; };
-  var kop = row(cell(&#x27;Mannummer&#x27;, &#x27;hdrdark&#x27;), cell(&#x27;Naam&#x27;, &#x27;hdrdark&#x27;), cell(&#x27;Reden&#x27;, &#x27;hdrdark&#x27;), cell(&#x27;Loongroep&#x27;, &#x27;hdrdark&#x27;),
-    cell(&#x27;\u2211 V301&#x27;, &#x27;hdrdark&#x27;), cell(&#x27;totaal km&#x27;, &#x27;hdrteal&#x27;), cell(&#x27;\u2211 V430&#x27;, &#x27;hdrdark&#x27;), cell(&#x27;Totaal verschoven&#x27;, &#x27;hdrblue&#x27;), cell(&#x27;\u2211 V175&#x27;, &#x27;hdrdark&#x27;), cell(&#x27;Totaal uur 0,74%&#x27;, &#x27;hdrblue&#x27;),
-    cell(&#x27;\u2211 V176&#x27;, &#x27;hdrdark&#x27;), cell(&#x27;Aantal uur 0,89%&#x27;, &#x27;hdrblue&#x27;), cell(&#x27;\u2211 V177&#x27;, &#x27;hdrdark&#x27;), cell(&#x27;Totaal uur 1,20%&#x27;, &#x27;hdrblue&#x27;), cell(&#x27;\u2211 V430 mutatie&#x27;, &#x27;hdrdark&#x27;), cell(&#x27;Mutatie Totaal&#x27;, &#x27;hdrblue&#x27;), cell(&#x27;0-urencontract (V160)&#x27;, &#x27;hdrblue&#x27;), cell(&#x27;Totaal&#x27;, &#x27;hdrdark&#x27;));
-  var rijen = r.map(function(z, i){ var bg = i % 2 === 0 ? &#x27;alt&#x27; : &#x27;white&#x27;;
-    return row(cell(z.x.badge, &#x27;l_&#x27; + bg), cell(z.x.naam, &#x27;lb_&#x27; + bg), cell(z.x.reden, &#x27;l_&#x27; + bg), cell(z.x.groep || &#x27;nog kiezen&#x27;, &#x27;l_&#x27; + bg),
-      cell(n(z.v301), &#x27;lblr_&#x27; + bg), cell(z.totKm &gt; 0 ? Math.round(z.totKm) : &#x27;&#x27;, &#x27;r_&#x27; + bg),
-      cell(n(z.v430), &#x27;lblr_&#x27; + bg), cell(e(z.totV430), &#x27;r_&#x27; + bg), cell(n(z.v175), &#x27;lblr_&#x27; + bg), cell(e(z.totV175), &#x27;r_&#x27; + bg),
-      cell(n(z.v176), &#x27;lblr_&#x27; + bg), cell(e(z.totV176), &#x27;r_&#x27; + bg), cell(n(z.v177), &#x27;lblr_&#x27; + bg), cell(e(z.totV177), &#x27;r_&#x27; + bg),
-      cell(n(z.v430m), &#x27;lblr_&#x27; + bg), cell(e(z.totMut), &#x27;r_&#x27; + bg), cell(e(z.totV160), &#x27;r_&#x27; + bg), cell(e(z.totaal), &#x27;rg_&#x27; + bg)); }).join(&#x27;&#x27;);
-  var titel = row(cell(&#x27;Apart melden \u2014 niet in de totalen van het tabblad Maandafsluiting (bijv. 0-urencontract). Kleine getallen = uren/dagen uit Quinyx, bedragen volgens de loongroep.&#x27;, &#x27;totl&#x27;));
-  var overigXml = &#x27;&#x27;;
-  var metOverig = r.filter(function(z){ return z.overig &amp;&amp; z.overig.length; });
-  if (metOverig.length) {
-    overigXml = row(cell(&#x27;&#x27;)) + row(cell(&#x27;Overige Quinyx-regels (bijv. 0-urencontract)&#x27;, &#x27;totl&#x27;)) +
-      row(cell(&#x27;Mannummer&#x27;, &#x27;hdrdark&#x27;), cell(&#x27;Naam&#x27;, &#x27;hdrdark&#x27;), cell(&#x27;Code&#x27;, &#x27;hdrdark&#x27;), cell(&#x27;Omschrijving&#x27;, &#x27;hdrdark&#x27;), cell(&#x27;Aantal&#x27;, &#x27;hdrblue&#x27;), cell(&#x27;Uurloon&#x27;, &#x27;hdrblue&#x27;), cell(&#x27;Percentage&#x27;, &#x27;hdrblue&#x27;), cell(&#x27;Bedrag&#x27;, &#x27;hdrblue&#x27;));
-    var ri = 0;
-    metOverig.forEach(function(z){ z.overig.forEach(function(o){ var bg = (ri++) % 2 === 0 ? &#x27;alt&#x27; : &#x27;white&#x27;;
-      var isV160 = o.code === &#x27;V160&#x27; &amp;&amp; z.uurloon;
-      overigXml += row(cell(z.x.badge, &#x27;l_&#x27; + bg), cell(z.x.naam, &#x27;lb_&#x27; + bg), cell(&#x27;\u2211 &#x27; + o.code, &#x27;l_&#x27; + bg), cell(o.oms, &#x27;l_&#x27; + bg), cell(Math.round(o.aantal * 100) / 100, &#x27;r_&#x27; + bg),
-        cell(isV160 ? e(z.uurloon) : &#x27;&#x27;, &#x27;r_&#x27; + bg), cell(isV160 ? o.pct + &#x27;%&#x27; : &#x27;&#x27;, &#x27;r_&#x27; + bg), cell(isV160 ? e(o.bedrag) : &#x27;&#x27;, &#x27;rg_&#x27; + bg)); }); });
+  var r2 = function(v){ return Math.round((Number(v) || 0) * 100) / 100; };
+  var eur = function(v){ return cell(r2(v), r2(v) ? &#x27;o_eur&#x27; : &#x27;o_eur0&#x27;, &#x27;Number&#x27;); };
+  var uren = function(v){ return cell(r2(v), r2(v) ? &#x27;o_uren&#x27; : &#x27;o_uren0&#x27;, &#x27;Number&#x27;); };
+  var km = function(v){ var k = Math.round((Number(v) || 0) * 10) / 10; return cell(k, k ? &#x27;o_km&#x27; : &#x27;o_km0&#x27;, &#x27;Number&#x27;); };
+  var kop = function(lijst){ return &#x27;&lt;Row ss:Height=&quot;48&quot;&gt;&#x27; + lijst.map(function(t){ return cell(t, &#x27;o_kop&#x27;); }).join(&#x27;&#x27;) + &#x27;&lt;/Row&gt;&#x27;; };
+  var x = &#x27;&#x27;;
+  if (r.length) {
+    // ── 0-urencontract e.d.: per medewerker ÉÉN regel, alle codes naast elkaar ──
+    x += row(cell(&#x27;Apart melden \u2014 niet in de totalen van het tabblad Berekening (bijv. 0-urencontract)&#x27;, &#x27;o_titel&#x27;));
+    x += kop([&#x27;Mannummer&#x27;, &#x27;Naam Personeelszaken&#x27;, &#x27;Reden&#x27;, &#x27;Loongroep Personeelszaken&#x27;, &#x27;&#x27;, &#x27;totaal km&#x27;, &#x27;&#x27;, &#x27;Totaal verschoven&#x27;, &#x27;&#x27;, &#x27;Totaal uur 0,74%&#x27;, &#x27;&#x27;, &#x27;Aantal uur 0,89%&#x27;, &#x27;&#x27;, &#x27;Totaal uur 1,20%&#x27;, &#x27;&#x27;, &#x27;Mutatie Totaal&#x27;,
+              &#x27;&#x27;, &#x27;Uren 0-uren 100%&#x27;, &#x27;Bedrag 100%&#x27;, &#x27;&#x27;, &#x27;Uren 0-uren 125%&#x27;, &#x27;Bedrag 125%&#x27;, &#x27;&#x27;, &#x27;Uren 0-uren 150%&#x27;, &#x27;Bedrag 150%&#x27;, &#x27;&#x27;, &#x27;Gewerkte dagen&#x27;, &#x27;Uurloon&#x27;, &#x27;Totaal&#x27;, &#x27;Overige regels&#x27;]);
+    r.forEach(function(z){
+      var v160 = function(pct){ var l = (z.overig || []).filter(function(o){ return o.code === &#x27;V160&#x27; &amp;&amp; Math.round(o.pct) === pct; });
+        return { uren: l.reduce(function(a, o){ return a + o.aantal; }, 0), bedrag: l.reduce(function(a, o){ return a + (o.bedrag || 0); }, 0) }; };
+      var p100 = v160(100), p125 = v160(125), p150 = v160(150);
+      var dagen = (z.overig || []).filter(function(o){ return o.code === &#x27;V193&#x27;; }).reduce(function(a, o){ return a + o.aantal; }, 0);
+      var rest = (z.overig || []).filter(function(o){ return !(o.code === &#x27;V193&#x27; || (o.code === &#x27;V160&#x27; &amp;&amp; [100, 125, 150].indexOf(Math.round(o.pct)) &gt;= 0)); })
+        .map(function(o){ return o.code + &#x27; &#x27; + o.oms + &#x27;: &#x27; + String(r2(o.aantal)).replace(&#x27;.&#x27;, &#x27;,&#x27;); }).join(&#x27;; &#x27;);
+      x += row(cell(Number(z.x.mannr), &#x27;o_nr&#x27;, &#x27;Number&#x27;), cell(z.x.naam, &#x27;o_tekst&#x27;), cell(z.x.reden, &#x27;o_tekst&#x27;), cell(z.x.groep || &#x27;nog kiezen&#x27;, &#x27;o_tekst&#x27;),
+        cell(&#x27;\u2211 V301&#x27;, &#x27;o_code&#x27;), km(z.totKm), cell(&#x27;\u2211 V430&#x27;, &#x27;o_code&#x27;), eur(z.totV430), cell(&#x27;\u2211 V175&#x27;, &#x27;o_code&#x27;), eur(z.totV175),
+        cell(&#x27;\u2211 V176&#x27;, &#x27;o_code&#x27;), eur(z.totV176), cell(&#x27;\u2211 V177&#x27;, &#x27;o_code&#x27;), eur(z.totV177), cell(&#x27;\u2211 V430 mutatie&#x27;, &#x27;o_code&#x27;), eur(z.totMut),
+        cell(&#x27;\u2211 V160&#x27;, &#x27;o_code&#x27;), uren(p100.uren), eur(p100.bedrag), cell(&#x27;\u2211 V160&#x27;, &#x27;o_code&#x27;), uren(p125.uren), eur(p125.bedrag), cell(&#x27;\u2211 V160&#x27;, &#x27;o_code&#x27;), uren(p150.uren), eur(p150.bedrag),
+        cell(&#x27;\u2211 V193&#x27;, &#x27;o_code&#x27;), uren(dagen), eur(z.uurloon), eur(z.totaal), cell(rest, &#x27;o_tekst&#x27;));
+    });
   }
-  return &#x27;&lt;Worksheet ss:Name=&quot;Apart melden&quot;&gt;&lt;Table&gt;&#x27; + titel + kop + rijen + overigXml + (mentorXml ? row(cell(&#x27;&#x27;)) + mentorXml : &#x27;&#x27;) + &#x27;&lt;/Table&gt;&lt;/Worksheet&gt;&#x27;;
+  if (mentor.length) {
+    // ── Mentortoeslag ──
+    var tot = mentor.reduce(function(a, m){ return a + (Number(m.bedrag) || 0); }, 0);
+    x += (x ? row(cell(&#x27;&#x27;)) : &#x27;&#x27;) + row(cell(&#x27;Mentortoeslag (Quinyx: V028) \u2014 niet in de totalen van het tabblad Berekening&#x27;, &#x27;o_titel&#x27;));
+    x += kop([&#x27;Mannummer&#x27;, &#x27;Naam Personeelszaken&#x27;, &#x27;Loongroep Personeelszaken&#x27;, &#x27;&#x27;, &#x27;Mentortoeslag&#x27;, &#x27;Opmerking&#x27;]);
+    mentor.forEach(function(m){ x += row(cell(Number(m.mannr), &#x27;o_nr&#x27;, &#x27;Number&#x27;), cell(m.naam, &#x27;o_tekst&#x27;), cell(m.groep || &#x27;&#x27;, &#x27;o_tekst&#x27;), cell(&#x27;\u2211 V028&#x27;, &#x27;o_code&#x27;), eur(m.bedrag), cell(m.opm || &#x27;&#x27;, &#x27;o_tekst&#x27;)); });
+    x += row(cell(&#x27;TOTAAL&#x27;, &#x27;o_totl&#x27;), cell(&#x27;&#x27;, &#x27;o_totl&#x27;), cell(&#x27;&#x27;, &#x27;o_totl&#x27;), cell(&#x27;&#x27;, &#x27;o_totl&#x27;), cell(r2(tot), &#x27;o_toteur&#x27;, &#x27;Number&#x27;), cell(&#x27;&#x27;, &#x27;o_totl&#x27;));
+  }
+  var kol = [52, 110, 70, 52, 52, 52, 52, 56, 52, 64, 52, 64, 52, 64, 52, 56, 52, 56, 64, 52, 56, 64, 52, 56, 64, 52, 56, 56, 64, 200].map(function(w){ return &#x27;&lt;Column ss:Width=&quot;&#x27; + w + &#x27;&quot;/&gt;&#x27;; }).join(&#x27;&#x27;);
+  return &#x27;&lt;Worksheet ss:Name=&quot;Apart melden&quot;&gt;&lt;Table&gt;&#x27; + kol + x + &#x27;&lt;/Table&gt;&lt;/Worksheet&gt;&#x27;;
 }
 &lt;/script&gt;
 
@@ -17842,6 +17886,107 @@ function maMentorSheetRows(cell, row, l){
     row(cell(&#x27;Mannummer&#x27;, &#x27;hdrdark&#x27;), cell(&#x27;Naam&#x27;, &#x27;hdrdark&#x27;), cell(&#x27;Loongroep&#x27;, &#x27;hdrdark&#x27;), cell(&#x27;Mentortoeslag&#x27;, &#x27;hdrblue&#x27;), cell(&#x27;Opmerking&#x27;, &#x27;hdrdark&#x27;)) +
     l.map(function(x, i){ var bg = i % 2 === 0 ? &#x27;alt&#x27; : &#x27;white&#x27;; return row(cell(x.mannr, &#x27;l_&#x27; + bg), cell(x.naam, &#x27;lb_&#x27; + bg), cell(x.groep || &#x27;&#x27;, &#x27;l_&#x27; + bg), cell(e(x.bedrag), &#x27;rg_&#x27; + bg), cell(x.opm || &#x27;&#x27;, &#x27;l_&#x27; + bg)); }).join(&#x27;&#x27;) +
     row(cell(&#x27;TOTAAL&#x27;, &#x27;totl&#x27;), cell(&#x27;&#x27;, &#x27;totl&#x27;), cell(&#x27;&#x27;, &#x27;totl&#x27;), cell(e(tot), &#x27;totr&#x27;), cell(&#x27;&#x27;, &#x27;totl&#x27;));
+}
+&lt;/script&gt;
+
+&lt;script&gt;
+// ══════════════════════════════════════════════════════════════════
+// Bladen toevoegen aan het ORIGINELE Quinyx-bestand, zonder het origineel te herschrijven:
+// het blad PayrollSummary (inclusief opmaak, kolombreedtes, afdruktitels) blijft byte-voor-byte gelijk.
+// ══════════════════════════════════════════════════════════════════
+function djLaadJSZip(){
+  if (window.JSZip) return Promise.resolve(window.JSZip);
+  return new Promise(function(ok, nok){
+    var bronnen = [&#x27;https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js&#x27;, &#x27;https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js&#x27;], i = 0;
+    (function volgende(){ if (i &gt;= bronnen.length) { nok(new Error(&#x27;JSZip kon niet worden geladen&#x27;)); return; }
+      var sc = document.createElement(&#x27;script&#x27;); sc.src = bronnen[i++]; sc.onload = function(){ window.JSZip ? ok(window.JSZip) : volgende(); }; sc.onerror = volgende; document.head.appendChild(sc); })();
+  });
+}
+function djVoegBladenToeAanOrigineel(origBuf, extraBlob){
+  var NS = &#x27;http://schemas.openxmlformats.org/spreadsheetml/2006/main&#x27;, RNS = &#x27;http://schemas.openxmlformats.org/officeDocument/2006/relationships&#x27;;
+  var parse = function(t){ return new DOMParser().parseFromString(t, &#x27;application/xml&#x27;); };
+  var ser = function(d){ var t = new XMLSerializer().serializeToString(d); return /^&lt;\?xml/.test(t) ? t : &#x27;&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; standalone=&quot;yes&quot;?&gt;\n&#x27; + t; };
+  var esc = function(t){ return String(t).replace(/&amp;/g, &#x27;&amp;amp;&#x27;).replace(/&lt;/g, &#x27;&amp;lt;&#x27;).replace(/&gt;/g, &#x27;&amp;gt;&#x27;); };
+  var kids = function(el, n){ return el ? Array.prototype.filter.call(el.childNodes, function(c){ return c.nodeType === 1 &amp;&amp; c.localName === n; }) : []; };
+  var eerste = function(d, n){ return d.getElementsByTagNameNS(NS, n)[0] || null; };
+  return djLaadJSZip().then(function(JSZip){
+    return Promise.all([JSZip.loadAsync(origBuf), extraBlob.arrayBuffer().then(function(b){ return JSZip.loadAsync(b); })]);
+  }).then(function(z){
+    var zo = z[0], ze = z[1];
+    var lees = function(zip, pad){ var f = zip.file(pad); return f ? f.async(&#x27;string&#x27;) : Promise.resolve(null); };
+    return Promise.all([lees(zo, &#x27;xl/workbook.xml&#x27;), lees(zo, &#x27;xl/_rels/workbook.xml.rels&#x27;), lees(zo, &#x27;[Content_Types].xml&#x27;), lees(zo, &#x27;xl/styles.xml&#x27;),
+                        lees(ze, &#x27;xl/workbook.xml&#x27;), lees(ze, &#x27;xl/_rels/workbook.xml.rels&#x27;), lees(ze, &#x27;xl/styles.xml&#x27;), lees(ze, &#x27;xl/sharedStrings.xml&#x27;)]).then(function(t){
+      var oWb = parse(t[0]), oRels = parse(t[1]), oCt = parse(t[2]), oSt = parse(t[3]), eWb = parse(t[4]), eRels = parse(t[5]), eSt = parse(t[6]);
+      // gedeelde teksten van onze bladen
+      var teksten = [];
+      if (t[7]) Array.prototype.forEach.call(parse(t[7]).getElementsByTagNameNS(NS, &#x27;si&#x27;), function(si){ teksten.push(Array.prototype.map.call(si.getElementsByTagNameNS(NS, &#x27;t&#x27;), function(x){ return x.textContent; }).join(&#x27;&#x27;)); });
+      // ── stijlen samenvoegen: lettertypen, vullingen, randen, getalnotaties en celopmaak van onze bladen achteraan toevoegen ──
+      var sec = function(d, n){ return eerste(d, n); };
+      var oFonts = sec(oSt, &#x27;fonts&#x27;), oFills = sec(oSt, &#x27;fills&#x27;), oBorders = sec(oSt, &#x27;borders&#x27;), oXfs = sec(oSt, &#x27;cellXfs&#x27;);
+      var nFo = kids(oFonts, &#x27;font&#x27;).length, nFi = kids(oFills, &#x27;fill&#x27;).length, nBo = kids(oBorders, &#x27;border&#x27;).length, nXf = kids(oXfs, &#x27;xf&#x27;).length;
+      var oNum = sec(oSt, &#x27;numFmts&#x27;);
+      if (!oNum) { oNum = oSt.createElementNS(NS, &#x27;numFmts&#x27;); oSt.documentElement.insertBefore(oNum, oFonts); }
+      var maxId = 163; kids(oNum, &#x27;numFmt&#x27;).forEach(function(n){ maxId = Math.max(maxId, +n.getAttribute(&#x27;numFmtId&#x27;)); });
+      var numMap = {};
+      kids(sec(eSt, &#x27;numFmts&#x27;), &#x27;numFmt&#x27;).forEach(function(n){ var id = +n.getAttribute(&#x27;numFmtId&#x27;); if (id &lt; 164) return; var nn = oSt.importNode(n, true); maxId++; numMap[id] = maxId; nn.setAttribute(&#x27;numFmtId&#x27;, maxId); oNum.appendChild(nn); });
+      oNum.setAttribute(&#x27;count&#x27;, kids(oNum, &#x27;numFmt&#x27;).length);
+      [[&#x27;fonts&#x27;, &#x27;font&#x27;, oFonts], [&#x27;fills&#x27;, &#x27;fill&#x27;, oFills], [&#x27;borders&#x27;, &#x27;border&#x27;, oBorders]].forEach(function(x){
+        kids(sec(eSt, x[0]), x[1]).forEach(function(n){ x[2].appendChild(oSt.importNode(n, true)); }); x[2].setAttribute(&#x27;count&#x27;, kids(x[2], x[1]).length); });
+      kids(sec(eSt, &#x27;cellXfs&#x27;), &#x27;xf&#x27;).forEach(function(n){
+        var nn = oSt.importNode(n, true);
+        if (nn.hasAttribute(&#x27;fontId&#x27;)) nn.setAttribute(&#x27;fontId&#x27;, +nn.getAttribute(&#x27;fontId&#x27;) + nFo);
+        if (nn.hasAttribute(&#x27;fillId&#x27;)) nn.setAttribute(&#x27;fillId&#x27;, +nn.getAttribute(&#x27;fillId&#x27;) + nFi);
+        if (nn.hasAttribute(&#x27;borderId&#x27;)) nn.setAttribute(&#x27;borderId&#x27;, +nn.getAttribute(&#x27;borderId&#x27;) + nBo);
+        var nf = +nn.getAttribute(&#x27;numFmtId&#x27;); if (numMap[nf]) nn.setAttribute(&#x27;numFmtId&#x27;, numMap[nf]);
+        if (nn.hasAttribute(&#x27;xfId&#x27;)) nn.setAttribute(&#x27;xfId&#x27;, &#x27;0&#x27;);
+        oXfs.appendChild(nn);
+      });
+      oXfs.setAttribute(&#x27;count&#x27;, kids(oXfs, &#x27;xf&#x27;).length);
+      if (!kids(oNum, &#x27;numFmt&#x27;).length) oNum.parentNode.removeChild(oNum);
+      // ── onze bladen ophalen (in volgorde) ──
+      var eRelMap = {}; Array.prototype.forEach.call(eRels.getElementsByTagName(&#x27;Relationship&#x27;), function(r){ eRelMap[r.getAttribute(&#x27;Id&#x27;)] = r.getAttribute(&#x27;Target&#x27;); });
+      var oSheets = eerste(oWb, &#x27;sheets&#x27;), bestaand = {}, maxSheetId = 0;
+      kids(oSheets, &#x27;sheet&#x27;).forEach(function(sh){ bestaand[sh.getAttribute(&#x27;name&#x27;).toLowerCase()] = 1; maxSheetId = Math.max(maxSheetId, +sh.getAttribute(&#x27;sheetId&#x27;)); });
+      var relIds = Array.prototype.map.call(oRels.getElementsByTagName(&#x27;Relationship&#x27;), function(r){ return r.getAttribute(&#x27;Id&#x27;); });
+      var volgendRel = 1; while (relIds.indexOf(&#x27;rId&#x27; + volgendRel) &gt;= 0) volgendRel++;
+      var bladNr = 1; while (zo.file(&#x27;xl/worksheets/sheet&#x27; + bladNr + &#x27;.xml&#x27;)) bladNr++;
+      var taken = [];
+      kids(eerste(eWb, &#x27;sheets&#x27;), &#x27;sheet&#x27;).forEach(function(sh){
+        var naam = sh.getAttribute(&#x27;name&#x27;); if (bestaand[naam.toLowerCase()]) return;
+        var rid = sh.getAttributeNS(RNS, &#x27;id&#x27;) || sh.getAttribute(&#x27;r:id&#x27;), doel = &#x27;xl/&#x27; + String(eRelMap[rid] || &#x27;&#x27;).replace(/^\/?xl\//, &#x27;&#x27;);
+        var nr = bladNr++, nieuweRid = &#x27;rId&#x27; + (volgendRel++); while (relIds.indexOf(nieuweRid) &gt;= 0) nieuweRid = &#x27;rId&#x27; + (volgendRel++); relIds.push(nieuweRid);
+        taken.push(lees(ze, doel).then(function(xml){
+          // celopmaak verschuiven naar de samengevoegde stijlen; gedeelde teksten als vaste tekst in de cel
+          xml = xml.replace(/&lt;c ([^&gt;]*?)(\/?)&gt;/g, function(m0, attrs, dicht){ return &#x27;&lt;c &#x27; + attrs.replace(/\bs=&quot;(\d+)&quot;/, function(a, n){ return &#x27;s=&quot;&#x27; + (+n + nXf) + &#x27;&quot;&#x27;; }) + dicht + &#x27;&gt;&#x27;; });
+          xml = xml.replace(/&lt;c ([^&gt;]*?)t=&quot;s&quot;([^&gt;]*)&gt;&lt;v&gt;(\d+)&lt;\/v&gt;&lt;\/c&gt;/g, function(m0, a1, a2, idx){ return &#x27;&lt;c &#x27; + a1 + &#x27;t=&quot;inlineStr&quot;&#x27; + a2 + &#x27;&gt;&lt;is&gt;&lt;t xml:space=&quot;preserve&quot;&gt;&#x27; + esc(teksten[+idx] || &#x27;&#x27;) + &#x27;&lt;/t&gt;&lt;/is&gt;&lt;/c&gt;&#x27;; });
+          xml = xml.replace(/(&lt;col [^&gt;]*?)\bstyle=&quot;(\d+)&quot;/g, function(m0, a, n){ return a + &#x27;style=&quot;&#x27; + (+n + nXf) + &#x27;&quot;&#x27;; });
+          xml = xml.replace(/(&lt;row [^&gt;]*?)\bs=&quot;(\d+)&quot;/g, function(m0, a, n){ return a + &#x27;s=&quot;&#x27; + (+n + nXf) + &#x27;&quot;&#x27;; });
+          xml = xml.replace(/\stabSelected=&quot;1&quot;/g, &#x27;&#x27;);
+          zo.file(&#x27;xl/worksheets/sheet&#x27; + nr + &#x27;.xml&#x27;, xml);
+          var s2 = oWb.createElementNS(NS, &#x27;sheet&#x27;); s2.setAttribute(&#x27;name&#x27;, naam); s2.setAttribute(&#x27;sheetId&#x27;, ++maxSheetId); s2.setAttributeNS(RNS, &#x27;r:id&#x27;, nieuweRid); oSheets.appendChild(s2);
+          var r2 = oRels.createElementNS(&#x27;http://schemas.openxmlformats.org/package/2006/relationships&#x27;, &#x27;Relationship&#x27;);
+          r2.setAttribute(&#x27;Id&#x27;, nieuweRid); r2.setAttribute(&#x27;Type&#x27;, &#x27;http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet&#x27;); r2.setAttribute(&#x27;Target&#x27;, &#x27;worksheets/sheet&#x27; + nr + &#x27;.xml&#x27;); oRels.documentElement.appendChild(r2);
+          var o2 = oCt.createElementNS(&#x27;http://schemas.openxmlformats.org/package/2006/content-types&#x27;, &#x27;Override&#x27;);
+          o2.setAttribute(&#x27;PartName&#x27;, &#x27;/xl/worksheets/sheet&#x27; + nr + &#x27;.xml&#x27;); o2.setAttribute(&#x27;ContentType&#x27;, &#x27;application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml&#x27;); oCt.documentElement.appendChild(o2);
+        }));
+      });
+      return Promise.all(taken).then(function(){
+        // bladvolgorde in de taken kan door async verschuiven: sorteer de nieuwe bladen op sheetId
+        var lijst = kids(oSheets, &#x27;sheet&#x27;).sort(function(a, b){ return +a.getAttribute(&#x27;sheetId&#x27;) - +b.getAttribute(&#x27;sheetId&#x27;); }); lijst.forEach(function(sh){ oSheets.appendChild(sh); });
+        zo.file(&#x27;xl/workbook.xml&#x27;, ser(oWb)); zo.file(&#x27;xl/_rels/workbook.xml.rels&#x27;, ser(oRels)); zo.file(&#x27;[Content_Types].xml&#x27;, ser(oCt)); zo.file(&#x27;xl/styles.xml&#x27;, ser(oSt));
+        // docProps/app.xml (bladnamen) bijwerken
+        return lees(zo, &#x27;docProps/app.xml&#x27;).then(function(app){
+          if (app) {
+            var namen = kids(oSheets, &#x27;sheet&#x27;).map(function(sh){ return sh.getAttribute(&#x27;name&#x27;); });
+            app = app.replace(/&lt;TitlesOfParts&gt;[\s\S]*?&lt;\/TitlesOfParts&gt;/, &#x27;&lt;TitlesOfParts&gt;&lt;vt:vector size=&quot;&#x27; + namen.length + &#x27;&quot; baseType=&quot;lpstr&quot;&gt;&#x27; + namen.map(function(n){ return &#x27;&lt;vt:lpstr&gt;&#x27; + esc(n) + &#x27;&lt;/vt:lpstr&gt;&#x27;; }).join(&#x27;&#x27;) + &#x27;&lt;/vt:vector&gt;&lt;/TitlesOfParts&gt;&#x27;)
+                     .replace(/(&lt;vt:lpstr&gt;Worksheets&lt;\/vt:lpstr&gt;&lt;\/vt:variant&gt;&lt;vt:variant&gt;&lt;vt:i4&gt;)\d+/, &#x27;$1&#x27; + namen.length);
+            zo.file(&#x27;docProps/app.xml&#x27;, app);
+          }
+          return zo.generateAsync({ type: &#x27;blob&#x27;, mimeType: &#x27;application/vnd.openxmlformats-officedocument.spreadsheetml.sheet&#x27;, compression: &#x27;DEFLATE&#x27; });
+        });
+      });
+    });
+  });
 }
 &lt;/script&gt;
 &lt;/body&gt;
@@ -23926,7 +24071,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.99';
+var DJ_BUILD = '2026-10-07.104';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
