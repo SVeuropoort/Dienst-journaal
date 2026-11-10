@@ -3136,7 +3136,7 @@ async function spOphalenBestandRuw(bestandsnaam){
 //    nog aan vertrouwelijke sleutels in main stond, blijft ongemoeid staan.
 var DJ_VERTR_SLEUTELS = ['dienstjournaal_stena_v1', 'werkoverdracht_ziekmeldingen_v1',
   'personeelsdossier_v1', 'personeelsdossier_actief_v1',
-  'ma_loongroepen_v1', 'ma_medewerkers_v1', 'ma_hvh_v1', 'ma_apart_v1', 'ma_mentor_v1', 'ma_verzonden_v1', 'ma_mail_v1', 'plan_sv_v1', 'startup_v1', 'kledingpunten_v1', 'bezetting_deeltijd_v1', 'pd_verlof_v1'];
+  'ma_loongroepen_v1', 'ma_medewerkers_v1', 'ma_hvh_v1', 'ma_apart_v1', 'ma_mentor_v1', 'ma_verzonden_v1', 'ma_mail_v1', 'ma_quinyx_namen_v1', 'plan_sv_v1', 'startup_v1', 'kledingpunten_v1', 'bezetting_deeltijd_v1', 'pd_verlof_v1'];
 function djIsVertrSleutel(k){ return DJ_VERTR_SLEUTELS.indexOf(String(k).replace(/^(EP|HVH|IMM)_/, '')) >= 0; }
 function djVertrSplits(data){
   var vertr = {}, rest = {};
@@ -7183,6 +7183,7 @@ window.addEventListener('resize', () => {
     'ma_mentor_v1',
     'ma_verzonden_v1',
     'ma_mail_v1',
+    'ma_quinyx_namen_v1',
     'dj_verjaardagen_v1',
     'dagpl_cert_v1',
     'dagpl_cert_v2',
@@ -15624,7 +15625,7 @@ window.addEventListener('message', function(ev){
     // app de wijziging niet als "eigen wijziging" zag en hem niet altijd naar SharePoint stuurde.
     // Nu wel: de drie lijsten opnieuw zetten via de app zelf → gemarkeerd als gewijzigd → opgeslagen.
     if (d.opgeslagen) {
-      ['ma_loongroepen_v1', 'ma_medewerkers_v1', 'ma_hvh_v1', 'ma_apart_v1', 'ma_mentor_v1', 'ma_verzonden_v1', 'ma_mail_v1'].forEach(function(k){
+      ['ma_loongroepen_v1', 'ma_medewerkers_v1', 'ma_hvh_v1', 'ma_apart_v1', 'ma_mentor_v1', 'ma_verzonden_v1', 'ma_mail_v1', 'ma_quinyx_namen_v1'].forEach(function(k){
         var v = localStorage.getItem(k); if (v !== null) localStorage.setItem(k, v);
       });
       if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
@@ -17661,6 +17662,9 @@ function handleFile(file) {
     state.payroll=data; state.maand=maand; state.jaar=jaar; state.step=&quot;preview&quot;;
     state.rawWorkbook = wb; // originele upload bewaren voor extra tabblad bij export
     try { state.rawBuffer = e.target.result.slice(0); } catch(x) { state.rawBuffer = null; } // exacte kopie van het Quinyx-bestand
+    // Volledige namen uit Quinyx (&quot;Achternaam, Voornaam&quot;) bewaren — voor de voornamen bij o.a. het ziekmelden
+    try { var qn = JSON.parse(localStorage.getItem(&#x27;ma_quinyx_namen_v1&#x27;) || &#x27;{}&#x27;) || {}; Object.keys(state.payroll || {}).forEach(function(k){ var n = state.payroll[k] &amp;&amp; state.payroll[k].__naam; if (n) qn[k] = String(n).trim(); });
+      localStorage.setItem(&#x27;ma_quinyx_namen_v1&#x27;, JSON.stringify(qn)); } catch(x) {}
     render();
   };
   reader.readAsArrayBuffer(file);
@@ -24130,7 +24134,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.108';
+var DJ_BUILD = '2026-10-07.110';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -34033,7 +34037,7 @@ function pdVerlofGet(){ try { return JSON.parse(localStorage.getItem(pdVerlofKey
 window.pdVerlofZet = function(naam, k, v){
   var a = pdVerlofGet(); a[naam] = a[naam] || {};
   a[naam][k] = (k === 'geb' || k === 'senior') ? !!v : (k === 'sfr' ? String(v || '') : (v === '' ? '' : Number(v)));
-  if (!a[naam].geb && !a[naam].aanv && !a[naam].ouder && !a[naam].senior && !a[naam].indienst && !a[naam].sfr && !a[naam].pensioen && !a[naam].kind && !a[naam].ouderTot && (a[naam].pct === undefined || a[naam].pct === '' || a[naam].pct === 100)) delete a[naam];
+  if (!a[naam].geb && !a[naam].aanv && !a[naam].ouder && !a[naam].senior && !a[naam].indienst && !a[naam].sfr && !a[naam].pensioen && !a[naam].kind && !a[naam].ouderTot && !a[naam].voornaam && (a[naam].pct === undefined || a[naam].pct === '' || a[naam].pct === 100)) delete a[naam];
   localStorage.setItem(pdVerlofKey(), JSON.stringify(a)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
 };
 function pdVerlofHtml(naam){
@@ -34414,9 +34418,13 @@ function pdGegevensHtml(naam, verj, isGroepslid){
     '<input type="number" min="1" max="12" placeholder="Mnd" value="' + esc(verj.maand || '') + '" id="pd-verj-maand" onchange="pdSlaVerjaardagOp()" style="width:56px!important;">' +
     '<input type="number" min="1900" max="2100" placeholder="Jaar" value="' + esc(verj.jaar || '') + '" id="pd-verj-jaar" onchange="pdSlaVerjaardagOp()" style="width:74px!important;"></div>';
   var info1 = []; if (p) { info1.push(p.leeftijd !== null ? p.leeftijd + ' jaar' : '<span style="color:#b9770e;">geboortejaar onbekend</span>'); if (!isGroepslid) info1.push(p.dienst !== null ? p.dienst + ' jaar in dienst' : '<span style="color:#b9770e;">datum in dienst onbekend</span>'); }
+  var vnAuto = (!vl.voornaam && typeof djVoornaamAuto === 'function') ? djVoornaamAuto(naam) : '';
+  var vnVeld = '<input type="text" value="' + esc(vl.voornaam || '') + '" placeholder="' + esc(vnAuto ? vnAuto + ' (gevonden)' : 'bijv. Ashley') + '" onchange="pdVoornaamZet(\'' + n + '\',this)">';
   h += sectie('&#x1F464;', 'Persoonlijk', '#d4a72c',
+    veld('Voornaam', vnVeld, 'Wordt o.a. bij het ziekmelden achter de naam getoond, zodat naamgenoten niet verwisseld worden') +
     veld('Verjaardag / geboortedatum', verjVelden) + (isGroepslid ? '' : veld('In dienst sinds', datum('', vl.indienst, '', 'pdIndienstZet'))),
     info1.join(' &middot; ') + ' <span id="pd-verj-opgeslagen" style="font-size:11px;color:#166534;opacity:0;transition:opacity .4s;">&#10003; Opgeslagen</span>',
+    ((vl.voornaam || vnAuto) ? '<b>' + esc(vl.voornaam || vnAuto) + '</b>' + (vl.voornaam ? '' : ' <span style="color:#b9770e;">(gevonden, nog bevestigen)</span>') + ' &middot; ' : '<span style="color:#b9770e;">voornaam onbekend</span> &middot; ') +
     (verj.dag && verj.maand ? verj.dag + '-' + verj.maand + (verj.jaar ? '-' + verj.jaar : '') + ' &middot; ' : '') + info1.join(' &middot; ').replace(/<[^>]+>/g, ''));
   if (isGroepslid) return h;
   // 2. Functie
@@ -35057,21 +35065,41 @@ window.djMaMailGet = djMaMailGet; window.djMaMailZet = djMaMailZet; window.djMaV
 // Voornaam bij een naam met voorletters (bijv. "A.A. Rodgers" → "Ashley"), om naamgenoten uit elkaar te houden.
 // Bronnen: de Dagplanning-naam uit Certificeringen (🔗), en anders de kledingpunten-lijst (voornaam uit de leverancier).
 var _djVnCache = null, _djVnTijd = 0;
-function djVnKern(n){ // achternaam zonder voorletters en tussenvoegsels ("V. vd Berg" en "Vincent van den Berg" → "berg")
-  return String(n || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\*/g, '')
-    .split(/[\s,]+/).filter(function(w){ return w && !/^([a-z]\.)+$/.test(w) && !/^[a-z]\.?$/.test(w) && ['van','der','den','de','vd','v/d','vander','ter','te','het',"'t",'in','op'].indexOf(w) < 0; }).join(' ');
+function djVnKern(n){ // achternaam zonder voorletters/tussenvoegsels; ij = y ("J. de Kruyk" = "Jeroen de Kruijk")
+  return String(n || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\*/g, '').replace(/ij/g, 'y').replace(/[,']\s*\d{2,4}\b/g, ' ')
+    .split(/[\s,]+/).filter(function(w){ return w && !/^([a-z]\.?)+$/.test(w) && ['van','der','den','de','vd','v/d','vander','ter','te','het',"'t",'in','op'].indexOf(w) < 0; }).join(' ');
 }
 function djVnBronnen(){
   var l = [];
   try { ((typeof oplOverzichtGetData === 'function' ? oplOverzichtGetData() : []) || []).forEach(function(r){ if (r && r.dpNaam) l.push(r.dpNaam); }); } catch(e) {}
   try { var kp = JSON.parse(localStorage.getItem(tk('kledingpunten_v1')) || 'null'); ((kp && kp.people) || []).forEach(function(x){ if (x.vn) l.push([x.vn, x.tv, x.an].filter(Boolean).join(' ')); }); } catch(e) {}
-  try { (window.allEmps || (typeof allEmps !== 'undefined' ? allEmps : []) || []).forEach(function(e){ if (e && e.name) l.push(e.name); }); } catch(e) {}    // namen uit de Dagplanning (Excel)
+  try { var qn = JSON.parse(localStorage.getItem('ma_quinyx_namen_v1') || '{}') || {}; Object.keys(qn).forEach(function(k){ var d = String(qn[k]).split(','); if (d.length >= 2) l.push(d.slice(1).join(' ').trim() + ' ' + d[0].replace(/-$/, '').trim()); }); } catch(e) {}  // Quinyx: "Achternaam, Voornaam"
+  try { (window.allEmps || (typeof allEmps !== 'undefined' ? allEmps : []) || []).forEach(function(e){ if (e && e.name) l.push(e.name); }); } catch(e) {}   // namen uit de Dagplanning (Excel)
   try { var vr = JSON.parse(localStorage.getItem('dj_verjaardagen_v1') || '{}') || {}; Object.keys(vr).forEach(function(n){ l.push(n); }); } catch(e) {}
-  return l.map(function(n){ return String(n).replace(/\*/g, '').trim(); }).filter(function(n){ return /^[A-Za-zÀ-ÿ'-]{2,}\s/.test(n) && !/^(?:[A-Z]\.)/.test(n); });
+  return l.map(function(n){ return String(n).replace(/\*/g, '').replace(/\s+/g, ' ').trim(); }).filter(function(n){ return /^[A-Za-zÀ-ÿ'-]{2,}\s/.test(n) && !/^(?:[A-Z]\.)/.test(n); });
+}
+// Voornaam uit het Personeelsdossier (ingevuld door supervisors) gaat altijd voor
+function djVoornaamDossier(naam){
+  var a = (typeof pdVerlofGet === 'function') ? pdVerlofGet() : {};
+  if (a[naam] && a[naam].voornaam) return a[naam].voornaam;
+  if (typeof vakZelfdePersoon !== 'function') return '';
+  var k = Object.keys(a).filter(function(n){ return a[n] && a[n].voornaam && vakZelfdePersoon(n, naam); });
+  return k.length === 1 ? a[k[0]].voornaam : '';
 }
 function djVoornaam(naam){
   if (!naam) return '';
-  var t = String(naam).trim(), m = t.match(/^((?:[A-Z]\.)+|[A-Z])\s/); if (!m) return ''; // staat er al een voornaam, dan niets toevoegen
+  var uitDossier = djVoornaamDossier(naam);
+  if (uitDossier) { var vol = String(naam).trim(); return vol.toLowerCase().indexOf(uitDossier.toLowerCase()) === 0 ? '' : uitDossier; }
+  return djVoornaamAuto(naam);
+}
+function djVoornaamAuto(naam){
+  if (!naam) return '';
+  var t = String(naam).trim(), letter = '', jaar = '', achter = '';
+  var a = t.match(/^((?:[A-Z]\.?){1,4})\s+(.+)$/);                         // "R.R.T Lauwers", "J. de Kruyk", "C. Burger"
+  var b = t.match(/^([^,]+),\s*((?:[A-Z]\.?){1,4})\s*(?:,\s*'?(\d{2,4}))?/); // "Rodgers, A.A.,'83"
+  if (a && /^[A-Z]\.?$|^(?:[A-Z]\.)+[A-Z]?\.?$/.test(a[1])) { letter = a[1].charAt(0); achter = a[2]; }
+  else if (b) { letter = b[2].charAt(0); achter = b[1]; jaar = b[3] || ''; }
+  else return ''; // staat er al een voornaam, dan niets toevoegen
   if (!_djVnCache || Date.now() - _djVnTijd > 30000) { _djVnCache = {}; _djVnTijd = Date.now(); }
   if (naam in _djVnCache) return _djVnCache[naam];
   var vn = '';
@@ -35080,16 +35108,30 @@ function djVoornaam(naam){
     var rij = ((typeof oplOverzichtGetData === 'function' ? oplOverzichtGetData() : []) || []).find(function(r){ return r && r.naam === naam; });
     var dp = rij && (rij.dpNaam || '');
     if (dp && /^[A-Za-zÀ-ÿ'-]{2,}\s/.test(dp) && !/^(?:[A-Z]\.)/.test(dp)) vn = dp.split(/\s+/)[0];
-    // 2) zelfde achternaam (zonder tussenvoegsels) + zelfde eerste voorletter in de andere lijsten — alleen als het eenduidig is
+    // 2) zelfde achternaam + eerste voorletter in de andere lijsten — alleen als het eenduidig is
     if (!vn) {
-      var kern = djVnKern(t), letter = m[1].charAt(0).toLowerCase(), gevonden = {};
-      djVnBronnen().forEach(function(n){ var w = n.split(/\s+/)[0]; if (w.charAt(0).toLowerCase() === letter && djVnKern(n.slice(w.length)) === kern) gevonden[w.charAt(0).toUpperCase() + w.slice(1)] = 1; });
-      var k = Object.keys(gevonden); if (k.length === 1) vn = k[0];
+      var kern = djVnKern(achter), l = letter.toLowerCase(), gevonden = {};
+      djVnBronnen().forEach(function(n){ var w = n.split(/\s+/)[0]; if (w.charAt(0).toLowerCase() === l && djVnKern(n.slice(w.length)) === kern) (gevonden[w.charAt(0).toUpperCase() + w.slice(1)] = gevonden[w.charAt(0).toUpperCase() + w.slice(1)] || []).push(n); });
+      var k = Object.keys(gevonden);
+      // naamgenoten met dezelfde voorletter: het geboortejaar ('83) beslist, via de verjaardagenlijst
+      if (k.length > 1 && jaar) {
+        var vr = {}; try { vr = JSON.parse(localStorage.getItem('dj_verjaardagen_v1') || '{}') || {}; } catch(e) {}
+        var jj = jaar.length === 2 ? jaar : jaar.slice(-2);
+        k = k.filter(function(v){ return gevonden[v].some(function(n){ return Object.keys(vr).some(function(vn2){ return vr[vn2] && String(vr[vn2].jaar || '').slice(-2) === jj && djVnKern(vn2.slice(vn2.split(/\s+/)[0].length)) === kern && vn2.split(/\s+/)[0].toLowerCase() === v.toLowerCase(); }); }); });
+      }
+      if (k.length === 1) vn = k[0];
     }
   } catch(e) {}
   return (_djVnCache[naam] = vn);
 }
-window.djVoornaam = djVoornaam;
+window.djVoornaam = djVoornaam; window.djVoornaamAuto = djVoornaamAuto;
+window.pdVoornaamZet = function(naam, el){
+  var v = String(el.value || '').trim().replace(/\s+/g, ' ');
+  var a = pdVerlofGet(); a[naam] = a[naam] || {}; if (v) a[naam].voornaam = v.charAt(0).toUpperCase() + v.slice(1); else delete a[naam].voornaam;
+  if (!Object.keys(a[naam]).length) delete a[naam];
+  localStorage.setItem(pdVerlofKey(), JSON.stringify(a)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+  _djVnCache = null; if (typeof pdRenderDetail === 'function') pdRenderDetail();
+};
 </script>
 </body>
 </html>
