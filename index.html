@@ -3136,7 +3136,7 @@ async function spOphalenBestandRuw(bestandsnaam){
 //    nog aan vertrouwelijke sleutels in main stond, blijft ongemoeid staan.
 var DJ_VERTR_SLEUTELS = ['dienstjournaal_stena_v1', 'werkoverdracht_ziekmeldingen_v1',
   'personeelsdossier_v1', 'personeelsdossier_actief_v1',
-  'ma_loongroepen_v1', 'ma_medewerkers_v1', 'ma_hvh_v1', 'ma_apart_v1', 'ma_mentor_v1', 'ma_verzonden_v1', 'ma_mail_v1', 'ma_quinyx_namen_v1', 'pd_koppeling_v1', 'pd_team_v1', 'plan_sv_v1', 'startup_v1', 'kledingpunten_v1', 'bezetting_deeltijd_v1', 'pd_verlof_v1'];
+  'ma_loongroepen_v1', 'ma_medewerkers_v1', 'ma_hvh_v1', 'ma_apart_v1', 'ma_mentor_v1', 'ma_verzonden_v1', 'ma_mail_v1', 'ma_quinyx_namen_v1', 'pd_koppeling_v1', 'pd_team_v1', 'pd_quinyx_extra_v1', 'plan_sv_v1', 'startup_v1', 'kledingpunten_v1', 'bezetting_deeltijd_v1', 'pd_verlof_v1'];
 function djIsVertrSleutel(k){ return DJ_VERTR_SLEUTELS.indexOf(String(k).replace(/^(EP|HVH|IMM)_/, '')) >= 0; }
 function djVertrSplits(data){
   var vertr = {}, rest = {};
@@ -7186,6 +7186,7 @@ window.addEventListener('resize', () => {
     'ma_quinyx_namen_v1',
     'pd_koppeling_v1',
     'pd_team_v1',
+    'pd_quinyx_extra_v1',
     'dj_verjaardagen_v1',
     'dagpl_cert_v1',
     'dagpl_cert_v2',
@@ -24139,7 +24140,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.119';
+var DJ_BUILD = '2026-10-07.120';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -34426,12 +34427,15 @@ function pdGegevensHtml(naam, verj, isGroepslid){
   var reg = (typeof djRegVoorNaam === 'function') ? djRegVoorNaam(naam) : null;
   var vnQuinyx = reg && reg.voornaam ? reg.voornaam : '';
   var vnAuto = (!vl.voornaam && !vnQuinyx && typeof djVoornaamAuto === 'function') ? djVoornaamAuto(naam) : '';
-  var vnVeld = '<input type="text" value="' + esc(vl.voornaam || '') + '" placeholder="' + esc(vnQuinyx ? vnQuinyx + ' (uit Quinyx)' : vnAuto ? vnAuto + ' (gevonden)' : 'bijv. Ashley') + '" onchange="pdVoornaamZet(\'' + n + '\',this)">';
+  var qx = (reg && typeof djQxExtraGet === 'function') ? (djQxExtraGet()[reg.mannr] || {}) : {};
+  var slot = function(tekst){ return '<span class="wa" title="Komt uit Quinyx. Wijzigen? Pas het aan in Quinyx en lees de Quinyx-lijst opnieuw in.">' + esc(tekst) + ' <span style="font-size:11px;color:#8795a8;">&#x1F512; Quinyx</span></span>'; };
+  var nl = function(iso){ var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? m[3] + '-' + m[2] + '-' + m[1] : iso; };
+  var vnVeld = vnQuinyx ? slot(vnQuinyx) : '<input type="text" value="' + esc(vl.voornaam || '') + '" placeholder="' + esc(vnAuto ? vnAuto + ' (gevonden)' : 'bijv. Ashley') + '" onchange="pdVoornaamZet(\'' + n + '\',this)">';
   var ploeg = reg && typeof djTeamGet === 'function' ? (djTeamGet()[reg.mannr] || '') : '';
   var regVelden = reg ? veld('Mannummer', '<span class="wa">' + esc(reg.mannr) + '</span>', 'Uit de medewerkerslijst van de Maandafsluiting') + (ploeg ? veld('Ploeg (Quinyx)', '<span class="wa">' + esc(ploeg) + '</span>') : '') + veld('Naam in Quinyx', '<span class="wa">' + esc(reg.quinyxNaam || '— lees Quinyx in bij de Maandafsluiting —') + '</span>', 'Voornaam + achternaam zoals in Quinyx; deze naam gebruiken we ook in de Dagplanning en bij verjaardagen') : '';
   h += sectie('&#x1F464;', 'Persoonlijk', '#d4a72c',
-    regVelden + veld('Voornaam', vnVeld, 'Leeg = de voornaam uit Quinyx. Alleen invullen als die anders moet (bijv. een roepnaam).') +
-    veld('Verjaardag / geboortedatum', verjVelden) + (isGroepslid ? '' : veld('In dienst sinds', datum('', vl.indienst, '', 'pdIndienstZet'))),
+    regVelden + veld('Voornaam', vnVeld) +
+    veld('Verjaardag / geboortedatum', qx.geb ? slot(nl(qx.geb)) : verjVelden) + (isGroepslid ? '' : veld('In dienst sinds', qx.indienst ? slot(nl(qx.indienst)) : datum('', vl.indienst, '', 'pdIndienstZet'))),
     info1.join(' &middot; ') + ' <span id="pd-verj-opgeslagen" style="font-size:11px;color:#166534;opacity:0;transition:opacity .4s;">&#10003; Opgeslagen</span>',
     (reg ? '<span style="color:#1a7a40;">vast &middot; ' + esc(reg.mannr) + (ploeg ? ' &middot; ' + esc(ploeg) : '') + '</span> &middot; ' : '') +
     ((vl.voornaam || vnQuinyx || vnAuto) ? '<b>' + esc(vl.voornaam || vnQuinyx || vnAuto) + '</b>' + ((vl.voornaam || vnQuinyx) ? '' : ' <span style="color:#b9770e;">(gevonden, nog bevestigen)</span>') + ' &middot; ' : '<span style="color:#b9770e;">voornaam onbekend</span> &middot; ') +
@@ -35467,7 +35471,10 @@ function djDatumIso(v){
   return '';
 }
 // Datum in dienst + geboortedatum overnemen in het dossier van de vaste medewerkers (register)
+function djQxExtraKey(){ return tk('pd_quinyx_extra_v1'); }
+function djQxExtraGet(){ try { return JSON.parse(localStorage.getItem(djQxExtraKey()) || '{}') || {}; } catch(e) { return {}; } }
 function djRegExtraToepassen(extra){
+  try { var bew = djQxExtraGet(); Object.keys(extra).forEach(function(k){ bew[k] = extra[k]; }); localStorage.setItem(djQxExtraKey(), JSON.stringify(bew)); } catch(e) {}
   var reg = (typeof djRegister === 'function') ? djRegister() : [], vl = (typeof pdVerlofGet === 'function') ? pdVerlofGet() : {}, verj = (typeof getVerjaardagen === 'function') ? getVerjaardagen() : {};
   var nInd = 0, nGeb = 0;
   reg.forEach(function(p){
