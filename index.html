@@ -3136,7 +3136,7 @@ async function spOphalenBestandRuw(bestandsnaam){
 //    nog aan vertrouwelijke sleutels in main stond, blijft ongemoeid staan.
 var DJ_VERTR_SLEUTELS = ['dienstjournaal_stena_v1', 'werkoverdracht_ziekmeldingen_v1',
   'personeelsdossier_v1', 'personeelsdossier_actief_v1',
-  'ma_loongroepen_v1', 'ma_medewerkers_v1', 'ma_hvh_v1', 'ma_apart_v1', 'ma_mentor_v1', 'ma_verzonden_v1', 'ma_mail_v1', 'ma_quinyx_namen_v1', 'plan_sv_v1', 'startup_v1', 'kledingpunten_v1', 'bezetting_deeltijd_v1', 'pd_verlof_v1'];
+  'ma_loongroepen_v1', 'ma_medewerkers_v1', 'ma_hvh_v1', 'ma_apart_v1', 'ma_mentor_v1', 'ma_verzonden_v1', 'ma_mail_v1', 'ma_quinyx_namen_v1', 'pd_koppeling_v1', 'plan_sv_v1', 'startup_v1', 'kledingpunten_v1', 'bezetting_deeltijd_v1', 'pd_verlof_v1'];
 function djIsVertrSleutel(k){ return DJ_VERTR_SLEUTELS.indexOf(String(k).replace(/^(EP|HVH|IMM)_/, '')) >= 0; }
 function djVertrSplits(data){
   var vertr = {}, rest = {};
@@ -7184,6 +7184,7 @@ window.addEventListener('resize', () => {
     'ma_verzonden_v1',
     'ma_mail_v1',
     'ma_quinyx_namen_v1',
+    'pd_koppeling_v1',
     'dj_verjaardagen_v1',
     'dagpl_cert_v1',
     'dagpl_cert_v2',
@@ -16073,7 +16074,7 @@ function oplOverzichtTabelHtml(titel, kleur, rijen, tbodyId, isGroep){
     var r = item.r, idx = item.idx;
     var acties = '<span style="display:inline-flex;gap:4px;margin-left:6px;vertical-align:middle;">' +
       '<button onclick="oplOverzichtWijzigGroep(' + idx + ')" title="Groep wijzigen" style="background:none;border:none;color:#95a5a6;cursor:pointer;font-size:11px;padding:0;">&#x1F3F7;&#xFE0F;</button>' +
-      '<button onclick="oplOverzichtKoppelDagplanning(' + idx + ')" title="' + (r.dpNaam ? 'Gekoppeld aan &quot;' + oplEsc(r.dpNaam) + '&quot; in de Dagplanning — klik om te wijzigen' : 'Koppelen aan een naam in de Dagplanning') + '" style="background:none;border:none;color:' + (r.dpNaam ? '#1a7a40' : '#95a5a6') + ';cursor:pointer;font-size:11px;padding:0;">&#x1F517;</button>' +
+      '<button onclick="oplOverzichtKoppelDagplanning(' + idx + ')" title="' + (r.dpNaam ? 'Gekoppeld aan &quot;' + oplEsc(r.dpNaam) + '&quot; in de Dagplanning (voor de certificaat-waarschuwingen in de Dagplanning) — klik om te wijzigen' : 'Koppelen aan een naam in de Dagplanning, zodat de Dagplanning ziet welke certificaten deze persoon heeft. (De voornaam vul je in het Personeelsdossier in.)') + '" style="background:none;border:none;color:' + (r.dpNaam ? '#1a7a40' : '#95a5a6') + ';cursor:pointer;font-size:11px;padding:0;">&#x1F517;</button>' +
       '<button onclick="oplOverzichtVerwijder(' + idx + ')" title="Medewerker verwijderen uit overzicht" style="background:none;border:none;color:#c0392b;cursor:pointer;font-size:11px;padding:0;">&#x2715;</button>' +
       '</span>';
     return '<tr data-naam="' + oplEsc(r.naam) + '">' +
@@ -24134,7 +24135,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.110';
+var DJ_BUILD = '2026-10-07.114';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -34418,13 +34419,17 @@ function pdGegevensHtml(naam, verj, isGroepslid){
     '<input type="number" min="1" max="12" placeholder="Mnd" value="' + esc(verj.maand || '') + '" id="pd-verj-maand" onchange="pdSlaVerjaardagOp()" style="width:56px!important;">' +
     '<input type="number" min="1900" max="2100" placeholder="Jaar" value="' + esc(verj.jaar || '') + '" id="pd-verj-jaar" onchange="pdSlaVerjaardagOp()" style="width:74px!important;"></div>';
   var info1 = []; if (p) { info1.push(p.leeftijd !== null ? p.leeftijd + ' jaar' : '<span style="color:#b9770e;">geboortejaar onbekend</span>'); if (!isGroepslid) info1.push(p.dienst !== null ? p.dienst + ' jaar in dienst' : '<span style="color:#b9770e;">datum in dienst onbekend</span>'); }
-  var vnAuto = (!vl.voornaam && typeof djVoornaamAuto === 'function') ? djVoornaamAuto(naam) : '';
-  var vnVeld = '<input type="text" value="' + esc(vl.voornaam || '') + '" placeholder="' + esc(vnAuto ? vnAuto + ' (gevonden)' : 'bijv. Ashley') + '" onchange="pdVoornaamZet(\'' + n + '\',this)">';
+  var reg = (typeof djRegVoorNaam === 'function') ? djRegVoorNaam(naam) : null;
+  var vnQuinyx = reg && reg.voornaam ? reg.voornaam : '';
+  var vnAuto = (!vl.voornaam && !vnQuinyx && typeof djVoornaamAuto === 'function') ? djVoornaamAuto(naam) : '';
+  var vnVeld = '<input type="text" value="' + esc(vl.voornaam || '') + '" placeholder="' + esc(vnQuinyx ? vnQuinyx + ' (uit Quinyx)' : vnAuto ? vnAuto + ' (gevonden)' : 'bijv. Ashley') + '" onchange="pdVoornaamZet(\'' + n + '\',this)">';
+  var regVelden = reg ? veld('Mannummer', '<span class="wa">' + esc(reg.mannr) + '</span>', 'Uit de medewerkerslijst van de Maandafsluiting') + veld('Naam in Quinyx', '<span class="wa">' + esc(reg.quinyxNaam || '— lees Quinyx in bij de Maandafsluiting —') + '</span>', 'Voornaam + achternaam zoals in Quinyx; deze naam gebruiken we ook in de Dagplanning en bij verjaardagen') : '';
   h += sectie('&#x1F464;', 'Persoonlijk', '#d4a72c',
-    veld('Voornaam', vnVeld, 'Wordt o.a. bij het ziekmelden achter de naam getoond, zodat naamgenoten niet verwisseld worden') +
+    regVelden + veld('Voornaam', vnVeld, 'Leeg = de voornaam uit Quinyx. Alleen invullen als die anders moet (bijv. een roepnaam).') +
     veld('Verjaardag / geboortedatum', verjVelden) + (isGroepslid ? '' : veld('In dienst sinds', datum('', vl.indienst, '', 'pdIndienstZet'))),
     info1.join(' &middot; ') + ' <span id="pd-verj-opgeslagen" style="font-size:11px;color:#166534;opacity:0;transition:opacity .4s;">&#10003; Opgeslagen</span>',
-    ((vl.voornaam || vnAuto) ? '<b>' + esc(vl.voornaam || vnAuto) + '</b>' + (vl.voornaam ? '' : ' <span style="color:#b9770e;">(gevonden, nog bevestigen)</span>') + ' &middot; ' : '<span style="color:#b9770e;">voornaam onbekend</span> &middot; ') +
+    (reg ? '<span style="color:#1a7a40;">vast &middot; ' + esc(reg.mannr) + '</span> &middot; ' : '') +
+    ((vl.voornaam || vnQuinyx || vnAuto) ? '<b>' + esc(vl.voornaam || vnQuinyx || vnAuto) + '</b>' + ((vl.voornaam || vnQuinyx) ? '' : ' <span style="color:#b9770e;">(gevonden, nog bevestigen)</span>') + ' &middot; ' : '<span style="color:#b9770e;">voornaam onbekend</span> &middot; ') +
     (verj.dag && verj.maand ? verj.dag + '-' + verj.maand + (verj.jaar ? '-' + verj.jaar : '') + ' &middot; ' : '') + info1.join(' &middot; ').replace(/<[^>]+>/g, ''));
   if (isGroepslid) return h;
   // 2. Functie
@@ -35132,6 +35137,206 @@ window.pdVoornaamZet = function(naam, el){
   localStorage.setItem(pdVerlofKey(), JSON.stringify(a)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
   _djVnCache = null; if (typeof pdRenderDetail === 'function') pdRenderDetail();
 };
+</script>
+<script>
+// ══════════════════════════════════════════════════════════════════
+// PERSONEELSREGISTER — de vaste medewerkers komen uit de MAANDAFSLUITING (mannummer = sleutel).
+//  • Elke vaste medewerker staat automatisch in het Personeelsdossier.
+//  • De volledige naam (Voornaam Achternaam) komt uit Quinyx, op mannummer — dus zonder gokken.
+//  • Vanuit het dossier vullen we de rest aan (voornaam, verlof, CAO-dagen, …).
+// Koppeling mannummer → dossiernaam: tk('pd_koppeling_v1') = { mannr: dossierNaam }
+// ══════════════════════════════════════════════════════════════════
+function djRegKoppelKey(){ return tk('pd_koppeling_v1'); }
+function djRegKoppelGet(){ try { return JSON.parse(localStorage.getItem(djRegKoppelKey()) || '{}') || {}; } catch(e) { return {}; } }
+function djRegKoppelSet(k){ localStorage.setItem(djRegKoppelKey(), JSON.stringify(k)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }
+function djRegMa(){
+  var T = sessionStorage.getItem('dj_terminal') || 'EP', k = T === 'HVH' ? 'ma_hvh_v1' : 'ma_medewerkers_v1';
+  try { var l = JSON.parse(localStorage.getItem(k) || '[]'); return Array.isArray(l) ? l.filter(function(m){ return m && m.mannr != null && m.naam; }) : []; } catch(e) { return []; }
+}
+// "Rodgers, Ashley" → "Ashley Rodgers"; "Bosveld-, Tobias" → "Tobias Bosveld"; "Jellema, *Matthijs" → "Matthijs Jellema"
+function djRegQuinyxVol(q){
+  if (!q) return ''; var d = String(q).replace(/\*/g, '').split(',');
+  if (d.length < 2) return String(q).replace(/\*/g, '').trim();
+  return (d.slice(1).join(' ').trim() + ' ' + d[0].replace(/-\s*$/, '').trim()).replace(/\s+/g, ' ').trim();
+}
+function djRegQuinyx(){ try { return JSON.parse(localStorage.getItem('ma_quinyx_namen_v1') || '{}') || {}; } catch(e) { return {}; } }
+// Het register: één regel per vaste medewerker
+function djRegister(){
+  var ma = djRegMa(), qn = djRegQuinyx(), kop = djRegKoppelGet(), dos = (typeof pdData === 'function' && pdData()) || {};
+  var dosNamen = Object.keys(dos);
+  return ma.map(function(m){
+    var nr = String(Number(m.mannr)), qv = djRegQuinyxVol(qn[nr] || qn[m.mannr]);
+    var dn = kop[nr] && dos[kop[nr]] !== undefined ? kop[nr] : null;
+    if (!dn) {
+      // eenmalig koppelen: exact op naam, anders alleen als er precies één passende dossiernaam is
+      if (dosNamen.indexOf(m.naam) >= 0) dn = m.naam;
+      else if (qv && dosNamen.indexOf(qv) >= 0) dn = qv;
+      else if (typeof vakZelfdePersoon === 'function') {
+        var kand = dosNamen.filter(function(n){ return vakZelfdePersoon(n, m.naam) || (qv && vakZelfdePersoon(n, qv)); });
+        if (kand.length === 1) dn = kand[0];
+      }
+    }
+    return { mannr: nr, maNaam: m.naam, groep: m.groep || '', quinyxNaam: qv, voornaam: qv ? qv.split(' ')[0] : '', dossierNaam: dn };
+  });
+}
+// Vaste medewerkers zonder dossier automatisch aanmaken (alleen supervisors / wie het dossier mag bewerken)
+function djRegSync(){
+  try {
+    if (window.DJ_MEELEES || typeof pdData !== 'function') return 0;
+    var reg = djRegister(); if (!reg.length) return 0;
+    var dos = pdData() || {}, kop = djRegKoppelGet(), nieuw = 0, kopGewijzigd = false;
+    reg.forEach(function(p){
+      if (p.dossierNaam) { if (kop[p.mannr] !== p.dossierNaam) { kop[p.mannr] = p.dossierNaam; kopGewijzigd = true; } return; }
+      var naam = p.quinyxNaam || p.maNaam;
+      if (dos[naam] === undefined) { dos[naam] = []; nieuw++; }
+      kop[p.mannr] = naam; kopGewijzigd = true;
+    });
+    if (nieuw) { localStorage.setItem(pdKey(), JSON.stringify(dos)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }
+    if (kopGewijzigd) djRegKoppelSet(kop);
+    return nieuw;
+  } catch(e) { return 0; }
+}
+// Register-gegevens bij een dossiernaam (of een andere schrijfwijze) — op mannummer, dus eenduidig
+function djRegVoorNaam(naam){
+  if (!naam) return null;
+  var reg = djRegister(), t = String(naam).trim();
+  return reg.find(function(p){ return p.dossierNaam === t || p.maNaam === t || p.quinyxNaam === t; }) || null;
+}
+window.djRegister = djRegister; window.djRegSync = djRegSync; window.djRegVoorNaam = djRegVoorNaam;
+// Voornaam: eerst het register (Quinyx, op mannummer), dan wat in het dossier is ingevuld, dan het automatisch zoeken
+(function(){
+  if (typeof djVoornaam !== 'function') return;
+  var _vn = djVoornaam;
+  djVoornaam = function(naam){
+    var p = djRegVoorNaam(naam), vol = String(naam || '').trim();
+    var eigen = (typeof djVoornaamDossier === 'function') ? djVoornaamDossier(naam) : '';
+    var vn = eigen || (p && p.voornaam) || '';
+    if (vn) return vol.toLowerCase().indexOf(vn.toLowerCase()) === 0 ? '' : vn;
+    return _vn(naam);
+  };
+  window.djVoornaam = djVoornaam;
+})();
+// Automatisch bijwerken: bij openen van het dossier en na het inlezen in de Maandafsluiting
+(function(){
+  if (typeof navPersoneel === 'function') { var _np = navPersoneel; navPersoneel = function(){ try { if (djRegSync() && typeof pdRenderLijst === 'function') setTimeout(pdRenderLijst, 50); } catch(e) {} return _np.apply(this, arguments); }; window.navPersoneel = navPersoneel; }
+  document.addEventListener('DOMContentLoaded', function(){ setTimeout(djRegSync, 12000); });
+  window.addEventListener('message', function(ev){ if (ev && ev.data && ev.data.type === 'ma-medewerkers-sync') setTimeout(djRegSync, 500); });
+})();
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// Stap 1: Dagplanning, certificaten, verjaardagen en ziekmeldingen koppelen via het register
+// (mannummer uit de Maandafsluiting + naam uit Quinyx) — vóór het oude gokken en de 🔗-koppeling.
+// ══════════════════════════════════════════════════════════════════
+function djRegNorm(n){ return String(n || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\*/g, '').replace(/ij/g, 'y').replace(/[.]/g, ' ').replace(/\s+/g, ' ').trim(); }
+var _djRegIdx = null, _djRegIdxT = 0;
+function djRegZoek(naam){
+  if (!naam || typeof djRegister !== 'function') return null;
+  if (!_djRegIdx || Date.now() - _djRegIdxT > 3000) {
+    _djRegIdx = {}; _djRegIdxT = Date.now();
+    djRegister().forEach(function(p){ [p.dossierNaam, p.maNaam, p.quinyxNaam].forEach(function(n){ if (!n) return; var k = djRegNorm(n); if (_djRegIdx[k] && _djRegIdx[k].mannr !== p.mannr) _djRegIdx[k] = 'dubbel'; else _djRegIdx[k] = p; }); });
+  }
+  var r = _djRegIdx[djRegNorm(naam)];
+  return r && r !== 'dubbel' ? r : null;
+}
+window.djRegZoek = djRegZoek;
+// Certificaten / verjaardag-taartjes in de Dagplanning: eerst via het register (Quinyx-naam → mannummer → dossier)
+(function(){
+  if (typeof certZoekRij !== 'function') return;
+  var _cz = certZoekRij;
+  certZoekRij = function(naam, lijst){
+    try {
+      var p = djRegZoek(naam);
+      if (p && p.dossierNaam && lijst) {
+        for (var i = 0; i < lijst.length; i++) if (lijst[i] && lijst[i].naam === p.dossierNaam) return i;
+        for (var j = 0; j < lijst.length; j++) if (lijst[j] && (lijst[j].naam === p.maNaam || (p.quinyxNaam && djRegNorm(lijst[j].naam) === djRegNorm(p.quinyxNaam)))) return j;
+      }
+    } catch(e) {}
+    return _cz(naam, lijst);
+  };
+  window.certZoekRij = certZoekRij;
+})();
+// Ziek in de Dagplanning: dezelfde persoon = hetzelfde mannummer
+(function(){
+  if (typeof djIsZiekInPlanning !== 'function' || typeof djZiekNamenOpDatum !== 'function') return;
+  var _zi = djIsZiekInPlanning;
+  djIsZiekInPlanning = function(naam){
+    try {
+      var p = djRegZoek(naam);
+      if (p) { var ziek = djZiekNamenOpDatum() || []; if (ziek.some(function(z){ var pz = djRegZoek(z); return pz && pz.mannr === p.mannr; })) return true; }
+    } catch(e) {}
+    return _zi(naam);
+  };
+  window.djIsZiekInPlanning = djIsZiekInPlanning;
+})();
+// Verjaardag: de datum staat bij de dossiernaam; via het register vinden we die ook bij de Quinyx- of Maandafsluiting-naam
+(function(){
+  if (typeof isVerjaardag !== 'function') return;
+  var _iv = isVerjaardag;
+  isVerjaardag = function(naam){
+    try {
+      var p = djRegZoek(naam);
+      if (p && p.dossierNaam) {
+        var v = (typeof getVerjaardagen === 'function' ? getVerjaardagen() : {})[p.dossierNaam];
+        if (v && v.dag && v.maand) {
+          var d = new Date(); // zoals voorheen: de verjaardag van vandaag
+          return Number(v.dag) === d.getDate() && Number(v.maand) === d.getMonth() + 1;
+        }
+        return false; // gekoppeld aan een vaste medewerker zonder verjaardag: geen gok op naamgenoten
+      }
+    } catch(e) {}
+    return _iv(naam);
+  };
+  window.isVerjaardag = isVerjaardag;
+})();
+</script>
+<script>
+// Quinyx-namenlijst ("Samenvatting per werknemer": Naam + Badgenummer) inlezen voor het register.
+// Alleen naam en badgenummer worden bewaard (vertrouwelijk); de uren worden genegeerd.
+function djQuinyxNamenInlezen(){
+  var inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.xlsx,.xls,.csv';
+  inp.onchange = function(){
+    var f = inp.files && inp.files[0]; if (!f) return;
+    var r = new FileReader();
+    r.onload = function(e){
+      try {
+        if (!window.XLSX) throw new Error('Excel-lezer niet geladen');
+        var wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' }), ws = wb.Sheets[wb.SheetNames[0]];
+        var rijen = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
+        var kop = rijen.findIndex(function(rw){ return rw.some(function(c){ return /^naam$/i.test(String(c).trim()); }) && rw.some(function(c){ return /badge/i.test(String(c)); }); });
+        if (kop < 0) throw new Error('kolommen "Naam" en "Badgenummer" niet gevonden');
+        var cN = rijen[kop].findIndex(function(c){ return /^naam$/i.test(String(c).trim()); }), cB = rijen[kop].findIndex(function(c){ return /badge/i.test(String(c)); });
+        var qn = {}; try { qn = JSON.parse(localStorage.getItem('ma_quinyx_namen_v1') || '{}') || {}; } catch(x) {}
+        var n = 0, overgeslagen = [];
+        rijen.slice(kop + 1).forEach(function(rw){
+          var naam = String(rw[cN] || '').replace(/\*/g, '').replace(/\s+/g, ' ').trim(), badge = String(rw[cB] || '').trim();
+          if (!naam || !badge) return;
+          if (!/^\d+$/.test(badge)) { overgeslagen.push(naam); return; } // bijv. PRO_… = inhuur zonder badgenummer
+          naam = naam.split(' ').map(function(w, i){ return i === 0 ? w.charAt(0).toUpperCase() + w.slice(1) : w; }).join(' ');
+          qn[String(Number(badge))] = naam; n++;
+        });
+        localStorage.setItem('ma_quinyx_namen_v1', JSON.stringify(qn)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+        if (typeof _djVnCache !== 'undefined') _djVnCache = null; if (typeof _djRegIdx !== 'undefined') _djRegIdx = null;
+        var nieuw = (typeof djRegSync === 'function') ? djRegSync() : 0;
+        var reg = (typeof djRegister === 'function') ? djRegister() : [], zonder = reg.filter(function(p){ return !p.quinyxNaam; });
+        if (typeof pdRenderLijst === 'function') pdRenderLijst();
+        alert(n + ' namen uit Quinyx ingelezen.' + (nieuw ? '\n' + nieuw + ' vaste medewerker(s) nieuw in het Personeelsdossier.' : '') +
+          (zonder.length ? '\n\nNog zonder Quinyx-naam (mannummer niet in deze lijst): ' + zonder.map(function(p){ return p.maNaam + ' (' + p.mannr + ')'; }).join(', ') : '\n\nAlle vaste medewerkers uit de Maandafsluiting hebben nu een naam uit Quinyx.') +
+          (overgeslagen.length ? '\n\nZonder badgenummer, niet bewaard (inhuur): ' + overgeslagen.join(', ') : ''));
+      } catch(err) { alert('Inlezen mislukt: ' + (err.message || err)); }
+    };
+    r.readAsArrayBuffer(f);
+  };
+  inp.click();
+}
+window.djQuinyxNamenInlezen = djQuinyxNamenInlezen;
+document.addEventListener('DOMContentLoaded', function(){
+  var lijst = document.getElementById('pd-medewerkers-lijst'); if (!lijst || document.getElementById('pd-quinyx-knop')) return;
+  var k = document.createElement('div'); k.id = 'pd-quinyx-knop';
+  k.innerHTML = '<button type="button" onclick="djQuinyxNamenInlezen()" title="Quinyx-lijst \'Samenvatting per werknemer\' (Naam + Badgenummer) inlezen: dan kent de app van elke vaste medewerker de volledige naam" style="width:100%;margin:0 0 8px;padding:6px 10px;border:1px dashed #9fb3c8;background:#f8fbff;color:#0f6cbd;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">&#x1F4E5; Namen uit Quinyx inlezen</button>';
+  lijst.parentNode.insertBefore(k, lijst);
+});
 </script>
 </body>
 </html>
