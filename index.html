@@ -24140,7 +24140,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.120';
+var DJ_BUILD = '2026-10-07.121';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -35385,7 +35385,16 @@ window.djQuinyxNamenInlezen = djQuinyxNamenInlezen;
 document.addEventListener('DOMContentLoaded', function(){
   var lijst = document.getElementById('pd-medewerkers-lijst'); if (!lijst || document.getElementById('pd-quinyx-knop')) return;
   var k = document.createElement('div'); k.id = 'pd-quinyx-knop';
-  k.innerHTML = '<button type="button" onclick="djQuinyxNamenInlezen()" title="Quinyx-lijst inlezen: het Payroll-rapport (met ploegen, het meest compleet) of de Samenvatting per werknemer. Dan kent de app van elke vaste medewerker de volledige naam en ploeg" style="width:100%;margin:0 0 8px;padding:6px 10px;border:1px dashed #9fb3c8;background:#f8fbff;color:#0f6cbd;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">&#x1F4E5; Namen uit Quinyx inlezen</button>';
+  k.innerHTML = '<button type="button" onclick="djQuinyxNamenInlezen()" title="Quinyx-lijst inlezen: het Payroll-rapport (met ploegen, het meest compleet) of de Samenvatting per werknemer. Dan kent de app van elke vaste medewerker de volledige naam en ploeg" style="width:100%;margin:0 0 8px;padding:6px 10px;border:1px dashed #9fb3c8;background:#f8fbff;color:#0f6cbd;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">&#x1F4E5; Namen uit Quinyx inlezen</button>' +
+    '<details style="margin:-4px 0 8px;font-size:11.5px;color:#5a6b80;"><summary style="cursor:pointer;color:#0f6cbd;">&#x2139;&#xFE0F; Waar haal ik deze lijst vandaan?</summary>' +
+    '<ol style="margin:6px 0 4px 18px;padding:0;line-height:1.55;">' +
+      '<li>Open <b>Quinyx</b> &rarr; <b>Analytics</b>.</li>' +
+      '<li>Klik op de groene knop <b>Aanmaken</b>.</li>' +
+      '<li>Kies bij <b>Units</b> je eigen unit (bijv. <i>Rotterdam Europoort &ndash; Stevedoring</i>).</li>' +
+      '<li>Klik onder <b>Alle namen</b> bij <b>Gegevens</b> op <b>Alles selecteren</b>.</li>' +
+      '<li>Download het rapport als <b>Excel</b> en lees het hier in met de knop hierboven.</li>' +
+    '</ol>' +
+    '<div>De app gebruikt alleen badgenummer, naam, ploeg (sectie), datum in dienst en geboortedatum. BSN, adres, telefoon en salaris worden <b>niet</b> bewaard.</div></details>';
   lijst.parentNode.insertBefore(k, lijst);
 });
 </script>
