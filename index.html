@@ -24139,7 +24139,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.118';
+var DJ_BUILD = '2026-10-07.119';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -35432,7 +35432,11 @@ function djQuinyxLijstVerwerken(rijen){
   var vind = function(rw, re){ return rw.findIndex(function(c){ return re.test(String(c || '').trim()); }); };
   var kop = rijen.findIndex(function(rw){ return vind(rw, /^badge/i) >= 0 && (vind(rw, /^naam$/i) >= 0 || vind(rw, /^voornaam$/i) >= 0); });
   if (kop < 0) throw new Error('kolommen "Badgenummer" en "Naam" (of "Voornaam"/"Achternaam") niet gevonden');
-  var h = rijen[kop], cB = vind(h, /^badge/i), cN = vind(h, /^naam$/i), cV = vind(h, /^voornaam$/i), cA = vind(h, /^achternaam$/i), cS = vind(h, /^sectie\s*-\s*werknemer$/i);
+  var h = rijen[kop], cB = vind(h, /^badge/i), cN = vind(h, /^naam$/i), cV = vind(h, /^voornaam$/i), cA = vind(h, /^achternaam$/i), cS = vind(h, /^sectie(\s*-\s*werknemer)?$/i);
+  // Medewerkersrapport (meest compleet): ook datum in dienst en geboortedatum. Alleen díe velden worden gebruikt —
+  // BSN, adres, telefoon, salaris, geslacht en noodcontact worden NIET gelezen of bewaard.
+  var cU = vind(h, /^basis-?unit$/i), cD = vind(h, /^in dienst sinds$/i), cG = vind(h, /^geboortedatum$/i);
+  var extra = {}; // mannr → { indienst, geb }
   var qn = {}; try { qn = JSON.parse(localStorage.getItem('ma_quinyx_namen_v1') || '{}') || {}; } catch(x) {}
   var teams = djTeamGet(), gezien = {}, n = 0, overgeslagen = [];
   var netjes = function(t){ return String(t || '').replace(/\*/g, '').replace(/[;]+$/, '').replace(/-\s*$/, '').replace(/\s+/g, ' ').trim(); };
@@ -35440,16 +35444,42 @@ function djQuinyxLijstVerwerken(rijen){
     var badge = String(rw[cB] || '').trim(); if (!badge || gezien[badge]) return; gezien[badge] = 1;
     var naam = cN >= 0 ? netjes(rw[cN]) : netjes(netjes(rw[cV]) + ' ' + netjes(rw[cA]));
     if (!naam) return;
+    if (cU >= 0 && !/stevedoring/i.test(String(rw[cU] || ''))) return; // alleen Stevedoring (geen admin-/testaccounts)
     if (!/^\d+$/.test(badge)) { overgeslagen.push(naam); return; } // inhuur/stage zonder badgenummer
     naam = naam.charAt(0).toUpperCase() + naam.slice(1);
     var nr = String(Number(badge)); qn[nr] = naam; n++;
     if (cS >= 0) { var s = netjes(rw[cS]); if (s) teams[nr] = s; else delete teams[nr]; }
+    if (cD >= 0 || cG >= 0) extra[nr] = { indienst: djDatumIso(rw[cD]), geb: djDatumIso(rw[cG]) };
   });
   localStorage.setItem('ma_quinyx_namen_v1', JSON.stringify(qn));
   if (cS >= 0) localStorage.setItem(djTeamKey(), JSON.stringify(teams));
   if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
   if (typeof _djVnCache !== 'undefined') _djVnCache = null; if (typeof _djRegIdx !== 'undefined') _djRegIdx = null;
-  return { n: n, overgeslagen: overgeslagen, metPloeg: cS >= 0 };
+  return { n: n, overgeslagen: overgeslagen, metPloeg: cS >= 0, extra: extra };
+}
+function djDatumIso(v){
+  if (v == null || v === '') return '';
+  if (typeof v === 'number' && v > 20000 && v < 80000) { var d0 = new Date(Math.round((v - 25569) * 864e5)); return d0.toISOString().slice(0, 10); }
+  var t = String(v).trim(), m;
+  if ((m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(t))) return m[1] + '-' + m[2].padStart(2, '0') + '-' + m[3].padStart(2, '0');
+  if ((m = /^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/.exec(t))) return m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+  if ((m = /^(\d{1,2})\/(\d{1,2})\/(\d{2})$/.exec(t))) { var j = +m[3]; return (j > 40 ? 1900 + j : 2000 + j) + '-' + m[1].padStart(2, '0') + '-' + m[2].padStart(2, '0'); } // SheetJS m/d/yy
+  return '';
+}
+// Datum in dienst + geboortedatum overnemen in het dossier van de vaste medewerkers (register)
+function djRegExtraToepassen(extra){
+  var reg = (typeof djRegister === 'function') ? djRegister() : [], vl = (typeof pdVerlofGet === 'function') ? pdVerlofGet() : {}, verj = (typeof getVerjaardagen === 'function') ? getVerjaardagen() : {};
+  var nInd = 0, nGeb = 0;
+  reg.forEach(function(p){
+    var x = extra[p.mannr]; if (!x || !p.dossierNaam) return;
+    if (x.indienst && (!vl[p.dossierNaam] || vl[p.dossierNaam].indienst !== x.indienst)) { vl[p.dossierNaam] = vl[p.dossierNaam] || {}; vl[p.dossierNaam].indienst = x.indienst; nInd++; }
+    if (x.geb) { var g = x.geb.split('-'), e = verj[p.dossierNaam] || {};
+      if (String(e.dag) !== String(+g[2]) || String(e.maand) !== String(+g[1]) || String(e.jaar) !== g[0]) { verj[p.dossierNaam] = Object.assign({}, e, { dag: String(+g[2]), maand: String(+g[1]), jaar: g[0] }); nGeb++; } }
+  });
+  if (nInd) { localStorage.setItem(pdVerlofKey(), JSON.stringify(vl)); }
+  if (nGeb && typeof saveVerjaardagen === 'function') saveVerjaardagen(verj);
+  if ((nInd || nGeb) && typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+  return { indienst: nInd, geb: nGeb };
 }
 // Organogram bijwerken met de ploegen uit Quinyx
 function djOrgPloegenBijwerken(){
@@ -35491,6 +35521,7 @@ window.djQuinyxNamenInlezen = djQuinyxNamenInlezen = function(){
         var wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
         var res = djQuinyxLijstVerwerken(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: '' }));
         var nieuw = (typeof djRegSync === 'function') ? djRegSync() : 0;
+        var ext = Object.keys(res.extra || {}).length ? djRegExtraToepassen(res.extra) : null;
         var org = res.metPloeg ? djOrgPloegenBijwerken() : null;
         var reg = (typeof djRegister === 'function') ? djRegister() : [], zonder = reg.filter(function(p){ return !p.quinyxNaam; });
         if (typeof pdRenderLijst === 'function') try { pdRenderLijst(); } catch(x) {}
@@ -35498,6 +35529,7 @@ window.djQuinyxNamenInlezen = djQuinyxNamenInlezen = function(){
         if (document.getElementById('cert-reg-balk') && typeof oplToonTab === 'function') try { oplToonTab('overzicht'); } catch(x) {}
         alert(res.n + ' medewerkers uit Quinyx ingelezen' + (res.metPloeg ? ' (met ploeg)' : '') + '.' +
           (nieuw ? '\n' + nieuw + ' vaste medewerker(s) nieuw in het Personeelsdossier.' : '') +
+          (ext ? '\nPersoneelsdossier bijgewerkt: datum in dienst bij ' + ext.indienst + ', geboortedatum bij ' + ext.geb + ' medewerker(s). (BSN, adres, telefoon en salaris worden niet bewaard.)' : '') +
           (org && org.gewijzigd && org.gewijzigd.length ? '\n\nOrganogram bijgewerkt: ' + org.gewijzigd.join(', ') + '.' : (org && !org.geenOrganogram ? '\n\nOrganogram: de ploegen klopten al.' : '')) +
           (org && org.nietInOrg && org.nietInOrg.length ? '\nDeze ploegen staan nog niet in het Organogram (voeg toe via \u270F\uFE0F Bewerken): ' + org.nietInOrg.join(', ') + '.' : '') +
           (org && org.zonderId && org.zonderId.length ? '\nNiet in Certificeringen, dus niet in het Organogram gezet: ' + org.zonderId.join(', ') + '.' : '') +
