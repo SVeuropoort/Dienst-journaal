@@ -24130,7 +24130,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.107';
+var DJ_BUILD = '2026-10-07.108';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -35057,20 +35057,34 @@ window.djMaMailGet = djMaMailGet; window.djMaMailZet = djMaMailZet; window.djMaV
 // Voornaam bij een naam met voorletters (bijv. "A.A. Rodgers" → "Ashley"), om naamgenoten uit elkaar te houden.
 // Bronnen: de Dagplanning-naam uit Certificeringen (🔗), en anders de kledingpunten-lijst (voornaam uit de leverancier).
 var _djVnCache = null, _djVnTijd = 0;
+function djVnKern(n){ // achternaam zonder voorletters en tussenvoegsels ("V. vd Berg" en "Vincent van den Berg" → "berg")
+  return String(n || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\*/g, '')
+    .split(/[\s,]+/).filter(function(w){ return w && !/^([a-z]\.)+$/.test(w) && !/^[a-z]\.?$/.test(w) && ['van','der','den','de','vd','v/d','vander','ter','te','het',"'t",'in','op'].indexOf(w) < 0; }).join(' ');
+}
+function djVnBronnen(){
+  var l = [];
+  try { ((typeof oplOverzichtGetData === 'function' ? oplOverzichtGetData() : []) || []).forEach(function(r){ if (r && r.dpNaam) l.push(r.dpNaam); }); } catch(e) {}
+  try { var kp = JSON.parse(localStorage.getItem(tk('kledingpunten_v1')) || 'null'); ((kp && kp.people) || []).forEach(function(x){ if (x.vn) l.push([x.vn, x.tv, x.an].filter(Boolean).join(' ')); }); } catch(e) {}
+  try { (window.allEmps || (typeof allEmps !== 'undefined' ? allEmps : []) || []).forEach(function(e){ if (e && e.name) l.push(e.name); }); } catch(e) {}    // namen uit de Dagplanning (Excel)
+  try { var vr = JSON.parse(localStorage.getItem('dj_verjaardagen_v1') || '{}') || {}; Object.keys(vr).forEach(function(n){ l.push(n); }); } catch(e) {}
+  return l.map(function(n){ return String(n).replace(/\*/g, '').trim(); }).filter(function(n){ return /^[A-Za-zÀ-ÿ'-]{2,}\s/.test(n) && !/^(?:[A-Z]\.)/.test(n); });
+}
 function djVoornaam(naam){
   if (!naam) return '';
-  if (!/^(?:[A-Z]\.)+\s|^[A-Z]\s/.test(String(naam).trim())) return ''; // staat er al een voornaam, dan niets toevoegen
+  var t = String(naam).trim(), m = t.match(/^((?:[A-Z]\.)+|[A-Z])\s/); if (!m) return ''; // staat er al een voornaam, dan niets toevoegen
   if (!_djVnCache || Date.now() - _djVnTijd > 30000) { _djVnCache = {}; _djVnTijd = Date.now(); }
   if (naam in _djVnCache) return _djVnCache[naam];
   var vn = '';
   try {
+    // 1) gekoppelde Dagplanning-naam uit Certificeringen (🔗)
     var rij = ((typeof oplOverzichtGetData === 'function' ? oplOverzichtGetData() : []) || []).find(function(r){ return r && r.naam === naam; });
     var dp = rij && (rij.dpNaam || '');
     if (dp && /^[A-Za-zÀ-ÿ'-]{2,}\s/.test(dp) && !/^(?:[A-Z]\.)/.test(dp)) vn = dp.split(/\s+/)[0];
-    if (!vn && typeof vakMatchSterkte === 'function') {
-      var kp = JSON.parse(localStorage.getItem(tk('kledingpunten_v1')) || 'null');
-      var k = ((kp && kp.people) || []).filter(function(x){ return x.vn && vakMatchSterkte(naam, [x.vn, x.tv, x.an].filter(Boolean).join(' ')) > 0; });
-      if (k.length === 1) vn = String(k[0].vn).replace(/\*/g, '').trim().split(/\s+/)[0];
+    // 2) zelfde achternaam (zonder tussenvoegsels) + zelfde eerste voorletter in de andere lijsten — alleen als het eenduidig is
+    if (!vn) {
+      var kern = djVnKern(t), letter = m[1].charAt(0).toLowerCase(), gevonden = {};
+      djVnBronnen().forEach(function(n){ var w = n.split(/\s+/)[0]; if (w.charAt(0).toLowerCase() === letter && djVnKern(n.slice(w.length)) === kern) gevonden[w.charAt(0).toUpperCase() + w.slice(1)] = 1; });
+      var k = Object.keys(gevonden); if (k.length === 1) vn = k[0];
     }
   } catch(e) {}
   return (_djVnCache[naam] = vn);
