@@ -19753,7 +19753,7 @@ function ziekmVulDropdown(actief){
   secties.forEach(function(sec){
     var namen = (sec.namen || []).filter(function(n){ return !bezet[n]; });
     if (!namen.length) return;
-    html += '<optgroup label="' + ziekmEsc(sec.titel) + '">' + namen.map(function(n){ return '<option value="' + ziekmEsc(n) + '">' + ziekmEsc(n) + '</option>'; }).join('') + '</optgroup>';
+    html += '<optgroup label="' + ziekmEsc(sec.titel) + '">' + namen.map(function(n){ var vn = (typeof djVoornaam === 'function') ? djVoornaam(n) : ''; return '<option value="' + ziekmEsc(n) + '">' + ziekmEsc(n) + (vn ? ' (' + ziekmEsc(vn) + ')' : '') + '</option>'; }).join('') + '</optgroup>';
   });
   var vorige = sel.value;
   sel.innerHTML = html;
@@ -19781,7 +19781,7 @@ function ziekmRender(){
     var id = ziekmEsc(z.id);
     var dagen = Math.max(0, Math.round((new Date(datum + 'T12:00:00') - new Date(z.gemeldOp + 'T12:00:00')) / 86400000));
     return '<tr style="' + (isBeter ? 'opacity:.6;background:#eef8f0;' : '') + '">' +
-      '<td style="' + td + 'font-weight:700;color:var(--navy);white-space:nowrap;">' + ziekmEsc(z.naam) + '</td>' +
+      '<td style="' + td + 'font-weight:700;color:var(--navy);white-space:nowrap;">' + ziekmEsc(z.naam) + ((typeof djVoornaam === 'function' && djVoornaam(z.naam)) ? ' <span style="font-weight:400;color:#5a6b80;">(' + ziekmEsc(djVoornaam(z.naam)) + ')</span>' : '') + '</td>' +
       '<td style="' + td + 'white-space:nowrap;">' + ziekmNL(z.gemeldOp) + (isBeter ? '' : '<div style="font-size:10.5px;color:#8795a8;">' + (en ? 'day ' : 'dag ') + (dagen + 1) + '</div>') + '</td>' +
       '<td style="' + td + '"><input type="text" placeholder="dd/mm/jjjj" style="' + inp + 'width:105px;" value="' + ziekmEsc(ziekmNL(z.laatsteContact || '')) + '" onchange="ziekmContactDatum(\'' + id + '\',this)"></td>' +
       '<td style="' + td + '"><input type="text" style="' + inp + 'min-width:120px;" value="' + ziekmEsc(z.contactMet || '') + '" placeholder="' + (en ? 'Name' : 'Naam') + '" onchange="ziekmVeld(\'' + id + '\',\'contactMet\',this.value)"></td>' +
@@ -24130,7 +24130,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.106';
+var DJ_BUILD = '2026-10-07.107';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -35052,6 +35052,30 @@ async function djMaArchiefOphalen(id){
   return { blob: await resp.blob(), naam: r.naam };
 }
 window.djMaMailGet = djMaMailGet; window.djMaMailZet = djMaMailZet; window.djMaVerzondenGet = djMaVerzondenGet; window.djMaVersturen = djMaVersturen; window.djMaArchiefOphalen = djMaArchiefOphalen;
+</script>
+<script>
+// Voornaam bij een naam met voorletters (bijv. "A.A. Rodgers" → "Ashley"), om naamgenoten uit elkaar te houden.
+// Bronnen: de Dagplanning-naam uit Certificeringen (🔗), en anders de kledingpunten-lijst (voornaam uit de leverancier).
+var _djVnCache = null, _djVnTijd = 0;
+function djVoornaam(naam){
+  if (!naam) return '';
+  if (!/^(?:[A-Z]\.)+\s|^[A-Z]\s/.test(String(naam).trim())) return ''; // staat er al een voornaam, dan niets toevoegen
+  if (!_djVnCache || Date.now() - _djVnTijd > 30000) { _djVnCache = {}; _djVnTijd = Date.now(); }
+  if (naam in _djVnCache) return _djVnCache[naam];
+  var vn = '';
+  try {
+    var rij = ((typeof oplOverzichtGetData === 'function' ? oplOverzichtGetData() : []) || []).find(function(r){ return r && r.naam === naam; });
+    var dp = rij && (rij.dpNaam || '');
+    if (dp && /^[A-Za-zÀ-ÿ'-]{2,}\s/.test(dp) && !/^(?:[A-Z]\.)/.test(dp)) vn = dp.split(/\s+/)[0];
+    if (!vn && typeof vakMatchSterkte === 'function') {
+      var kp = JSON.parse(localStorage.getItem(tk('kledingpunten_v1')) || 'null');
+      var k = ((kp && kp.people) || []).filter(function(x){ return x.vn && vakMatchSterkte(naam, [x.vn, x.tv, x.an].filter(Boolean).join(' ')) > 0; });
+      if (k.length === 1) vn = String(k[0].vn).replace(/\*/g, '').trim().split(/\s+/)[0];
+    }
+  } catch(e) {}
+  return (_djVnCache[naam] = vn);
+}
+window.djVoornaam = djVoornaam;
 </script>
 </body>
 </html>
