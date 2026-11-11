@@ -4,6 +4,75 @@
 <head>
 <script>
 // ══════════════════════════════════════════════════════════════════
+// FOUTENLOGBOEK — fouten bij collega's automatisch vastleggen in SharePoint (Data/Logboek/fouten_JJJJ-MM.json)
+// Beheerder bekijkt ze via de zoekbalk: "foutenlogboek".
+// ══════════════════════════════════════════════════════════════════
+(function(){
+  var buffer = [], gezien = {}, perSessie = 0, MAX = 25;
+  function scherm(){ var v = document.querySelector('.view.active'); return v ? v.id.replace(/^view-/, '') : ''; }
+  function vastleggen(bericht, bron, stack, soort){
+    try {
+      bericht = String(bericht || '').slice(0, 300); if (!bericht) return;
+      if (/ResizeObserver loop|Script error\.?$|Failed to fetch|NetworkError|Load failed|AbortError/i.test(bericht)) return; // ruis / tijdelijk netwerk
+      var sleutel = bericht + '|' + (bron || '');
+      if (gezien[sleutel] && Date.now() - gezien[sleutel] < 10 * 60000) return; gezien[sleutel] = Date.now();
+      if (++perSessie > MAX) return;
+      buffer.push({ t: Date.now(), soort: soort || 'fout', bericht: bericht, bron: String(bron || '').slice(0, 160), stack: String(stack || '').slice(0, 400),
+        door: localStorage.getItem('dj_sp_account_username') || '', terminal: sessionStorage.getItem('dj_terminal') || '',
+        build: (typeof DJ_BUILD !== 'undefined' ? DJ_BUILD : ''), scherm: scherm(), browser: (navigator.userAgent.match(/(Edg|Chrome|Firefox|Safari)\/[\d.]+/) || [''])[0] + (/Mobi/.test(navigator.userAgent) ? ' (mobiel)' : '') });
+    } catch(e) {}
+  }
+  window.addEventListener('error', function(ev){ vastleggen(ev.message, (ev.filename || '').split('/').pop() + ':' + ev.lineno, ev.error && ev.error.stack, 'fout'); });
+  window.addEventListener('unhandledrejection', function(ev){ var r = ev.reason; vastleggen(r && r.message ? r.message : r, '', r && r.stack, 'fout (async)'); });
+  // Opslaan mislukt / foutmeldingen in de statusbalk ook vastleggen
+  document.addEventListener('DOMContentLoaded', function(){
+    if (typeof showSyncStatus === 'function') { var _s = showSyncStatus; window.showSyncStatus = showSyncStatus = function(tekst, type){ if (type === 'err') vastleggen(tekst, 'statusbalk', '', 'opslaan'); return _s.apply(this, arguments); }; }
+    var _alert = window.alert; window.alert = function(m){ if (/mislukt|fout|error|kon niet|failed|exceeded|quota/i.test(String(m || ''))) vastleggen(m, 'melding', '', 'melding'); return _alert.apply(this, arguments); };
+  });
+  async function versturen(){
+    if (!buffer.length || window.DJ_MEELEES || typeof spOpslaanBestandRuw !== 'function') return;
+    if (typeof spIngelogdAsync === 'function') { try { if (!(await spIngelogdAsync())) return; } catch(e) { return; } }
+    var mee = buffer.splice(0, buffer.length), maand = new Date().toISOString().slice(0, 7), naam = 'Logboek/fouten_' + maand + '.json';
+    try {
+      var d = null; try { d = await spOphalenBestandRuw(naam); } catch(e) {}
+      var lijst = (d && Array.isArray(d.fouten)) ? d.fouten : [];
+      lijst = lijst.concat(mee); if (lijst.length > 2000) lijst = lijst.slice(-2000);
+      await spOpslaanBestandRuw(naam, { fouten: lijst, bijgewerkt: new Date().toISOString() });
+    } catch(e) { buffer = mee.concat(buffer).slice(-50); } // lukt het nu niet, dan de volgende keer
+  }
+  setInterval(versturen, 60000);
+  window.addEventListener('pagehide', function(){ try { versturen(); } catch(e) {} });
+  window.djFoutVastleggen = vastleggen; window.djFoutenVersturen = versturen;
+})();
+// Overzicht voor de beheerder
+window.djFoutenOverzicht = async function(){
+  var oud = document.getElementById('dj-fouten'); if (oud) oud.remove();
+  var o = document.createElement('div'); o.id = 'dj-fouten';
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(0,20,40,.45);z-index:100005;display:flex;align-items:center;justify-content:center;padding:16px;';
+  o.innerHTML = '<div style="background:#fff;border-radius:10px;padding:18px;width:820px;max-width:100%;max-height:85vh;display:flex;flex-direction:column;"><div style="display:flex;align-items:center;margin-bottom:8px;"><b style="flex:1;color:#003366;font-size:15px;">&#x1F41E; Foutenlogboek</b><button type="button" onclick="document.getElementById(\'dj-fouten\').remove()" style="border:none;background:none;font-size:18px;cursor:pointer;">&#x2715;</button></div><div id="dj-fouten-inhoud" style="overflow:auto;font-size:12.5px;color:#5a6b80;">Laden&hellip;</div></div>';
+  o.addEventListener('click', function(ev){ if (ev.target === o) o.remove(); });
+  document.body.appendChild(o);
+  var box = document.getElementById('dj-fouten-inhoud'), alle = [];
+  try {
+    var nu = new Date(), maanden = [nu.toISOString().slice(0, 7), new Date(nu.getFullYear(), nu.getMonth() - 1, 15).toISOString().slice(0, 7)];
+    for (var i = 0; i < maanden.length; i++) { var d = null; try { d = await spOphalenBestandRuw('Logboek/fouten_' + maanden[i] + '.json'); } catch(e) {} if (d && d.fouten) alle = alle.concat(d.fouten); }
+  } catch(e) { box.textContent = 'Kon het logboek niet ophalen: ' + (e.message || e); return; }
+  var grens = Date.now() - 30 * 864e5; alle = alle.filter(function(f){ return f.t >= grens; });
+  if (!alle.length) { box.innerHTML = '<div style="padding:14px;color:#1a7a40;font-weight:700;">&#x2714; Geen fouten in de afgelopen 30 dagen.</div>'; return; }
+  var esc = function(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
+  var naam = function(e){ return typeof dpLogNaam === 'function' ? dpLogNaam(e) : e; };
+  // groeperen per foutmelding
+  var groep = {}; alle.forEach(function(f){ var k = f.bericht + '|' + f.bron; var g = groep[k] = groep[k] || { f: f, n: 0, wie: {}, laatst: 0, builds: {}, schermen: {} }; g.n++; g.wie[naam(f.door) || '?'] = 1; g.builds[f.build] = 1; if (f.scherm) g.schermen[f.scherm] = 1; if (f.t > g.laatst) { g.laatst = f.t; g.f = f; } });
+  var lijst = Object.keys(groep).map(function(k){ return groep[k]; }).sort(function(a, b){ return b.laatst - a.laatst; });
+  box.innerHTML = '<div style="margin-bottom:8px;">' + alle.length + ' meldingen in 30 dagen, ' + lijst.length + ' verschillende. Nieuwste bovenaan.</div>' + lijst.map(function(g){
+    return '<details style="border:1px solid #f1c4c4;border-left:4px solid #c0392b;border-radius:6px;padding:7px 10px;margin-bottom:6px;background:#fffafa;"><summary style="cursor:pointer;color:#24313f;"><b>' + esc(g.f.bericht) + '</b> <span style="color:#8795a8;">&middot; ' + g.n + '\u00D7 &middot; laatst ' + new Date(g.laatst).toLocaleString('nl-NL', { dateStyle: 'short', timeStyle: 'short' }) + '</span></summary>' +
+      '<div style="margin-top:6px;line-height:1.6;">Soort: ' + esc(g.f.soort) + ' &middot; Scherm: ' + esc(Object.keys(g.schermen).join(', ') || '-') + ' &middot; Build: ' + esc(Object.keys(g.builds).join(', ')) + '<br>Bij: ' + esc(Object.keys(g.wie).join(', ')) + ' &middot; ' + esc(g.f.browser || '') + ' &middot; terminal ' + esc(g.f.terminal) +
+      (g.f.bron ? '<br>Plek: <code>' + esc(g.f.bron) + '</code>' : '') + (g.f.stack ? '<pre style="white-space:pre-wrap;font-size:11px;background:#f6f6f6;padding:6px;border-radius:4px;margin:6px 0 0;">' + esc(g.f.stack) + '</pre>' : '') + '</div></details>';
+  }).join('');
+};
+</script>
+<script>
+// ══════════════════════════════════════════════════════════════════
 // JAARARCHIEF — het hoofdbestand in SharePoint klein en snel houden.
 // Eens per maand (bij een beheerder) gaan oude, gedateerde gegevens uit <T>_main.json naar
 // Data/Archief/<T>_main_<jaar>.json:
@@ -3259,7 +3328,7 @@ async function spOphalenBestandRuw(bestandsnaam){
 //    nog aan vertrouwelijke sleutels in main stond, blijft ongemoeid staan.
 var DJ_VERTR_SLEUTELS = ['dienstjournaal_stena_v1', 'werkoverdracht_ziekmeldingen_v1',
   'personeelsdossier_v1', 'personeelsdossier_actief_v1',
-  'ma_loongroepen_v1', 'ma_medewerkers_v1', 'ma_hvh_v1', 'ma_apart_v1', 'ma_mentor_v1', 'ma_verzonden_v1', 'ma_mail_v1', 'ma_quinyx_namen_v1', 'pd_koppeling_v1', 'pd_team_v1', 'pd_quinyx_extra_v1', 'plan_sv_v1', 'startup_v1', 'kledingpunten_v1', 'bezetting_deeltijd_v1', 'pd_verlof_v1'];
+  'ma_loongroepen_v1', 'ma_medewerkers_v1', 'ma_hvh_v1', 'ma_apart_v1', 'ma_mentor_v1', 'ma_verzonden_v1', 'ma_mail_v1', 'ma_quinyx_namen_v1', 'pd_koppeling_v1', 'pd_team_v1', 'pd_quinyx_extra_v1', 'dj_prullenbak_vertr_v1', 'plan_sv_v1', 'startup_v1', 'kledingpunten_v1', 'bezetting_deeltijd_v1', 'pd_verlof_v1'];
 function djIsVertrSleutel(k){ return DJ_VERTR_SLEUTELS.indexOf(String(k).replace(/^(EP|HVH|IMM)_/, '')) >= 0; }
 function djVertrSplits(data){
   var vertr = {}, rest = {};
@@ -7310,6 +7379,9 @@ window.addEventListener('resize', () => {
     'pd_koppeling_v1',
     'pd_team_v1',
     'pd_quinyx_extra_v1',
+    'dj_prullenbak_v1',
+    'dj_prullenbak_vertr_v1',
+    'dj_uitdienst_gepland_v1',
     'dj_verjaardagen_v1',
     'dagpl_cert_v1',
     'dagpl_cert_v2',
@@ -7682,6 +7754,11 @@ window.addEventListener('resize', () => {
       // Dagplanning: per VAK samenvoegen (3-weg). Werken twee collega's tegelijk aan dezelfde dag,
       // dan wint per vak alleen wat déze pc zelf heeft veranderd; vakken die de collega intussen
       // heeft ingevuld blijven staan. Voorheen won de hele dag van wie het laatst opsloeg.
+      // Personeelsdossier, certificaten, organogram, verlof, verjaardagen, kledingpunten, …: per regel/persoon samenvoegen (3-weg)
+      if ((k in cloudData) && djIsRegelSleutel(k) && (k in _djBasis)) {
+        var basisR; try { basisR = JSON.parse(_djBasis[k]); } catch(e) { basisR = undefined; }
+        if (basisR !== undefined && basisR !== null) { data[k] = djMerge3Diep(basisR, lokaal[k], cloudData[k]); return; }
+      }
       if ((k in cloudData) && djIsPlanningSleutel(k) && (k in _djBasis)) {
         var basis; try { basis = JSON.parse(_djBasis[k]); } catch(e) { basis = undefined; }
         if (basis !== undefined && basis !== null) { data[k] = djMerge3(basis, lokaal[k], cloudData[k], 0); return; }
@@ -7691,6 +7768,52 @@ window.addEventListener('resize', () => {
     return data;
   }
   function djIsPlanningSleutel(k){ return /dagplan_|dagPlanning_v2_state|^ls_/.test(k); }
+  // Sleutels die per regel (persoon / registratie / ploeg) worden samengevoegd i.p.v. "wie het laatst opslaat wint"
+  function djIsRegelSleutel(k){ return /(^|_)(personeelsdossier_v1|opleiding_overzicht_v1|organogram_v1|pd_verlof_v1|pd_functies_v1|dj_verjaardagen_v1|kledingpunten_v1|vakantierooster_v1|tugmasters_v1|pd_koppeling_v1|pd_team_v1|pd_quinyx_extra_v1|ma_medewerkers_v1|ma_hvh_v1|ma_apart_v1|ma_mentor_v1|ma_quinyx_namen_v1|ontwikkelgesprek[a-z_]*_v1|bezetting_deeltijd_v1|bezetting_instellingen_v1|dj_toegang_v1|dj_prullenbak_v1|dj_prullenbak_vertr_v1|dj_uitdienst_gepland_v1)$/.test(k); }
+  // Diepe 3-weg-samenvoeging. Lijsten met herkenbare regels (id / naam / mannr) worden per regel samengevoegd:
+  // wat ik toevoeg, wijzig of verwijder telt; wat een collega intussen toevoegde/wijzigde blijft staan.
+  function djRegelId(x){ if (!x || typeof x !== 'object' || Array.isArray(x)) return null; var v = x.id != null ? 'id:' + x.id : x.mannr != null ? 'nr:' + x.mannr : x.naam != null ? 'n:' + x.naam : x.persoon != null ? 'p:' + x.persoon : null; return v; }
+  function djMerge3Diep(b, l, c){
+    var js = function(x){ return JSON.stringify(x); };
+    if (js(l) === js(b)) return c;           // ik veranderde niets: collega's versie
+    if (js(c) === js(b)) return l;           // collega veranderde niets: mijn versie
+    if (js(l) === js(c)) return l;
+    var isA = Array.isArray, isO = function(x){ return x && typeof x === 'object' && !Array.isArray(x); };
+    if (isO(b) && isO(l) && isO(c)) {
+      var uit = {}, ks = {}; [b, l, c].forEach(function(o){ Object.keys(o).forEach(function(x){ ks[x] = 1; }); });
+      Object.keys(ks).forEach(function(x){
+        var inB = x in b, inL = x in l, inC = x in c;
+        if (inL && inC) { uit[x] = inB ? djMerge3Diep(b[x], l[x], c[x]) : l[x]; return; }
+        if (inL && !inC) { if (!inB || js(l[x]) !== js(b[x])) uit[x] = l[x]; return; }      // collega verwijderde: alleen houden als ik het nieuw maakte/wijzigde
+        if (!inL && inC) { if (!inB || js(c[x]) !== js(b[x])) uit[x] = c[x]; return; }      // ik verwijderde: alleen houden als collega het intussen wijzigde
+      });
+      return uit;
+    }
+    if (isA(b) && isA(l) && isA(c)) {
+      var metId = l.concat(c, b).every(function(x){ return djRegelId(x) !== null; }) && (l.length + c.length) > 0;
+      if (metId) {
+        var map = function(a){ var m = {}; a.forEach(function(x){ m[djRegelId(x)] = x; }); return m; };
+        var mb = map(b), ml = map(l), mc = map(c), volgorde = [], gezien = {};
+        c.concat(l).forEach(function(x){ var id = djRegelId(x); if (!gezien[id]) { gezien[id] = 1; volgorde.push(id); } });
+        var res = [];
+        volgorde.forEach(function(id){
+          var inB = id in mb, inL = id in ml, inC = id in mc;
+          if (inL && inC) res.push(inB ? djMerge3Diep(mb[id], ml[id], mc[id]) : ml[id]);
+          else if (inL && !inC) { if (!inB || js(ml[id]) !== js(mb[id])) res.push(ml[id]); }
+          else if (!inL && inC) { if (!inB || js(mc[id]) !== js(mb[id])) res.push(mc[id]); }
+        });
+        return res;
+      }
+      var allesSimpel = l.concat(c, b).every(function(x){ return x === null || typeof x !== 'object'; });
+      if (allesSimpel) { // bijv. ploegleden (id's): toevoegingen en verwijderingen van beide kanten
+        var sb = b.map(js), sl = l.map(js), toe = l.filter(function(x){ return sb.indexOf(js(x)) < 0; }), weg = b.filter(function(x){ return sl.indexOf(js(x)) < 0; }).map(js);
+        var r2 = c.filter(function(x){ return weg.indexOf(js(x)) < 0; }); toe.forEach(function(x){ if (r2.map(js).indexOf(js(x)) < 0) r2.push(x); }); return r2;
+      }
+      if (b.length === l.length && l.length === c.length) return l.map(function(x, i){ return djMerge3Diep(b[i], x, c[i]); }); // zelfde opbouw: per positie
+    }
+    return l; // niet samen te voegen: mijn (nieuwste) versie
+  }
+  window.djMerge3Diep = djMerge3Diep;
   function djIsObj(x){ return x && typeof x === 'object' && !Array.isArray(x); }
   // 3-weg-samenvoegen: per veld de lokale waarde als die t.o.v. de basis is veranderd, anders de cloud-waarde.
   function djMerge3(basis, lok, cloud, diepte){
@@ -7717,7 +7840,7 @@ window.addEventListener('resize', () => {
     var origSet = Storage.prototype.setItem, origDel = Storage.prototype.removeItem, origGet = Storage.prototype.getItem;
     var onthoudBasis = function(st, k){
       // Vóór de eerste eigen wijziging: de huidige waarde is de laatst gesynchroniseerde versie.
-      if (!_djVuil[k] && !(k in _djBasis) && djIsPlanningSleutel(k)) { var oud = origGet.call(st, k); if (oud !== null) _djBasis[k] = oud; }
+      if (!_djVuil[k] && !(k in _djBasis) && (djIsPlanningSleutel(k) || djIsRegelSleutel(k))) { var oud = origGet.call(st, k); if (oud !== null) _djBasis[k] = oud; }
     };
     // Op het localStorage-object zelf inhaken (niet op Storage.prototype): elders in de app is
     // localStorage.setItem al vervangen door een eigen "vangnet"-functie die rechtstreeks de
@@ -7725,7 +7848,7 @@ window.addEventListener('resize', () => {
     var ls = window.localStorage;
     var curSet = ls.setItem, curDel = ls.removeItem;
     ls.setItem = function(k, v){
-      if (_djSyncDataToepassen) { if (djIsPlanningSleutel(k)) _djBasis[k] = String(v); }
+      if (_djSyncDataToepassen) { if (djIsPlanningSleutel(k) || djIsRegelSleutel(k)) _djBasis[k] = String(v); }
       else { onthoudBasis(ls, k); _djVuil[k] = Date.now(); }
       return curSet.apply(ls, arguments);
     };
@@ -7803,7 +7926,7 @@ window.addEventListener('resize', () => {
       window._djSyncFout = null;
       // Wat nu in de cloud staat, is niet meer "vuil" (tenzij het tijdens het opslaan opnieuw wijzigde).
       Object.keys(_vuilBijStart).forEach(function(k){
-        if (djIsPlanningSleutel(k) && data[k] !== undefined) _djBasis[k] = JSON.stringify(data[k]);
+        if ((djIsPlanningSleutel(k) || djIsRegelSleutel(k)) && data[k] !== undefined) _djBasis[k] = JSON.stringify(data[k]);
         if (_djVuil[k] === _vuilBijStart[k]) delete _djVuil[k];
       });
       // Het samengevoegde resultaat (met de vakken van collega's) ook lokaal zetten, zodat het
@@ -24275,7 +24398,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.125';
+var DJ_BUILD = '2026-10-07.130';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -27401,6 +27524,9 @@ var DJ_ZOEK_INDEX = [
   { label: 'Schade formulier', keywords: 'schade formulier incident melding pdf', actie: function(){ navTo('schade', 'SCHADE FORMULIER', null); } },
   { label: 'Maandafsluiting', keywords: 'maandafsluiting payroll salaris quinyx mutaties', actie: function(){ navTo('maandafsluiting', 'MAANDAFSLUITING', null); } },
   { label: 'ORT / Basisrooster', keywords: 'ort basisrooster onregelmatigheidstoeslag cao artikel b8', actie: function(){ navTo('ort', 'ORT / BASISROOSTER', null); } },
+  { label: 'Back-ups (dagelijks, terugzetten)', keywords: 'backup back-up back up terugzetten herstellen gisteren kopie reservekopie', actie: function(){ if (typeof djBackupOverzicht === 'function') djBackupOverzicht(); } },
+  { label: 'Prullenbak (verwijderde items terugzetten)', keywords: 'prullenbak verwijderd terugzetten herstellen ongedaan per ongeluk weg kwijt', actie: function(){ if (typeof djPrullenbak === 'function') djPrullenbak(); } },
+  { label: 'Foutenlogboek (beheer)', keywords: 'fouten foutenlogboek log error storing problemen bug beheer', actie: function(){ if (typeof djFoutenOverzicht === 'function') djFoutenOverzicht(); } },
   { label: 'Archief oude dagplanningen', keywords: 'archief oud oude dagplanning jaar jaararchief download sharepoint', actie: function(){ if (typeof djArchiefOverzicht === 'function') djArchiefOverzicht(); } },
   { label: 'AOW & SFR', keywords: 'aow sfr esw pensioen vervroegd uittreden verlof', actie: function(){ navTo('aowdash', 'AOW & SFR', null); } }
 ];
@@ -35586,6 +35712,7 @@ function djQuinyxLijstVerwerken(rijen){
   // Medewerkersrapport (meest compleet): ook datum in dienst en geboortedatum. Alleen díe velden worden gebruikt —
   // BSN, adres, telefoon, salaris, geslacht en noodcontact worden NIET gelezen of bewaard.
   var cU = vind(h, /^basis-?unit$/i), cD = vind(h, /^in dienst sinds$/i), cG = vind(h, /^geboortedatum$/i);
+  var cO = vind(h, /^ontslagdatum$/i), cP = vind(h, /^passief$/i), cE = vind(h, /^e-?mail$/i), uitDienst = [];
   var extra = {}; // mannr → { indienst, geb }
   var qn = {}; try { qn = JSON.parse(localStorage.getItem('ma_quinyx_namen_v1') || '{}') || {}; } catch(x) {}
   var teams = djTeamGet(), gezien = {}, n = 0, overgeslagen = [];
@@ -35595,6 +35722,8 @@ function djQuinyxLijstVerwerken(rijen){
     var naam = cN >= 0 ? netjes(rw[cN]) : netjes(netjes(rw[cV]) + ' ' + netjes(rw[cA]));
     if (!naam) return;
     if (cU >= 0 && !/stevedoring/i.test(String(rw[cU] || ''))) return; // alleen Stevedoring (geen admin-/testaccounts)
+    var ontslag = cO >= 0 ? djDatumIso(rw[cO]) : '', passief = cP >= 0 && /^(ja|yes|true|1|x)$/i.test(String(rw[cP] || '').trim());
+    if (ontslag || passief) uitDienst.push({ naam: naam, email: cE >= 0 ? String(rw[cE] || '').trim().toLowerCase() : '', datum: ontslag || '' });
     if (!/^\d+$/.test(badge)) { overgeslagen.push(naam); return; } // inhuur/stage zonder badgenummer
     naam = naam.charAt(0).toUpperCase() + naam.slice(1);
     var nr = String(Number(badge)); qn[nr] = naam; n++;
@@ -35605,7 +35734,7 @@ function djQuinyxLijstVerwerken(rijen){
   if (cS >= 0) localStorage.setItem(djTeamKey(), JSON.stringify(teams));
   if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
   if (typeof _djVnCache !== 'undefined') _djVnCache = null; if (typeof _djRegIdx !== 'undefined') _djRegIdx = null;
-  return { n: n, overgeslagen: overgeslagen, metPloeg: cS >= 0, extra: extra };
+  return { n: n, overgeslagen: overgeslagen, metPloeg: cS >= 0, extra: extra, uitDienst: uitDienst, metOntslag: cO >= 0 || cP >= 0 };
 }
 function djDatumIso(v){
   if (v == null || v === '') return '';
@@ -35676,6 +35805,7 @@ window.djQuinyxNamenInlezen = djQuinyxNamenInlezen = function(){
         var nieuw = (typeof djRegSync === 'function') ? djRegSync() : 0;
         var ext = Object.keys(res.extra || {}).length ? djRegExtraToepassen(res.extra) : null;
         var org = res.metPloeg ? djOrgPloegenBijwerken() : null;
+        var ud = res.metOntslag && typeof djUitDienstVerwerken === 'function' ? djUitDienstVerwerken(res.uitDienst) : null;
         var reg = (typeof djRegister === 'function') ? djRegister() : [], zonder = reg.filter(function(p){ return !p.quinyxNaam; });
         if (typeof pdRenderLijst === 'function') try { pdRenderLijst(); } catch(x) {}
         if (typeof orgRender === 'function' && document.getElementById('nieuw-tab-organogram')) try { orgRender(); } catch(x) {}
@@ -35686,6 +35816,9 @@ window.djQuinyxNamenInlezen = djQuinyxNamenInlezen = function(){
           (org && org.gewijzigd && org.gewijzigd.length ? '\n\nOrganogram bijgewerkt: ' + org.gewijzigd.join(', ') + '.' : (org && !org.geenOrganogram ? '\n\nOrganogram: de ploegen klopten al.' : '')) +
           (org && org.nietInOrg && org.nietInOrg.length ? '\nDeze ploegen staan nog niet in het Organogram (voeg toe via \u270F\uFE0F Bewerken): ' + org.nietInOrg.join(', ') + '.' : '') +
           (org && org.zonderId && org.zonderId.length ? '\nNiet in Certificeringen, dus niet in het Organogram gezet: ' + org.zonderId.join(', ') + '.' : '') +
+          (ud && ud.uit && ud.uit.length ? '\n\nUit dienst \u2192 toegang tot de app ingetrokken: ' + ud.uit.join(', ') + '.' : '') +
+          (ud && ud.geenBeheer && ud.aantal ? '\n\n' + ud.aantal + ' medewerker(s) uit dienst: laat een beheerder deze lijst inlezen om hun toegang in te trekken.' : '') +
+          (ud && ud.gepland ? '\n' + ud.gepland + ' medewerker(s) gaan binnenkort uit dienst; hun toegang gaat op die dag automatisch uit.' : '') +
           (zonder.length ? '\n\nVaste medewerkers (Maandafsluiting) die niet in deze Quinyx-lijst staan: ' + zonder.map(function(p){ return p.maNaam + ' (' + p.mannr + ')'; }).join(', ') : '') +
           (res.overgeslagen.length ? '\n\nZonder badgenummer, niet bewaard (inhuur/stage): ' + res.overgeslagen.join(', ') : ''));
       } catch(err) { alert('Inlezen mislukt: ' + (err.message || err)); }
@@ -35708,5 +35841,333 @@ document.addEventListener('DOMContentLoaded', function(){
   }, 6000);
 });
 </script>
+<script>
+// ══════════════════════════════════════════════════════════════════
+// INVOERCONTROLE — overal in de app:
+//  • tijden (--:--, uu:mm, Punctuality): "1130" → 11:30, "9.30" → 09:30; onmogelijke tijden (25:80) geweigerd
+//  • datums: geen jaartal vóór 1940 of meer dan 10 jaar vooruit; dd-mm-jjjj netjes en echt bestaand
+//  • getallen: niet negatief, niet boven de maximale waarde (bijv. units hooguit 2000)
+//  • versturen: dubbel klikken verstuurt niet twee keer
+// ══════════════════════════════════════════════════════════════════
+(function(){
+  function melding(el, tekst){
+    try {
+      var r = el.getBoundingClientRect(), m = document.createElement('div');
+      m.textContent = tekst;
+      m.style.cssText = 'position:fixed;z-index:100008;left:' + Math.max(8, r.left) + 'px;top:' + (r.bottom + 4) + 'px;max-width:300px;background:#c0392b;color:#fff;font-size:12px;font-weight:600;padding:5px 9px;border-radius:5px;box-shadow:0 4px 12px rgba(0,0,0,.25);pointer-events:none;';
+      document.body.appendChild(m); setTimeout(function(){ m.remove(); }, 3500);
+      el.style.outline = '2px solid #c0392b'; setTimeout(function(){ el.style.outline = ''; }, 3500);
+    } catch(e) {}
+  }
+  function isTijdVeld(el){ return el.tagName === 'INPUT' && el.type !== 'time' && (el.classList.contains('tijden-input') || /^(--:--|uu:mm|hh:mm)$/i.test(el.placeholder || '')); }
+  function isDatumTekstVeld(el){ return el.tagName === 'INPUT' && el.type === 'text' && /dd-mm-jjjj/i.test(el.placeholder || ''); }
+  function tijdNormaal(v){
+    v = String(v || '').trim(); if (!v) return '';
+    var m = /^(\d{1,2})[:.,;\s-]?(\d{2})$/.exec(v) || /^(\d{1,2})$/.exec(v);
+    if (!m) return null;
+    var u = +m[1], mi = m[2] != null ? +m[2] : 0;
+    if (u > 23 || mi > 59) return null;
+    return String(u).padStart(2, '0') + ':' + String(mi).padStart(2, '0');
+  }
+  function datumNormaal(v){
+    v = String(v || '').trim(); if (!v) return '';
+    var m = /^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2}|\d{4})$/.exec(v) || /^(\d{2})(\d{2})(\d{4})$/.exec(v);
+    if (!m) return null;
+    var d = +m[1], mn = +m[2], j = +m[3]; if (j < 100) j += j > 40 ? 1900 : 2000;
+    var t = new Date(j, mn - 1, d); if (t.getFullYear() !== j || t.getMonth() !== mn - 1 || t.getDate() !== d) return null;
+    return String(d).padStart(2, '0') + '-' + String(mn).padStart(2, '0') + '-' + j;
+  }
+  function jaarOk(j){ var nu = new Date().getFullYear(); return j >= 1940 && j <= nu + 10; }
+  document.addEventListener('change', function(ev){
+    var el = ev.target; if (!el || el.tagName !== 'INPUT' || el.disabled || el.readOnly) return;
+    try {
+      if (isTijdVeld(el)) {
+        var t = tijdNormaal(el.value);
+        if (t === null) { melding(el, '\u26A0 "' + el.value + '" is geen geldige tijd (uu:mm). Het vak is leeggemaakt.'); el.value = ''; }
+        else if (t !== el.value) el.value = t;
+        return;
+      }
+      if (isDatumTekstVeld(el)) {
+        var d = datumNormaal(el.value);
+        if (d === null) { melding(el, '\u26A0 "' + el.value + '" is geen bestaande datum (dd-mm-jjjj). Het vak is leeggemaakt.'); el.value = ''; }
+        else if (d && !jaarOk(+d.slice(-4))) { melding(el, '\u26A0 ' + d + ' ligt buiten 1940 \u2013 ' + (new Date().getFullYear() + 10) + '. Controleer het jaartal.'); el.value = ''; }
+        else if (d !== el.value) el.value = d;
+        return;
+      }
+      if (el.type === 'date' && el.value) {
+        var jj = +el.value.slice(0, 4);
+        if (!jaarOk(jj)) { melding(el, '\u26A0 Jaartal ' + jj + ' klopt niet (1940 \u2013 ' + (new Date().getFullYear() + 10) + '). Het vak is leeggemaakt.'); el.value = ''; }
+        return;
+      }
+      if (el.type === 'number' && el.value !== '') {
+        var n = parseFloat(el.value), min = el.min !== '' ? parseFloat(el.min) : 0, max = el.max !== '' ? parseFloat(el.max) : (/^u-(in|out)-/.test(el.id) ? 2000 : null);
+        if (isNaN(n)) { el.value = ''; return; }
+        if (n < min) { melding(el, '\u26A0 Kleiner dan ' + min + ' kan niet. Aangepast naar ' + min + '.'); el.value = min; }
+        else if (max != null && n > max) { melding(el, '\u26A0 Meer dan ' + max + ' kan niet. Controleer de invoer.'); el.value = max; }
+      }
+    } catch(e) {}
+  }, true); // "capture": vóór de eigen opslag-functies van het scherm, zodat die al de nette waarde krijgen
+  // Dubbel versturen voorkomen (formulieren, mails, meldingen)
+  var laatsteKlik = new WeakMap();
+  document.addEventListener('click', function(ev){
+    var b = ev.target && ev.target.closest && ev.target.closest('button'); if (!b) return;
+    var t = (b.textContent || '').trim();
+    if (!/verst(uur|uren)|verzend|indienen|aanmaken en versturen/i.test(t) || /nogmaals|bevestig/i.test(t) || b.hasAttribute('data-tweestap')) return;
+    var vorige = laatsteKlik.get(b) || 0;
+    if (Date.now() - vorige < 4000) { ev.stopImmediatePropagation(); ev.preventDefault(); return; }
+    laatsteKlik.set(b, Date.now());
+  }, true);
+  window.djTijdNormaal = tijdNormaal; window.djDatumNormaal = datumNormaal;
+})();
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// PRULLENBAK — alles wat verwijderd wordt (registraties, certificaten, taken, cursussen, meldingen,
+// ziekmeldingen, …) staat 30 dagen in de prullenbak en is met één klik terug te zetten.
+// Vertrouwelijke onderdelen gaan naar een aparte, vertrouwelijke prullenbak.
+// ══════════════════════════════════════════════════════════════════
+(function(){
+  var KEY = 'dj_prullenbak_v1', KEYV = 'dj_prullenbak_vertr_v1', DAGEN = 30, MAX = 400;
+  var LABEL = { personeelsdossier_v1: 'Personeelsdossier', opleiding_overzicht_v1: 'Certificeringen', organogram_v1: 'Organogram', pd_verlof_v1: 'Werktijd & verlof', pd_functies_v1: 'Functies',
+    dj_verjaardagen_v1: 'Verjaardagen', kledingpunten_v1: 'Kledingpunten', vakantierooster_v1: 'Vakantierooster', tugmasters_v1: 'Tugmasters', plan_v3: 'To Do', plan_sv_v1: 'To Do supervisors',
+    cursus_planning_v1: 'Cursusplanning', dagmeldingen_v1: 'Dagmeldingen', werkoverdracht_ziekmeldingen_v1: 'Ziekmeldingen', dienstjournaal_stena_v1: 'Werkoverdracht', opl_afgerond_v1: 'Opleidingen',
+    ma_medewerkers_v1: 'Maandafsluiting – medewerkers EP', ma_hvh_v1: 'Maandafsluiting – medewerkers HVH', ma_apart_v1: 'Maandafsluiting – apart melden', ma_mentor_v1: 'Maandafsluiting – mentoren' };
+  function kaal(k){ return String(k).replace(/^(EP|HVH|IMM)_/, ''); }
+  function bewaakt(k){ return LABEL.hasOwnProperty(kaal(k)) || /(^|_)ontwikkelgesprek[a-z_]*_v1$/.test(k); }
+  function lees(k){ try { var l = JSON.parse(localStorage.getItem(k) || '[]'); return Array.isArray(l) ? l : []; } catch(e) { return []; } }
+  function idVan(x){ return (typeof djRegelId === 'function') ? djRegelId(x) : (x && x.id != null ? 'id:' + x.id : null); }
+  function samenvatting(x){
+    if (x == null) return '';
+    if (typeof x !== 'object') return String(x).slice(0, 80);
+    var t = x.tekst || x.titel || x.omschrijving || x.onderwerp || x.taak || x.naam || x.soort || x.bericht || '';
+    if (x.datum) t = (t ? t + ' · ' : '') + x.datum;
+    if (!t) { var s = JSON.stringify(x); t = s.length > 80 ? s.slice(0, 77) + '…' : s; }
+    return String(t).replace(/<[^>]+>/g, '').slice(0, 120);
+  }
+  // Vergelijk oud ↔ nieuw: welke regels zijn verdwenen? (tot 3 niveaus diep)
+  function verdwenen(oud, nieuw, pad, uit, diepte){
+    if (diepte > 3 || oud == null) return;
+    if (Array.isArray(oud) && Array.isArray(nieuw)) {
+      var ids = {}; nieuw.forEach(function(x){ var i = idVan(x); if (i) ids[i] = 1; });
+      oud.forEach(function(x){ var i = idVan(x); if (i && !ids[i]) uit.push({ pad: pad, item: x });
+        else if (i) { var n = nieuw.find(function(y){ return idVan(y) === i; }); if (n) verdwenen(x, n, pad.concat([{ id: i }]), uit, diepte + 1); } });
+      return;
+    }
+    if (typeof oud === 'object' && !Array.isArray(oud) && nieuw && typeof nieuw === 'object' && !Array.isArray(nieuw)) {
+      Object.keys(oud).forEach(function(k){
+        if (k === 'weg' || k === 'laatst' || k === 'gw') return;
+        if (!(k in nieuw)) { if (oud[k] && typeof oud[k] === 'object') uit.push({ pad: pad, sleutel: k, item: oud[k] }); }
+        else verdwenen(oud[k], nieuw[k], pad.concat([k]), uit, diepte + 1);
+      });
+    }
+  }
+  function toevoegen(k, gevonden){
+    var vertr = (typeof djIsVertrSleutel === 'function') && djIsVertrSleutel(k), pk = vertr ? KEYV : KEY;
+    var l = lees(pk), ik = localStorage.getItem('dj_sp_account_username') || '', nu = Date.now(), grens = nu - DAGEN * 864e5;
+    gevonden.forEach(function(g, i){ l.push({ id: 'pb' + nu.toString(36) + i + Math.random().toString(36).slice(2, 6), sleutel: k, pad: g.pad, objSleutel: g.sleutel || null, item: g.item, door: ik, t: nu }); });
+    l = l.filter(function(x){ return x.t >= grens; }); if (l.length > MAX) l = l.slice(-MAX);
+    _orig(pk, JSON.stringify(l));
+    if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+  }
+  var _orig = localStorage.setItem.bind(localStorage);
+  var _prev = localStorage.setItem;
+  localStorage.setItem = function(k, v){
+    var oud = null, kijk = false;
+    try { kijk = bewaakt(k) && !(typeof _djSyncDataToepassen !== 'undefined' && _djSyncDataToepassen) && !window._djPbTerugzetten; if (kijk) oud = localStorage.getItem(k); } catch(e) { kijk = false; }
+    var r = _prev.apply(this, arguments);
+    if (kijk && oud && oud !== v) {
+      try { var uit = []; verdwenen(JSON.parse(oud), JSON.parse(v), [], uit, 0); if (uit.length && uit.length <= 50) toevoegen(k, uit); } catch(e) {}
+    }
+    return r;
+  };
+  // Terugzetten
+  window.djPbTerugzetten = function(id){
+    var bron = [KEY, KEYV].find(function(pk){ return lees(pk).some(function(x){ return x.id === id; }); }); if (!bron) return false;
+    var l = lees(bron), e = l.find(function(x){ return x.id === id; });
+    var data; try { data = JSON.parse(localStorage.getItem(e.sleutel) || 'null'); } catch(x) { data = null; }
+    if (data == null) data = e.objSleutel ? {} : [];
+    var doel = data;
+    (e.pad || []).forEach(function(stap){
+      if (doel == null) return;
+      if (stap && typeof stap === 'object' && stap.id) doel = Array.isArray(doel) ? doel.find(function(y){ return idVan(y) === stap.id; }) : undefined;
+      else { if (doel[stap] == null) doel[stap] = e.objSleutel ? {} : []; doel = doel[stap]; }
+    });
+    if (doel == null) { alert('Terugzetten lukt niet: de plek waar dit stond bestaat niet meer.'); return false; }
+    if (e.objSleutel) doel[e.objSleutel] = e.item;
+    else if (Array.isArray(doel)) { var iid = idVan(e.item); if (!doel.some(function(y){ return idVan(y) === iid; })) doel.push(e.item); }
+    // "verwijderd"-lijstjes (tombstones) van cursussen/meldingen opschonen
+    if (data && Array.isArray(data.weg) && e.item && e.item.id != null) data.weg = data.weg.filter(function(w){ return (w && w.id != null ? w.id : w) !== e.item.id; });
+    window._djPbTerugzetten = true; try { localStorage.setItem(e.sleutel, JSON.stringify(data)); } finally { window._djPbTerugzetten = false; }
+    _orig(bron, JSON.stringify(l.filter(function(x){ return x.id !== id; })));
+    if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+    return true;
+  };
+  window.djPrullenbak = function(){
+    var oud = document.getElementById('dj-prullenbak'); if (oud) oud.remove();
+    var grens = Date.now() - DAGEN * 864e5, alle = lees(KEY).concat(lees(KEYV)).filter(function(x){ return x.t >= grens; }).sort(function(a, b){ return b.t - a.t; });
+    var esc = function(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
+    var naam = function(e){ return typeof dpLogNaam === 'function' ? dpLogNaam(e) : e; };
+    var o = document.createElement('div'); o.id = 'dj-prullenbak';
+    o.style.cssText = 'position:fixed;inset:0;background:rgba(0,20,40,.45);z-index:100005;display:flex;align-items:center;justify-content:center;padding:16px;';
+    o.innerHTML = '<div style="background:#fff;border-radius:10px;padding:18px;width:760px;max-width:100%;max-height:85vh;display:flex;flex-direction:column;">' +
+      '<div style="display:flex;align-items:center;margin-bottom:6px;"><b style="flex:1;color:#003366;font-size:15px;">&#x1F5D1;&#xFE0F; Prullenbak</b><button type="button" onclick="document.getElementById(\'dj-prullenbak\').remove()" style="border:none;background:none;font-size:18px;cursor:pointer;">&#x2715;</button></div>' +
+      '<div style="font-size:12px;color:#5a6b80;margin-bottom:8px;">Alles wat de afgelopen ' + DAGEN + ' dagen is verwijderd. Klik op <b>Terugzetten</b> om het terug te halen.</div>' +
+      '<div style="overflow:auto;">' + (alle.length ? '<table style="width:100%;border-collapse:collapse;font-size:12.5px;"><tr style="text-align:left;color:#5a6b80;"><th style="padding:4px 6px;">Onderdeel</th><th>Wat</th><th>Door</th><th>Wanneer</th><th></th></tr>' +
+        alle.map(function(e){ var waar = (LABEL[kaal(e.sleutel)] || kaal(e.sleutel)) + ((e.pad || []).filter(function(p){ return typeof p === 'string'; }).length ? ' – ' + e.pad.filter(function(p){ return typeof p === 'string'; }).join(' › ') : '');
+          return '<tr style="border-top:1px solid #eef1f5;"><td style="padding:5px 6px;white-space:nowrap;">' + esc(waar) + '</td><td>' + esc(e.objSleutel ? e.objSleutel + ' (alles)' : samenvatting(e.item)) + '</td><td style="white-space:nowrap;">' + esc(naam(e.door)) + '</td><td style="white-space:nowrap;">' + new Date(e.t).toLocaleString('nl-NL', { dateStyle: 'short', timeStyle: 'short' }) + '</td>' +
+            '<td><button type="button" onclick="if(djPbTerugzetten(\'' + e.id + '\')){ this.textContent=\'\u2714 Teruggezet\'; this.disabled=true; }" style="padding:3px 10px;border:1px solid #1a7a40;background:#fff;color:#1a7a40;border-radius:5px;cursor:pointer;font-weight:700;">&#x21A9; Terugzetten</button></td></tr>'; }).join('') + '</table>'
+        : '<div style="padding:14px;color:#8795a8;">De prullenbak is leeg.</div>') + '</div></div>';
+    o.addEventListener('click', function(ev){ if (ev.target === o) o.remove(); });
+    document.body.appendChild(o);
+  };
+})();
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// UIT DIENST → GEEN TOEGANG MEER. Bij het inlezen van het Quinyx-medewerkersrapport (Ontslagdatum / Passief):
+//  • ontslagdatum vandaag of eerder → alle rechten in Toegangsbeheer uit (de oude rechten worden bewaard)
+//  • ontslagdatum in de toekomst → ingepland; op die dag gaat de toegang automatisch uit
+// Alleen een beheerder kan Toegangsbeheer wijzigen; de vertrouwelijke mappen volgen vanzelf.
+// ══════════════════════════════════════════════════════════════════
+function djUitDienstGepland(){ try { return JSON.parse(localStorage.getItem('dj_uitdienst_gepland_v1') || '[]') || []; } catch(e) { return []; } }
+function djUitDienstVerwerken(lijst){
+  var ik = localStorage.getItem('dj_sp_account_username') || '', vandaag = new Date().toISOString().slice(0, 10);
+  var gepland = djUitDienstGepland(), nuUit = [];
+  (lijst || []).forEach(function(p){
+    if (!p.datum || p.datum <= vandaag) nuUit.push(p);
+    else if (!gepland.some(function(g){ return g.email === p.email && g.naam === p.naam; })) gepland.push(p);
+  });
+  gepland = gepland.filter(function(g){ if (g.datum <= vandaag) { nuUit.push(g); return false; } return true; });
+  localStorage.setItem('dj_uitdienst_gepland_v1', JSON.stringify(gepland));
+  if (!(typeof djToegangHeeft === 'function' && djToegangHeeft(ik, 'beheer'))) return { geenBeheer: true, aantal: nuUit.length, gepland: gepland.length };
+  var acc = djToegangGet().map(function(a){ return Object.assign({}, a); }), uit = [];
+  nuUit.forEach(function(p){
+    var a = acc.find(function(x){ return p.email && x.email && x.email.toLowerCase() === p.email.toLowerCase(); }) ||
+            (typeof vakZelfdePersoon === 'function' ? (function(){ var k = acc.filter(function(x){ return x.naam && vakZelfdePersoon(x.naam.split(' ').reverse().join(' '), p.naam) || (x.naam && vakZelfdePersoon(x.naam, p.naam)); }); return k.length === 1 ? k[0] : null; })() : null);
+    if (!a || a.email.toLowerCase() === ik.toLowerCase()) return; // jezelf nooit buitensluiten
+    var heeft = a.permissies && Object.keys(a.permissies).some(function(k){ return a.permissies[k]; });
+    if (!heeft) return;
+    a.uitDienst = { sinds: p.datum || vandaag, oudePermissies: a.permissies, door: ik, op: new Date().toISOString() };
+    a.permissies = {}; uit.push(a.naam || a.email);
+  });
+  if (uit.length) djToegangSet(acc);
+  return { uit: uit, gepland: gepland.length };
+}
+window.djUitDienstVerwerken = djUitDienstVerwerken;
+// Ingeplande uitdiensttredingen: elke dag (bij een beheerder) controleren
+document.addEventListener('DOMContentLoaded', function(){
+  setTimeout(function(){ try { if (djUitDienstGepland().length) { var r = djUitDienstVerwerken([]); if (r.uit && r.uit.length) console.info('Toegang ingetrokken (uit dienst): ' + r.uit.join(', ')); } } catch(e) {} }, 30000);
+});
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// DAGELIJKSE BACK-UP — de eerste ingelogde gebruiker van de dag maakt (op de server, via een kopie in
+// SharePoint) een back-up van:  Data/<T>_main.json → Data/Backup/<T>/<T>_main_JJJJ-MM-DD.json
+//   + wie in de vertrouwelijke map mag:  Vertrouwelijk/<T>/vertrouwelijk.json → Vertrouwelijk/<T>/Backup/…
+//   + een beheerder: Beheer/toegang_accounts.json → Beheer/Backup/…
+// Back-ups ouder dan 30 dagen worden opgeruimd. Terugzetten/downloaden via de zoekbalk: "back-up".
+// ══════════════════════════════════════════════════════════════════
+var DJ_BACKUP_DAGEN = 30;
+async function djBkGraph(pad, opties){
+  var token = await spGetToken(), siteId = await spGetSiteId();
+  return fetch('https://graph.microsoft.com/v1.0/sites/' + siteId + '/drive/' + pad, Object.assign({ headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, cache: 'no-store' }, opties || {}));
+}
+function djBkPad(p){ return 'root:/Data/' + p.split('/').map(encodeURIComponent).join('/'); }
+async function djBkMap(map){ // map aanmaken als hij nog niet bestaat
+  var r = await djBkGraph(djBkPad(map)); if (r.ok) return true;
+  var delen = map.split('/'), naam = delen.pop(), ouder = delen.join('/');
+  if (ouder) await djBkMap(ouder); // bovenliggende map eerst
+  var c = await djBkGraph((ouder ? djBkPad(ouder) + ':' : 'root:/Data:') + '/children', { method: 'POST', body: JSON.stringify({ name: naam, folder: {}, '@microsoft.graph.conflictBehavior': 'replace' }) });
+  return c.ok || c.status === 409;
+}
+async function djBkKopie(bron, doelMap, doelNaam){
+  await djBkMap(doelMap);
+  var drive = await (await djBkGraph('?$select=id')).json();
+  var r = await djBkGraph(djBkPad(bron) + ':/copy?@microsoft.graph.conflictBehavior=replace', { method: 'POST', body: JSON.stringify({ parentReference: { driveId: drive.id, path: '/drive/' + djBkPad(doelMap).replace(/^root:/, 'root:') }, name: doelNaam }) });
+  return r.status === 202 || r.ok;
+}
+async function djBkOpruimen(map, voorvoegsel){
+  var r = await djBkGraph(djBkPad(map) + ':/children?$select=name,id&$top=200'); if (!r.ok) return 0;
+  var grens = new Date(); grens.setDate(grens.getDate() - DJ_BACKUP_DAGEN); grens = grens.toISOString().slice(0, 10);
+  var lijst = (await r.json()).value || [], n = 0;
+  for (var i = 0; i < lijst.length; i++) { var m = new RegExp('^' + voorvoegsel + '_(\\d{4}-\\d{2}-\\d{2})\\.json$').exec(lijst[i].name); if (m && m[1] < grens) { var d = await djBkGraph('items/' + lijst[i].id, { method: 'DELETE' }); if (d.ok || d.status === 204) n++; } }
+  return n;
+}
+async function djBackupMaken(forceer){
+  if (window.DJ_MEELEES || typeof spGetToken !== 'function') return null;
+  if (typeof spIngelogdAsync === 'function' && !(await spIngelogdAsync())) return null;
+  var T = sessionStorage.getItem('dj_terminal') || 'EP', vandaag = new Date().toISOString().slice(0, 10), ik = localStorage.getItem('dj_sp_account_username') || '';
+  var gedaan = {}; try { gedaan = JSON.parse(localStorage.getItem('dj_backup_lokaal_v1') || '{}') || {}; } catch(e) {}
+  var uit = [];
+  var taken = [
+    { id: T + '_main', bron: T + '_main.json', map: 'Backup/' + T, voor: T + '_main', mag: true },
+    { id: T + '_vertr', bron: 'Vertrouwelijk/' + T + '/vertrouwelijk.json', map: 'Vertrouwelijk/' + T + '/Backup', voor: 'vertrouwelijk', mag: typeof djVertrHeeftToegang === 'function' ? await djVertrHeeftToegang(T).catch(function(){ return false; }) : false },
+    { id: 'toegang', bron: 'Beheer/toegang_accounts.json', map: 'Beheer/Backup', voor: 'toegang_accounts', mag: typeof djToegangHeeft === 'function' && djToegangHeeft(ik, 'beheer') }
+  ];
+  for (var i = 0; i < taken.length; i++) {
+    var t = taken[i]; if (!t.mag) continue;
+    if (!forceer && gedaan[t.id] === vandaag) continue;
+    try {
+      // bestaat de back-up van vandaag al (door een collega gemaakt)? Dan niets doen
+      var bestaat = await djBkGraph(djBkPad(t.map + '/' + t.voor + '_' + vandaag + '.json') + '?$select=id');
+      if (!bestaat.ok || forceer) { var ok = await djBkKopie(t.bron, t.map, t.voor + '_' + vandaag + '.json'); if (ok) uit.push(t.id); }
+      gedaan[t.id] = vandaag;
+      await djBkOpruimen(t.map, t.voor);
+    } catch(e) { if (typeof djFoutVastleggen === 'function') djFoutVastleggen('Back-up ' + t.id + ' mislukt: ' + (e.message || e), 'backup', '', 'back-up'); }
+  }
+  localStorage.setItem('dj_backup_lokaal_v1', JSON.stringify(gedaan));
+  if (uit.length) console.info('Back-up gemaakt: ' + uit.join(', '));
+  return uit;
+}
+window.djBackupMaken = djBackupMaken;
+document.addEventListener('DOMContentLoaded', function(){ setTimeout(function(){ djBackupMaken(false).catch(function(){}); }, 20000); });
+// ── Overzicht: back-ups bekijken, downloaden en (beheerder) terugzetten ──
+window.djBackupOverzicht = async function(){
+  var T = sessionStorage.getItem('dj_terminal') || 'EP', ik = localStorage.getItem('dj_sp_account_username') || '', beheer = typeof djToegangHeeft === 'function' && djToegangHeeft(ik, 'beheer');
+  var oud = document.getElementById('dj-backup'); if (oud) oud.remove();
+  var o = document.createElement('div'); o.id = 'dj-backup';
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(0,20,40,.45);z-index:100005;display:flex;align-items:center;justify-content:center;padding:16px;';
+  o.innerHTML = '<div style="background:#fff;border-radius:10px;padding:18px;width:640px;max-width:100%;max-height:85vh;display:flex;flex-direction:column;"><div style="display:flex;align-items:center;margin-bottom:6px;"><b style="flex:1;color:#003366;font-size:15px;">&#x1F4BE; Back-ups (' + T + ')</b><button type="button" onclick="document.getElementById(\'dj-backup\').remove()" style="border:none;background:none;font-size:18px;cursor:pointer;">&#x2715;</button></div>' +
+    '<div style="font-size:12px;color:#5a6b80;margin-bottom:8px;">Elke dag wordt automatisch een back-up gemaakt; de laatste ' + DJ_BACKUP_DAGEN + ' dagen worden bewaard.' + (beheer ? ' <b>Terugzetten</b> zet het hele bestand terug naar die dag (eerst wordt er nog een back-up van nu gemaakt).' : '') + '</div><div id="dj-backup-inhoud" style="overflow:auto;font-size:12.5px;">Laden&hellip;</div></div>';
+  o.addEventListener('click', function(ev){ if (ev.target === o) o.remove(); });
+  document.body.appendChild(o);
+  var box = document.getElementById('dj-backup-inhoud'), rijen = [];
+  var mappen = [{ map: 'Backup/' + T, bron: T + '_main.json', titel: 'Hoofdbestand' }, { map: 'Vertrouwelijk/' + T + '/Backup', bron: 'Vertrouwelijk/' + T + '/vertrouwelijk.json', titel: 'Vertrouwelijk' }, { map: 'Beheer/Backup', bron: 'Beheer/toegang_accounts.json', titel: 'Toegangsbeheer' }];
+  for (var i = 0; i < mappen.length; i++) {
+    try { var r = await djBkGraph(djBkPad(mappen[i].map) + ':/children?$select=name,size,lastModifiedDateTime&$top=200'); if (!r.ok) continue;
+      ((await r.json()).value || []).forEach(function(f){ rijen.push({ m: mappen[i], naam: f.name, kb: Math.round((f.size || 0) / 1024), d: (/(\d{4}-\d{2}-\d{2})\.json$/.exec(f.name) || [])[1] || '' }); }); } catch(e) {}
+  }
+  rijen.sort(function(a, b){ return b.d.localeCompare(a.d) || a.m.titel.localeCompare(b.m.titel); });
+  if (!rijen.length) { box.innerHTML = '<div style="padding:12px;color:#8795a8;">Nog geen back-ups gevonden. De eerste wordt vandaag automatisch gemaakt.</div>'; return; }
+  window._djBkRijen = rijen;
+  box.innerHTML = '<table style="width:100%;border-collapse:collapse;"><tr style="text-align:left;color:#5a6b80;"><th style="padding:4px 6px;">Datum</th><th>Bestand</th><th>Grootte</th><th></th></tr>' + rijen.map(function(r, i){
+    return '<tr style="border-top:1px solid #eef1f5;"><td style="padding:5px 6px;font-weight:700;">' + r.d.split('-').reverse().join('-') + '</td><td>' + r.m.titel + '</td><td>' + r.kb + ' kB</td><td style="text-align:right;white-space:nowrap;">' +
+      '<button type="button" onclick="djBackupDownload(' + i + ',this)" style="padding:3px 9px;border:1px solid #c8d7e8;background:#fff;color:#003366;border-radius:5px;cursor:pointer;font-weight:700;">&#x2B07;</button> ' +
+      (beheer ? '<button type="button" onclick="djBackupTerugzetten(' + i + ',this)" style="padding:3px 9px;border:1px solid #c0392b;background:#fff;color:#c0392b;border-radius:5px;cursor:pointer;font-weight:700;">&#x21A9; Terugzetten</button>' : '') + '</td></tr>'; }).join('') + '</table>';
+};
+window.djBackupDownload = async function(i, knop){
+  var r = window._djBkRijen[i]; try { knop.textContent = '\u2026'; var d = await djBkGraph(djBkPad(r.m.map + '/' + r.naam) + ':/content'); var blob = await d.blob();
+    var url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = r.naam; a.click(); setTimeout(function(){ URL.revokeObjectURL(url); }, 2000); knop.textContent = '\u2B07'; } catch(e) { knop.textContent = '\u2717'; }
+};
+var _djBkBevestig = {};
+window.djBackupTerugzetten = async function(i, knop){
+  var r = window._djBkRijen[i];
+  if (!_djBkBevestig[i] || Date.now() - _djBkBevestig[i] > 6000) { _djBkBevestig[i] = Date.now(); knop.textContent = 'Zeker? Klik nogmaals'; knop.style.background = '#c0392b'; knop.style.color = '#fff'; return; }
+  knop.disabled = true; knop.textContent = 'Bezig\u2026';
+  try {
+    var vandaag = new Date().toISOString().slice(0, 10), nu = new Date().toTimeString().slice(0, 5).replace(':', '');
+    await djBkKopie(r.m.bron, r.m.map, r.m.bron.split('/').pop().replace('.json', '') + '_voor-terugzetten_' + vandaag + '_' + nu + '.json'); // veiligheidskopie van nu
+    var d = await djBkGraph(djBkPad(r.m.map + '/' + r.naam) + ':/content'); if (!d.ok) throw new Error('back-up niet te lezen');
+    var inhoud = await d.json();
+    await spOpslaanBestandRuw(r.m.bron, inhoud);
+    knop.textContent = '\u2714 Teruggezet \u2014 de app wordt ververst';
+    setTimeout(function(){ location.reload(); }, 1800);
+  } catch(e) { knop.disabled = false; knop.textContent = '\u2717 ' + (e.message || e); }
+};
+</script>
+
 </body>
 </html>
