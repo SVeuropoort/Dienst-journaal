@@ -4,16 +4,104 @@
 <head>
 <script>
 // ══════════════════════════════════════════════════════════════════
+// JAARARCHIEF — het hoofdbestand in SharePoint klein en snel houden.
+// Eens per maand (bij een beheerder) gaan oude, gedateerde gegevens uit <T>_main.json naar
+// Data/Archief/<T>_main_<jaar>.json:
+//   • dagplanningen (dagplan_JJJJ-MM-DD) ouder dan 14 maanden
+//   • dagplanning-archieven (dagPlanning_arch_JJJJ-MM-DD) ouder dan 90 dagen
+// In het hoofdbestand komt een "grens" te staan, zodat geen enkele pc die oude gegevens er weer in zet.
+// ══════════════════════════════════════════════════════════════════
+var DJ_ARCH_GRENS_KEY = 'dj_archief_grens_v1';
+function djArchGrensUit(data){ var g = data && data[DJ_ARCH_GRENS_KEY]; if (typeof g === 'string') { try { g = JSON.parse(g); } catch(e) { g = null; } } return g || {}; }
+// Hoort deze sleutel bij het archief (ouder dan de grens die in het hoofdbestand staat)?
+function djIsGearchiveerd(k, grens){
+  if (!grens) return false;
+  var m = /^(?:EP_|HVH_|IMM_)?dagplan_(\d{4}-\d{2}-\d{2})$/.exec(k || ''); if (m && grens.dagplan && m[1] < grens.dagplan) return true;
+  var a = /^dagPlanning_arch_(\d{4}-\d{2}-\d{2})$/.exec(k || ''); if (a && grens.arch && a[1] < grens.arch) return true;
+  return false;
+}
+window.djIsGearchiveerd = djIsGearchiveerd;
+async function djArchiveren(forceer){
+  if (window.DJ_MEELEES || typeof spOphalenMetVersie !== 'function') return null;
+  var ik = localStorage.getItem('dj_sp_account_username') || '';
+  if (!(typeof djToegangHeeft === 'function' && djToegangHeeft(ik, 'beheer'))) return null; // alleen een beheerder doet dit
+  var bestand = getSBRowId() + '.json';
+  var res = await spOphalenMetVersie(bestand); if (!res || !res.inhoud || !res.inhoud.data) return null;
+  var data = res.inhoud.data, oud = djArchGrensUit(data);
+  if (!forceer && oud.laatst && Date.now() - oud.laatst < 30 * 864e5) return { overgeslagen: true }; // eens per maand
+  var dg = new Date(); dg.setDate(dg.getDate() - 425); var grensDp = dg.toISOString().slice(0, 10);
+  var da = new Date(); da.setDate(da.getDate() - 90); var grensAr = da.toISOString().slice(0, 10);
+  var grens = { dagplan: grensDp, arch: grensAr };
+  var perJaar = {}, aantal = 0;
+  Object.keys(data).forEach(function(k){
+    if (!djIsGearchiveerd(k, grens)) return;
+    var jaar = (/(\d{4})-\d{2}-\d{2}$/.exec(k) || [])[1] || 'onbekend';
+    (perJaar[jaar] = perJaar[jaar] || {})[k] = data[k]; aantal++;
+  });
+  // 1) eerst de archiefbestanden bijwerken (pas daarna uit het hoofdbestand halen: nooit iets kwijt)
+  for (var jaar in perJaar) {
+    var naam = 'Archief/' + getSBRowId() + '_' + jaar + '.json';
+    var bestaand = null; try { bestaand = await spOphalenBestandRuw(naam); } catch(e) { bestaand = null; }
+    var arch = (bestaand && bestaand.data) ? bestaand.data : {};
+    Object.keys(perJaar[jaar]).forEach(function(k){ arch[k] = perJaar[jaar][k]; });
+    await spOpslaanBestandRuw(naam, { data: arch, bijgewerkt: new Date().toISOString(), uitleg: 'Gearchiveerde dagplanningen uit ' + getSBRowId() + '.json' });
+  }
+  // 2) daarna uit het hoofdbestand + grens vastleggen (met versiecontrole: is het intussen gewijzigd, dan volgende keer)
+  Object.keys(perJaar).forEach(function(j){ Object.keys(perJaar[j]).forEach(function(k){ delete data[k]; }); });
+  grens.laatst = Date.now(); grens.door = ik;
+  grens.jaren = Array.from(new Set((oud.jaren || []).concat(Object.keys(perJaar)))).sort();
+  data[DJ_ARCH_GRENS_KEY] = grens;
+  try { await spOpslaanAlsOngewijzigd(bestand, Object.assign({}, res.inhoud, { data: data, updated_at: new Date().toISOString() }), res.eTag); }
+  catch(e) { if (e && e.conflict) return { conflict: true }; throw e; }
+  localStorage.setItem(DJ_ARCH_GRENS_KEY, JSON.stringify(grens));
+  // 3) ook lokaal weghalen
+  try { var keys = []; for (var i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i)); keys.forEach(function(k){ if (djIsGearchiveerd(k, grens)) localStorage.removeItem(k); }); } catch(e) {}
+  console.info('Archivering: ' + aantal + ' oude onderdelen naar Data/Archief verplaatst (' + Object.keys(perJaar).join(', ') + ').');
+  return { aantal: aantal, jaren: Object.keys(perJaar) };
+}
+window.djArchiveren = djArchiveren;
+// Automatisch: kort na het openen van de app (alleen bij een beheerder, eens per maand)
+document.addEventListener('DOMContentLoaded', function(){ setTimeout(function(){ djArchiveren(false).catch(function(e){ console.warn('Archivering niet gelukt (volgende keer opnieuw):', e && e.message); }); }, 45000); });
+// Overzicht + downloaden van de archiefbestanden (via de zoekbalk: "archief")
+window.djArchiefOverzicht = async function(){
+  var g = {}; try { g = JSON.parse(localStorage.getItem(DJ_ARCH_GRENS_KEY) || '{}') || {}; } catch(e) {}
+  var o = document.createElement('div'); o.id = 'dj-archief-overzicht';
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(0,20,40,.45);z-index:100005;display:flex;align-items:center;justify-content:center;padding:16px;';
+  var jaren = (g.jaren || []).slice().reverse();
+  o.innerHTML = '<div style="background:#fff;border-radius:10px;padding:18px;width:480px;max-width:100%;">' +
+    '<div style="display:flex;align-items:center;margin-bottom:10px;"><b style="flex:1;color:#003366;font-size:15px;">&#x1F4E6; Archief oude dagplanningen</b><button type="button" onclick="document.getElementById(\'dj-archief-overzicht\').remove()" style="border:none;background:none;font-size:18px;cursor:pointer;">&#x2715;</button></div>' +
+    '<div style="font-size:12.5px;color:#5a6b80;margin-bottom:10px;">Om de app snel te houden, gaan dagplanningen ouder dan 14 maanden en dagplanning-archieven ouder dan 90 dagen eens per maand naar <b>Data/Archief</b> in SharePoint. Er gaat niets verloren.' +
+      (g.laatst ? '<br>Laatst gearchiveerd: <b>' + new Date(g.laatst).toLocaleString('nl-NL') + '</b> (tot ' + (g.dagplan || '-') + ').' : '<br>Nog niet gearchiveerd.') + '</div>' +
+    (jaren.length ? jaren.map(function(j){ return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px solid #eef1f5;"><span style="flex:1;font-weight:700;">' + j + '</span><button type="button" onclick="djArchiefDownload(\'' + j + '\', this)" style="padding:4px 10px;border:1px solid #c8d7e8;background:#fff;color:#003366;border-radius:5px;cursor:pointer;font-weight:700;">&#x2B07; Download</button></div>'; }).join('') : '<div style="color:#8795a8;font-size:12.5px;">Nog geen archiefbestanden.</div>') +
+    '</div>';
+  o.addEventListener('click', function(ev){ if (ev.target === o) o.remove(); });
+  document.body.appendChild(o);
+};
+window.djArchiefDownload = async function(jaar, knop){
+  try { knop.textContent = 'Ophalen\u2026'; var d = await spOphalenBestandRuw('Archief/' + getSBRowId() + '_' + jaar + '.json');
+    var url = URL.createObjectURL(new Blob([JSON.stringify(d, null, 1)], { type: 'application/json' })), a = document.createElement('a'); a.href = url; a.download = getSBRowId() + '_archief_' + jaar + '.json'; a.click(); setTimeout(function(){ URL.revokeObjectURL(url); }, 2000); knop.textContent = '\u2B07 Download';
+  } catch(e) { knop.textContent = '\u2717 ' + (e.message || e); }
+};
+</script>
+<script>
+// ══════════════════════════════════════════════════════════════════
 // Browseropslag (±5 MB) netjes houden. De dagplanning-archieven (dagPlanning_arch_<datum>) zijn veruit
 // het grootst; ze staan óók in SharePoint. Lokaal bewaren we alleen de laatste weken.
 // ══════════════════════════════════════════════════════════════════
 var DJ_ARCH_LOKAAL_DAGEN = 30;
 function djArchDatum(k){ var m = /^dagPlanning_arch_(\d{4}-\d{2}-\d{2})$/.exec(k || ''); return m ? m[1] : null; }
+// Dagplanningen per datum ((EP_|HVH_|IMM_)dagplan_JJJJ-MM-DD): lokaal ruim 13 maanden (genoeg voor alle KPI-periodes)
+var DJ_DAGPLAN_LOKAAL_DAGEN = 400;
+function djDagplanDatum(k){ var m = /^(?:EP_|HVH_|IMM_)?dagplan_(\d{4}-\d{2}-\d{2})$/.exec(k || ''); return m ? m[1] : null; }
+function djGrens(dagen){ var g = new Date(); g.setDate(g.getDate() - dagen); return g.toISOString().slice(0, 10); }
 function djArchTeOud(k, dagen){
-  var d = djArchDatum(k); if (!d) return false;
-  var grens = new Date(); grens.setDate(grens.getDate() - (dagen || DJ_ARCH_LOKAAL_DAGEN));
-  return d < grens.toISOString().slice(0, 10);
+  var d = djArchDatum(k); if (d) return d < djGrens(dagen || DJ_ARCH_LOKAAL_DAGEN);
+  var p = djDagplanDatum(k); if (p) return p < djGrens(DJ_DAGPLAN_LOKAAL_DAGEN);
+  return false;
 }
+// Hoeveel ruimte gebruikt de app in deze browser (bytes, UTF-16)
+function djOpslagGebruik(){ var t = 0; try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); t += (k.length + (localStorage.getItem(k) || '').length) * 2; } } catch(e) {} return t; }
+window.djOpslagGebruik = djOpslagGebruik;
 function djOpslagOpruimen(nood){
   var weg = 0, dagen = nood ? 14 : DJ_ARCH_LOKAAL_DAGEN;
   try {
@@ -22,12 +110,20 @@ function djOpslagOpruimen(nood){
       if (djArchTeOud(k, dagen)) { localStorage.removeItem(k); weg++; }
       else if (nood && /^(EP|HVH|IMM)?_?djbackup|_backup$/.test(k || '')) { localStorage.removeItem(k); weg++; } // oude reservekopieën
     });
+    // Nog steeds erg vol (>80%)? Dan ook dagplanningen ouder dan 6 maanden lokaal weg (staan in SharePoint)
+    // in stappen: eerst ouder dan 6 maanden, zo nodig 3 maanden, in het uiterste geval 6 weken (alles staat in SharePoint)
+    if (nood) [190, 95, 45].forEach(function(grensDagen){
+      if (djOpslagGebruik() <= 4.0e6) return;
+      keys.forEach(function(k){ var p = djDagplanDatum(k); if (p && p < djGrens(grensDagen) && localStorage.getItem(k) !== null) { localStorage.removeItem(k); weg++; } });
+    });
   } catch(e) {}
   if (weg) console.info('Browseropslag opgeruimd: ' + weg + ' oude onderdelen (staan nog in SharePoint).');
   return weg;
 }
 window.djOpslagOpruimen = djOpslagOpruimen; window.djArchTeOud = djArchTeOud;
 try { djOpslagOpruimen(false); } catch(e) {}
+// Elke 10 minuten controleren: boven 70% (±3,5 MB) alvast ruim opruimen, zodat "vol" niet meer voorkomt
+setInterval(function(){ try { if (djOpslagGebruik() > 3.5e6) djOpslagOpruimen(true); } catch(e) {} }, 10 * 60000);
 </script>
 <script>
 // Vroege tk() fallback — wordt overschreven door de echte definitie zodra die laadt
@@ -7572,7 +7668,9 @@ window.addEventListener('resize', () => {
   // een verouderde Dagplanning — en overschreef zo de wijzigingen die een collega net had gedaan.
   function djSamenvoegenMetCloud(cloudData, lokaal, vuil){
     var data = Object.assign({}, cloudData);
+    var _archGrens = (typeof djArchGrensUit === 'function') ? djArchGrensUit(cloudData) : null;
     Object.keys(lokaal).forEach(function(k){
+      if (_archGrens && !(k in cloudData) && typeof djIsGearchiveerd === 'function' && djIsGearchiveerd(k, _archGrens)) { try { localStorage.removeItem(k); } catch(e) {} return; } // staat in het jaararchief
       if (vuil && (k in cloudData) && !vuil[k]) return; // niet zelf gewijzigd: cloud-versie behouden
       if (/(^|_)vs_data_v1$/.test(k) && cloudData[k]) { data[k] = djVsSamenvoegen(cloudData[k], lokaal[k]); return; }
       if (/(^|_)dagmeldingen_v1$/.test(k) && cloudData[k]) { data[k] = djDmSamenvoegen(cloudData[k], lokaal[k]); return; }
@@ -24177,7 +24275,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.123';
+var DJ_BUILD = '2026-10-07.125';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -27303,6 +27401,7 @@ var DJ_ZOEK_INDEX = [
   { label: 'Schade formulier', keywords: 'schade formulier incident melding pdf', actie: function(){ navTo('schade', 'SCHADE FORMULIER', null); } },
   { label: 'Maandafsluiting', keywords: 'maandafsluiting payroll salaris quinyx mutaties', actie: function(){ navTo('maandafsluiting', 'MAANDAFSLUITING', null); } },
   { label: 'ORT / Basisrooster', keywords: 'ort basisrooster onregelmatigheidstoeslag cao artikel b8', actie: function(){ navTo('ort', 'ORT / BASISROOSTER', null); } },
+  { label: 'Archief oude dagplanningen', keywords: 'archief oud oude dagplanning jaar jaararchief download sharepoint', actie: function(){ if (typeof djArchiefOverzicht === 'function') djArchiefOverzicht(); } },
   { label: 'AOW & SFR', keywords: 'aow sfr esw pensioen vervroegd uittreden verlof', actie: function(){ navTo('aowdash', 'AOW & SFR', null); } }
 ];
 var _djZoekActieveIndex = -1;
@@ -35597,5 +35696,17 @@ window.djQuinyxNamenInlezen = djQuinyxNamenInlezen = function(){
 };
 </script>
 
+<script>
+// Beheer: browseropslag zichtbaar in de statusbalk-tooltip en in de console
+document.addEventListener('DOMContentLoaded', function(){
+  setTimeout(function(){
+    try {
+      var mb = (djOpslagGebruik() / 1048576).toFixed(1), el = document.getElementById('sync-status') || document.querySelector('.sync-status');
+      if (el) el.title = 'Browseropslag: ' + mb + ' MB van ca. 5 MB (wordt automatisch opgeruimd boven 3,5 MB)';
+      console.info('Browseropslag Dienst Journaal: ' + mb + ' MB');
+    } catch(e) {}
+  }, 6000);
+});
+</script>
 </body>
 </html>
