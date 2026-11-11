@@ -3,6 +3,33 @@
 <html id="dj-html" style="visibility:hidden" lang="nl">
 <head>
 <script>
+// ══════════════════════════════════════════════════════════════════
+// Browseropslag (±5 MB) netjes houden. De dagplanning-archieven (dagPlanning_arch_<datum>) zijn veruit
+// het grootst; ze staan óók in SharePoint. Lokaal bewaren we alleen de laatste weken.
+// ══════════════════════════════════════════════════════════════════
+var DJ_ARCH_LOKAAL_DAGEN = 30;
+function djArchDatum(k){ var m = /^dagPlanning_arch_(\d{4}-\d{2}-\d{2})$/.exec(k || ''); return m ? m[1] : null; }
+function djArchTeOud(k, dagen){
+  var d = djArchDatum(k); if (!d) return false;
+  var grens = new Date(); grens.setDate(grens.getDate() - (dagen || DJ_ARCH_LOKAAL_DAGEN));
+  return d < grens.toISOString().slice(0, 10);
+}
+function djOpslagOpruimen(nood){
+  var weg = 0, dagen = nood ? 14 : DJ_ARCH_LOKAAL_DAGEN;
+  try {
+    var keys = []; for (var i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
+    keys.forEach(function(k){
+      if (djArchTeOud(k, dagen)) { localStorage.removeItem(k); weg++; }
+      else if (nood && /^(EP|HVH|IMM)?_?djbackup|_backup$/.test(k || '')) { localStorage.removeItem(k); weg++; } // oude reservekopieën
+    });
+  } catch(e) {}
+  if (weg) console.info('Browseropslag opgeruimd: ' + weg + ' oude onderdelen (staan nog in SharePoint).');
+  return weg;
+}
+window.djOpslagOpruimen = djOpslagOpruimen; window.djArchTeOud = djArchTeOud;
+try { djOpslagOpruimen(false); } catch(e) {}
+</script>
+<script>
 // Vroege tk() fallback — wordt overschreven door de echte definitie zodra die laadt
 window.tk = window.tk || function(key) {
   var pfx = (sessionStorage.getItem('dj_terminal') || 'EP') + '_';
@@ -7254,7 +7281,12 @@ window.addEventListener('resize', () => {
     var _origSetItem = localStorage.setItem.bind(localStorage);
     var _dynamischeVoorvoegsels = ['dagplan_', 'kpi_snapshot_', 'ls_', 'dagPlanning_arch_'];
     localStorage.setItem = function(key, value){
-      _origSetItem(key, value);
+      try { _origSetItem(key, value); }
+      catch(eq) {
+        if (!(eq && (eq.name === 'QuotaExceededError' || /quota/i.test(eq.message || '')))) throw eq;
+        if (typeof djOpslagOpruimen === 'function') djOpslagOpruimen(true);
+        _origSetItem(key, value); // lukt het nu nog niet, dan volgt de normale foutmelding
+      }
       try {
         if (typeof window.autoCloudOpslaan !== 'function' || !key) return;
         var kaal = key.replace(/^(EP|HVH|IMM)_/, '');
@@ -7405,9 +7437,14 @@ window.addEventListener('resize', () => {
     try {
       Object.keys(data).forEach(function(k) {
         if (data[k] !== undefined) {
+          if (typeof djArchTeOud === 'function' && djArchTeOud(k)) return; // oud dagplanning-archief: alleen in SharePoint
           var val = typeof data[k] === 'string' ? data[k] : JSON.stringify(data[k]);
           try { localStorage.setItem(k, val); }
-          catch(e) { _vol++; } // browseropslag vol: deze sleutel overslaan, de rest wél bijwerken
+          catch(e) {
+            // vol: eerst opruimen en het nog één keer proberen
+            try { if (typeof djOpslagOpruimen === 'function') djOpslagOpruimen(true); localStorage.setItem(k, val); }
+            catch(e2) { _vol++; } // nog steeds vol: deze sleutel overslaan, de rest wél bijwerken
+          }
         }
       });
     } finally {
@@ -24140,7 +24177,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.122';
+var DJ_BUILD = '2026-10-07.123';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
