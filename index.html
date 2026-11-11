@@ -7382,6 +7382,7 @@ window.addEventListener('resize', () => {
     'dj_prullenbak_v1',
     'dj_prullenbak_vertr_v1',
     'dj_uitdienst_gepland_v1',
+    'dj_rechtencontrole_v1',
     'dj_verjaardagen_v1',
     'dagpl_cert_v1',
     'dagpl_cert_v2',
@@ -7769,7 +7770,7 @@ window.addEventListener('resize', () => {
   }
   function djIsPlanningSleutel(k){ return /dagplan_|dagPlanning_v2_state|^ls_/.test(k); }
   // Sleutels die per regel (persoon / registratie / ploeg) worden samengevoegd i.p.v. "wie het laatst opslaat wint"
-  function djIsRegelSleutel(k){ return /(^|_)(personeelsdossier_v1|opleiding_overzicht_v1|organogram_v1|pd_verlof_v1|pd_functies_v1|dj_verjaardagen_v1|kledingpunten_v1|vakantierooster_v1|tugmasters_v1|pd_koppeling_v1|pd_team_v1|pd_quinyx_extra_v1|ma_medewerkers_v1|ma_hvh_v1|ma_apart_v1|ma_mentor_v1|ma_quinyx_namen_v1|ontwikkelgesprek[a-z_]*_v1|bezetting_deeltijd_v1|bezetting_instellingen_v1|dj_toegang_v1|dj_prullenbak_v1|dj_prullenbak_vertr_v1|dj_uitdienst_gepland_v1)$/.test(k); }
+  function djIsRegelSleutel(k){ return /(^|_)(personeelsdossier_v1|opleiding_overzicht_v1|organogram_v1|pd_verlof_v1|pd_functies_v1|dj_verjaardagen_v1|kledingpunten_v1|vakantierooster_v1|tugmasters_v1|pd_koppeling_v1|pd_team_v1|pd_quinyx_extra_v1|ma_medewerkers_v1|ma_hvh_v1|ma_apart_v1|ma_mentor_v1|ma_quinyx_namen_v1|ontwikkelgesprek[a-z_]*_v1|bezetting_deeltijd_v1|bezetting_instellingen_v1|dj_toegang_v1|dj_prullenbak_v1|dj_prullenbak_vertr_v1|dj_uitdienst_gepland_v1|dj_rechtencontrole_v1)$/.test(k); }
   // Diepe 3-weg-samenvoeging. Lijsten met herkenbare regels (id / naam / mannr) worden per regel samengevoegd:
   // wat ik toevoeg, wijzig of verwijder telt; wat een collega intussen toevoegde/wijzigde blijft staan.
   function djRegelId(x){ if (!x || typeof x !== 'object' || Array.isArray(x)) return null; var v = x.id != null ? 'id:' + x.id : x.mannr != null ? 'nr:' + x.mannr : x.naam != null ? 'n:' + x.naam : x.persoon != null ? 'p:' + x.persoon : null; return v; }
@@ -24398,7 +24399,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.130';
+var DJ_BUILD = '2026-10-07.132';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -27524,6 +27525,7 @@ var DJ_ZOEK_INDEX = [
   { label: 'Schade formulier', keywords: 'schade formulier incident melding pdf', actie: function(){ navTo('schade', 'SCHADE FORMULIER', null); } },
   { label: 'Maandafsluiting', keywords: 'maandafsluiting payroll salaris quinyx mutaties', actie: function(){ navTo('maandafsluiting', 'MAANDAFSLUITING', null); } },
   { label: 'ORT / Basisrooster', keywords: 'ort basisrooster onregelmatigheidstoeslag cao artikel b8', actie: function(){ navTo('ort', 'ORT / BASISROOSTER', null); } },
+  { label: 'Rechtenoverzicht (wie heeft welke rechten)', keywords: 'rechten rechtenoverzicht toegang autorisatie accounts laatst gezien audit kwartaal controle', actie: function(){ if (typeof djRechtenOverzicht === 'function') djRechtenOverzicht(); } },
   { label: 'Back-ups (dagelijks, terugzetten)', keywords: 'backup back-up back up terugzetten herstellen gisteren kopie reservekopie', actie: function(){ if (typeof djBackupOverzicht === 'function') djBackupOverzicht(); } },
   { label: 'Prullenbak (verwijderde items terugzetten)', keywords: 'prullenbak verwijderd terugzetten herstellen ongedaan per ongeluk weg kwijt', actie: function(){ if (typeof djPrullenbak === 'function') djPrullenbak(); } },
   { label: 'Foutenlogboek (beheer)', keywords: 'fouten foutenlogboek log error storing problemen bug beheer', actie: function(){ if (typeof djFoutenOverzicht === 'function') djFoutenOverzicht(); } },
@@ -36167,6 +36169,186 @@ window.djBackupTerugzetten = async function(i, knop){
     setTimeout(function(){ location.reload(); }, 1800);
   } catch(e) { knop.disabled = false; knop.textContent = '\u2717 ' + (e.message || e); }
 };
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// WAARSCHUWING BIJ NIET-OPGESLAGEN WERK
+//  • tab/app sluiten terwijl er nog iets opgeslagen moet worden → de browser vraagt "Weet je het zeker?"
+//    (en de app probeert het direct nog op te slaan)
+//  • lukt opslaan langer dan 1,5 minuut niet → rode balk bovenin met "Nu opslaan"
+//  • geen internet → oranje balk; zodra de verbinding terug is, wordt automatisch opgeslagen
+// ══════════════════════════════════════════════════════════════════
+(function(){
+  var sinds = null, balk = null;
+  function onopgeslagen(){ try { return typeof djHeeftOnopgeslagenWerk === 'function' && djHeeftOnopgeslagenWerk() && !window.DJ_MEELEES; } catch(e) { return false; } }
+  function nuOpslaan(knop){
+    if (knop) { knop.disabled = true; knop.textContent = 'Bezig\u2026'; }
+    try { if (typeof window._doCloudOpslaan === 'function') window._doCloudOpslaan(); } catch(e) {}
+    Promise.resolve(typeof window._flushPendingCloudOpslaan === 'function' ? window._flushPendingCloudOpslaan() : null)
+      .catch(function(){}).then(function(){ setTimeout(controleer, 1500); });
+  }
+  window.djNuOpslaan = nuOpslaan;
+  function toon(type, tekst){
+    if (!balk) {
+      balk = document.createElement('div'); balk.id = 'dj-onopgeslagen-balk';
+      balk.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:100007;padding:9px 14px;font-size:13.5px;font-weight:700;display:flex;align-items:center;gap:12px;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.25);';
+      document.body.appendChild(balk);
+    }
+    balk.style.background = type === 'offline' ? '#e67e22' : '#c0392b'; balk.style.color = '#fff';
+    balk.innerHTML = '<span>' + tekst + '</span>' + (type === 'offline' ? '' : '<button type="button" onclick="djNuOpslaan(this)" style="background:#fff;color:#c0392b;border:none;border-radius:5px;padding:5px 12px;font-weight:800;cursor:pointer;">Nu opslaan</button>');
+  }
+  function verberg(){ if (balk) { balk.remove(); balk = null; } }
+  function controleer(){
+    if (!navigator.onLine) { if (onopgeslagen()) toon('offline', '\u26A0\uFE0F Geen internetverbinding \u2014 je wijzigingen staan veilig op dit apparaat en worden opgeslagen zodra de verbinding terug is. Sluit de app nog niet.'); else verberg(); return; }
+    if (!onopgeslagen()) { sinds = null; verberg(); return; }
+    if (!sinds) sinds = Date.now();
+    var sec = Math.round((Date.now() - sinds) / 1000);
+    if (sec >= 90) toon('fout', '\u26A0\uFE0F Je wijzigingen zijn al ' + (sec >= 120 ? Math.round(sec / 60) + ' minuten' : sec + ' seconden') + ' niet opgeslagen. Sluit de app nog niet.');
+  }
+  setInterval(controleer, 10000);
+  window.addEventListener('online', function(){ nuOpslaan(); setTimeout(controleer, 3000); });
+  window.addEventListener('offline', controleer);
+  // Sluiten/verversen met onopgeslagen werk: eerst nog opslaan en de browser laten waarschuwen
+  window.addEventListener('beforeunload', function(ev){
+    if (!onopgeslagen()) return;
+    try { nuOpslaan(); } catch(e) {}
+    ev.preventDefault(); ev.returnValue = 'Er wordt nog opgeslagen. Weet je zeker dat je de app wilt sluiten?'; return ev.returnValue;
+  });
+  window.djOnopgeslagenControleren = controleer;
+})();
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// RECHTENOVERZICHT + KWARTAALCONTROLE
+//  • "laatst gezien": één keer per dag per gebruiker in Data/Logboek/gebruik.json (alleen datum/terminal/build)
+//  • overzicht voor beheerders met waarschuwingen (90 dagen niet gezien, uit dienst, vertrouwelijk, onbekend)
+//  • elk kwartaal automatisch een taak in TO-DO SV voor de beheerder; "Klaar" = gecontroleerd (wie + wanneer)
+// ══════════════════════════════════════════════════════════════════
+var DJ_RECHT_VERTR = ['supervisor', 'maandafsluiting', 'kledingpunten', 'salaris', 'ontwikkelgesprek', 'beheer'];
+async function djGebruikVastleggen(){
+  if (window.DJ_MEELEES || typeof spOpslaanBestandRuw !== 'function') return;
+  var ik = String(localStorage.getItem('dj_sp_account_username') || '').toLowerCase(), vandaag = new Date().toISOString().slice(0, 10);
+  if (!ik || localStorage.getItem('dj_gebruik_gemeld') === vandaag) return;
+  if (typeof spIngelogdAsync === 'function') { try { if (!(await spIngelogdAsync())) return; } catch(e) { return; } }
+  try {
+    var d = null; try { d = await spOphalenBestandRuw('Logboek/gebruik.json'); } catch(e) {}
+    var g = (d && d.gebruikers) || {};
+    g[ik] = { laatst: vandaag, terminal: sessionStorage.getItem('dj_terminal') || '', build: (typeof DJ_BUILD !== 'undefined' ? DJ_BUILD : '') };
+    await spOpslaanBestandRuw('Logboek/gebruik.json', { gebruikers: g, bijgewerkt: new Date().toISOString() });
+    localStorage.setItem('dj_gebruik_gemeld', vandaag);
+  } catch(e) {}
+}
+document.addEventListener('DOMContentLoaded', function(){ setTimeout(djGebruikVastleggen, 25000); });
+function djKwartaal(d){ d = d || new Date(); return { sleutel: d.getFullYear() + '-Q' + (Math.floor(d.getMonth() / 3) + 1), label: 'Q' + (Math.floor(d.getMonth() / 3) + 1) + ' ' + d.getFullYear() }; }
+// ── Kwartaaltaak in TO-DO SV ──
+function djRechtenTaakGenereren(){
+  var ik = String(localStorage.getItem('dj_sp_account_username') || '').toLowerCase();
+  if (!ik || !(typeof djToegangHeeft === 'function' && djToegangHeeft(ik, 'beheer')) || !(typeof djMagTodoSV === 'function' && djMagTodoSV())) return;
+  if (!sessionStorage.getItem('_cloudGeladen')) return;
+  var k = tk('plan_sv_v1'), sv; try { sv = JSON.parse(localStorage.getItem(k) || 'null') || { a: [], d: [], r: [] }; } catch(e) { return; }
+  sv.a = sv.a || []; sv.d = sv.d || []; sv.rechtenGen = sv.rechtenGen || [];
+  var q = djKwartaal(); if (sv.rechtenGen.indexOf(q.sleutel) >= 0) return; // dit kwartaal al aangemaakt (ook als hij al klaar is)
+  var nu = new Date(), dl = new Date(nu.getTime() + 14 * 864e5), f = function(x){ return String(x.getDate()).padStart(2, '0') + '/' + String(x.getMonth() + 1).padStart(2, '0') + '/' + x.getFullYear(); };
+  sv.a.push({ id: Date.now() + Math.random(), gw: Date.now(), datum: f(nu), deadline: f(dl), wie: '', toegewezen: ik, toegewezenDoor: ik, rechtenKey: q.sleutel,
+    taak: '\uD83D\uDD10 Rechtencontrole Dienst Journaal \u2013 ' + q.label,
+    uitleg: 'Loop het rechtenoverzicht na (zoekbalk: "rechten", of Toegangsbeheer \u2192 Rechtenoverzicht): wie heeft welke rechten, wie is al 90 dagen niet ingelogd, wie is uit dienst. Pas zo nodig aan en zet deze taak daarna op Klaar \u2014 dat wordt vastgelegd als "gecontroleerd". Deadline: ' + f(dl) + '.' });
+  sv.rechtenGen.push(q.sleutel);
+  localStorage.setItem(k, JSON.stringify(sv)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+  try { if (typeof djTodoMeldingBijwerken === 'function') djTodoMeldingBijwerken(); } catch(e) {}
+}
+document.addEventListener('DOMContentLoaded', function(){ setTimeout(djRechtenTaakGenereren, 35000); setInterval(djRechtenTaakGenereren, 6 * 3600000); });
+// "Klaar" op de kwartaaltaak = gecontroleerd door wie hem afvinkte
+(function(){
+  var _prev = localStorage.setItem;
+  localStorage.setItem = function(k, v){
+    try {
+      if (/(^|_)plan_sv_v1$/.test(k) && v && v.indexOf('rechtenKey') >= 0 && !(typeof _djSyncDataToepassen !== 'undefined' && _djSyncDataToepassen)) {
+        var o = JSON.parse(v), ik = localStorage.getItem('dj_sp_account_username') || '', veranderd = false;
+        (o.d || []).forEach(function(t){
+          if (t.rechtenKey && !t.gecontroleerdDoor) {
+            t.gecontroleerdDoor = ik; t.gecontroleerdOp = new Date().toISOString(); veranderd = true;
+            try { var log = JSON.parse(localStorage.getItem('dj_rechtencontrole_v1') || '[]'); log.push({ kwartaal: t.rechtenKey, door: ik, op: t.gecontroleerdOp }); _prev.call(localStorage, 'dj_rechtencontrole_v1', JSON.stringify(log)); } catch(e) {}
+          }
+        });
+        if (veranderd) v = JSON.stringify(o);
+      }
+    } catch(e) {}
+    return _prev.call(this, k, v);
+  };
+})();
+// ── Overzicht ──
+window.djRechtenOverzicht = async function(){
+  var oud = document.getElementById('dj-rechten'); if (oud) oud.remove();
+  var esc = function(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
+  var o = document.createElement('div'); o.id = 'dj-rechten';
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(0,20,40,.45);z-index:100006;display:flex;align-items:center;justify-content:center;padding:16px;';
+  o.innerHTML = '<div style="background:#fff;border-radius:10px;padding:18px;width:1100px;max-width:100%;max-height:88vh;display:flex;flex-direction:column;"><div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><b style="flex:1;color:#003366;font-size:15px;">&#x1F4CB; Rechtenoverzicht</b><button type="button" onclick="djRechtenExport()" style="padding:5px 12px;border:1px solid #1a7a40;background:#fff;color:#1a7a40;border-radius:6px;cursor:pointer;font-weight:700;">&#x2B07; Exporteren naar Excel</button><button type="button" onclick="document.getElementById(\'dj-rechten\').remove()" style="border:none;background:none;font-size:18px;cursor:pointer;">&#x2715;</button></div><div id="dj-rechten-inhoud" style="overflow:auto;font-size:12.5px;">Laden&hellip;</div></div>';
+  o.addEventListener('click', function(ev){ if (ev.target === o) o.remove(); });
+  document.body.appendChild(o);
+  var gebruik = {}; try { var d = await spOphalenBestandRuw('Logboek/gebruik.json'); gebruik = (d && d.gebruikers) || {}; } catch(e) {}
+  var acc = djToegangGet(), qn = {}; try { qn = JSON.parse(localStorage.getItem('ma_quinyx_namen_v1') || '{}') || {}; } catch(e) {}
+  var qNamen = Object.keys(qn).map(function(k){ return qn[k]; });
+  var omg = (typeof DJ_TOEGANG_OMGEVINGEN !== 'undefined') ? DJ_TOEGANG_OMGEVINGEN : [];
+  var nu = Date.now(), rijen = acc.map(function(a){
+    var rechten = omg.filter(function(x){ return a.permissies && a.permissies[x.key]; }), g = gebruik[String(a.email || '').toLowerCase()];
+    var dagen = g ? Math.floor((nu - new Date(g.laatst + 'T12:00:00')) / 864e5) : null;
+    var vertr = rechten.some(function(x){ return DJ_RECHT_VERTR.indexOf(x.key) >= 0; });
+    var naamVol = a.naam ? a.naam.split(' ').reverse().join(' ') : '';
+    var bekend = !a.naam || qNamen.some(function(q){ return typeof vakZelfdePersoon === 'function' ? (vakZelfdePersoon(q, naamVol) || vakZelfdePersoon(q, a.naam)) : q === naamVol; });
+    var vlag = [];
+    if (rechten.length && a.uitDienst) vlag.push(['r', 'uit dienst, nog rechten']);
+    if (rechten.length && (dagen === null || dagen > 90)) vlag.push(['r', dagen === null ? 'nooit gezien (sinds de meting)' : dagen + ' dagen niet gezien']);
+    if (vertr) vlag.push(['o', 'vertrouwelijke toegang']);
+    if (rechten.length && !bekend && qNamen.length) vlag.push(['o', 'niet in Quinyx (extern/garage/FC?)']);
+    if (a.uitDienst && !rechten.length) vlag.push(['g', 'uit dienst \u2014 toegang ingetrokken ' + (a.uitDienst.sinds || '')]);
+    return { a: a, rechten: rechten, g: g, dagen: dagen, vertr: vertr, vlag: vlag };
+  }).sort(function(x, y){ return y.vlag.filter(function(v){ return v[0] === 'r'; }).length - x.vlag.filter(function(v){ return v[0] === 'r'; }).length || String(x.a.naam || x.a.email).localeCompare(String(y.a.naam || y.a.email)); });
+  window._djRechtenRijen = rijen;
+  var met = rijen.filter(function(r){ return r.rechten.length; }), nVertr = rijen.filter(function(r){ return r.vertr; }).length, nOud = met.filter(function(r){ return r.dagen === null || r.dagen > 90; }).length;
+  var log = []; try { log = JSON.parse(localStorage.getItem('dj_rechtencontrole_v1') || '[]'); } catch(e) {}
+  var laatste = log[log.length - 1], kleur = { r: '#c0392b', o: '#b9770e', g: '#1a7a40' };
+  document.getElementById('dj-rechten-inhoud').innerHTML =
+    '<div style="margin-bottom:10px;"><b>' + met.length + '</b> accounts met rechten &middot; <b>' + nVertr + '</b> met vertrouwelijke toegang &middot; <b style="color:' + (nOud ? '#c0392b' : '#1a7a40') + ';">' + nOud + '</b> al 90 dagen niet gezien' +
+      (laatste ? ' &middot; laatste controle: <b>' + esc(laatste.kwartaal) + '</b> door ' + esc(typeof dpLogNaam === 'function' ? dpLogNaam(laatste.door) : laatste.door) + ' op ' + new Date(laatste.op).toLocaleDateString('nl-NL') : ' &middot; <span style="color:#b9770e;">nog geen kwartaalcontrole vastgelegd</span>') + '</div>' +
+    '<table style="width:100%;border-collapse:collapse;"><tr style="text-align:left;color:#5a6b80;"><th style="padding:4px 6px;">Naam</th><th>Rechten</th><th>Laatst gezien</th><th>Let op</th></tr>' +
+    rijen.map(function(r){ return '<tr style="border-top:1px solid #eef1f5;vertical-align:top;"><td style="padding:5px 6px;"><b>' + esc(r.a.naam || r.a.email) + '</b><br><span style="color:#8795a8;font-size:11px;">' + esc(r.a.email) + '</span></td>' +
+      '<td style="max-width:420px;">' + (r.rechten.length ? r.rechten.map(function(x){ return '<span style="display:inline-block;margin:1px;padding:1px 6px;border-radius:8px;font-size:11px;background:' + (DJ_RECHT_VERTR.indexOf(x.key) >= 0 ? '#fdebd0' : '#eef3f9') + ';">' + esc(x.label) + '</span>'; }).join('') : '<span style="color:#8795a8;">geen</span>') + '</td>' +
+      '<td style="white-space:nowrap;">' + (r.g ? r.g.laatst.split('-').reverse().join('-') + '<br><span style="color:#8795a8;font-size:11px;">' + esc(r.g.terminal) + '</span>' : '<span style="color:#8795a8;">\u2014</span>') + '</td>' +
+      '<td>' + r.vlag.map(function(v){ return '<div style="color:' + kleur[v[0]] + ';font-weight:700;font-size:11.5px;">' + (v[0] === 'r' ? '\uD83D\uDD34 ' : v[0] === 'o' ? '\uD83D\uDFE0 ' : '\u2714 ') + esc(v[1]) + '</div>'; }).join('') + '</td></tr>'; }).join('') + '</table>' +
+    '<div style="margin-top:10px;font-size:11.5px;color:#8795a8;">"Laatst gezien" wordt bijgehouden vanaf deze versie (eens per dag per gebruiker). Rechten aanpassen doe je in Toegangsbeheer.</div>';
+};
+window.djRechtenExport = function(){
+  var r = window._djRechtenRijen || [], omg = (typeof DJ_TOEGANG_OMGEVINGEN !== 'undefined') ? DJ_TOEGANG_OMGEVINGEN : [];
+  var csv = [['Naam', 'E-mail'].concat(omg.map(function(o){ return o.label; })).concat(['Laatst gezien', 'Let op'])].concat(r.map(function(x){
+    return [x.a.naam || '', x.a.email].concat(omg.map(function(o){ return x.a.permissies && x.a.permissies[o.key] ? 'ja' : ''; })).concat([x.g ? x.g.laatst : '', x.vlag.map(function(v){ return v[1]; }).join('; ')]); }));
+  var tekst = '\ufeff' + csv.map(function(rij){ return rij.map(function(c){ return '"' + String(c).replace(/"/g, '""') + '"'; }).join(';'); }).join('\r\n');
+  var url = URL.createObjectURL(new Blob([tekst], { type: 'text/csv;charset=utf-8' })), a = document.createElement('a'); a.href = url; a.download = 'Rechtenoverzicht_' + new Date().toISOString().slice(0, 10) + '.csv'; a.click(); setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+};
+// Knop in Toegangsbeheer
+document.addEventListener('DOMContentLoaded', function(){
+  var c = document.getElementById('dj-toegang-lijst'); if (!c || document.getElementById('dj-rechten-knop')) return;
+  var b = document.createElement('button'); b.id = 'dj-rechten-knop'; b.type = 'button'; b.onclick = function(){ djRechtenOverzicht(); };
+  b.innerHTML = '&#x1F4CB; Rechtenoverzicht (wie heeft wat, laatst gezien)';
+  b.style.cssText = 'width:100%;margin:0 0 10px;padding:8px 12px;border:1px solid #e8a020;background:rgba(232,160,32,.12);color:#e8a020;border-radius:8px;font-weight:800;cursor:pointer;font-size:12.5px;';
+  c.parentNode.insertBefore(b, c);
+});
+// Knop in de To Do bij de kwartaaltaak
+(function(){
+  function knoppen(){
+    var v = document.getElementById('view-planning'); if (!v) return;
+    Array.prototype.forEach.call(v.querySelectorAll('*'), function(el){
+      if (el.children.length || el.dataset.rechtenKnop || !/^\uD83D\uDD10 Rechtencontrole/.test((el.textContent || '').trim())) return;
+      el.dataset.rechtenKnop = '1';
+      var k = document.createElement('button'); k.type = 'button'; k.textContent = 'Open rechtenoverzicht';
+      k.style.cssText = 'margin-left:8px;padding:2px 9px;border:1px solid #0f6cbd;background:#fff;color:#0f6cbd;border-radius:5px;font-size:11.5px;font-weight:700;cursor:pointer;';
+      k.onclick = function(ev){ ev.stopPropagation(); djRechtenOverzicht(); };
+      el.appendChild(k);
+    });
+  }
+  document.addEventListener('DOMContentLoaded', function(){ var v = document.getElementById('view-planning'); if (v) try { new MutationObserver(function(){ setTimeout(knoppen, 50); }).observe(v, { childList: true, subtree: true }); } catch(e) {} });
+})();
 </script>
 
 </body>
