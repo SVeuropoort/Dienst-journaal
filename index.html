@@ -24401,7 +24401,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.137';
+var DJ_BUILD = '2026-10-07.138';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -36413,5 +36413,135 @@ window.djGebruikershandleiding = function(taal){
   setTimeout(function(){ document.addEventListener('click', function weg(ev){ if (!m.contains(ev.target) && ev.target.id !== 'dj-help-knop') { m.remove(); document.removeEventListener('click', weg); } }); }, 0);
 };
 </script>
+<script>
+// ══════════════════════════════════════════════════════════════════
+// DIENSTREGELING (PDF) INLEZEN → DAGMELDINGEN
+// Een "Sailing schedule" (Thuleland/Mistral/Stena Forerunner/Stena Foreteller …) wordt per datum omgezet
+// in één dagmelding. Een nieuwe versie vervangt de meldingen van de vorige versie (zelfde periode/bestand).
+// Gaat via de gewone dagmeldingen, dus ook naar de Dagplanning en wordt per melding samengevoegd.
+// ══════════════════════════════════════════════════════════════════
+var DR_MAAND = { jan:1, feb:2, mar:3, mrt:3, apr:4, may:5, mei:5, jun:6, jul:7, aug:8, sep:9, oct:10, okt:10, nov:11, dec:12 };
+async function drPdfRegels(buf){
+  await oplLaadPdfJs();
+  var pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise, regels = [];
+  for (var p = 1; p <= pdf.numPages; p++) {
+    var tc = await (await pdf.getPage(p)).getTextContent(), rijen = [];
+    tc.items.forEach(function(it){
+      if (!it.str || !it.str.trim()) return;
+      var y = it.transform[5], x = it.transform[4], r = rijen.find(function(q){ return Math.abs(q.y - y) < 3; });
+      if (!r) { r = { y: y, delen: [] }; rijen.push(r); } r.delen.push({ x: x, t: it.str });
+    });
+    rijen.sort(function(a, b){ return b.y - a.y; }).forEach(function(r){ regels.push(r.delen.sort(function(a, b){ return a.x - b.x; }).map(function(d){ return d.t; }).join(' ').replace(/\s+/g, ' ').trim()); });
+  }
+  return regels;
+}
+function drParse(regels, bestandsnaam){
+  var tekst = regels.join('\n'), vm = /Version:?\s*(\d+)/i.exec(tekst), dm = /Date:?\s*(\d{1,2})-(\d{1,2})-(\d{4})/i.exec(tekst);
+  var versie = vm ? vm[1] : '', versieDatum = dm ? dm[3] + '-' + dm[2].padStart(2, '0') + '-' + dm[1].padStart(2, '0') : '';
+  var jaar = dm ? +dm[3] : new Date().getFullYear(), vMaand = dm ? +dm[2] : 0, eersteGezien = false, basisJaar = null;
+  var schip = '', route = '', huidigeDatum = null, ev = [], laatsteEv = null;
+  regels.forEach(function(r){
+    var t = r.trim(); if (!t) return;
+    if (/^20\d{2}$/.test(t)) { jaar = +t; return; }
+    var s = /^Sailing schedule\s+(.+?)(?:\s*\/\s*vessel)?\s*$/i.exec(t); if (s) { schip = s[1].replace(/\/\s*$/, '').trim(); huidigeDatum = null; if (basisJaar) jaar = basisJaar; return; } // elk schip begint weer in het beginjaar
+    var ro = /^(?:Route\s+)?(Rotterdam.*?-\s*\w+)\s*$/i.exec(t); if (ro && !/sailing/i.test(t)) { route = ro[1]; return; }
+    if (/continuation as per schedule/i.test(t)) { if (laatsteEv) laatsteEv.daarna = 'normaal'; return; }
+    var d = /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun|Maa|Din|Woe|Don|Vri|Zat|Zon)[a-z]*\s+(\d{1,2})-([A-Za-z]{3})[a-z]*\.?\s*(.*)$/i.exec(t), rest = t;
+    if (d) {
+      var mnd = DR_MAAND[d[3].toLowerCase()]; if (!mnd) return;
+      if (!eersteGezien) { eersteGezien = true; if (vMaand && mnd < vMaand - 6) jaar++; basisJaar = jaar; }
+      huidigeDatum = jaar + '-' + String(mnd).padStart(2, '0') + '-' + String(+d[2]).padStart(2, '0'); rest = d[4];
+    }
+    if (!huidigeDatum || !schip) return;
+    var e = /^(Arr|Dep|Aank|Vertr)[a-z]*\.?\s+([A-Za-z ]+?)\s+(\d{1,2}[:.]\d{2})\s*(.*)$/i.exec(rest); if (!e) return;
+    laatsteEv = { datum: huidigeDatum, schip: schip, soort: /^(arr|aank)/i.test(e[1]) ? 'aankomst' : 'vertrek', haven: e[2].trim(), tijd: e[3].replace('.', ':').padStart(5, '0'), extra: e[4].trim() };
+    ev.push(laatsteEv);
+  });
+  var titel = String(bestandsnaam || 'Dienstregeling').replace(/\.pdf$/i, '').replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return { versie: versie, versieDatum: versieDatum, titel: titel, events: ev };
+}
+function drMeldingen(p){
+  var en = (sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM', perDag = {};
+  p.events.forEach(function(e){ (perDag[e.datum] = perDag[e.datum] || []).push(e); });
+  var nl = function(e){
+    var x = (e.extra || ''), extra = '';
+    if (/lay-?over/i.test(x)) extra = en ? ', then lay-over' : ', daarna lay-over (ligt stil)';
+    var to = /^to\s+(\w+)/i.exec(x); if (to) extra += en ? ' (to ' + to[1] + ')' : ' (naar ' + to[1] + ')';
+    if (e.daarna === 'normaal') extra += en ? ', then normal schedule' : ', daarna weer normaal schema';
+    return e.schip + ' ' + (en ? (e.soort === 'aankomst' ? 'arr.' : 'dep.') : e.soort) + ' ' + e.haven + ' ' + e.tijd + extra;
+  };
+  var kop = (en ? 'Sailing schedule' : 'Dienstregeling') + (p.versie ? ' v' + p.versie : '') + (p.versieDatum ? ' (' + p.versieDatum.split('-').reverse().join('-') + ')' : '') + ': ';
+  return Object.keys(perDag).sort().map(function(d){
+    var lijst = perDag[d].sort(function(a, b){ return a.tijd.localeCompare(b.tijd); });
+    return { datum: d, tekst: kop + lijst.map(nl).join(' \u00B7 ') };
+  });
+}
+window.drInlezen = function(){
+  var inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.pdf,application/pdf';
+  inp.onchange = function(){
+    var f = inp.files && inp.files[0]; if (!f) return;
+    var rd = new FileReader();
+    rd.onload = async function(ev){
+      try {
+        var p = drParse(await drPdfRegels(ev.target.result), f.name);
+        if (!p.events.length) { alert('In deze PDF zijn geen afvaarten gevonden. Is het een "Sailing schedule" zoals gebruikelijk?'); return; }
+        drVoorbeeld(p, drMeldingen(p));
+      } catch(e) { alert('Inlezen van de dienstregeling mislukt: ' + (e.message || e)); }
+    };
+    rd.readAsArrayBuffer(f);
+  };
+  inp.click();
+};
+function drVoorbeeld(p, lijst){
+  var oud = document.getElementById('dr-voorbeeld'); if (oud) oud.remove();
+  var bronId = 'dr:' + p.titel.toLowerCase().replace(/\bv(ersion)?\s*\d+\b/g, '').replace(/[^a-z0-9]+/g, '-');
+  var van = lijst[0].datum, tot = lijst[lijst.length - 1].datum;
+  var bestaand = dmGet().meldingen.filter(function(m){ return m.bron && (m.bron.id === bronId || (m.datum >= van && m.datum <= tot)); });
+  var o = document.createElement('div'); o.id = 'dr-voorbeeld';
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(0,20,40,.45);z-index:100006;display:flex;align-items:center;justify-content:center;padding:16px;';
+  o.innerHTML = '<div style="background:#fff;border-radius:10px;padding:18px;width:820px;max-width:100%;max-height:86vh;display:flex;flex-direction:column;">' +
+    '<div style="display:flex;align-items:center;margin-bottom:6px;"><b style="flex:1;color:#003366;font-size:15px;">&#x1F6F3;&#xFE0F; ' + dmEsc(p.titel) + (p.versie ? ' &middot; versie ' + dmEsc(p.versie) : '') + (p.versieDatum ? ' (' + dmNL(p.versieDatum) + ')' : '') + '</b><button type="button" onclick="document.getElementById(\'dr-voorbeeld\').remove()" style="border:none;background:none;font-size:18px;cursor:pointer;">&#x2715;</button></div>' +
+    '<div style="font-size:12.5px;color:#5a6b80;margin-bottom:8px;">' + lijst.length + ' dagmeldingen (' + dmNL(van) + ' t/m ' + dmNL(tot) + ')' + (bestaand.length ? ' &middot; <b style="color:#b9770e;">vervangt ' + bestaand.length + ' melding(en) van een eerdere versie</b>' : '') + '. Controleer en klik op <b>Verwerken</b>.</div>' +
+    '<div style="overflow:auto;border:1px solid #eef1f5;border-radius:6px;">' + lijst.map(function(m){ return '<div style="padding:6px 10px;border-top:1px solid #f3e3c8;font-size:12.5px;"><b>' + dmNL(m.datum) + '</b> &mdash; ' + dmEsc(m.tekst) + '</div>'; }).join('') + '</div>' +
+    '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;"><button type="button" onclick="document.getElementById(\'dr-voorbeeld\').remove()" style="padding:7px 14px;border:1px solid #c8d7e8;background:#fff;border-radius:6px;cursor:pointer;">Annuleren</button>' +
+    '<button type="button" id="dr-verwerk" style="padding:7px 16px;border:none;background:#e67e22;color:#fff;border-radius:6px;font-weight:800;cursor:pointer;">Verwerken</button></div></div>';
+  document.body.appendChild(o);
+  document.getElementById('dr-verwerk').onclick = function(){
+    var x = dmGet(), nu = Date.now(), ik = localStorage.getItem('dj_sp_account_username') || '';
+    x.weg = x.weg || [];
+    var weg = x.meldingen.filter(function(m){ return m.bron && (m.bron.id === bronId || (m.datum >= van && m.datum <= tot)); });
+    weg.forEach(function(m){ x.weg.push({ id: m.id, gw: nu }); });
+    x.meldingen = x.meldingen.filter(function(m){ return weg.indexOf(m) < 0; });
+    lijst.forEach(function(m, i){ x.meldingen.push({ id: 'dr' + nu.toString(36) + i, datum: m.datum, datumTot: m.datum, tekst: m.tekst, door: ik, gw: nu + 1, bron: { id: bronId, titel: p.titel, versie: p.versie, versieDatum: p.versieDatum } }); });
+    // de tijden waarop de oude versie verwijderd is, mogen de nieuwe niet raken
+    x.weg = x.weg.filter(function(w){ return !x.meldingen.some(function(m){ return m.id === w.id; }); });
+    dmSet(x); o.remove();
+    try { dmRender(); } catch(e) {} try { if (typeof dpCursusBalk === 'function') dpCursusBalk(); } catch(e) {}
+    try { localStorage.setItem(tk('dienstregeling_laatst_v1'), JSON.stringify({ titel: p.titel, versie: p.versie, versieDatum: p.versieDatum, van: van, tot: tot, door: ik, op: nu })); } catch(e) {}
+  };
+}
+// Knop + regel "laatst ingelezen" onder de dagmeldingen
+(function(){
+  if (typeof dmRender !== 'function') return;
+  var _r = dmRender;
+  dmRender = function(){
+    var r = _r.apply(this, arguments);
+    try {
+      var knopRij = Array.prototype.find.call(document.querySelectorAll('button'), function(b){ return /dmToevoegen\(\)/.test(b.getAttribute('onclick') || ''); });
+      if (knopRij && !document.getElementById('dr-knop')) {
+        var l = null; try { l = JSON.parse(localStorage.getItem(tk('dienstregeling_laatst_v1')) || 'null'); } catch(e) {}
+        var en = (sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM';
+        var d = document.createElement('div'); d.id = 'dr-knop'; d.style.cssText = 'margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px;color:#5a6b80;';
+        d.innerHTML = '<button type="button" onclick="drInlezen()" style="padding:6px 12px;border:1px dashed #e67e22;background:#fff7ee;color:#a04000;border-radius:6px;font-weight:800;cursor:pointer;">&#x1F6F3;&#xFE0F; ' + (en ? 'Read in new sailing schedule (PDF)' : 'Nieuwe dienstregeling (PDF) inlezen') + '</button>' +
+          (l ? '<span>' + (en ? 'Last: ' : 'Laatst ingelezen: ') + '<b>' + dmEsc(l.titel) + (l.versie ? ' v' + dmEsc(l.versie) : '') + '</b> (' + dmNL(l.van) + ' t/m ' + dmNL(l.tot) + ')</span>' : '');
+        var ouder = knopRij.closest('div'); (ouder && ouder.parentNode ? ouder.parentNode : knopRij.parentNode).insertBefore(d, (ouder && ouder.nextSibling) || null);
+      }
+    } catch(e) {}
+    return r;
+  };
+  window.dmRender = dmRender;
+})();
+</script>
+
 </body>
 </html>
