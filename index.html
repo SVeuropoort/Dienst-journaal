@@ -7732,6 +7732,7 @@ window.addEventListener('resize', () => {
     });
     uit.xr = Object.keys(weg);
     var cg = {}; (C.certGen || []).concat(L.certGen || []).forEach(function(x){ cg[x] = 1; }); uit.certGen = Object.keys(cg);
+    var rg = {}; (C.rechtenGen || []).concat(L.rechtenGen || []).forEach(function(x){ rg[x] = 1; }); if (Object.keys(rg).length) uit.rechtenGen = Object.keys(rg); // kwartaalcontrole: niet opnieuw aanmaken
     // Prullenbak niet eindeloos laten groeien: verwijder-markeringen ouder dan 60 dagen opruimen
     var grens = Date.now() - 60 * 864e5; uit.x = uit.x.filter(function(t){ return (+t.gw || 0) > grens; });
     return uit;
@@ -24401,7 +24402,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.139';
+var DJ_BUILD = '2026-10-07.140';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -36256,7 +36257,19 @@ function djRechtenTaakGenereren(){
   if (!sessionStorage.getItem('_cloudGeladen')) return;
   var k = tk('plan_sv_v1'), sv; try { sv = JSON.parse(localStorage.getItem(k) || 'null') || { a: [], d: [], r: [] }; } catch(e) { return; }
   sv.a = sv.a || []; sv.d = sv.d || []; sv.rechtenGen = sv.rechtenGen || [];
-  var q = djKwartaal(); if (sv.rechtenGen.indexOf(q.sleutel) >= 0) return; // dit kwartaal al aangemaakt (ook als hij al klaar is)
+  var q = djKwartaal();
+  // Opruimen: is de taak van dit kwartaal al klaar, of staat hij er dubbel, haal de overbodige open taken weg
+  var klaar = sv.d.some(function(t){ return t.rechtenKey === q.sleutel; }), open = sv.a.filter(function(t){ return t.rechtenKey === q.sleutel; });
+  var teVeel = klaar ? open : open.slice(1);
+  if (teVeel.length) {
+    sv.x = sv.x || []; sv.a = sv.a.filter(function(t){ return teVeel.indexOf(t) < 0; });
+    teVeel.forEach(function(t){ sv.x.push({ id: t.id, gw: Date.now() }); });
+    if (sv.rechtenGen.indexOf(q.sleutel) < 0) sv.rechtenGen.push(q.sleutel);
+    localStorage.setItem(k, JSON.stringify(sv)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+    try { if (typeof pRender === 'function') pRender(); if (typeof djTodoMeldingBijwerken === 'function') djTodoMeldingBijwerken(); } catch(e) {}
+    return;
+  }
+  if (klaar || open.length || sv.rechtenGen.indexOf(q.sleutel) >= 0) { if (sv.rechtenGen.indexOf(q.sleutel) < 0) { sv.rechtenGen.push(q.sleutel); localStorage.setItem(k, JSON.stringify(sv)); } return; } // dit kwartaal al aangemaakt
   var nu = new Date(), dl = new Date(nu.getTime() + 14 * 864e5), f = function(x){ return String(x.getDate()).padStart(2, '0') + '/' + String(x.getMonth() + 1).padStart(2, '0') + '/' + x.getFullYear(); };
   sv.a.push({ id: Date.now() + Math.random(), gw: Date.now(), datum: f(nu), deadline: f(dl), wie: '', toegewezen: ik, toegewezenDoor: ik, rechtenKey: q.sleutel,
     taak: '\uD83D\uDD10 Rechtencontrole Dienst Journaal \u2013 ' + q.label,
