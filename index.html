@@ -7391,6 +7391,7 @@ window.addEventListener('resize', () => {
     'cal_nummers_v1',
     'cin_formulier_v1',
     'cin_meldingen_v1',
+    'lees_ploegleiders_v1',
     'dj_verjaardagen_v1',
     'dagpl_cert_v1',
     'dagpl_cert_v2',
@@ -7779,7 +7780,7 @@ window.addEventListener('resize', () => {
   }
   function djIsPlanningSleutel(k){ return /dagplan_|dagPlanning_v2_state|^ls_/.test(k); }
   // Sleutels die per regel (persoon / registratie / ploeg) worden samengevoegd i.p.v. "wie het laatst opslaat wint"
-  function djIsRegelSleutel(k){ return /(^|_)(personeelsdossier_v1|opleiding_overzicht_v1|organogram_v1|pd_verlof_v1|pd_functies_v1|dj_verjaardagen_v1|kledingpunten_v1|vakantierooster_v1|tugmasters_v1|pd_koppeling_v1|pd_team_v1|pd_quinyx_extra_v1|ma_medewerkers_v1|ma_hvh_v1|ma_apart_v1|ma_mentor_v1|ma_quinyx_namen_v1|ontwikkelgesprek[a-z_]*_v1|bezetting_deeltijd_v1|bezetting_instellingen_v1|dj_toegang_v1|dj_prullenbak_v1|dj_prullenbak_vertr_v1|dj_uitdienst_gepland_v1|dj_rechtencontrole_v1|dm_gelezen_v1|wo_lees_v1|lees_uitgesloten_v1|cal_nummers_v1|cin_formulier_v1|cin_meldingen_v1)$/.test(k); }
+  function djIsRegelSleutel(k){ return /(^|_)(personeelsdossier_v1|opleiding_overzicht_v1|organogram_v1|pd_verlof_v1|pd_functies_v1|dj_verjaardagen_v1|kledingpunten_v1|vakantierooster_v1|tugmasters_v1|pd_koppeling_v1|pd_team_v1|pd_quinyx_extra_v1|ma_medewerkers_v1|ma_hvh_v1|ma_apart_v1|ma_mentor_v1|ma_quinyx_namen_v1|ontwikkelgesprek[a-z_]*_v1|bezetting_deeltijd_v1|bezetting_instellingen_v1|dj_toegang_v1|dj_prullenbak_v1|dj_prullenbak_vertr_v1|dj_uitdienst_gepland_v1|dj_rechtencontrole_v1|dm_gelezen_v1|wo_lees_v1|lees_uitgesloten_v1|cal_nummers_v1|cin_formulier_v1|cin_meldingen_v1|lees_ploegleiders_v1)$/.test(k); }
   // Diepe 3-weg-samenvoeging. Lijsten met herkenbare regels (id / naam / mannr) worden per regel samengevoegd:
   // wat ik toevoeg, wijzig of verwijder telt; wat een collega intussen toevoegde/wijzigde blijft staan.
   function djRegelId(x){ if (!x || typeof x !== 'object' || Array.isArray(x)) return null; var v = x.id != null ? 'id:' + x.id : x.mannr != null ? 'nr:' + x.mannr : x.naam != null ? 'n:' + x.naam : x.persoon != null ? 'p:' + x.persoon : null; return v; }
@@ -24408,7 +24409,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.153';
+var DJ_BUILD = '2026-10-07.155';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -36745,7 +36746,8 @@ document.addEventListener('DOMContentLoaded', function(){ setTimeout(dmLeesContr
       if (knop && !document.getElementById('dm-lees')) {
         var grid = knop.parentNode, l = document.createElement('label');
         l.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12.5px;color:#1f4e79;font-weight:700;cursor:pointer;';
-        l.innerHTML = '<input type="checkbox" id="dm-lees" style="width:auto;margin:0;"> &#x1F4D6; Leesbevestiging: iedere supervisor moet deze melding lezen';
+        l.innerHTML = '<input type="checkbox" id="dm-lees" style="width:auto;margin:0;"> &#x1F4D6; Leesbevestiging: ploegleiders en supervisors moeten deze melding lezen <span id="dm-pl-gear" title="Welke ploegleiders?" style="cursor:pointer;font-size:14px;margin-left:6px;">&#x2699;&#xFE0F;</span>';
+        setTimeout(function(){ var gg = document.getElementById('dm-pl-gear'); if (gg) gg.onclick = function(ev){ ev.stopPropagation(); ev.preventDefault(); setTimeout(leesPlInstellingen, 0); }; }, 0);
         grid.parentNode.insertBefore(l, grid.nextSibling);
       }
       // status per leesmelding
@@ -36758,7 +36760,7 @@ document.addEventListener('DOMContentLoaded', function(){ setTimeout(dmLeesContr
         var lijst = sup.filter(function(a){ return String(a.email).toLowerCase() !== door; }).map(function(a){ var t = gel[String(a.email).toLowerCase()];
           return t ? '<span style="color:#1a7a40;">&#x2714; ' + dmEsc((a.naam || a.email).split(' ').slice(-1)[0]) + ' <span style="color:#8795a8;">' + new Date(t).toLocaleString('nl-NL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + '</span></span>'
                    : '<span style="color:#c0392b;">&#x2717; ' + dmEsc((a.naam || a.email).split(' ').slice(-1)[0]) + '</span>'; });
-        st.style.cssText = 'flex-basis:100%;margin:4px 0 0 130px;font-size:11.5px;';
+        st.className = 'dm-lees-status'; st.style.cssText = 'flex-basis:100%;margin:4px 0 0 130px;font-size:11.5px;';
         st.innerHTML = '&#x1F4D6; <b>' + (m.gesloten ? 'Leesbevestiging afgesloten' : 'Leesbevestiging') + ':</b> ' + lijst.join(' &middot; ') +
           (!m.gesloten && !(gel[ik]) && door !== ik ? ' <button type="button" onclick="dmGelezen(\'' + m.id + '\')" style="margin-left:6px;padding:1px 8px;border:none;background:#1a7a40;color:#fff;border-radius:4px;font-weight:700;cursor:pointer;">&#x2714; Gelezen</button>' : '') +
           (!m.gesloten && (door === ik || beheer) ? ' <button type="button" onclick="dmLeesAfsluiten(\'' + m.id + '\')" title="Niemand hoeft hem nog te lezen" style="margin-left:6px;padding:1px 8px;border:1px solid #c8d7e8;background:#fff;color:#5a6b80;border-radius:4px;cursor:pointer;">Afsluiten</button>' : '');
@@ -36842,7 +36844,7 @@ window.woLeesZet = function(aan){
   if (typeof laadDagData === 'function') { var _l = laadDagData; laadDagData = function(){ var r = _l.apply(this, arguments); try { woLeesRender(); } catch(e) {} return r; }; window.laadDagData = laadDagData; }
   document.addEventListener('DOMContentLoaded', function(){ setTimeout(woLeesRender, 1500); });
   // het vinkje bij de Dagmeldingen is niet meer nodig (het hoort bij Bijzonderheden / incidenten)
-  if (typeof dmRender === 'function') { var _r = dmRender; dmRender = function(){ var r = _r.apply(this, arguments); try { var v = document.getElementById('dm-lees'); if (v && v.parentNode) v.parentNode.remove(); } catch(e) {} return r; }; window.dmRender = dmRender; }
+  // (vinkje bij Dagmeldingen is terug, nu voor ploegleiders — zie "LEESBEVESTIGING VOOR PLOEGLEIDERS")
 })();
 </script>
 
@@ -37130,6 +37132,167 @@ window.cinStandaardTerug = function(){ var a = cinCfgAlle(); delete a[sessionSto
       }
     } catch(e) {}
     return p;
+  };
+})();
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// LEESBEVESTIGING VOOR PLOEGLEIDERS via de Dagmeldingen (zonder toegang tot de Werkoverdracht).
+// Lezers van een dagmelding met leesbevestiging = supervisors (min uitgezonderden) + de gekozen ploegleiders.
+// Keuze ploegleiders: ⚙️ naast het vinkje bij de Dagmeldingen → lees_ploegleiders_v1 = [e-mail]
+// ══════════════════════════════════════════════════════════════════
+function leesPlGet(){ try { var l = JSON.parse(localStorage.getItem('lees_ploegleiders_v1') || '[]'); return Array.isArray(l) ? l.map(function(x){ return String(x).toLowerCase(); }) : []; } catch(e) { return []; } }
+function dmLezersDm(){
+  var T = sessionStorage.getItem('dj_terminal') || 'EP', pl = leesPlGet(), sup = dmSupervisors(), gezien = {};
+  sup.forEach(function(a){ gezien[String(a.email).toLowerCase()] = 1; });
+  var extra = (typeof djToegangGet === 'function' ? djToegangGet() : []).filter(function(a){ var e = String(a.email).toLowerCase(); return pl.indexOf(e) >= 0 && !gezien[e] && a.permissies && a.permissies[T] && !a.uitDienst; });
+  return sup.concat(extra);
+}
+window.dmLezersDm = dmLezersDm;
+(function(){
+  // Wie krijgt wat: Bijzonderheden (wo) alleen supervisors; dagmeldingen ook de gekozen ploegleiders
+  var _basis = window.dmTeLezen;
+  window.dmTeLezen = dmTeLezen = function(){
+    var ik = String(localStorage.getItem('dj_sp_account_username') || '').toLowerCase();
+    var isSup = typeof dmIkSupervisor === 'function' && dmIkSupervisor() && leesUitgeslotenGet().indexOf(ik) < 0;
+    var isPl = leesPlGet().indexOf(ik) >= 0;
+    if (!isSup && !isPl) return [];
+    var lijst = [];
+    // de supervisor-versie laat uitgesloten mensen leeg; voor ploegleiders lezen we de dagmeldingen zelf
+    if (isSup) lijst = _basis();
+    else {
+      var g = dmLeesGet(), grens = Date.now() - 30 * 864e5;
+      lijst = dmGet().meldingen.filter(function(m){ return m.lees && !m.gesloten && (m.leesSinds || m.gw || 0) >= grens && String(m.door || '').toLowerCase() !== ik && !(g[m.id] && g[m.id][ik]); });
+    }
+    return lijst.filter(function(m){ return m.wo ? isSup : true; });
+  };
+  // Oproep linksonder: voor iedereen die iets moet lezen (niet alleen supervisors)
+  window.dmLeesControle = dmLeesControle = function(){
+    var el = document.getElementById('dm-lees-balk'), n = dmTeLezen().length, en = (sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM';
+    if (!n) { if (el) el.remove(); return; }
+    if (!el) { el = document.createElement('div'); el.id = 'dm-lees-balk'; el.onclick = function(){ dmLeesVenster(); };
+      el.style.cssText = 'position:fixed;left:18px;bottom:18px;z-index:100004;background:#1f4e79;color:#fff;padding:10px 16px;border-radius:10px;box-shadow:0 8px 24px rgba(0,30,60,.35);font-weight:800;font-size:14px;cursor:pointer;';
+      document.body.appendChild(el); }
+    el.innerHTML = en ? '&#x1F4D6; ' + n + (n === 1 ? ' message' : ' messages') + ' you still need to read <span style="font-weight:600;opacity:.85;">&rsaquo; open</span>' : '&#x1F4D6; ' + n + (n === 1 ? ' melding' : ' meldingen') + ' die je nog moet lezen <span style="font-weight:600;opacity:.85;">&rsaquo; openen</span>';
+  };
+  // In het leesvenster: niet-supervisors krijgen "Openen in de Dagplanning" i.p.v. de Werkoverdracht
+  var _v = window.dmLeesVenster;
+  window.dmLeesVenster = dmLeesVenster = function(){
+    var r = _v.apply(this, arguments);
+    try {
+      if (!(typeof dmIkSupervisor === 'function' && dmIkSupervisor())) {
+        var en = (sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM';
+        document.querySelectorAll('#dm-lees-venster button').forEach(function(b){ var oc = b.getAttribute('onclick') || ''; var m = /dmLeesGaNaar\('([^']+)'\)/.exec(oc);
+          if (m) { b.setAttribute('onclick', 'dmLeesNaarDagplanning(\'' + m[1] + '\')'); b.innerHTML = '&#x2197; ' + (en ? 'Open in the day planning' : 'Openen in de Dagplanning'); } });
+      }
+    } catch(e) {}
+    return r;
+  };
+  window.dmLeesNaarDagplanning = function(id){
+    var m = dmGet().meldingen.find(function(x){ return x.id === id; }); if (!m) return;
+    var o = document.getElementById('dm-lees-venster'); if (o) o.remove();
+    try { planDate = m.datum; navTo('dagplanning', 'DAGPLANNING', null); if (typeof buildPanels === 'function') buildPanels(); } catch(e) {}
+    setTimeout(function(){ var b = document.getElementById('dp-cursus-balk'); if (b) { b.scrollIntoView({ behavior: 'smooth', block: 'center' }); b.style.boxShadow = '0 0 0 4px #5dade2'; setTimeout(function(){ b.style.boxShadow = ''; }, 3000); } }, 500);
+  };
+  // Dagmeldingen-formulier: vinkje weer tonen (nu bedoeld voor ploegleiders) + ⚙️ om ploegleiders te kiezen
+  var _r = window.dmRender;
+  window.dmRender = dmRender = function(){
+    var r = _r.apply(this, arguments);
+    try {
+      var knop = Array.prototype.find.call(document.querySelectorAll('#wo-dagmeldingen button'), function(b){ return /dmToevoegen\(\)/.test(b.getAttribute('onclick') || ''); });
+      if (knop && !document.getElementById('dm-lees')) {
+        var grid = knop.parentNode, l = document.createElement('div');
+        l.style.cssText = 'display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12.5px;color:#1f4e79;font-weight:700;';
+        l.innerHTML = '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="dm-lees" style="width:auto;margin:0;"> &#x1F4D6; Leesbevestiging: ploegleiders en supervisors moeten deze melding lezen</label>' +
+          '<span id="dm-pl-gear" title="Welke ploegleiders?" style="cursor:pointer;font-size:14px;">&#x2699;&#xFE0F;</span><span style="font-weight:400;color:#8795a8;">(' + leesPlGet().length + ' ploegleiders)</span>';
+        l.querySelector('#dm-pl-gear').onclick = function(ev){ ev.stopPropagation(); ev.preventDefault(); setTimeout(leesPlInstellingen, 0); };
+        grid.parentNode.insertBefore(l, grid.nextSibling);
+      }
+      // status per dagmelding: supervisors + ploegleiders
+      document.querySelectorAll('#wo-dagmeldingen [onclick^="dmBewerk("]').forEach(function(span){
+        var id = (/dmBewerk\('([^']+)'\)/.exec(span.getAttribute('onclick') || '') || [])[1], m = dmGet().meldingen.find(function(x){ return x.id === id; });
+        if (!m || !m.lees) return;
+        var st = span.parentNode.querySelector('.dm-lees-status'); if (!st) return;
+        var g = dmLeesGet()[m.id] || {}, door = String(m.door || '').toLowerCase();
+        var lijst = dmLezersDm().filter(function(a){ return String(a.email).toLowerCase() !== door; }).map(function(a){ var t = g[String(a.email).toLowerCase()], nm = dmEsc((a.naam || a.email).split(' ').slice(-1)[0]);
+          return t ? '<span style="color:#1a7a40;">&#x2714; ' + nm + '</span>' : '<span style="color:#c0392b;">&#x2717; ' + nm + '</span>'; });
+        var b = st.querySelector('b'); if (!b) return;
+        var rest = Array.prototype.slice.call(st.querySelectorAll('button')).map(function(x){ return x.outerHTML; }).join(' ');
+        st.innerHTML = '&#x1F4D6; ' + b.outerHTML + ' ' + lijst.join(' &middot; ') + ' ' + rest;
+      });
+    } catch(e) {}
+    return r;
+  };
+})();
+function leesPlInstellingen(){
+  var oud = document.getElementById('lees-pl'); if (oud) oud.remove();
+  var T = sessionStorage.getItem('dj_terminal') || 'EP', pl = leesPlGet();
+  var alle = (typeof djToegangGet === 'function' ? djToegangGet() : []).filter(function(a){ return a.permissies && a.permissies[T] && !a.permissies.supervisor && !a.uitDienst; })
+    .sort(function(a, b){ return String(a.naam || a.email).localeCompare(String(b.naam || b.email)); });
+  var o = document.createElement('div'); o.id = 'lees-pl';
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(0,20,40,.45);z-index:100006;display:flex;align-items:center;justify-content:center;padding:14px;';
+  o.innerHTML = '<div style="background:#fff;border-radius:10px;width:460px;max-width:100%;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;">' +
+    '<div style="background:#1f4e79;color:#fff;padding:12px 16px;display:flex;align-items:center;"><b style="flex:1;">&#x2699;&#xFE0F; Welke ploegleiders moeten lezen?</b><button type="button" onclick="document.getElementById(\'lees-pl\').remove()" style="border:none;background:none;color:#fff;font-size:18px;cursor:pointer;">&#x2715;</button></div>' +
+    '<div style="padding:10px 16px;font-size:12.5px;color:#5a6b80;">Vink de ploegleiders aan. Zij krijgen dagmeldingen met leesbevestiging als oproep, zonder toegang tot de Werkoverdracht.</div>' +
+    '<div style="overflow:auto;padding:0 16px 10px;">' + (alle.length ? alle.map(function(a){ var e = String(a.email).toLowerCase();
+      return '<label style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f1f1;cursor:pointer;"><input type="checkbox" data-email="' + dmEsc(e) + '" ' + (pl.indexOf(e) >= 0 ? 'checked' : '') + ' style="width:auto;margin:0;"><span style="flex:1;font-weight:700;">' + dmEsc(typeof dpLogNaam === 'function' ? dpLogNaam(a.email) : (a.naam || a.email)) + '</span></label>'; }).join('') : '<div style="color:#8795a8;">Geen accounts zonder supervisor-rechten gevonden.</div>') + '</div>' +
+    '<div style="padding:10px 16px;border-top:1px solid #eee;text-align:right;"><button type="button" onclick="leesPlOpslaan()" style="padding:6px 16px;border:none;background:#1f4e79;color:#fff;border-radius:6px;font-weight:800;cursor:pointer;">Opslaan</button></div></div>';
+  o.addEventListener('click', function(ev){ if (ev.target === o) o.remove(); });
+  document.body.appendChild(o);
+}
+window.leesPlInstellingen = leesPlInstellingen;
+window.leesPlOpslaan = function(){
+  var pl = leesPlGet();
+  document.querySelectorAll('#lees-pl input[data-email]').forEach(function(c){ var e = c.getAttribute('data-email'); pl = pl.filter(function(x){ return x !== e; }); if (c.checked) pl.push(e); });
+  localStorage.setItem('lees_ploegleiders_v1', JSON.stringify(pl)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+  var o = document.getElementById('lees-pl'); if (o) o.remove();
+  try { dmRender(); dmLeesControle(); } catch(e) {}
+};
+</script>
+
+<script>
+// Ploegleiders automatisch uit het Personeelsdossier (Functie → Ploegleider) — gekoppeld aan hun account op naam
+function leesPlUitDossier(){
+  var f = (typeof djFunctiesGet === 'function') ? djFunctiesGet() : {}, T = sessionStorage.getItem('dj_terminal') || 'EP';
+  var acc = (typeof djToegangGet === 'function' ? djToegangGet() : []).filter(function(a){ return a.permissies && a.permissies[T] && !a.uitDienst; });
+  var uit = [], nietGevonden = [];
+  Object.keys(f).forEach(function(naam){
+    if (!f[naam] || !f[naam].pl) return;
+    var reg = (typeof djRegVoorNaam === 'function') ? djRegVoorNaam(naam) : null, vol = (reg && reg.quinyxNaam) || naam;
+    var k = acc.filter(function(a){
+      var an = String(a.naam || ''), omgekeerd = an.split(' ').length > 1 ? an.split(' ').slice(1).join(' ') + ' ' + an.split(' ')[0] : an; // "Wiegmans Jeroen" → "Jeroen Wiegmans"
+      if (typeof vakZelfdePersoon === 'function') return vakZelfdePersoon(an, vol) || vakZelfdePersoon(omgekeerd, vol) || vakZelfdePersoon(an, naam) || vakZelfdePersoon(omgekeerd, naam);
+      return an === vol || omgekeerd === vol;
+    });
+    if (k.length === 1) uit.push(String(k[0].email).toLowerCase()); else nietGevonden.push(naam);
+  });
+  return { emails: uit, nietGevonden: nietGevonden };
+}
+(function(){
+  var _g = leesPlGet;
+  // lezers = handmatig gekozen + ploegleiders volgens het dossier
+  window.leesPlGet = leesPlGet = function(){ var h = _g(), d = leesPlUitDossier().emails; d.forEach(function(e){ if (h.indexOf(e) < 0) h.push(e); }); return h; };
+  window.leesPlHandmatig = _g;
+  var _i = leesPlInstellingen;
+  window.leesPlInstellingen = leesPlInstellingen = function(){
+    _i.apply(this, arguments);
+    try {
+      var d = leesPlUitDossier(), box = document.querySelector('#lees-pl > div > div:nth-child(2)');
+      document.querySelectorAll('#lees-pl input[data-email]').forEach(function(c){
+        if (d.emails.indexOf(c.getAttribute('data-email')) >= 0) { c.checked = true; c.disabled = true; c.parentNode.insertAdjacentHTML('beforeend', '<span style="font-size:11px;color:#1a7a40;">Ploegleider in dossier</span>'); }
+      });
+      if (box) box.innerHTML = 'Iedereen met <b>Functie: Ploegleider</b> in het Personeelsdossier staat hier automatisch aangevinkt. Vink daarnaast eventueel anderen aan die dagmeldingen met leesbevestiging moeten lezen.' +
+        (d.nietGevonden.length ? '<div style="color:#b9770e;margin-top:6px;">Ploegleider in het dossier, maar geen account gevonden: ' + d.nietGevonden.map(dmEsc).join(', ') + '.</div>' : '');
+    } catch(e) {}
+  };
+  // bij opslaan alleen de handmatige keuzes bewaren (dossier-ploegleiders komen er vanzelf bij)
+  window.leesPlOpslaan = function(){
+    var pl = _g(), d = leesPlUitDossier().emails;
+    document.querySelectorAll('#lees-pl input[data-email]').forEach(function(c){ var e = c.getAttribute('data-email'); if (d.indexOf(e) >= 0) return; pl = pl.filter(function(x){ return x !== e; }); if (c.checked) pl.push(e); });
+    localStorage.setItem('lees_ploegleiders_v1', JSON.stringify(pl)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+    var o = document.getElementById('lees-pl'); if (o) o.remove();
+    try { dmRender(); dmLeesControle(); } catch(e) {}
   };
 })();
 </script>
