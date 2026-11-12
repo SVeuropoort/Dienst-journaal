@@ -7388,6 +7388,7 @@ window.addEventListener('resize', () => {
     'dm_gelezen_v1',
     'wo_lees_v1',
     'lees_uitgesloten_v1',
+    'cal_nummers_v1',
     'dj_verjaardagen_v1',
     'dagpl_cert_v1',
     'dagpl_cert_v2',
@@ -7776,7 +7777,7 @@ window.addEventListener('resize', () => {
   }
   function djIsPlanningSleutel(k){ return /dagplan_|dagPlanning_v2_state|^ls_/.test(k); }
   // Sleutels die per regel (persoon / registratie / ploeg) worden samengevoegd i.p.v. "wie het laatst opslaat wint"
-  function djIsRegelSleutel(k){ return /(^|_)(personeelsdossier_v1|opleiding_overzicht_v1|organogram_v1|pd_verlof_v1|pd_functies_v1|dj_verjaardagen_v1|kledingpunten_v1|vakantierooster_v1|tugmasters_v1|pd_koppeling_v1|pd_team_v1|pd_quinyx_extra_v1|ma_medewerkers_v1|ma_hvh_v1|ma_apart_v1|ma_mentor_v1|ma_quinyx_namen_v1|ontwikkelgesprek[a-z_]*_v1|bezetting_deeltijd_v1|bezetting_instellingen_v1|dj_toegang_v1|dj_prullenbak_v1|dj_prullenbak_vertr_v1|dj_uitdienst_gepland_v1|dj_rechtencontrole_v1|dm_gelezen_v1|wo_lees_v1|lees_uitgesloten_v1)$/.test(k); }
+  function djIsRegelSleutel(k){ return /(^|_)(personeelsdossier_v1|opleiding_overzicht_v1|organogram_v1|pd_verlof_v1|pd_functies_v1|dj_verjaardagen_v1|kledingpunten_v1|vakantierooster_v1|tugmasters_v1|pd_koppeling_v1|pd_team_v1|pd_quinyx_extra_v1|ma_medewerkers_v1|ma_hvh_v1|ma_apart_v1|ma_mentor_v1|ma_quinyx_namen_v1|ontwikkelgesprek[a-z_]*_v1|bezetting_deeltijd_v1|bezetting_instellingen_v1|dj_toegang_v1|dj_prullenbak_v1|dj_prullenbak_vertr_v1|dj_uitdienst_gepland_v1|dj_rechtencontrole_v1|dm_gelezen_v1|wo_lees_v1|lees_uitgesloten_v1|cal_nummers_v1)$/.test(k); }
   // Diepe 3-weg-samenvoeging. Lijsten met herkenbare regels (id / naam / mannr) worden per regel samengevoegd:
   // wat ik toevoeg, wijzig of verwijder telt; wat een collega intussen toevoegde/wijzigde blijft staan.
   function djRegelId(x){ if (!x || typeof x !== 'object' || Array.isArray(x)) return null; var v = x.id != null ? 'id:' + x.id : x.mannr != null ? 'nr:' + x.mannr : x.naam != null ? 'n:' + x.naam : x.persoon != null ? 'p:' + x.persoon : null; return v; }
@@ -24405,7 +24406,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.148';
+var DJ_BUILD = '2026-10-07.150';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -27531,7 +27532,7 @@ var DJ_ZOEK_INDEX = [
   { label: 'Schade formulier', keywords: 'schade formulier incident melding pdf', actie: function(){ navTo('schade', 'SCHADE FORMULIER', null); } },
   { label: 'Maandafsluiting', keywords: 'maandafsluiting payroll salaris quinyx mutaties', actie: function(){ navTo('maandafsluiting', 'MAANDAFSLUITING', null); } },
   { label: 'ORT / Basisrooster', keywords: 'ort basisrooster onregelmatigheidstoeslag cao artikel b8', actie: function(){ navTo('ort', 'ORT / BASISROOSTER', null); } },
-  { label: '🚨 Calamiteitenplan (map)', keywords: 'calamiteit calamiteitenplan noodplan nood ontruiming ontruimingsplan brand bhv ehbo alarm alarmering plattegrond plattegronden vluchtweg vluchtwegen evacuatie incident ongeval lekkage hulpverleners emergency plan evacuation fire', actie: function(){ if (typeof djCalamiteitenplan === 'function') djCalamiteitenplan(); } },
+  { label: '🚨 Calamiteitenplan (map)', keywords: 'calamiteit calamiteitenplan telefoonnummers nummers telefoon bellen noodnummer cin melding dcmr rws adres havennummer beveiliging noodplan nood ontruiming ontruimingsplan brand bhv ehbo alarm alarmering plattegrond plattegronden vluchtweg vluchtwegen evacuatie incident ongeval lekkage hulpverleners emergency plan evacuation fire', actie: function(){ if (typeof djCalamiteitenplan === 'function') djCalamiteitenplan(); } },
   { label: 'Handleiding / User guide', keywords: 'handleiding gebruikershandleiding help hulp uitleg hoe werkt guide user manual instructions', actie: function(){ if (typeof djGebruikershandleiding === 'function') djGebruikershandleiding(); } },
   { label: 'Beheerdershandleiding (PDF)', keywords: 'handleiding beheerdershandleiding beheer uitleg pdf instructie hoe werkt', actie: function(){ if (typeof djHandleidingOpenen === 'function') djHandleidingOpenen(); } },
   { label: 'Rechtenoverzicht (wie heeft welke rechten)', keywords: 'rechten rechtenoverzicht toegang autorisatie accounts laatst gezien audit kwartaal controle', actie: function(){ if (typeof djRechtenOverzicht === 'function') djRechtenOverzicht(); } },
@@ -27598,10 +27599,12 @@ function djZoekFilter(query){
     return;
   }
   var onderdelen = DJ_ZOEK_INDEX.filter(function(item){
-    if (!djZoekMagOnderdeel(item)) return false; // geen toegang = niet in de zoekresultaten
-    return item.label.toLowerCase().indexOf(q) !== -1 || item.keywords.toLowerCase().indexOf(q) !== -1;
+    try {
+      if (!item || !djZoekMagOnderdeel(item)) return false; // geen toegang = niet in de zoekresultaten
+      return String(item.label || '').toLowerCase().indexOf(q) !== -1 || String(item.keywords || '').toLowerCase().indexOf(q) !== -1;
+    } catch(e) { if (typeof djFoutVastleggen === 'function') djFoutVastleggen('Zoekbalk: ' + (e.message || e), 'zoeken', e.stack, 'fout'); return false; }
   });
-  var dataMatches = djZoekDataMatches(q);
+  var dataMatches = []; try { dataMatches = djZoekDataMatches(q); } catch(e) {}
   window._djZoekHuidigeMatches = onderdelen.concat(dataMatches);
   _djZoekActieveIndex = window._djZoekHuidigeMatches.length ? 0 : -1;
   djZoekRenderResultaten();
@@ -36903,5 +36906,86 @@ window.dmLeesGaNaar = function(id){
   }, 300);
 };
 </script>
+<script>
+// ══════════════════════════════════════════════════════════════════
+// CALAMITEITENPLAN: belangrijke nummers + adres/havennummer bovenaan, per terminal, aan te passen met ⚙️.
+// Opslag: cal_nummers_v1 = { EP: { nummers:[{label,nummer,uitleg}], gegevens:[{label,waarde}], bijgewerkt, door } }
+// Staat ook in de browser → werkt zonder internet.
+// ══════════════════════════════════════════════════════════════════
+var CAL_NR_STANDAARD = {
+  EP: {
+    nummers: [
+      { label: 'Noodnummer (ambulance, brandweer, politie)', nummer: '112', uitleg: 'Bij direct gevaar of zwaar letsel' },
+      { label: 'Beveiliging Stena Line Europoort (24/7)', nummer: '0181-242190', uitleg: 'Eerste melding van ieder incident, ongeval of lekkage' },
+      { label: 'CIN-melding (Centraal Informatiepunt Noodsituaties)', nummer: '010-411 88 88', uitleg: 'Zo snel mogelijk, bij voorkeur binnen 15 minuten' },
+      { label: 'DCMR bedrijfsmeldingen (milieu)', nummer: '010-246 86 86', uitleg: 'Ongewone voorvallen die niet via het CIN zijn gemeld' },
+      { label: 'RWS overdag', nummer: '06-51 38 63 42', uitleg: 'Kleinere milieugevolgen water' },
+      { label: 'RWS buiten kantooruren (Verkeerscentrale Dordrecht)', nummer: '0800-023 62 00', uitleg: '' },
+      { label: 'Havenbedrijf EHBO-wagen (letsel, niet acuut)', nummer: '010-438 44 48', uitleg: '' }
+    ],
+    gegevens: [
+      { label: 'Adres', waarde: 'Stena Line BV, Elbeweg 91, 3198 LC Europoort-Rotterdam' },
+      { label: 'Havennummer', waarde: '5812' },
+      { label: 'CIN-nummer', waarde: '0214' },
+      { label: 'E-mail beveiliging', waarde: 'security.europoort@stenaline.com' }
+    ],
+    bron: 'Calamiteitenplan Europoort, 11e editie augustus 2023 \u2014 controleer of de nummers nog kloppen'
+  }
+};
+function calNrAlle(){ try { return JSON.parse(localStorage.getItem('cal_nummers_v1') || '{}') || {}; } catch(e) { return {}; } }
+function calNrGet(){ var T = sessionStorage.getItem('dj_terminal') || 'EP', a = calNrAlle(); return a[T] || CAL_NR_STANDAARD[T] || { nummers: [{ label: 'Noodnummer', nummer: '112', uitleg: '' }], gegevens: [] }; }
+function calNrHtml(){
+  var d = calNrGet(), en = (sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM';
+  var tel = function(n){ return '<a href="tel:' + String(n).replace(/[^\d+]/g, '') + '" style="color:#7b241c;font-weight:800;font-size:15px;text-decoration:none;white-space:nowrap;">&#x1F4DE; ' + calEsc(n) + '</a>'; };
+  return '<div id="cal-nummers" style="padding:10px 16px;background:#fdecea;border-bottom:1px solid #f1c4c4;">' +
+    '<div style="display:flex;align-items:center;margin-bottom:6px;"><b style="flex:1;color:#7b241c;font-size:13px;text-transform:uppercase;letter-spacing:.5px;">' + (en ? 'Important numbers' : 'Belangrijke nummers') + '</b>' +
+      '<span id="cal-nr-gear" title="Nummers en gegevens aanpassen" onclick="calNrBewerk()" style="cursor:pointer;font-size:16px;">&#x2699;&#xFE0F;</span></div>' +
+    (d.nummers || []).map(function(r){ return '<div style="display:flex;gap:10px;align-items:baseline;padding:3px 0;border-top:1px dashed #f1c4c4;"><span style="flex:1;font-size:13px;color:#4a1a14;"><b>' + calEsc(r.label) + '</b>' + (r.uitleg ? '<span style="display:block;font-size:11px;color:#8a5a54;">' + calEsc(r.uitleg) + '</span>' : '') + '</span>' + tel(r.nummer) + '</div>'; }).join('') +
+    ((d.gegevens || []).length ? '<div style="margin-top:8px;display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:12.5px;color:#4a1a14;">' + d.gegevens.map(function(g){ return '<span style="color:#8a5a54;">' + calEsc(g.label) + '</span><b>' + calEsc(g.waarde) + '</b>'; }).join('') + '</div>' : '') +
+    (d.bron ? '<div style="margin-top:6px;font-size:10.5px;color:#a07a74;">' + calEsc(d.bron) + '</div>' : (d.bijgewerkt ? '<div style="margin-top:6px;font-size:10.5px;color:#a07a74;">Bijgewerkt ' + new Date(d.bijgewerkt).toLocaleDateString('nl-NL') + (d.door ? ' door ' + calEsc(typeof dpLogNaam === 'function' ? dpLogNaam(d.door) : d.door) : '') + '</div>' : '')) +
+    '</div>';
+}
+window.calNrBewerk = function(){
+  var d = JSON.parse(JSON.stringify(calNrGet())), oud = document.getElementById('cal-nr-edit'); if (oud) oud.remove();
+  var rij = function(a, b, c, soort){ return '<div class="cal-nr-rij" data-soort="' + soort + '" style="display:grid;grid-template-columns:' + (soort === 'n' ? '1.4fr 1fr 1.4fr' : '1fr 2.5fr') + ' auto;gap:6px;margin-bottom:6px;">' +
+    '<input value="' + calEsc(a) + '" placeholder="' + (soort === 'n' ? 'Omschrijving' : 'Gegeven') + '" style="padding:6px;border:1px solid #c8d7e8;border-radius:5px;">' +
+    '<input value="' + calEsc(b) + '" placeholder="' + (soort === 'n' ? 'Nummer' : 'Waarde') + '" style="padding:6px;border:1px solid #c8d7e8;border-radius:5px;">' +
+    (soort === 'n' ? '<input value="' + calEsc(c || '') + '" placeholder="Toelichting (optioneel)" style="padding:6px;border:1px solid #c8d7e8;border-radius:5px;">' : '') +
+    '<button type="button" onclick="this.parentNode.remove()" title="Regel weg" style="border:none;background:none;color:#c0392b;cursor:pointer;font-size:16px;">&#x2715;</button></div>'; };
+  var o = document.createElement('div'); o.id = 'cal-nr-edit';
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(0,20,40,.5);z-index:100007;display:flex;align-items:center;justify-content:center;padding:14px;';
+  o.innerHTML = '<div style="background:#fff;border-radius:10px;width:860px;max-width:100%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;">' +
+    '<div style="background:#c0392b;color:#fff;padding:12px 16px;display:flex;align-items:center;"><b style="flex:1;">&#x2699;&#xFE0F; Belangrijke nummers en gegevens</b><button type="button" onclick="document.getElementById(\'cal-nr-edit\').remove()" style="border:none;background:none;color:#fff;font-size:18px;cursor:pointer;">&#x2715;</button></div>' +
+    '<div style="overflow:auto;padding:12px 16px;"><b style="font-size:12px;color:#5a6b80;">TELEFOONNUMMERS (in deze volgorde bovenaan het calamiteitenplan)</b><div id="cal-nr-n" style="margin-top:6px;">' + (d.nummers || []).map(function(r){ return rij(r.label, r.nummer, r.uitleg, 'n'); }).join('') + '</div>' +
+    '<button type="button" onclick="document.getElementById(\'cal-nr-n\').insertAdjacentHTML(\'beforeend\', calNrRijHtml(\'n\'))" style="padding:4px 10px;border:1px dashed #c0392b;background:#fff;color:#c0392b;border-radius:5px;cursor:pointer;font-weight:700;">+ Nummer</button>' +
+    '<div style="margin-top:14px;"><b style="font-size:12px;color:#5a6b80;">GEGEVENS (adres, havennummer, CIN-nummer, …)</b></div><div id="cal-nr-g" style="margin-top:6px;">' + (d.gegevens || []).map(function(g){ return rij(g.label, g.waarde, '', 'g'); }).join('') + '</div>' +
+    '<button type="button" onclick="document.getElementById(\'cal-nr-g\').insertAdjacentHTML(\'beforeend\', calNrRijHtml(\'g\'))" style="padding:4px 10px;border:1px dashed #c0392b;background:#fff;color:#c0392b;border-radius:5px;cursor:pointer;font-weight:700;">+ Gegeven</button></div>' +
+    '<div style="padding:10px 16px;border-top:1px solid #eee;text-align:right;"><button type="button" onclick="calNrOpslaan()" style="padding:7px 18px;border:none;background:#c0392b;color:#fff;border-radius:6px;font-weight:800;cursor:pointer;">Opslaan</button></div></div>';
+  window.calNrRijHtml = function(s){ return rij('', '', '', s); };
+  document.body.appendChild(o);
+};
+window.calNrOpslaan = function(){
+  var T = sessionStorage.getItem('dj_terminal') || 'EP', a = calNrAlle();
+  var lees = function(soort){ return Array.prototype.map.call(document.querySelectorAll('#cal-nr-edit .cal-nr-rij[data-soort="' + soort + '"]'), function(r){ var i = r.querySelectorAll('input'); return soort === 'n' ? { label: i[0].value.trim(), nummer: i[1].value.trim(), uitleg: i[2].value.trim() } : { label: i[0].value.trim(), waarde: i[1].value.trim() }; }).filter(function(x){ return x.label || x.nummer || x.waarde; }); };
+  a[T] = { nummers: lees('n'), gegevens: lees('g'), bijgewerkt: Date.now(), door: localStorage.getItem('dj_sp_account_username') || '' };
+  localStorage.setItem('cal_nummers_v1', JSON.stringify(a)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+  var o = document.getElementById('cal-nr-edit'); if (o) o.remove();
+  var oud = document.getElementById('cal-nummers'); if (oud) oud.outerHTML = calNrHtml();
+};
+// In het calamiteitenplan: de rode alarmeerregel vervangen door het nummerblok
+(function(){
+  if (typeof djCalamiteitenplan !== 'function') return;
+  var _c = djCalamiteitenplan;
+  window.djCalamiteitenplan = djCalamiteitenplan = async function(){
+    var p = _c.apply(this, arguments);
+    try {
+      var kop = document.querySelector('#dj-calam > div > div:nth-child(2)');
+      if (kop && !document.getElementById('cal-nummers')) kop.outerHTML = calNrHtml();
+    } catch(e) {}
+    return p;
+  };
+})();
+</script>
+
 </body>
 </html>
