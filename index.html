@@ -24409,7 +24409,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.156';
+var DJ_BUILD = '2026-10-07.157';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -37367,5 +37367,44 @@ function leesPlUitDossier(){
 })();
 </script>
 
+<script>
+// Leesbevestiging: status ververst vanzelf (gelezen door een collega op een ander apparaat komt binnen via de synchronisatie)
+// en namen duidelijker: voornaam + eerste letter achternaam (twee Jeroens zijn dan te onderscheiden).
+function leesKorteNaam(a){
+  var vol = (typeof dpLogNaam === 'function' ? dpLogNaam(a.email) : '') || '';
+  if (!vol || vol === a.email) { var d = String(a.naam || a.email).split(' '); vol = d.length > 1 ? d.slice(-1)[0] + ' ' + d.slice(0, -1).join(' ') : d[0]; }
+  var w = vol.split(' '); return w.length > 1 ? w[0] + ' ' + w[w.length - 1].charAt(0).toUpperCase() + '.' : vol;
+}
+window.leesKorteNaam = leesKorteNaam;
+(function(){
+  var _w = window.woLeesRender;
+  window.woLeesRender = woLeesRender = function(){
+    var r = _w.apply(this, arguments);
+    try {
+      // namen in de statusregels vervangen door voornaam + initiaal, met tijdstip als tooltip
+      var datum = (document.getElementById('f-datum') || {}).value, box = document.getElementById('wo-lees-box'), s = woLeesGet()[datum];
+      if (!box || !s || s.gesloten) return r;
+      var g = dmLeesGet()['wo:' + datum] || {}, door = String(s.door || '').toLowerCase();
+      var sup = dmSupervisors().filter(function(a){ return String(a.email).toLowerCase() !== door; });
+      var supE = sup.map(function(a){ return String(a.email).toLowerCase(); });
+      var pl = s.pl ? dmLezersDm().filter(function(a){ var e = String(a.email).toLowerCase(); return supE.indexOf(e) < 0 && e !== door; }) : [];
+      var regel = function(lijst){ return lijst.map(function(a){ var e = String(a.email).toLowerCase(), t = g[e], nm = dmEsc(leesKorteNaam(a));
+        return t ? '<span title="Gelezen ' + new Date(t).toLocaleString('nl-NL') + '" style="color:#1a7a40;">&#x2714; ' + nm + '</span>' : '<span title="Nog niet gelezen" style="color:#c0392b;">&#x2717; ' + nm + '</span>'; }).join(' &middot; '); };
+      var divs = box.querySelectorAll(':scope > div');
+      divs.forEach(function(d){
+        if (/^Ploegleiders:|^Team leaders:/.test(d.innerText.trim())) d.innerHTML = '<span style="color:#5a6b80;">Ploegleiders: </span>' + regel(pl);
+        else if (d.querySelector('span') && /[\u2714\u2717]/.test(d.innerText) && !d.querySelector('input')) { var knoppen = Array.prototype.slice.call(d.querySelectorAll('button')).map(function(b){ return b.outerHTML; }).join(' '); var rest = (d.innerHTML.match(/<span style="color:#8795a8;">[^<]*<\/span>\s*$/) || [''])[0]; d.innerHTML = '<span style="color:#5a6b80;">Supervisors: </span>' + regel(sup) + ' ' + knoppen + ' ' + rest; }
+      });
+    } catch(e) {}
+    return r;
+  };
+  // elke 20 seconden de status opnieuw tekenen als de Werkoverdracht open staat (niet tijdens typen in het vak)
+  setInterval(function(){
+    try { var v = document.getElementById('view-nieuw'); if (!v || !v.classList.contains('active') || !document.getElementById('wo-lees-box')) return;
+      var a = document.activeElement; if (a && (a.id === 'f-incident' || (a.closest && a.closest('#wo-lees-box')))) return;
+      woLeesRender(); } catch(e) {}
+  }, 20000);
+})();
+</script>
 </body>
 </html>
