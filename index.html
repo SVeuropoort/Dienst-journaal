@@ -24405,7 +24405,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.147';
+var DJ_BUILD = '2026-10-07.148';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -36712,7 +36712,8 @@ window.dmLeesVenster = function(){
     '<div style="overflow:auto;padding:6px 16px;">' + lijst.map(function(m){ return '<div data-dm="' + m.id + '" style="padding:10px 0;border-bottom:1px solid #eef1f5;">' +
       '<div style="font-size:12px;color:#5a6b80;margin-bottom:4px;">' + (m.wo ? 'Bijzonderheden / incidenten &middot; ' : 'Dagmelding &middot; ') + '<b>' + dmNL(m.datum) + (dmEind(m) !== m.datum ? ' t/m ' + dmNL(dmEind(m)) : '') + '</b> &middot; door ' + dmEsc(naam(m.door)) + '</div>' +
       '<div style="font-size:14px;white-space:pre-wrap;color:#1f2d3d;">' + dmEsc(m.tekst) + '</div>' +
-      '<button type="button" onclick="dmGelezen(\'' + m.id + '\')" style="margin-top:8px;padding:6px 14px;border:none;background:#1a7a40;color:#fff;border-radius:6px;font-weight:800;cursor:pointer;">&#x2714; Gelezen</button></div>'; }).join('') + '</div></div>';
+      '<button type="button" onclick="dmGelezen(\'' + m.id + '\')" style="margin-top:8px;padding:6px 14px;border:none;background:#1a7a40;color:#fff;border-radius:6px;font-weight:800;cursor:pointer;">&#x2714; Gelezen</button>' +
+      '<button type="button" onclick="dmLeesGaNaar(\'' + m.id + '\')" style="margin:8px 0 0 8px;padding:6px 12px;border:1px solid #c8d7e8;background:#fff;color:#1f4e79;border-radius:6px;font-weight:700;cursor:pointer;">&#x2197; Openen in de Werkoverdracht</button></div>'; }).join('') + '</div></div>';
   o.addEventListener('click', function(ev){ if (ev.target === o) o.remove(); });
   document.body.appendChild(o);
 };
@@ -36882,5 +36883,25 @@ window.leesInstellingenOpslaan = function(){
 };
 </script>
 
+<script>
+// Vanuit "Te lezen meldingen" direct naar de juiste dag en plek in de Werkoverdracht
+window.dmLeesGaNaar = function(id){
+  var m = (typeof dmTeLezen === 'function' ? dmTeLezen() : []).find(function(x){ return x.id === id; }) || dmGet().meldingen.find(function(x){ return x.id === id; });
+  var datum = m ? m.datum : (/^wo:(.+)$/.exec(id) || [])[1]; if (!datum) return;
+  var o = document.getElementById('dm-lees-venster'); if (o) o.remove();
+  try { navWerkoverdracht('WERKOVERDRACHT', null, 'overdracht'); } catch(e) {}
+  setTimeout(function(){
+    var f = document.getElementById('f-datum'); if (f) { f.value = datum; if (typeof laadDagData === 'function') laadDagData(); }
+    setTimeout(function(){
+      var doel = /^wo:/.test(id) ? document.getElementById('f-incident') : document.getElementById('wo-dagmeldingen-kaart');
+      if (!doel) return;
+      var kaart = doel.closest('.card') || doel;
+      kaart.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      kaart.style.transition = 'box-shadow .3s'; kaart.style.boxShadow = '0 0 0 4px #5dade2';
+      setTimeout(function(){ kaart.style.boxShadow = ''; }, 3000);
+    }, 400);
+  }, 300);
+};
+</script>
 </body>
 </html>
