@@ -24409,7 +24409,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.155';
+var DJ_BUILD = '2026-10-07.156';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -37294,6 +37294,76 @@ function leesPlUitDossier(){
     var o = document.getElementById('lees-pl'); if (o) o.remove();
     try { dmRender(); dmLeesControle(); } catch(e) {}
   };
+})();
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// Bijzonderheden / incidenten: ook leesbevestiging voor PLOEGLEIDERS (zonder toegang tot de Werkoverdracht).
+// Alleen díe tekst wordt met hen gedeeld: een kopie staat in wo_lees_v1[datum].tekst (niet vertrouwelijk).
+// Het vinkje bij de Dagmeldingen vervalt (staat nu hier).
+// ══════════════════════════════════════════════════════════════════
+(function(){
+  var _w = window.woLeesRender;
+  window.woLeesRender = woLeesRender = function(){
+    var r = _w.apply(this, arguments);
+    try {
+      var datum = (document.getElementById('f-datum') || {}).value, box = document.getElementById('wo-lees-box'); if (!box || !datum) return r;
+      var s = woLeesGet()[datum], en = (sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM';
+      if (!document.getElementById('wo-lees-pl')) {
+        var l = document.createElement('div'); l.style.cssText = 'margin-top:4px;display:flex;align-items:center;gap:8px;';
+        l.innerHTML = '<label style="display:inline-flex;align-items:center;gap:6px;color:#1f4e79;font-weight:700;cursor:pointer;font-size:12.5px;"><input type="checkbox" id="wo-lees-pl" ' + (s && !s.gesloten && s.pl ? 'checked' : '') + ' style="width:auto;margin:0;"> &#x1F4D6; ' + (en ? 'Also team leaders must read this (only this text is shared with them)' : 'Ook ploegleiders moeten dit lezen (alleen deze tekst wordt met hen gedeeld)') + '</label>' +
+          '<span id="wo-pl-gear" title="Welke ploegleiders?" style="cursor:pointer;font-size:14px;">&#x2699;&#xFE0F;</span>';
+        l.querySelector('#wo-lees-pl').onchange = function(){ woLeesPlZet(this.checked); };
+        l.querySelector('#wo-pl-gear').onclick = function(ev){ ev.stopPropagation(); ev.preventDefault(); setTimeout(leesPlInstellingen, 0); };
+        var lab = box.querySelector('label'); (lab && lab.parentNode === box ? box.insertBefore(l, lab.nextSibling.nextSibling || null) : box.appendChild(l));
+      }
+      // status: ook de ploegleiders tonen
+      if (s && !s.gesloten && s.pl) {
+        var g = dmLeesGet()['wo:' + datum] || {}, door = String(s.door || '').toLowerCase(), sup = dmSupervisors().map(function(a){ return String(a.email).toLowerCase(); });
+        var pl = dmLezersDm().filter(function(a){ var e = String(a.email).toLowerCase(); return sup.indexOf(e) < 0 && e !== door; });
+        if (pl.length) { var st = document.createElement('div'); st.style.cssText = 'margin-top:3px;font-size:12px;';
+          st.innerHTML = '<span style="color:#5a6b80;">' + (en ? 'Team leaders: ' : 'Ploegleiders: ') + '</span>' + pl.map(function(a){ var t = g[String(a.email).toLowerCase()], nm = dmEsc((a.naam || a.email).split(' ').slice(-1)[0]); return t ? '<span style="color:#1a7a40;">&#x2714; ' + nm + '</span>' : '<span style="color:#c0392b;">&#x2717; ' + nm + '</span>'; }).join(' &middot; ');
+          box.appendChild(st); }
+      }
+    } catch(e) {}
+    return r;
+  };
+  window.woLeesPlZet = function(aan){
+    var datum = (document.getElementById('f-datum') || {}).value; if (!datum) return;
+    var w = woLeesGet(), ik = localStorage.getItem('dj_sp_account_username') || '', tekst = ((document.getElementById('f-incident') || {}).value || '').trim();
+    if (aan) { w[datum] = Object.assign({}, w[datum] && !w[datum].gesloten ? w[datum] : { door: ik, sinds: Date.now() }, { gesloten: false, pl: true, tekst: tekst }); }
+    else if (w[datum]) { w[datum].pl = false; delete w[datum].tekst; }
+    woLeesSet(w); woLeesRender(); if (typeof dmLeesControle === 'function') dmLeesControle();
+  };
+  // gedeelde tekst bijhouden als de supervisor hem nog aanpast
+  document.addEventListener('input', function(ev){
+    if (!ev.target || ev.target.id !== 'f-incident') return;
+    var datum = (document.getElementById('f-datum') || {}).value, w = woLeesGet();
+    if (datum && w[datum] && w[datum].pl && !w[datum].gesloten) { clearTimeout(window._woPlT); window._woPlT = setTimeout(function(){ var w2 = woLeesGet(); if (w2[datum]) { w2[datum].tekst = ev.target.value.trim(); woLeesSet(w2); } }, 1500); }
+  });
+  // supervisor-vinkje uit = ook voor ploegleiders afgesloten (dat deed woLeesZet al via gesloten)
+  // Wie leest wat: ploegleiders ook de Bijzonderheden met pl:true (tekst uit de gedeelde kopie)
+  var _t = window.dmTeLezen;
+  window.dmTeLezen = dmTeLezen = function(){
+    var lijst = _t(), ik = String(localStorage.getItem('dj_sp_account_username') || '').toLowerCase();
+    var isSup = typeof dmIkSupervisor === 'function' && dmIkSupervisor() && leesUitgeslotenGet().indexOf(ik) < 0;
+    if (isSup || leesPlGet().indexOf(ik) < 0) return lijst;
+    var g = dmLeesGet(), w = woLeesGet(), grens = Date.now() - 30 * 864e5;
+    Object.keys(w).forEach(function(datum){ var s = w[datum]; if (!s || !s.pl || s.gesloten || !s.tekst || (s.sinds || 0) < grens || String(s.door || '').toLowerCase() === ik) return;
+      var id = 'wo:' + datum; if (g[id] && g[id][ik]) return; lijst.push({ id: id, datum: datum, tekst: s.tekst, door: s.door, wo: true, pl: true }); });
+    return lijst;
+  };
+  // In het leesvenster: voor ploegleiders bij Bijzonderheden geen knop naar Werkoverdracht/Dagplanning
+  var _v = window.dmLeesVenster;
+  window.dmLeesVenster = dmLeesVenster = function(){
+    var r = _v.apply(this, arguments);
+    try { if (!(typeof dmIkSupervisor === 'function' && dmIkSupervisor())) document.querySelectorAll('#dm-lees-venster [data-dm^="wo:"] button').forEach(function(b){ if (!/dmGelezen/.test(b.getAttribute('onclick') || '')) b.remove(); }); } catch(e) {}
+    return r;
+  };
+  // Vinkje bij de Dagmeldingen weghalen (staat nu bij Bijzonderheden / incidenten)
+  var _r = window.dmRender;
+  window.dmRender = dmRender = function(){ var r = _r.apply(this, arguments); try { var v = document.getElementById('dm-lees'); if (v) { var lab = v.closest('label'); if (lab) lab.remove(); else v.remove(); } } catch(e) {} return r; };
 })();
 </script>
 
