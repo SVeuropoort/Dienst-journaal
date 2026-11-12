@@ -7387,6 +7387,7 @@ window.addEventListener('resize', () => {
     'dj_rechtencontrole_v1',
     'dm_gelezen_v1',
     'wo_lees_v1',
+    'lees_uitgesloten_v1',
     'dj_verjaardagen_v1',
     'dagpl_cert_v1',
     'dagpl_cert_v2',
@@ -7775,7 +7776,7 @@ window.addEventListener('resize', () => {
   }
   function djIsPlanningSleutel(k){ return /dagplan_|dagPlanning_v2_state|^ls_/.test(k); }
   // Sleutels die per regel (persoon / registratie / ploeg) worden samengevoegd i.p.v. "wie het laatst opslaat wint"
-  function djIsRegelSleutel(k){ return /(^|_)(personeelsdossier_v1|opleiding_overzicht_v1|organogram_v1|pd_verlof_v1|pd_functies_v1|dj_verjaardagen_v1|kledingpunten_v1|vakantierooster_v1|tugmasters_v1|pd_koppeling_v1|pd_team_v1|pd_quinyx_extra_v1|ma_medewerkers_v1|ma_hvh_v1|ma_apart_v1|ma_mentor_v1|ma_quinyx_namen_v1|ontwikkelgesprek[a-z_]*_v1|bezetting_deeltijd_v1|bezetting_instellingen_v1|dj_toegang_v1|dj_prullenbak_v1|dj_prullenbak_vertr_v1|dj_uitdienst_gepland_v1|dj_rechtencontrole_v1|dm_gelezen_v1|wo_lees_v1)$/.test(k); }
+  function djIsRegelSleutel(k){ return /(^|_)(personeelsdossier_v1|opleiding_overzicht_v1|organogram_v1|pd_verlof_v1|pd_functies_v1|dj_verjaardagen_v1|kledingpunten_v1|vakantierooster_v1|tugmasters_v1|pd_koppeling_v1|pd_team_v1|pd_quinyx_extra_v1|ma_medewerkers_v1|ma_hvh_v1|ma_apart_v1|ma_mentor_v1|ma_quinyx_namen_v1|ontwikkelgesprek[a-z_]*_v1|bezetting_deeltijd_v1|bezetting_instellingen_v1|dj_toegang_v1|dj_prullenbak_v1|dj_prullenbak_vertr_v1|dj_uitdienst_gepland_v1|dj_rechtencontrole_v1|dm_gelezen_v1|wo_lees_v1|lees_uitgesloten_v1)$/.test(k); }
   // Diepe 3-weg-samenvoeging. Lijsten met herkenbare regels (id / naam / mannr) worden per regel samengevoegd:
   // wat ik toevoeg, wijzig of verwijder telt; wat een collega intussen toevoegde/wijzigde blijft staan.
   function djRegelId(x){ if (!x || typeof x !== 'object' || Array.isArray(x)) return null; var v = x.id != null ? 'id:' + x.id : x.mannr != null ? 'nr:' + x.mannr : x.naam != null ? 'n:' + x.naam : x.persoon != null ? 'p:' + x.persoon : null; return v; }
@@ -24404,7 +24405,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.146';
+var DJ_BUILD = '2026-10-07.147';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -36837,6 +36838,48 @@ window.woLeesZet = function(aan){
   // het vinkje bij de Dagmeldingen is niet meer nodig (het hoort bij Bijzonderheden / incidenten)
   if (typeof dmRender === 'function') { var _r = dmRender; dmRender = function(){ var r = _r.apply(this, arguments); try { var v = document.getElementById('dm-lees'); if (v && v.parentNode) v.parentNode.remove(); } catch(e) {} return r; }; window.dmRender = dmRender; }
 })();
+</script>
+
+<script>
+// Leesbevestiging: instellen wie het NIET hoeft te lezen (bijv. OM/POM met toegang tot de Werkoverdracht)
+function leesUitgeslotenGet(){ try { var l = JSON.parse(localStorage.getItem('lees_uitgesloten_v1') || '[]'); return Array.isArray(l) ? l.map(function(x){ return String(x).toLowerCase(); }) : []; } catch(e) { return []; } }
+(function(){
+  if (typeof dmSupervisors === 'function') { var _s = dmSupervisors; dmSupervisors = function(){ var uit = leesUitgeslotenGet(); return _s().filter(function(a){ return uit.indexOf(String(a.email).toLowerCase()) < 0; }); }; window.dmSupervisors = dmSupervisors; }
+  if (typeof dmTeLezen === 'function') { var _t = dmTeLezen; dmTeLezen = function(){ var ik = String(localStorage.getItem('dj_sp_account_username') || '').toLowerCase(); if (leesUitgeslotenGet().indexOf(ik) >= 0) return []; return _t(); }; window.dmTeLezen = dmTeLezen; }
+  if (typeof woLeesRender === 'function') {
+    var _w = woLeesRender;
+    woLeesRender = function(){
+      var r = _w.apply(this, arguments);
+      try { var lab = document.querySelector('#wo-lees-box label'); if (lab && !document.getElementById('wo-lees-gear')) { var g = document.createElement('span'); g.id = 'wo-lees-gear'; g.title = 'Wie hoeft het niet te lezen?'; g.innerHTML = '&#x2699;&#xFE0F;'; g.style.cssText = 'margin-left:8px;cursor:pointer;font-size:14px;'; g.onclick = function(ev){ ev.stopPropagation(); ev.preventDefault(); setTimeout(leesInstellingen, 0); }; lab.parentNode.insertBefore(g, lab.nextSibling); } } catch(e) {}
+      return r;
+    };
+    window.woLeesRender = woLeesRender;
+  }
+})();
+function leesInstellingen(){
+  var oud = document.getElementById('lees-inst'); if (oud) oud.remove();
+  var T = sessionStorage.getItem('dj_terminal') || 'EP', uit = leesUitgeslotenGet();
+  var alle = (typeof djToegangGet === 'function' ? djToegangGet() : []).filter(function(a){ return a.permissies && a.permissies.supervisor && a.permissies[T] && !a.uitDienst; })
+    .sort(function(a, b){ return String(a.naam || a.email).localeCompare(String(b.naam || b.email)); });
+  var o = document.createElement('div'); o.id = 'lees-inst';
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(0,20,40,.45);z-index:100006;display:flex;align-items:center;justify-content:center;padding:14px;';
+  o.innerHTML = '<div style="background:#fff;border-radius:10px;width:440px;max-width:100%;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;">' +
+    '<div style="background:#1f4e79;color:#fff;padding:12px 16px;display:flex;align-items:center;"><b style="flex:1;">&#x2699;&#xFE0F; Wie moet het lezen?</b><button type="button" onclick="document.getElementById(\'lees-inst\').remove()" style="border:none;background:none;color:#fff;font-size:18px;cursor:pointer;">&#x2715;</button></div>' +
+    '<div style="padding:10px 16px;font-size:12.5px;color:#5a6b80;">Vinkje = moet meldingen met leesbevestiging lezen. Haal het vinkje weg bij wie wel toegang heeft tot de Werkoverdracht, maar het niet hoeft te lezen.</div>' +
+    '<div style="overflow:auto;padding:0 16px 10px;">' + alle.map(function(a){ var e = String(a.email).toLowerCase();
+      return '<label style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f1f1;cursor:pointer;"><input type="checkbox" data-email="' + dmEsc(e) + '" ' + (uit.indexOf(e) < 0 ? 'checked' : '') + ' style="width:auto;margin:0;"><span style="flex:1;font-weight:700;">' + dmEsc(typeof dpLogNaam === 'function' ? dpLogNaam(a.email) : (a.naam || a.email)) + '</span></label>'; }).join('') + '</div>' +
+    '<div style="padding:10px 16px;border-top:1px solid #eee;text-align:right;"><button type="button" onclick="leesInstellingenOpslaan()" style="padding:6px 16px;border:none;background:#1f4e79;color:#fff;border-radius:6px;font-weight:800;cursor:pointer;">Opslaan</button></div></div>';
+  o.addEventListener('click', function(ev){ if (ev.target === o) o.remove(); });
+  document.body.appendChild(o);
+}
+window.leesInstellingen = leesInstellingen;
+window.leesInstellingenOpslaan = function(){
+  var uit = leesUitgeslotenGet();
+  document.querySelectorAll('#lees-inst input[data-email]').forEach(function(c){ var e = c.getAttribute('data-email'); uit = uit.filter(function(x){ return x !== e; }); if (!c.checked) uit.push(e); });
+  localStorage.setItem('lees_uitgesloten_v1', JSON.stringify(uit)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+  var o = document.getElementById('lees-inst'); if (o) o.remove();
+  try { woLeesRender(); dmRender(); dmLeesControle(); } catch(e) {}
+};
 </script>
 
 </body>
