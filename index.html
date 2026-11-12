@@ -24409,7 +24409,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.157';
+var DJ_BUILD = '2026-10-07.158';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -37390,8 +37390,16 @@ window.leesKorteNaam = leesKorteNaam;
       var pl = s.pl ? dmLezersDm().filter(function(a){ var e = String(a.email).toLowerCase(); return supE.indexOf(e) < 0 && e !== door; }) : [];
       var regel = function(lijst){ return lijst.map(function(a){ var e = String(a.email).toLowerCase(), t = g[e], nm = dmEsc(leesKorteNaam(a));
         return t ? '<span title="Gelezen ' + new Date(t).toLocaleString('nl-NL') + '" style="color:#1a7a40;">&#x2714; ' + nm + '</span>' : '<span title="Nog niet gelezen" style="color:#c0392b;">&#x2717; ' + nm + '</span>'; }).join(' &middot; '); };
+      // Gelezen door iemand die niet in de lijsten staat (bijv. ander e-mailadres dan in Toegangsbeheer): toon dat ook
+      var bekend = sup.concat(pl).map(function(a){ return String(a.email).toLowerCase(); });
+      var vreemd = Object.keys(g).filter(function(e){ return bekend.indexOf(e) < 0 && e !== door; });
+      var oudV = box.querySelector('.lees-vreemd'); if (oudV) oudV.remove();
+      if (vreemd.length) { var dv = document.createElement('div'); dv.className = 'lees-vreemd'; dv.style.cssText = 'margin-top:3px;font-size:11.5px;color:#b9770e;';
+        dv.innerHTML = 'Ook gelezen door (account niet in de lijst, controleer het e-mailadres in Toegangsbeheer): ' + vreemd.map(function(e){ return '&#x2714; ' + dmEsc(e) + ' <span style="color:#8795a8;">' + new Date(g[e]).toLocaleString('nl-NL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + '</span>'; }).join(' &middot; ');
+        box.appendChild(dv); }
       var divs = box.querySelectorAll(':scope > div');
       divs.forEach(function(d){
+        if (d.classList.contains('lees-vreemd')) return;
         if (/^Ploegleiders:|^Team leaders:/.test(d.innerText.trim())) d.innerHTML = '<span style="color:#5a6b80;">Ploegleiders: </span>' + regel(pl);
         else if (d.querySelector('span') && /[\u2714\u2717]/.test(d.innerText) && !d.querySelector('input')) { var knoppen = Array.prototype.slice.call(d.querySelectorAll('button')).map(function(b){ return b.outerHTML; }).join(' '); var rest = (d.innerHTML.match(/<span style="color:#8795a8;">[^<]*<\/span>\s*$/) || [''])[0]; d.innerHTML = '<span style="color:#5a6b80;">Supervisors: </span>' + regel(sup) + ' ' + knoppen + ' ' + rest; }
       });
