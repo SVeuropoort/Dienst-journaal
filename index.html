@@ -24402,7 +24402,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.140';
+var DJ_BUILD = '2026-10-07.142';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -27528,6 +27528,7 @@ var DJ_ZOEK_INDEX = [
   { label: 'Schade formulier', keywords: 'schade formulier incident melding pdf', actie: function(){ navTo('schade', 'SCHADE FORMULIER', null); } },
   { label: 'Maandafsluiting', keywords: 'maandafsluiting payroll salaris quinyx mutaties', actie: function(){ navTo('maandafsluiting', 'MAANDAFSLUITING', null); } },
   { label: 'ORT / Basisrooster', keywords: 'ort basisrooster onregelmatigheidstoeslag cao artikel b8', actie: function(){ navTo('ort', 'ORT / BASISROOSTER', null); } },
+  { label: '🚨 Calamiteitenplan (map)', keywords: 'calamiteit calamiteitenplan noodplan nood ontruiming ontruimingsplan brand bhv ehbo alarm alarmering plattegrond plattegronden vluchtweg vluchtwegen evacuatie incident ongeval lekkage hulpverleners emergency plan evacuation fire', actie: function(){ if (typeof djCalamiteitenplan === 'function') djCalamiteitenplan(); } },
   { label: 'Handleiding / User guide', keywords: 'handleiding gebruikershandleiding help hulp uitleg hoe werkt guide user manual instructions', actie: function(){ if (typeof djGebruikershandleiding === 'function') djGebruikershandleiding(); } },
   { label: 'Beheerdershandleiding (PDF)', keywords: 'handleiding beheerdershandleiding beheer uitleg pdf instructie hoe werkt', actie: function(){ if (typeof djHandleidingOpenen === 'function') djHandleidingOpenen(); } },
   { label: 'Rechtenoverzicht (wie heeft welke rechten)', keywords: 'rechten rechtenoverzicht toegang autorisatie accounts laatst gezien audit kwartaal controle', actie: function(){ if (typeof djRechtenOverzicht === 'function') djRechtenOverzicht(); } },
@@ -36557,5 +36558,113 @@ function drVoorbeeld(p, lijst){
 })();
 </script>
 
+<script>
+// ══════════════════════════════════════════════════════════════════
+// CALAMITEITENPLAN — een "map" met de documenten van de eigen terminal, in SharePoint:
+// Data/Calamiteitenplan/<T>/  (alleen voor collega's met toegang tot de site; niet openbaar op GitHub).
+// Iedereen: openen (zoekbalk "calamiteit", "nood", "ontruiming", "brand", "BHV", …).
+// Beheerder: bestanden toevoegen / verwijderen. Geopende map wordt in de browser bewaard → werkt ook zonder internet.
+// ══════════════════════════════════════════════════════════════════
+var DJ_CAL_CACHE = 'dj-calamiteitenplan-v1';
+function calMap(){ return 'Calamiteitenplan/' + (sessionStorage.getItem('dj_terminal') || 'EP'); }
+function calPad(naam){ return 'root:/Data/' + (calMap() + (naam ? '/' + naam : '')).split('/').map(encodeURIComponent).join('/'); }
+async function calGraph(pad, opties){ var token = await spGetToken(), siteId = await spGetSiteId(); return fetch('https://graph.microsoft.com/v1.0/sites/' + siteId + '/drive/' + pad, Object.assign({ headers: { 'Authorization': 'Bearer ' + token }, cache: 'no-store' }, opties || {})); }
+function calEsc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+async function calCacheZet(naam, blob){ try { var c = await caches.open(DJ_CAL_CACHE); await c.put(new Request('/dj-cal/' + calMap() + '/' + encodeURIComponent(naam)), new Response(blob)); } catch(e) {} }
+async function calCacheHaal(naam){ try { var c = await caches.open(DJ_CAL_CACHE), r = await c.match(new Request('/dj-cal/' + calMap() + '/' + encodeURIComponent(naam))); return r ? await r.blob() : null; } catch(e) { return null; } }
+function calLijstLokaal(){ try { return JSON.parse(localStorage.getItem(tk('calamiteit_lijst_v1')) || '[]') || []; } catch(e) { return []; } }
+window.djCalamiteitenplan = async function(){
+  var en = (sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM', beheer = typeof djIkBeheerder === 'function' && djIkBeheerder();
+  var oud = document.getElementById('dj-calam'); if (oud) oud.remove();
+  var o = document.createElement('div'); o.id = 'dj-calam';
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(40,0,0,.5);z-index:100006;display:flex;align-items:center;justify-content:center;padding:14px;';
+  o.innerHTML = '<div style="background:#fff;border-radius:10px;width:720px;max-width:100%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;">' +
+    '<div style="background:#c0392b;color:#fff;padding:12px 16px;display:flex;align-items:center;gap:10px;"><span style="font-size:22px;">&#x1F6A8;</span><b style="flex:1;font-size:16px;">' + (en ? 'Emergency plan' : 'Calamiteitenplan') + ' ' + calEsc({ EP: 'Europoort', HVH: 'Hoek van Holland', IMM: 'Immingham' }[sessionStorage.getItem('dj_terminal') || 'EP']) + '</b><button type="button" onclick="document.getElementById(\'dj-calam\').remove()" style="border:none;background:none;color:#fff;font-size:20px;cursor:pointer;">&#x2715;</button></div>' +
+    '<div style="padding:10px 16px;background:#fdecea;color:#7b241c;font-size:13px;font-weight:700;">' + (en ? 'In an emergency: always call security / 112 first.' : 'Bij een calamiteit: eerst alarmeren &mdash; Beveiliging 0181-242190 (24/7) of 112.') + '</div>' +
+    '<div id="dj-calam-inhoud" style="padding:12px 16px;overflow:auto;font-size:13px;">' + (en ? 'Loading' : 'Laden') + '&hellip;</div>' +
+    (beheer ? '<div style="padding:10px 16px;border-top:1px solid #eee;display:flex;gap:8px;align-items:center;"><button type="button" onclick="calToevoegen()" style="padding:6px 12px;border:1px solid #003366;background:#fff;color:#003366;border-radius:6px;font-weight:700;cursor:pointer;">&#x2795; Bestanden toevoegen</button><span style="font-size:11.5px;color:#8795a8;">Alleen beheerders. Map in SharePoint: Data/' + calEsc(calMap()) + '</span></div>' : '') + '</div>';
+  o.addEventListener('click', function(ev){ if (ev.target === o) o.remove(); });
+  document.body.appendChild(o);
+  var box = document.getElementById('dj-calam-inhoud'), lijst = null, offline = false;
+  try {
+    var r = await calGraph(calPad() + ':/children?$select=name,size,lastModifiedDateTime,id&$top=200');
+    if (r.status === 404) lijst = []; else if (r.ok) lijst = ((await r.json()).value || []).filter(function(f){ return !f.folder; }).map(function(f){ return { naam: f.name, kb: Math.round((f.size || 0) / 1024), gewijzigd: f.lastModifiedDateTime }; });
+  } catch(e) {}
+  if (!lijst) { lijst = calLijstLokaal(); offline = true; }
+  else { try { localStorage.setItem(tk('calamiteit_lijst_v1'), JSON.stringify(lijst)); } catch(e) {} }
+  lijst.sort(function(a, b){ return a.naam.localeCompare(b.naam, 'nl', { numeric: true }); });
+  if (!lijst.length) { box.innerHTML = '<div style="color:#8795a8;padding:10px;">' + (en ? 'No documents yet.' : 'Nog geen documenten in deze map.') + (beheer ? ' Voeg ze toe met de knop hieronder.' : ' Vraag een beheerder om ze toe te voegen.') + '</div>'; return; }
+  window._calLijst = lijst;
+  box.innerHTML = (offline ? '<div style="color:#b9770e;font-weight:700;margin-bottom:8px;">&#x26A0;&#xFE0F; ' + (en ? 'No connection: showing the copies saved on this device.' : 'Geen verbinding: je ziet de kopie&euml;n die op dit apparaat bewaard zijn.') + '</div>' : '') +
+    '<div style="font-size:11.5px;color:#8795a8;margin-bottom:8px;">' + (en ? 'Note: check the edition date — parts of the plan may be outdated.' : 'Let op: kijk naar de editiedatum &mdash; delen van het plan kunnen verouderd zijn.') + '</div>' +
+    lijst.map(function(f, i){
+      var naam = f.naam.replace(/\.[^.]+$/, '').replace(/^\d+\s*/, ''), ext = (/\.([^.]+)$/.exec(f.naam) || [])[1] || '';
+      return '<div style="display:flex;align-items:center;gap:10px;padding:9px 6px;border-bottom:1px solid #f1f1f1;">' +
+        '<span style="font-size:20px;">' + (/pdf/i.test(ext) ? '&#x1F4C4;' : /xls/i.test(ext) ? '&#x1F4CA;' : '&#x1F4DD;') + '</span>' +
+        '<div style="flex:1;cursor:pointer;" onclick="calOpen(' + i + ',this)"><b style="color:#003366;">' + calEsc(naam) + '</b><br><span style="font-size:11px;color:#8795a8;">' + calEsc(ext.toUpperCase()) + ' &middot; ' + f.kb + ' kB</span></div>' +
+        '<button type="button" onclick="calOpen(' + i + ',this)" style="padding:5px 12px;border:none;background:#003366;color:#fff;border-radius:6px;font-weight:700;cursor:pointer;">' + (en ? 'Open' : 'Openen') + '</button>' +
+        (beheer ? '<button type="button" onclick="calVervang(' + i + ')" title="Nieuwe versie van dit document (vervangt het, zelfde plek in de lijst)" style="padding:5px 9px;border:1px solid #c8d7e8;background:#fff;color:#003366;border-radius:6px;cursor:pointer;font-weight:700;">&#x2B06; Nieuwe versie</button>' : '') +
+        (beheer ? '<button type="button" onclick="calVerwijder(' + i + ',this)" title="Verwijderen (2\u00D7 klikken)" style="padding:5px 9px;border:1px solid #e5b2ad;background:#fff;color:#c0392b;border-radius:6px;cursor:pointer;">&#x1F5D1;</button>' : '') + '</div>'; }).join('');
+  // Alles alvast op dit apparaat bewaren, zodat het plan ook zonder internet te openen is
+  if (!offline) lijst.forEach(async function(f){ try { if (await calCacheHaal(f.naam)) return; var d = await calGraph(calPad(f.naam) + ':/content'); if (d.ok) await calCacheZet(f.naam, await d.blob()); } catch(e) {} });
+};
+window.calOpen = async function(i, el){
+  var f = window._calLijst[i]; if (!f) return;
+  var w = window.open('', '_blank'); // meteen openen (anders blokkeert de browser het venster)
+  try {
+    var blob = null;
+    try { var d = await calGraph(calPad(f.naam) + ':/content'); if (d.ok) { blob = await d.blob(); calCacheZet(f.naam, blob); } } catch(e) {}
+    if (!blob) blob = await calCacheHaal(f.naam);
+    if (!blob) throw new Error('niet beschikbaar (geen verbinding en nog niet op dit apparaat bewaard)');
+    var type = /\.pdf$/i.test(f.naam) ? 'application/pdf' : blob.type;
+    var url = URL.createObjectURL(new Blob([blob], { type: type }));
+    if (w && /pdf/.test(type)) w.location.href = url;
+    else { if (w) w.close(); var a = document.createElement('a'); a.href = url; a.download = f.naam; document.body.appendChild(a); a.click(); a.remove(); }
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 120000);
+  } catch(e) { if (w) w.close(); alert('Openen mislukt: ' + (e.message || e)); }
+};
+window.calToevoegen = function(){
+  if (!(typeof djIkBeheerder === 'function' && djIkBeheerder())) return;
+  var inp = document.createElement('input'); inp.type = 'file'; inp.multiple = true; inp.accept = '.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg';
+  inp.onchange = async function(){
+    var files = Array.prototype.slice.call(inp.files || []), ok = 0;
+    for (var i = 0; i < files.length; i++) {
+      try { var r = await calGraph(calPad(files[i].name) + ':/content', { method: 'PUT', body: files[i], headers: { 'Authorization': 'Bearer ' + (await spGetToken()), 'Content-Type': files[i].type || 'application/octet-stream' } }); if (r.ok) ok++; } catch(e) {}
+    }
+    if (ok < files.length) alert(ok + ' van ' + files.length + ' bestanden toegevoegd. Probeer de rest opnieuw.');
+    djCalamiteitenplan();
+  };
+  inp.click();
+};
+var _calBev = {};
+window.calVerwijder = async function(i, knop){
+  var f = window._calLijst[i]; if (!f) return;
+  if (!_calBev[i] || Date.now() - _calBev[i] > 5000) { _calBev[i] = Date.now(); knop.textContent = 'Zeker?'; return; }
+  try { var token = await spGetToken(), siteId = await spGetSiteId(); var r = await fetch('https://graph.microsoft.com/v1.0/sites/' + siteId + '/drive/' + calPad(f.naam), { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } }); if (!r.ok && r.status !== 204) throw new Error(r.status); try { var c = await caches.open(DJ_CAL_CACHE); await c.delete(new Request('/dj-cal/' + calMap() + '/' + encodeURIComponent(f.naam))); } catch(e) {} djCalamiteitenplan(); }
+  catch(e) { knop.textContent = '\u2717'; }
+};
+</script>
+
+<script>
+// Calamiteitenplan: per document een nieuwe versie zetten (zelfde naam = zelfde plek in de lijst; vorige versie blijft in de SharePoint-versiegeschiedenis)
+window.calVervang = function(i){
+  if (!(typeof djIkBeheerder === 'function' && djIkBeheerder())) return;
+  var f = window._calLijst[i]; if (!f) return;
+  var inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg';
+  inp.onchange = async function(){
+    var nieuw = inp.files && inp.files[0]; if (!nieuw) return;
+    // extensie van het nieuwe bestand, naam van het oude (zodat volgorde en titel gelijk blijven)
+    var naam = f.naam.replace(/\.[^.]+$/, '') + ((/\.[^.]+$/.exec(nieuw.name) || [''])[0] || '.pdf');
+    try {
+      var r = await calGraph(calPad(naam) + ':/content', { method: 'PUT', body: nieuw, headers: { 'Authorization': 'Bearer ' + (await spGetToken()), 'Content-Type': nieuw.type || 'application/octet-stream' } });
+      if (!r.ok) throw new Error('status ' + r.status);
+      if (naam !== f.naam) { var token = await spGetToken(), siteId = await spGetSiteId(); await fetch('https://graph.microsoft.com/v1.0/sites/' + siteId + '/drive/' + calPad(f.naam), { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } }); }
+      try { var c = await caches.open(DJ_CAL_CACHE); await c.delete(new Request('/dj-cal/' + calMap() + '/' + encodeURIComponent(f.naam))); } catch(e) {}
+      djCalamiteitenplan();
+    } catch(e) { alert('Nieuwe versie zetten mislukt: ' + (e.message || e)); }
+  };
+  inp.click();
+};
+</script>
 </body>
 </html>
