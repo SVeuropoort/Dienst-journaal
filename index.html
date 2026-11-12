@@ -24409,7 +24409,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.158';
+var DJ_BUILD = '2026-10-07.159';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -36788,6 +36788,9 @@ document.addEventListener('DOMContentLoaded', function(){ setTimeout(dmLeesContr
 // Instelling: wo_lees_v1 = { "JJJJ-MM-DD": { door, sinds, gesloten } }   Gelezen: dm_gelezen_v1["wo:JJJJ-MM-DD"]
 // ══════════════════════════════════════════════════════════════════
 function woLeesGet(){ try { return JSON.parse(localStorage.getItem('wo_lees_v1') || '{}') || {}; } catch(e) { return {}; } }
+// Elke keer dat de leesbevestiging (opnieuw) wordt aangezet, is het een nieuwe ronde: eerder 'gelezen' telt dan niet meer
+function woLeesId(datum){ var x = woLeesGet()[datum]; return 'wo:' + datum + (x && x.sinds ? '#' + x.sinds : ''); }
+window.woLeesId = woLeesId;
 function woLeesSet(x){ localStorage.setItem('wo_lees_v1', JSON.stringify(x)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); }
 function woIncidentTekst(datum){
   var f = document.getElementById('f-datum'), t = document.getElementById('f-incident');
@@ -36807,7 +36810,7 @@ function woIncidentTekst(datum){
     var ik = String(localStorage.getItem('dj_sp_account_username') || '').toLowerCase(), g = dmLeesGet(), grens = Date.now() - 30 * 864e5, w = woLeesGet();
     Object.keys(w).forEach(function(datum){
       var s = w[datum]; if (!s || s.gesloten || (s.sinds || 0) < grens || String(s.door || '').toLowerCase() === ik) return;
-      var id = 'wo:' + datum; if (g[id] && g[id][ik]) return;
+      var id = woLeesId(datum); if (g[id] && g[id][ik]) return;
       var tekst = woIncidentTekst(datum); if (!tekst) return;
       uit.push({ id: id, datum: datum, datumTot: '', tekst: tekst, door: s.door, wo: true });
     });
@@ -36823,11 +36826,11 @@ function woLeesRender(){
   var w = woLeesGet(), s = w[datum], ik = String(localStorage.getItem('dj_sp_account_username') || '').toLowerCase();
   var h = '<label style="display:inline-flex;align-items:center;gap:6px;color:#1f4e79;font-weight:700;cursor:pointer;"><input type="checkbox" id="wo-lees" ' + (s && !s.gesloten ? 'checked' : '') + ' onchange="woLeesZet(this.checked)" style="width:auto;margin:0;"> &#x1F4D6; ' + (((sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM') ? 'Read confirmation: every supervisor must read this' : 'Leesbevestiging: iedere supervisor moet dit lezen') + '</label>';
   if (s && !s.gesloten) {
-    var g = dmLeesGet()['wo:' + datum] || {}, door = String(s.door || '').toLowerCase(), beheer = typeof djIkBeheerder === 'function' && djIkBeheerder();
+    var g = dmLeesGet()[woLeesId(datum)] || {}, door = String(s.door || '').toLowerCase(), beheer = typeof djIkBeheerder === 'function' && djIkBeheerder();
     var lijst = dmSupervisors().filter(function(a){ return String(a.email).toLowerCase() !== door; }).map(function(a){ var t = g[String(a.email).toLowerCase()], nm = dmEsc((a.naam || a.email).split(' ').slice(-1)[0]);
       return t ? '<span style="color:#1a7a40;">&#x2714; ' + nm + ' <span style="color:#8795a8;">' + new Date(t).toLocaleString('nl-NL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + '</span></span>' : '<span style="color:#c0392b;">&#x2717; ' + nm + '</span>'; });
     h += '<div style="margin-top:4px;">' + lijst.join(' &middot; ') +
-      (door !== ik && !g[ik] ? ' <button type="button" onclick="dmGelezen(\'wo:' + datum + '\');woLeesRender();" style="margin-left:6px;padding:1px 8px;border:none;background:#1a7a40;color:#fff;border-radius:4px;font-weight:700;cursor:pointer;">&#x2714; ' + (((sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM') ? 'Read' : 'Gelezen') + '</button>' : '') +
+      (door !== ik && !g[ik] ? ' <button type="button" onclick="dmGelezen(\'' + woLeesId(datum) + '\');woLeesRender();" style="margin-left:6px;padding:1px 8px;border:none;background:#1a7a40;color:#fff;border-radius:4px;font-weight:700;cursor:pointer;">&#x2714; ' + (((sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM') ? 'Read' : 'Gelezen') + '</button>' : '') +
       ((door === ik || beheer) ? ' <span style="color:#8795a8;">' + (((sessionStorage.getItem('dj_terminal') || 'EP') === 'IMM') ? '(untick = close)' : '(vinkje uit = afsluiten)') + '</span>' : '') + '</div>';
   }
   box.innerHTML = h;
@@ -36894,7 +36897,7 @@ window.leesInstellingenOpslaan = function(){
 // Vanuit "Te lezen meldingen" direct naar de juiste dag en plek in de Werkoverdracht
 window.dmLeesGaNaar = function(id){
   var m = (typeof dmTeLezen === 'function' ? dmTeLezen() : []).find(function(x){ return x.id === id; }) || dmGet().meldingen.find(function(x){ return x.id === id; });
-  var datum = m ? m.datum : (/^wo:(.+)$/.exec(id) || [])[1]; if (!datum) return;
+  var datum = m ? m.datum : ((/^wo:([^#]+)/.exec(id) || [])[1]); if (!datum) return;
   var o = document.getElementById('dm-lees-venster'); if (o) o.remove();
   try { navWerkoverdracht('WERKOVERDRACHT', null, 'overdracht'); } catch(e) {}
   setTimeout(function(){
@@ -37320,7 +37323,7 @@ function leesPlUitDossier(){
       }
       // status: ook de ploegleiders tonen
       if (s && !s.gesloten && s.pl) {
-        var g = dmLeesGet()['wo:' + datum] || {}, door = String(s.door || '').toLowerCase(), sup = dmSupervisors().map(function(a){ return String(a.email).toLowerCase(); });
+        var g = dmLeesGet()[woLeesId(datum)] || {}, door = String(s.door || '').toLowerCase(), sup = dmSupervisors().map(function(a){ return String(a.email).toLowerCase(); });
         var pl = dmLezersDm().filter(function(a){ var e = String(a.email).toLowerCase(); return sup.indexOf(e) < 0 && e !== door; });
         if (pl.length) { var st = document.createElement('div'); st.style.cssText = 'margin-top:3px;font-size:12px;';
           st.innerHTML = '<span style="color:#5a6b80;">' + (en ? 'Team leaders: ' : 'Ploegleiders: ') + '</span>' + pl.map(function(a){ var t = g[String(a.email).toLowerCase()], nm = dmEsc((a.naam || a.email).split(' ').slice(-1)[0]); return t ? '<span style="color:#1a7a40;">&#x2714; ' + nm + '</span>' : '<span style="color:#c0392b;">&#x2717; ' + nm + '</span>'; }).join(' &middot; ');
@@ -37351,7 +37354,7 @@ function leesPlUitDossier(){
     if (isSup || leesPlGet().indexOf(ik) < 0) return lijst;
     var g = dmLeesGet(), w = woLeesGet(), grens = Date.now() - 30 * 864e5;
     Object.keys(w).forEach(function(datum){ var s = w[datum]; if (!s || !s.pl || s.gesloten || !s.tekst || (s.sinds || 0) < grens || String(s.door || '').toLowerCase() === ik) return;
-      var id = 'wo:' + datum; if (g[id] && g[id][ik]) return; lijst.push({ id: id, datum: datum, tekst: s.tekst, door: s.door, wo: true, pl: true }); });
+      var id = woLeesId(datum); if (g[id] && g[id][ik]) return; lijst.push({ id: id, datum: datum, tekst: s.tekst, door: s.door, wo: true, pl: true }); });
     return lijst;
   };
   // In het leesvenster: voor ploegleiders bij Bijzonderheden geen knop naar Werkoverdracht/Dagplanning
@@ -37384,7 +37387,7 @@ window.leesKorteNaam = leesKorteNaam;
       // namen in de statusregels vervangen door voornaam + initiaal, met tijdstip als tooltip
       var datum = (document.getElementById('f-datum') || {}).value, box = document.getElementById('wo-lees-box'), s = woLeesGet()[datum];
       if (!box || !s || s.gesloten) return r;
-      var g = dmLeesGet()['wo:' + datum] || {}, door = String(s.door || '').toLowerCase();
+      var g = dmLeesGet()[woLeesId(datum)] || {}, door = String(s.door || '').toLowerCase();
       var sup = dmSupervisors().filter(function(a){ return String(a.email).toLowerCase() !== door; });
       var supE = sup.map(function(a){ return String(a.email).toLowerCase(); });
       var pl = s.pl ? dmLezersDm().filter(function(a){ var e = String(a.email).toLowerCase(); return supE.indexOf(e) < 0 && e !== door; }) : [];
