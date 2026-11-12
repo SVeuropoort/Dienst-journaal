@@ -7385,6 +7385,7 @@ window.addEventListener('resize', () => {
     'dj_prullenbak_vertr_v1',
     'dj_uitdienst_gepland_v1',
     'dj_rechtencontrole_v1',
+    'dm_gelezen_v1',
     'dj_verjaardagen_v1',
     'dagpl_cert_v1',
     'dagpl_cert_v2',
@@ -7773,7 +7774,7 @@ window.addEventListener('resize', () => {
   }
   function djIsPlanningSleutel(k){ return /dagplan_|dagPlanning_v2_state|^ls_/.test(k); }
   // Sleutels die per regel (persoon / registratie / ploeg) worden samengevoegd i.p.v. "wie het laatst opslaat wint"
-  function djIsRegelSleutel(k){ return /(^|_)(personeelsdossier_v1|opleiding_overzicht_v1|organogram_v1|pd_verlof_v1|pd_functies_v1|dj_verjaardagen_v1|kledingpunten_v1|vakantierooster_v1|tugmasters_v1|pd_koppeling_v1|pd_team_v1|pd_quinyx_extra_v1|ma_medewerkers_v1|ma_hvh_v1|ma_apart_v1|ma_mentor_v1|ma_quinyx_namen_v1|ontwikkelgesprek[a-z_]*_v1|bezetting_deeltijd_v1|bezetting_instellingen_v1|dj_toegang_v1|dj_prullenbak_v1|dj_prullenbak_vertr_v1|dj_uitdienst_gepland_v1|dj_rechtencontrole_v1)$/.test(k); }
+  function djIsRegelSleutel(k){ return /(^|_)(personeelsdossier_v1|opleiding_overzicht_v1|organogram_v1|pd_verlof_v1|pd_functies_v1|dj_verjaardagen_v1|kledingpunten_v1|vakantierooster_v1|tugmasters_v1|pd_koppeling_v1|pd_team_v1|pd_quinyx_extra_v1|ma_medewerkers_v1|ma_hvh_v1|ma_apart_v1|ma_mentor_v1|ma_quinyx_namen_v1|ontwikkelgesprek[a-z_]*_v1|bezetting_deeltijd_v1|bezetting_instellingen_v1|dj_toegang_v1|dj_prullenbak_v1|dj_prullenbak_vertr_v1|dj_uitdienst_gepland_v1|dj_rechtencontrole_v1|dm_gelezen_v1)$/.test(k); }
   // Diepe 3-weg-samenvoeging. Lijsten met herkenbare regels (id / naam / mannr) worden per regel samengevoegd:
   // wat ik toevoeg, wijzig of verwijder telt; wat een collega intussen toevoegde/wijzigde blijft staan.
   function djRegelId(x){ if (!x || typeof x !== 'object' || Array.isArray(x)) return null; var v = x.id != null ? 'id:' + x.id : x.mannr != null ? 'nr:' + x.mannr : x.naam != null ? 'n:' + x.naam : x.persoon != null ? 'p:' + x.persoon : null; return v; }
@@ -24402,7 +24403,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.144';
+var DJ_BUILD = '2026-10-07.145';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -36670,5 +36671,106 @@ window.calVervang = function(i){
   inp.click();
 };
 </script>
+<script>
+// ══════════════════════════════════════════════════════════════════
+// LEESBEVESTIGING per dagmelding (aanvinken bij het plaatsen): iedere supervisor moet hem lezen.
+// Wie hem nog niet las, krijgt (ook dagen later) een melding linksonder tot hij op "Gelezen" klikt.
+// Gelezen-registratie: <T>_dm_gelezen_v1 = { meldingId: { email: tijd } } (per persoon samengevoegd).
+// ══════════════════════════════════════════════════════════════════
+function dmLeesKey(){ return tk('dm_gelezen_v1'); }
+function dmLeesGet(){ try { return JSON.parse(localStorage.getItem(dmLeesKey()) || '{}') || {}; } catch(e) { return {}; } }
+function dmIkSupervisor(){ var ik = localStorage.getItem('dj_sp_account_username') || ''; return !!(ik && typeof djToegangHeeft === 'function' && djToegangHeeft(ik, 'supervisor')); }
+function dmSupervisors(){
+  var T = sessionStorage.getItem('dj_terminal') || 'EP';
+  return (typeof djToegangGet === 'function' ? djToegangGet() : []).filter(function(a){ return a.permissies && a.permissies.supervisor && a.permissies[T] && !a.uitDienst; });
+}
+function dmTeLezen(){ // leesmeldingen die ik nog niet las (max. 30 dagen oud, niet afgesloten)
+  var ik = String(localStorage.getItem('dj_sp_account_username') || '').toLowerCase(), g = dmLeesGet(), grens = Date.now() - 30 * 864e5;
+  return dmGet().meldingen.filter(function(m){ return m.lees && !m.gesloten && (m.leesSinds || m.gw || 0) >= grens && String(m.door || '').toLowerCase() !== ik && !(g[m.id] && g[m.id][ik]); });
+}
+window.dmGelezen = function(id){
+  var ik = String(localStorage.getItem('dj_sp_account_username') || '').toLowerCase(); if (!ik) return;
+  var g = dmLeesGet(); g[id] = g[id] || {}; g[id][ik] = new Date().toISOString();
+  localStorage.setItem(dmLeesKey(), JSON.stringify(g)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
+  dmLeesControle(); try { dmRender(); } catch(e) {}
+  var o = document.getElementById('dm-lees-venster'); if (o) { var rij = o.querySelector('[data-dm="' + id + '"]'); if (rij) rij.remove(); if (!o.querySelector('[data-dm]')) o.remove(); }
+};
+window.dmLeesAfsluiten = function(id){
+  var x = dmGet(), m = x.meldingen.find(function(z){ return z.id === id; }); if (!m) return;
+  m.gesloten = true; m.gw = Date.now(); dmSet(x); dmRender(); dmLeesControle();
+};
+window.dmLeesVenster = function(){
+  var lijst = dmTeLezen(); if (!lijst.length) return;
+  var oud = document.getElementById('dm-lees-venster'); if (oud) oud.remove();
+  var naam = function(e){ return typeof dpLogNaam === 'function' ? dpLogNaam(e) : e; };
+  var o = document.createElement('div'); o.id = 'dm-lees-venster';
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(0,20,40,.45);z-index:100006;display:flex;align-items:center;justify-content:center;padding:14px;';
+  o.innerHTML = '<div style="background:#fff;border-radius:10px;width:640px;max-width:100%;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;">' +
+    '<div style="background:#1f4e79;color:#fff;padding:12px 16px;display:flex;align-items:center;"><b style="flex:1;font-size:15px;">&#x1F4D6; Te lezen meldingen</b><button type="button" onclick="document.getElementById(\'dm-lees-venster\').remove()" style="border:none;background:none;color:#fff;font-size:18px;cursor:pointer;">&#x2715;</button></div>' +
+    '<div style="overflow:auto;padding:6px 16px;">' + lijst.map(function(m){ return '<div data-dm="' + m.id + '" style="padding:10px 0;border-bottom:1px solid #eef1f5;">' +
+      '<div style="font-size:12px;color:#5a6b80;margin-bottom:4px;"><b>' + dmNL(m.datum) + (dmEind(m) !== m.datum ? ' t/m ' + dmNL(dmEind(m)) : '') + '</b> &middot; door ' + dmEsc(naam(m.door)) + '</div>' +
+      '<div style="font-size:14px;white-space:pre-wrap;color:#1f2d3d;">' + dmEsc(m.tekst) + '</div>' +
+      '<button type="button" onclick="dmGelezen(\'' + m.id + '\')" style="margin-top:8px;padding:6px 14px;border:none;background:#1a7a40;color:#fff;border-radius:6px;font-weight:800;cursor:pointer;">&#x2714; Gelezen</button></div>'; }).join('') + '</div></div>';
+  o.addEventListener('click', function(ev){ if (ev.target === o) o.remove(); });
+  document.body.appendChild(o);
+};
+function dmLeesControle(){
+  var el = document.getElementById('dm-lees-balk');
+  if (!dmIkSupervisor()) { if (el) el.remove(); return; }
+  var n = dmTeLezen().length;
+  if (!n) { if (el) el.remove(); return; }
+  if (!el) { el = document.createElement('div'); el.id = 'dm-lees-balk'; el.onclick = function(){ dmLeesVenster(); };
+    el.style.cssText = 'position:fixed;left:18px;bottom:18px;z-index:100004;background:#1f4e79;color:#fff;padding:10px 16px;border-radius:10px;box-shadow:0 8px 24px rgba(0,30,60,.35);font-weight:800;font-size:14px;cursor:pointer;';
+    document.body.appendChild(el); }
+  el.innerHTML = '&#x1F4D6; ' + n + (n === 1 ? ' melding' : ' meldingen') + ' die je nog moet lezen <span style="font-weight:600;opacity:.85;">&rsaquo; openen</span>';
+}
+window.dmLeesControle = dmLeesControle;
+document.addEventListener('DOMContentLoaded', function(){ setTimeout(dmLeesControle, 8000); setInterval(dmLeesControle, 60000); });
+// Bij het plaatsen: vinkje "Leesbevestiging"; in de lijst: wie heeft gelezen
+(function(){
+  if (typeof dmRender !== 'function') return;
+  var _r = dmRender;
+  dmRender = function(){
+    var r = _r.apply(this, arguments);
+    try {
+      var knop = Array.prototype.find.call(document.querySelectorAll('#wo-dagmeldingen button'), function(b){ return /dmToevoegen\(\)/.test(b.getAttribute('onclick') || ''); });
+      if (knop && !document.getElementById('dm-lees')) {
+        var grid = knop.parentNode, l = document.createElement('label');
+        l.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12.5px;color:#1f4e79;font-weight:700;cursor:pointer;';
+        l.innerHTML = '<input type="checkbox" id="dm-lees" style="width:auto;margin:0;"> &#x1F4D6; Leesbevestiging: iedere supervisor moet deze melding lezen';
+        grid.parentNode.insertBefore(l, grid.nextSibling);
+      }
+      // status per leesmelding
+      var g = dmLeesGet(), sup = dmSupervisors(), ik = String(localStorage.getItem('dj_sp_account_username') || '').toLowerCase();
+      var beheer = typeof djIkBeheerder === 'function' && djIkBeheerder();
+      dmGet().meldingen.filter(function(m){ return m.lees; }).forEach(function(m){
+        var span = document.querySelector('#wo-dagmeldingen [onclick="dmBewerk(\'' + m.id + '\')"]'); if (!span) return;
+        var rij = span.parentNode, st = document.createElement('div');
+        var gel = g[m.id] || {}, door = String(m.door || '').toLowerCase();
+        var lijst = sup.filter(function(a){ return String(a.email).toLowerCase() !== door; }).map(function(a){ var t = gel[String(a.email).toLowerCase()];
+          return t ? '<span style="color:#1a7a40;">&#x2714; ' + dmEsc((a.naam || a.email).split(' ').slice(-1)[0]) + ' <span style="color:#8795a8;">' + new Date(t).toLocaleString('nl-NL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + '</span></span>'
+                   : '<span style="color:#c0392b;">&#x2717; ' + dmEsc((a.naam || a.email).split(' ').slice(-1)[0]) + '</span>'; });
+        st.style.cssText = 'flex-basis:100%;margin:4px 0 0 130px;font-size:11.5px;';
+        st.innerHTML = '&#x1F4D6; <b>' + (m.gesloten ? 'Leesbevestiging afgesloten' : 'Leesbevestiging') + ':</b> ' + lijst.join(' &middot; ') +
+          (!m.gesloten && !(gel[ik]) && door !== ik ? ' <button type="button" onclick="dmGelezen(\'' + m.id + '\')" style="margin-left:6px;padding:1px 8px;border:none;background:#1a7a40;color:#fff;border-radius:4px;font-weight:700;cursor:pointer;">&#x2714; Gelezen</button>' : '') +
+          (!m.gesloten && (door === ik || beheer) ? ' <button type="button" onclick="dmLeesAfsluiten(\'' + m.id + '\')" title="Niemand hoeft hem nog te lezen" style="margin-left:6px;padding:1px 8px;border:1px solid #c8d7e8;background:#fff;color:#5a6b80;border-radius:4px;cursor:pointer;">Afsluiten</button>' : '');
+        rij.style.flexWrap = 'wrap'; rij.appendChild(st);
+      });
+    } catch(e) {}
+    return r;
+  };
+  window.dmRender = dmRender;
+  var _t = window.dmToevoegen;
+  window.dmToevoegen = function(){
+    var vink = document.getElementById('dm-lees'), aan = !!(vink && vink.checked), tekst = ((document.getElementById('dm-tekst') || {}).value || '').trim();
+    var voor = dmGet().meldingen.map(function(m){ return m.id; });
+    var r = _t.apply(this, arguments);
+    if (aan) { var x = dmGet(), nieuw = x.meldingen.find(function(m){ return voor.indexOf(m.id) < 0 && m.tekst === tekst; });
+      if (nieuw) { nieuw.lees = true; nieuw.leesSinds = Date.now(); nieuw.gw = Date.now(); dmSet(x); dmRender(); } }
+    return r;
+  };
+})();
+</script>
+
 </body>
 </html>
