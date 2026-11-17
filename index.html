@@ -24410,7 +24410,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.169';
+var DJ_BUILD = '2026-10-07.170';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -37679,8 +37679,14 @@ window.djScheepsinfo = async function(schip){
   o.addEventListener('click', function(ev){ if (ev.target === o) o.remove(); });
   document.body.appendChild(o);
   var box = document.getElementById('si-docs'), lijst = [];
-  try { var r = await siGraph(siPad(k) + ':/children?$select=name,size,id&$top=200'); if (r.ok) lijst = ((await r.json()).value || []).filter(function(f){ return !f.folder; }); else if (r.status !== 404) throw new Error(r.status); }
+  var kernBestand = null;
+  try { var r = await siGraph(siPad(k) + ':/children?$select=name,size,id,lastModifiedDateTime&$top=200'); if (r.ok) lijst = ((await r.json()).value || []).filter(function(f){ if (f.name === '_kerngegevens.json') { kernBestand = f; return false; } return !f.folder; }); else if (r.status !== 404) throw new Error(r.status); }
   catch(err) { box.innerHTML = '<span style="color:#b9770e;">Kon de documenten niet ophalen (geen verbinding?).</span>'; return; }
+  // Kerngegevens: de versie in SharePoint is leidend (zo ziet iedereen direct dezelfde gegevens)
+  if (kernBestand && !window._siKernGeladen) {
+    try { var kr = await siGraph(siPad(k, '_kerngegevens.json') + ':/content'); if (kr.ok) { var kd = await kr.json(); var alle = schipInfoAlle();
+      if (kd && kd.velden && JSON.stringify(alle[k]) !== JSON.stringify(kd)) { alle[k] = kd; localStorage.setItem('schip_info_v1', JSON.stringify(alle)); window._siKernGeladen = true; try { return await djScheepsinfo(k); } finally { window._siKernGeladen = false; } } } } catch(e) {}
+  }
   lijst.sort(function(a, b){ return a.name.localeCompare(b.name, 'nl', { numeric: true }); }); window._siLijst = lijst; window._siSchip = k;
   box.innerHTML = lijst.length ? lijst.map(function(f, i){ var ext = (/\.([^.]+)$/.exec(f.name) || [])[1] || '';
     return '<div style="display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid #f1f1f1;"><span style="font-size:18px;">' + (/pdf/i.test(ext) ? '&#x1F4C4;' : /xls/i.test(ext) ? '&#x1F4CA;' : '&#x1F4DD;') + '</span><span style="flex:1;cursor:pointer;color:#003366;font-weight:700;" onclick="siOpen(' + i + ')">' + e(f.name.replace(/\.[^.]+$/, '')) + ' <span style="font-weight:400;color:#8795a8;font-size:11px;">' + e(ext.toUpperCase()) + ' &middot; ' + Math.round((f.size || 0) / 1024) + ' kB</span></span>' +
@@ -37738,7 +37744,13 @@ window.siBewerkOpslaan = function(k){
     velden: Array.prototype.map.call(document.querySelectorAll('#si-edit .si-r'), function(r){ return { label: r.querySelector('input').value.trim(), waarde: r.querySelector('textarea').value.trim() }; }).filter(function(v){ return v.label || v.waarde; }),
     bijgewerkt: Date.now(), door: localStorage.getItem('dj_sp_account_username') || '' };
   localStorage.setItem('schip_info_v1', JSON.stringify(a)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan();
-  document.getElementById('si-edit').remove(); djScheepsinfo(k);
+  document.getElementById('si-edit').remove();
+  (async function(){
+    try { var r = await siGraph(siPad(k, '_kerngegevens.json') + ':/content', { method: 'PUT', body: JSON.stringify(a[k]), headers: { 'Authorization': 'Bearer ' + (await spGetToken()), 'Content-Type': 'application/json' } });
+      if (!r.ok) throw new Error('status ' + r.status); }
+    catch(e) { alert('Opgeslagen op dit apparaat, maar nog niet in SharePoint (' + (e.message || e) + '). Probeer het zo nog eens.'); if (typeof djFoutVastleggen === 'function') djFoutVastleggen('Scheepsinfo opslaan mislukt: ' + (e.message || e), 'scheepsinfo', '', 'opslaan'); }
+    djScheepsinfo(k);
+  })();
 };
 // Rij "Scheepsinfo" onder de snelkoppelingen van Schip zoeken
 (function(){
