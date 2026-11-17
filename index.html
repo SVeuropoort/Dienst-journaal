@@ -24410,7 +24410,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.167';
+var DJ_BUILD = '2026-10-07.169';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -37575,8 +37575,8 @@ var SCHIP_STANDAARD = {
   'Scotia': { titel: 'Stena Scotia', velden: [
     { label: 'Laadmeters (totaal)', waarde: '1.548 m (lower hold 310 · maindeck 601 · weatherdeck 637)' },
     { label: 'Aantal trailers', waarde: '119 (weatherdeck 48 + 2 op de ramp · maindeck 50 · lower hold 19) · 117 zonder de ramp' },
-    { label: 'Aantal hutten', waarde: '' },
-    { label: 'Type', waarde: 'Ro-Ro vrachtschip, E-klasse (zusterschip Stena Hibernia), max. 12 chauffeurs' },
+    { label: 'Aantal hutten', waarde: '12 passagiershutten (12 passagiers/chauffeurs)' },
+    { label: 'Type', waarde: 'Ro-Ro vrachtschip, E-klasse (zusterschip Stena Hibernia), bouwjaar 1996, max. 12 chauffeurs' },
     { label: 'Route', waarde: 'Rotterdam – Harwich vanaf december 2026 (was Birkenhead – Dublin)' },
     { label: 'IMO / vlag', waarde: '9121625 · Isle of Man' },
     { label: 'Afmetingen', waarde: 'Lengte 142,50 m · breedte 23,20 m · GT 13.017 · DWT 5.908,8 t · 17,6 kn' },
@@ -37589,7 +37589,46 @@ var SCHIP_STANDAARD = {
     { label: 'Gevaarlijke stoffen', waarde: 'Alleen weatherdeck: pos. 1–14, 27–30, 32, 34, 36, 38, 41, 44–50 · niet op maindeck en lower hold' },
     { label: 'Reefer-aansluitingen', waarde: 'Weatherdeck 12 · maindeck 29 · lower hold 0 (totaal 41)' },
     { label: 'Let op', waarde: 'Weatherdeck pos. 31 = hot spot voor schade · maindeck pos. 6–8 geen tanks · pos. 3 maindeck korte trailer · ca. 18 m vanaf de hekdeur een afloop op het maindeck · schade aan reling bakboord hekdeur/ramp (melden/controleren)' }
-  ], bron: 'Inspectierapport Stena Scotia, november 2026 (Scott Edwards) en E-Class Cargo Care Document ver. 6' }
+  ], bron: 'Inspectierapport Stena Scotia, november 2026 (Scott Edwards), E-Class Cargo Care Document ver. 6 en General Information Scotia & Hibernia (Port Operations, juni 2012). Laadmeters volgens het rapport van 2026; het document van 2012 noemt 1.590 m (652 / 680 / 258).' },
+  'Hibernia': { titel: 'Stena Hibernia', velden: [
+    { label: 'Laadmeters (totaal)', waarde: '1.590 m (weatherdeck 652 · maindeck 680 · lower hold 258)' },
+    { label: 'Aantal trailers', waarde: '120 (weatherdeck 48 + 2 op de ramp · maindeck 50 · lower hold 20) · 118 zonder de ramp' },
+    { label: 'Aantal hutten', waarde: '12 passagiershutten (12 passagiers/chauffeurs)' },
+    { label: 'Type', waarde: 'Ro-Ro vrachtschip, E-klasse (zusterschip Stena Scotia), bouwjaar 1996' },
+    { label: 'Afmetingen', waarde: 'Lengte 143 m · breedte 23,2 m · GT 13.000 · diepgang 5,40 m · max. 18 kn' },
+    { label: 'Hekdeur', waarde: 'Breedte 16,00 m · hoogte weatherdeck 6,50 m / maindeck 5,80 m · weatherdeck-ramp 4,00 m · rijstroken 3,00 m' },
+    { label: 'Max. trailerhoogte maindeck', waarde: '4,65 m (pos. 6–8: 4,60 m) · hoge posities 5,30 m bij 5,50 m vrije hoogte (tekst: pos. 42–50; hoogtekaart E-klasse: 38, 40, 41, 45–50 — navragen)' },
+    { label: 'Max. trailerhoogte lower hold', waarde: '4,57 m · pos. 20 deels op de ramp, trestle-klem nodig' },
+    { label: 'Max. trailerhoogte weatherdeck', waarde: 'Buiten 6,20 m · onder de garage (15–26, 33, 35, 38) 4,65 m' },
+    { label: 'Gevaarlijke stoffen', waarde: 'Alleen weatherdeck: pos. 1–14, 27–30, 32, 34, 36, 38, 41, 44–50 · weatherdeck max. 31 hoog/gevaarlijk · niet op maindeck en lower hold' },
+    { label: 'Reefer-aansluitingen', waarde: 'Weatherdeck 12 · maindeck 29 · lower hold 0 (totaal 41)' },
+    { label: 'Mix chauffeurs / trailers', waarde: '1 artic → 118 trailers · 3 → 116 · 6 → 112 · 9 → 108 · 12 → 105' },
+    { label: 'Let op', waarde: 'Weatherdeck pos. 31 = hot spot voor schade · pos. 3 maindeck korte trailer · ca. 18 m vanaf de hekdeur een afloop op het maindeck' }
+  ], bron: 'General Information Scotia & Hibernia (Port Operations, M. v/d Vlugt, juni 2012) en E-Class Cargo Care Document ver. 6' },
+  'Forerunner': { titel: 'Stena Forerunner', velden: [
+    { label: 'Laadmeters (totaal)', waarde: 'ca. 3.486 m bij volle bezetting (249 trailers × ca. 14 m)' },
+    { label: 'Aantal trailers', waarde: '237 standaard · max. 249 (top deck 68 + 5 · upperdeck 67 + 7 · maindeck 72 · tank top 30)' },
+    { label: 'Aantal hutten', waarde: '' },
+    { label: 'Type', waarde: 'Ro-Ro vrachtschip, Forerunner-klasse (zusterschip Stena Foreteller) · vier dekken: tank top (1), maindeck (2), upperdeck (3), top deck (4)' },
+    { label: 'Route', waarde: 'Europoort – Immingham' },
+    { label: 'IMO', waarde: '9227259' },
+    { label: 'Posities', waarde: 'Nummer = dek, baan, positie: bijv. 3404 = dek 3 (upperdeck), baan 4, positie 04 · A/M/F = achter, midden, voor' },
+    { label: 'Per dek', waarde: 'Tank top 30 · maindeck 72 · upperdeck 67 (7 extra mogelijk) · top deck 68 (5 extra mogelijk)' },
+    { label: 'Gevaarlijke stoffen', waarde: 'Volgens het DG-plan (upperdeck en maindeck); zie het document' },
+    { label: 'Let op', waarde: 'Upperdeck: smalle posities/paal bij 3201–3202 en 3701–3702, posities onder de nieuwe ramp (baan 7–8, midden) · top deck: smalle ruimte en korte trailer bij 4101 en 4801, schoorsteen- en reddingsbootgebied, smalle banen 4707–4709, rampgebied (3 trailers)' }
+  ], bron: 'Laadplan Foreteller & Forerunner (Excel, 2026) · maximale trailerhoogtes en het aantal hutten staan niet in dit document' },
+  'Foreteller': { titel: 'Stena Foreteller', velden: [
+    { label: 'Laadmeters (totaal)', waarde: 'ca. 3.486 m bij volle bezetting (249 trailers × ca. 14 m)' },
+    { label: 'Aantal trailers', waarde: '237 standaard · max. 249 (top deck 68 + 5 · upperdeck 67 + 7 · maindeck 72 · tank top 30)' },
+    { label: 'Aantal hutten', waarde: '' },
+    { label: 'Type', waarde: 'Ro-Ro vrachtschip, Forerunner-klasse (zusterschip Stena Forerunner) · vier dekken: tank top (1), maindeck (2), upperdeck (3), top deck (4)' },
+    { label: 'Route', waarde: 'Europoort – Immingham' },
+    { label: 'IMO', waarde: '9214666' },
+    { label: 'Posities', waarde: 'Nummer = dek, baan, positie: bijv. 3404 = dek 3 (upperdeck), baan 4, positie 04 · A/M/F = achter, midden, voor' },
+    { label: 'Per dek', waarde: 'Tank top 30 · maindeck 72 · upperdeck 67 (7 extra mogelijk) · top deck 68 (5 extra mogelijk)' },
+    { label: 'Gevaarlijke stoffen', waarde: 'Volgens het DG-plan (upperdeck en maindeck); zie het document' },
+    { label: 'Let op', waarde: 'Upperdeck: smalle posities/paal bij 3201–3202 en 3701–3702, posities onder de nieuwe ramp (baan 7–8, midden) · top deck: smalle ruimte en korte trailer bij 4101 en 4801, schoorsteen- en reddingsbootgebied, smalle banen 4707–4709, rampgebied (3 trailers)' }
+  ], bron: 'Laadplan Foreteller & Forerunner (Excel, 2026) · maximale trailerhoogtes en het aantal hutten staan niet in dit document' }
 };
 function schipKey(n){ return String(n || '').trim().replace(/^stena\s+/i, '').replace(/[\\\/:*?"<>|#%]+/g, '').trim(); }
 function schipInfoAlle(){ try { return JSON.parse(localStorage.getItem('schip_info_v1') || '{}') || {}; } catch(e) { return {}; } }
@@ -37600,7 +37639,10 @@ function schipInfo(n){
   var k = schipKey(n), a = schipInfoAlle(), info = JSON.parse(JSON.stringify(a[k] || SCHIP_STANDAARD[k] || { titel: 'Stena ' + k, velden: [] }));
   info.velden = info.velden || [];
   var hl = SCHIP_HOOFD.map(function(l){ return l.toLowerCase(); });
-  var hoofd = SCHIP_HOOFD.map(function(l){ var v = info.velden.find(function(x){ return String(x.label).toLowerCase() === l.toLowerCase(); }); return v || { label: l, waarde: '' }; });
+  var std = (SCHIP_STANDAARD[k] || {}).velden || [];
+  var hoofd = SCHIP_HOOFD.map(function(l){ var v = info.velden.find(function(x){ return String(x.label).toLowerCase() === l.toLowerCase(); }) || { label: l, waarde: '' };
+    if (!v.waarde) { var sv = std.find(function(x){ return String(x.label).toLowerCase() === l.toLowerCase(); }); if (sv && sv.waarde) v = { label: l, waarde: sv.waarde }; }
+    return v; });
   info.velden = hoofd.concat(info.velden.filter(function(x){ return hl.indexOf(String(x.label).toLowerCase()) < 0; }));
   return info;
 }
