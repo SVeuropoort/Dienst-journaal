@@ -24410,7 +24410,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.170';
+var DJ_BUILD = '2026-10-07.171';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -27538,7 +27538,7 @@ var DJ_ZOEK_INDEX = [
   { label: 'ORT / Basisrooster', keywords: 'ort basisrooster onregelmatigheidstoeslag cao artikel b8', actie: function(){ navTo('ort', 'ORT / BASISROOSTER', null); } },
   { label: '🚨 Calamiteitenplan (map)', keywords: 'calamiteit calamiteitenplan cin cin-melding cinmelding meldformulier formulier incident telefoonnummers nummers telefoon bellen noodnummer cin melding dcmr rws adres havennummer beveiliging noodplan nood ontruiming ontruimingsplan brand bhv ehbo alarm alarmering plattegrond plattegronden vluchtweg vluchtwegen evacuatie incident ongeval lekkage hulpverleners emergency plan evacuation fire', actie: function(){ if (typeof djCalamiteitenplan === 'function') djCalamiteitenplan(); } },
   { label: 'Leesbevestigingen (wie heeft gelezen)', keywords: 'leesbevestiging leesbevestigingen gelezen lezen wie heeft gelezen overzicht meldingen bijzonderheden', actie: function(){ if (typeof djLeesOverzicht === 'function') djLeesOverzicht(); } },
-  { label: '🚢 Scheepsinformatie (per schip)', keywords: 'scheepsinfo scheepsinformatie schip schepen vessel cargo care plan inspectie inspectierapport dg plan deckplan stowage hoogte trailerhoogte scotia hibernia forerunner foreteller hollandica britannica transit transporter mistral thuleland', actie: function(){ if (typeof djScheepsinfo === 'function') djScheepsinfo(); } },
+  { label: '🚢 Scheepsinformatie (per schip)', keywords: 'scheepsinfo scheepsinformatie schip schepen vessel cargo care plan inspectie inspectierapport dg plan deckplan stowage hoogte trailerhoogte scotia hibernia somerset freighter forerunner foreteller hollandica britannica transit transporter mistral thuleland', actie: function(){ if (typeof djScheepsinfo === 'function') djScheepsinfo(); } },
   { label: 'Handleiding / User guide', keywords: 'handleiding gebruikershandleiding help hulp uitleg hoe werkt guide user manual instructions', actie: function(){ if (typeof djGebruikershandleiding === 'function') djGebruikershandleiding(); } },
   { label: 'Beheerdershandleiding (PDF)', keywords: 'handleiding beheerdershandleiding beheer uitleg pdf instructie hoe werkt', actie: function(){ if (typeof djHandleidingOpenen === 'function') djHandleidingOpenen(); } },
   { label: 'Rechtenoverzicht (wie heeft welke rechten)', keywords: 'rechten rechtenoverzicht toegang autorisatie accounts laatst gezien audit kwartaal controle', actie: function(){ if (typeof djRechtenOverzicht === 'function') djRechtenOverzicht(); } },
@@ -37628,7 +37628,21 @@ var SCHIP_STANDAARD = {
     { label: 'Per dek', waarde: 'Tank top 30 · maindeck 72 · upperdeck 67 (7 extra mogelijk) · top deck 68 (5 extra mogelijk)' },
     { label: 'Gevaarlijke stoffen', waarde: 'Volgens het DG-plan (upperdeck en maindeck); zie het document' },
     { label: 'Let op', waarde: 'Upperdeck: smalle posities/paal bij 3201–3202 en 3701–3702, posities onder de nieuwe ramp (baan 7–8, midden) · top deck: smalle ruimte en korte trailer bij 4101 en 4801, schoorsteen- en reddingsbootgebied, smalle banen 4707–4709, rampgebied (3 trailers)' }
-  ], bron: 'Laadplan Foreteller & Forerunner (Excel, 2026) · maximale trailerhoogtes en het aantal hutten staan niet in dit document' }
+  ], bron: 'Laadplan Foreteller & Forerunner (Excel, 2026) · maximale trailerhoogtes en het aantal hutten staan niet in dit document' },
+  'Somerset': { titel: 'Somerset', velden: [
+    { label: 'Laadmeters (totaal)', waarde: '' },
+    { label: 'Aantal trailers', waarde: '156 trailers volgens het stowage plan (weatherdeck 66 · maindeck 64 · tank top 26) · 175 posities in totaal (77 · 72 · 26)' },
+    { label: 'Aantal hutten', waarde: '' },
+    { label: 'Type', waarde: 'Ro-Ro vrachtschip, tijdelijk ingezet · drie dekken: tank top (1), maindeck (2), weatherdeck (3)' },
+    { label: 'Naam in de certificaten', waarde: 'Het stowage plan heet "M/V Somerset"; de certificaten (okt/nov 2026) staan op naam van STENA FREIGHTER — controleren of de naam nog wijzigt' },
+    { label: 'IMO / roepnaam / vlag', waarde: '9188221 · PDIU · Rotterdam (Nederland) · rederij Stena Line B.V.' },
+    { label: 'Afmetingen', waarde: 'Lengte 173,62 m · breedte 26,20 m · holte 9,30 m · GT 21.005 · NT 10.601' },
+    { label: 'Posities', waarde: 'Nummer = dek, rij, positie: bijv. 3118 = dek 3 (weatherdeck) · P/S = bakboord, S/S = stuurboord · tanks aan de achterkant van maindeck en weatherdeck' },
+    { label: 'Gevaarlijke stoffen', waarde: 'Volgens Document of Compliance (geldig tot 18-12-2029): klasse 1 (behalve 1.4S), 2.1, 3 FP<23 °C, 6.1 en 8 vloeibaar FP<23 °C alleen op het weatherdeck midden (CD 3 MID); 5.2 en 6.1 vloeibaar niet in de ruimen (CH 1/CH 2); overige klassen grotendeels toegestaan met voorwaarden — altijd het document raadplegen' },
+    { label: 'Reefer-aansluitingen', waarde: 'Zie het document "Reefer socket location": o.a. RS 11–15 stuurboord en RS 21–25 bakboord (frames 5, 25, 51, 78, 103), plus dekaansluitingen' },
+    { label: 'Certificaten', waarde: 'Interim ISSC (DNV) geldig tot 30-04-2027 · DG Document of Compliance (BV) tot 18-12-2029 · International Tonnage Certificate (BV, 05-11-2026)' },
+    { label: 'Sjorren', waarde: 'Volgens BV Summary of Lashing Arrangements (rev. 29-09-2018): trailers op LOT en trestles, self drivers, cassettes, light/heavy/IMO-severe weather' }
+  ], bron: 'Stowage plan Somerset, ITC, DG Document of Compliance, Interim ISSC, Reefer socket location en BV Summary of Lashing Arrangements · laadmeters, hutten en maximale trailerhoogtes staan niet in deze documenten' }
 };
 function schipKey(n){ return String(n || '').trim().replace(/^stena\s+/i, '').replace(/[\\\/:*?"<>|#%]+/g, '').trim(); }
 function schipInfoAlle(){ try { return JSON.parse(localStorage.getItem('schip_info_v1') || '{}') || {}; } catch(e) { return {}; } }
