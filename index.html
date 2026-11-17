@@ -24410,7 +24410,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.164';
+var DJ_BUILD = '2026-10-07.165';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -37592,6 +37592,12 @@ function schipKey(n){ return String(n || '').trim().replace(/^stena\s+/i, '').re
 function schipInfoAlle(){ try { return JSON.parse(localStorage.getItem('schip_info_v1') || '{}') || {}; } catch(e) { return {}; } }
 function schipInfo(n){ var k = schipKey(n), a = schipInfoAlle(); return a[k] || SCHIP_STANDAARD[k] || { titel: 'Stena ' + k, velden: [] }; }
 function schipNamen(){
+  // ontdubbelen op schipKey ("Stena Scotia" en "Scotia" zijn hetzelfde schip); de naam uit de snelkoppelingen gaat voor
+  var ruw = schipNamenRuw(), gezien = {}, uit = [];
+  ruw.forEach(function(n){ var k = schipKey(n).toLowerCase(); if (!gezien[k]) { gezien[k] = 1; uit.push(n); } });
+  return uit;
+}
+function schipNamenRuw(){
   var uit = [];
   document.querySelectorAll('#scheepzoeker-snelkoppelingen button').forEach(function(b){ var t = (b.textContent || '').trim(); if (t && !b.classList.contains('si-knop') && uit.indexOf(t) < 0) uit.push(t); });
   try { (JSON.parse(localStorage.getItem(tk('scheepzoeker_schepen')) || '[]') || []).forEach(function(s){ if (s && s.naam && uit.indexOf(s.naam) < 0) uit.push(s.naam); }); } catch(e) {}
