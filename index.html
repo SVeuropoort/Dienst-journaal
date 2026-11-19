@@ -4298,7 +4298,7 @@ function djAanwezigGesprekkenRender(){
 var DJ_TOEGANG_GROEPEN = [
   { titel: 'Terminals & Beheer', keys: ['beheer', 'instellingen', 'EP', 'HVH', 'IMM', 'supervisor'] },
   { titel: 'Dashboards', keys: ['kpi', 'materieel', 'bluevi', 'vandenijssel'] },
-  { titel: 'Modules', keys: ['certificeringen', 'maandafsluiting', 'salaris', 'ort', 'aowsfr', 'werkoverdracht', 'ontwikkelgesprek', 'kledingpunten'] },
+  { titel: 'Modules', keys: ['certificeringen', 'maandafsluiting', 'salaris', 'ort', 'aowsfr', 'werkoverdracht', 'ontwikkelgesprek', 'kledingpunten', 'tugmasters'] },
   { titel: 'Freightcheck (alleen lezen: punctuality + dagplanning van vandaag)', keys: ['fc_EP', 'fc_HVH', 'fc_IMM'] }
 ];
 // Iemand die alleen Freightcheck-rechten heeft, hoeft niet in de SharePoint-groep te zitten
@@ -24414,7 +24414,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.177';
+var DJ_BUILD = '2026-10-07.178';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -32915,7 +32915,7 @@ function djPersMag(t){
   if (t === 'dossier') return heeft('werkoverdracht');
   if (t === 'organogram') return heeft('werkoverdracht') || heeft('certificeringen') || heeft('ontwikkelgesprek');
   if (t === 'vakantie') return ep && (heeft('werkoverdracht') || heeft('ontwikkelgesprek'));
-  if (t === 'tugmaster') return ep && (heeft('werkoverdracht') || heeft('certificeringen') || heeft('ontwikkelgesprek'));
+  if (t === 'tugmaster') return ep && (heeft('werkoverdracht') || heeft('certificeringen') || heeft('ontwikkelgesprek') || heeft('tugmasters'));
   if (t === 'kleding') return heeft('kledingpunten');
   if (t === 'cursus') return heeft('supervisor') || heeft('beheer');
   if (t === 'certificeringen') return heeft('certificeringen');
