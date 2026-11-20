@@ -24416,7 +24416,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.190';
+var DJ_BUILD = '2026-10-07.191';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -38655,6 +38655,66 @@ window.plvAndereOpstelling = function(){
     } catch(e) {}
     return r0;
   };
+})();
+</script>
+<script>
+// ══════════════════════════════════════════════════════════════════
+// MEERIJDEN IN PROCENTEN: op hoeveel procent van de diensten kan een groep samen rijden?
+// = diensten waarop iedereen uit de groep dezelfde dienst (dag + ochtend/middag) werkt,
+//   gedeeld door alle diensten waarop iemand uit de groep werkt (over de hele cyclus van 18 weken).
+// Zelfde ploeg = 100%; andere ploegen kunnen toch deels overlappen.
+// ══════════════════════════════////////════════════════════════════
+function plvMeerijdPct(leden, r){
+  var ti = leden.map(function(p){ return PLV_TEAMS.indexOf(p.team); }).filter(function(x){ return x >= 0; }); if (ti.length < 2) return 100;
+  var samen = 0, iemand = 0;
+  for (var c = 0; c < 18; c++) for (var d = 0; d < 7; d++) {
+    var diensten = ti.map(function(t){ var w = (c + t) % 18; return r.werk(w, d) ? (r.ochtend(w, d) ? 'o' : 'm') : ''; });
+    if (diensten.some(Boolean)) iemand++;
+    if (diensten.every(function(x){ return x && x === diensten[0]; })) samen++;
+  }
+  return iemand ? Math.round(samen / iemand * 100) : 0;
+}
+window.plvMeerijdPct = plvMeerijdPct;
+(function(){
+  var _v = window.djPloegleiderVerdeling;
+  window.djPloegleiderVerdeling = function(){
+    var r0 = _v.apply(this, arguments);
+    try {
+      var r = plvRooster(), z = window._plvZoek, data = window._plvData; if (!r || !z || !data) return r0;
+      var nuSt = plvSamenStatus(data.mensen), naSt = plvSamenStatus(z.nieuw);
+      // 1) de regel "Samen houden: …" vervangen door een versie met procenten (nu → na het voorstel)
+      var regel = Array.prototype.find.call(document.querySelectorAll('#plv div'), function(d){ return /^\uD83D\uDE97 Samen houden:/.test((d.textContent || '').trim()); });
+      if (regel && naSt.length) {
+        var kort = function(p){ var w = p.naam.split(' '); return w[0] + (w.length > 1 ? ' ' + w[w.length - 1].charAt(0) + '.' : ''); };
+        regel.innerHTML = '&#x1F697; Samen rijden (% van de diensten): ' + naSt.map(function(s, i){ var na = plvMeerijdPct(s.leden, r), nu = nuSt[i] ? plvMeerijdPct(nuSt[i].leden, r) : na;
+          var kl = na === 100 ? '#1a7a40' : na >= 50 ? '#b9770e' : '#c0392b';
+          return '<span style="color:' + kl + ';" title="' + (s.g.soort === 'moet' ? 'Moet samen' : 'Graag samen') + (s.g.notitie ? ': ' + s.g.notitie : '') + '">' + s.leden.map(kort).join(' + ') + ' <b>' + (nu !== na ? nu + '% &rarr; ' : '') + na + '%</b></span>'; }).join(' &middot; ') +
+          '<div style="font-size:11px;color:#8795a8;">Percentage = op hoeveel van hun diensten ze allemaal tegelijk werken (zelfde dag, zelfde ochtend/middag). 100% = zelfde ploeg; ook vanuit verschillende ploegen kunnen ze soms samen rijden.</div>';
+      }
+      // 2) in de vergelijkingstabel: gemiddeld percentage per stand
+      var tab = document.querySelector('#plv-vergelijk table');
+      if (tab && !tab.dataset.pct) {
+        tab.dataset.pct = '1'; var kop = tab.querySelector('tr'); kop.insertAdjacentHTML('beforeend', '<th>Gem. samen rijden</th>');
+        var huidigW = window._plvSamenGewicht, rijen = tab.querySelectorAll('tr');
+        PLV_SAMEN_STANDEN.forEach(function(st, i){
+          window._plvSamenGewicht = st.w; var zz = plvZoekRuilen(data.mensen, window._plvRollen, r, 6);
+          var gr = plvSamenStatus(zz.nieuw).filter(function(x){ return x.g.soort !== 'moet'; }), gem = gr.length ? Math.round(gr.reduce(function(a, x){ return a + plvMeerijdPct(x.leden, r); }, 0) / gr.length) : 100;
+          if (rijen[i + 1]) rijen[i + 1].insertAdjacentHTML('beforeend', '<td><b>' + gem + '%</b></td>');
+        });
+        window._plvSamenGewicht = huidigW;
+        var nuGr = nuSt.filter(function(x){ return x.g.soort !== 'moet'; }), nuGem = nuGr.length ? Math.round(nuGr.reduce(function(a, x){ return a + plvMeerijdPct(x.leden, r); }, 0) / nuGr.length) : 100;
+        var kopTekst = document.querySelector('#plv-vergelijk > div'); if (kopTekst) kopTekst.insertAdjacentHTML('beforeend', ' <span style="font-weight:400;color:#5a6b80;">&middot; nu gemiddeld ' + nuGem + '% van de diensten samen rijden</span>');
+      }
+    } catch(e) {}
+    return r0;
+  };
+  // 3) ook in het venster "Samen houden": per groep het percentage nu
+  var _b = window.plvSamenBeheer;
+  window.plvSamenBeheer = function(){ var r0 = _b.apply(this, arguments);
+    try { var r = plvRooster(), st = plvSamenStatus(plvMensen().mensen), blokken = document.querySelectorAll('#plv-samen [style*="border:1px solid #dbe5f0"]');
+      blokken.forEach(function(bl, i){ var s = st[i]; if (!s || s.leden.length < 2) return; var pct = plvMeerijdPct(s.leden, r);
+        bl.insertAdjacentHTML('beforeend', '<div style="font-size:12px;margin-top:3px;color:' + (pct === 100 ? '#1a7a40' : pct >= 50 ? '#b9770e' : '#c0392b') + ';">&#x1F697; Kunnen nu op <b>' + pct + '%</b> van hun diensten samen rijden</div>'); }); } catch(e) {}
+    return r0; };
 })();
 </script>
 </body>
