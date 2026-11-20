@@ -24414,7 +24414,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.179';
+var DJ_BUILD = '2026-10-07.181';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -24489,8 +24489,17 @@ async function djNieuwsteVersie(){
     toonMelding();
     djNieuwsteVersie();
   }
+  // Eerst alleen de "kop" van het bestand opvragen (een paar honderd bytes). Alleen als die veranderd is
+  // (nieuwe versie op GitHub), wordt het hele bestand (±10 MB) opgehaald om het buildnummer te lezen.
+  var _versieKop = null;
+  async function kopVanBestand(){
+    try { var h = await fetch(location.pathname + '?versiekop=' + Date.now(), { method: 'HEAD', cache: 'no-store' }); if (!h.ok) return null;
+      return (h.headers.get('etag') || '') + '|' + (h.headers.get('last-modified') || '') + '|' + (h.headers.get('content-length') || ''); } catch(e) { return null; }
+  }
   async function controleer(){
     try {
+      var kop = await kopVanBestand();
+      if (kop && kop !== '||') { if (_versieKop === null) { _versieKop = kop; return; } if (kop === _versieKop) return; _versieKop = kop; }
       var r = await fetch(location.pathname + '?versiecheck=' + Date.now(), { cache: 'no-store' });
       if (!r.ok) return;
       var t = await r.text();
@@ -38223,5 +38232,72 @@ window.djTugVenster = function(){
   if (typeof tugRender === 'function') tugRender();
 };
 </script>
+<script>
+// ══════════════════════════════════════════════════════════════════
+// VERDELING SLEUTELFUNCTIES — snelle rekenkern (zelfde uitkomst, veel minder rekenwerk)
+//  • per ploeg één keer het patroon van 18 weken × 7 dagen × 2 diensten (252 vakjes)
+//  • een ruil past alleen de tellingen aan (+/− patroon) i.p.v. alles opnieuw te tellen
+//  • resultaat wordt onthouden: tabbladen wisselen of "voorstel tonen" rekent niet opnieuw
+// ══════════════════════════════════════════════════════════════════
+(function(){
+  var NC = 252;
+  function patronen(r){
+    var pat = [], act = new Uint8Array(NC);
+    for (var ti = 0; ti < 18; ti++) { var v = new Int8Array(NC);
+      for (var c = 0; c < 18; c++) for (var d = 0; d < 7; d++) { var w = (c + ti) % 18; if (!r.werk(w, d)) continue; var idx = (c * 7 + d) * 2 + (r.ochtend(w, d) ? 0 : 1); v[idx] = 1; act[idx] = 1; }
+      pat.push(v); }
+    return { pat: pat, act: act };
+  }
+  function kostenRol(cnt, act){
+    var nul = 0, een = 0, max = 0, som = 0, kw = 0, n = 0, i;
+    for (i = 0; i < NC; i++) { if (!act[i]) continue; var v = cnt[i]; n++; som += v; kw += v * v; if (!v) nul++; else if (v === 1) een++; if (v > max) max = v; }
+    var gem = n ? som / n : 0, sd = n ? Math.sqrt(Math.max(0, kw / n - gem * gem)) : 0, grens = Math.ceil(gem) + 1, veel = 0;
+    for (i = 0; i < NC; i++) if (act[i] && cnt[i] > grens) veel++;
+    return nul * 1000 + een * 60 + veel * 30 + sd * 100 + max * 5;
+  }
+  window.plvZoekRuilen = plvZoekRuilen = function(mensen, rollen, r, maxRuil){
+    var P = patronen(r), T = PLV_TEAMS, n = mensen.length;
+    var team = mensen.map(function(p){ return T.indexOf(p.team); });
+    var cnt = {}; rollen.forEach(function(rk){ var a = new Int16Array(NC); mensen.forEach(function(p, i){ if (p.rol[rk] && team[i] >= 0) { var v = P.pat[team[i]]; for (var x = 0; x < NC; x++) a[x] += v[x]; } }); cnt[rk] = a; });
+    // samen houden
+    var groepen = (typeof plvSamenGet === 'function' ? plvSamenGet() : []).map(function(g){ var idx = []; g.ids.forEach(function(id){ var k = mensen.findIndex(function(p){ return String(p.id) === String(id); }); if (k >= 0) idx.push(k); }); return { idx: idx, w: g.soort === 'moet' ? 20000 : 400 }; }).filter(function(g){ return g.idx.length > 1; });
+    function samenKost(){ var k = 0; groepen.forEach(function(g){ var s = {}; g.idx.forEach(function(i){ s[team[i]] = 1; }); k += (Object.keys(s).length - 1) * g.w; }); return k; }
+    function totaal(){ var k = samenKost(); rollen.forEach(function(rk){ k += kostenRol(cnt[rk], P.act); }); return k; }
+    function verplaats(i, van, naar){ rollen.forEach(function(rk){ if (!mensen[i].rol[rk]) return; var a = cnt[rk], pv = P.pat[van], pn = P.pat[naar]; for (var x = 0; x < NC; x++) a[x] += pn[x] - pv[x]; }); team[i] = naar; }
+    var vast = {}; groepen.forEach(function(g){ var s = {}; g.idx.forEach(function(i){ s[team[i]] = 1; }); if (g.w >= 20000 && Object.keys(s).length === 1) g.idx.forEach(function(i){ vast[i] = 1; }); });
+    var inGroepApart = {}; groepen.forEach(function(g){ var s = {}; g.idx.forEach(function(i){ s[team[i]] = 1; }); if (Object.keys(s).length > 1) g.idx.forEach(function(i){ inGroepApart[i] = 1; }); });
+    var relevant = mensen.map(function(p, i){ return rollen.some(function(rk){ return p.rol[rk]; }) || !!inGroepApart[i]; });
+    var hk = totaal(), ruilen = [], gebruikt = {};
+    for (var stap = 0; stap < (maxRuil || 6); stap++) {
+      var best = null;
+      for (var i = 0; i < n; i++) { if (vast[i] || gebruikt[i] || !relevant[i] || team[i] < 0) continue;
+        for (var j = 0; j < n; j++) { if (i === j || vast[j] || gebruikt[j] || team[j] < 0 || team[j] === team[i]) continue;
+          if (!inGroepApart[i] && !inGroepApart[j] && rollen.every(function(rk){ return mensen[i].rol[rk] === mensen[j].rol[rk]; })) continue;
+          var ti = team[i], tj = team[j]; verplaats(i, ti, tj); verplaats(j, tj, ti);
+          var k = totaal();
+          verplaats(i, tj, ti); verplaats(j, ti, tj);
+          if (k < hk - 0.5 && (!best || k < best.k)) best = { i: i, j: j, k: k };
+        } }
+      if (!best) break;
+      var a = mensen[best.i], b = mensen[best.j];
+      ruilen.push({ a: a.naam, aTeam: T[team[best.i]], b: b.naam, bTeam: T[team[best.j]] });
+      var ti2 = team[best.i], tj2 = team[best.j]; verplaats(best.i, ti2, tj2); verplaats(best.j, tj2, ti2);
+      gebruikt[best.i] = gebruikt[best.j] = 1; hk = best.k;
+    }
+    var nieuw = mensen.map(function(p, i){ return Object.assign({}, p, { team: T[team[i]] || p.team }); });
+    var per = function(lijst){ var o = {}; rollen.forEach(function(rk){ o[rk] = plvScoreRol(plvTelRol(lijst, rk, r)); }); return o; };
+    return { basis: { per: per(mensen) }, eind: { per: per(nieuw) }, ruilen: ruilen.map(function(x, i){ return Object.assign(x, { sc: null }); }), nieuw: nieuw };
+  };
+  // Onthouden: zelfde gegevens + zelfde functies = zelfde voorstel (niet opnieuw rekenen)
+  var _z = window.plvZoekRuilen, _cache = {};
+  window.plvZoekRuilen = plvZoekRuilen = function(mensen, rollen, r, maxRuil){
+    var sleutel = JSON.stringify([mensen.map(function(p){ return [p.id, p.team, p.rol]; }), rollen, maxRuil, typeof plvSamenGet === 'function' ? plvSamenGet() : []]);
+    if (_cache[sleutel]) return _cache[sleutel];
+    var t0 = performance.now(), res = _z(mensen, rollen, r, maxRuil); res.ms = Math.round(performance.now() - t0);
+    _cache = {}; _cache[sleutel] = res; return res;
+  };
+})();
+</script>
+
 </body>
 </html>
