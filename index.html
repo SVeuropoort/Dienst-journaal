@@ -24416,7 +24416,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.189';
+var DJ_BUILD = '2026-10-07.190';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -38327,7 +38327,7 @@ window.djTugVenster = function(){
     var sleutel = JSON.stringify([mensen.map(function(p){ return [p.id, p.team, p.rol]; }), rollen, maxRuil, typeof plvSamenGet === 'function' ? plvSamenGet() : [], typeof plvPloeg4Get === 'function' ? plvPloeg4Get() : [], window._plvSamenGewicht]);
     if (_cache[sleutel]) return _cache[sleutel];
     var t0 = performance.now(), res = _z(mensen, rollen, r, maxRuil); res.ms = Math.round(performance.now() - t0);
-    _cache = {}; _cache[sleutel] = res; return res;
+    var ks = Object.keys(_cache); if (ks.length >= 10) delete _cache[ks[0]]; _cache[sleutel] = res; return res;
   };
 })();
 </script>
@@ -38618,6 +38618,42 @@ window.plvAndereOpstelling = function(){
       }
     } catch(e) {}
     return r;
+  };
+})();
+</script>
+<script>
+// Vergelijking van de drie standen "samen rijden telt: zwaar / licht / niet" in één tabel,
+// zodat je ziet hoeveel het meerijden kost of oplevert. Klik op een rij om die stand te kiezen.
+(function(){
+  var _v = window.djPloegleiderVerdeling;
+  window.djPloegleiderVerdeling = function(){
+    var r0 = _v.apply(this, arguments);
+    try {
+      var r = plvRooster(), data = window._plvData; if (!r || !data || document.getElementById('plv-vergelijk')) return r0;
+      var graag = plvSamenGet().filter(function(g){ return g.soort !== 'moet'; }); if (!graag.length) return r0;
+      var huidigW = window._plvSamenGewicht, rollen = window._plvRollen, rijen = [];
+      var voorNu = plvSamenStatus(data.mensen).filter(function(s){ return s.g.soort !== 'moet'; }).filter(function(s){ return !s.apart; }).length;
+      PLV_SAMEN_STANDEN.forEach(function(st){
+        window._plvSamenGewicht = st.w;
+        var z = plvZoekRuilen(data.mensen, rollen, r, 6), samen = plvSamenStatus(z.nieuw).filter(function(s){ return s.g.soort !== 'moet'; }), ok = samen.filter(function(s){ return !s.apart; }).length;
+        var per = rollen.map(function(rk){ var e2 = z.eind.per[rk]; return { pl: 'PL', ctrl: 'C', kraan: 'K' }[rk] + ' ' + e2.nul + '/' + e2.een; }).join(' &middot; ');
+        rijen.push({ st: st, ok: ok, tot: samen.length, per: per, ruilen: z.ruilen.length });
+      });
+      window._plvSamenGewicht = huidigW;
+      var vak = Array.prototype.find.call(document.querySelectorAll('#plv div'), function(d){ return /^Voorstel:/.test((d.textContent || '').trim()); });
+      if (!vak) return r0;
+      var x = document.createElement('div'); x.id = 'plv-vergelijk'; x.style.cssText = 'font-size:12px;margin:6px 0 8px;break-inside:avoid;';
+      x.innerHTML = '<div style="font-weight:700;color:#003366;margin-bottom:3px;">&#x1F697; Hoeveel telt meerijden mee? <span style="font-weight:400;color:#5a6b80;">(nu, zonder ruilen: ' + voorNu + ' van ' + graag.length + ' meerijdgroepen samen)</span></div>' +
+        '<table style="border-collapse:collapse;width:100%;"><tr style="color:#5a6b80;text-align:left;"><th style="padding:2px 6px;">Stand</th><th>Meerijders samen</th><th>Zonder / maar 1</th><th>Ruilen</th></tr>' +
+        rijen.map(function(rw){ var actief = rw.st.w === huidigW, pct = rw.tot ? Math.round(rw.ok / rw.tot * 100) : 100;
+          return '<tr onclick="window._plvSamenGewicht=' + rw.st.w + ';window._plvVoorstel=null;djPloegleiderVerdeling()" title="Deze stand kiezen" style="cursor:pointer;border-top:1px solid #eef1f5;' + (actief ? 'background:#fff7e6;font-weight:700;' : '') + '">' +
+            '<td style="padding:3px 6px;">' + (actief ? '&#x25B6; ' : '') + rw.st.l + '</td>' +
+            '<td><span style="display:inline-block;width:60px;height:8px;background:#eef1f5;border-radius:4px;vertical-align:middle;overflow:hidden;"><span style="display:block;height:8px;width:' + pct + '%;background:' + (pct >= 75 ? '#1a7a40' : pct >= 40 ? '#b9770e' : '#c0392b') + ';"></span></span> ' + rw.ok + ' van ' + rw.tot + '</td>' +
+            '<td>' + rw.per + '</td><td>' + rw.ruilen + '</td></tr>'; }).join('') + '</table>' +
+        '<div style="font-size:11px;color:#8795a8;margin-top:2px;">Zonder / maar 1 = aantal diensten zonder, en met maar één (PL = ploegleider, C = checker, K = kraanmeester). Klik op een rij om die stand te kiezen.</div>';
+      vak.parentNode.insertBefore(x, vak.nextSibling);
+    } catch(e) {}
+    return r0;
   };
 })();
 </script>
