@@ -24416,7 +24416,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.191';
+var DJ_BUILD = '2026-10-07.192';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -38712,9 +38712,36 @@ window.plvMeerijdPct = plvMeerijdPct;
   var _b = window.plvSamenBeheer;
   window.plvSamenBeheer = function(){ var r0 = _b.apply(this, arguments);
     try { var r = plvRooster(), st = plvSamenStatus(plvMensen().mensen), blokken = document.querySelectorAll('#plv-samen [style*="border:1px solid #dbe5f0"]');
-      blokken.forEach(function(bl, i){ var s = st[i]; if (!s || s.leden.length < 2) return; var pct = plvMeerijdPct(s.leden, r);
-        bl.insertAdjacentHTML('beforeend', '<div style="font-size:12px;margin-top:3px;color:' + (pct === 100 ? '#1a7a40' : pct >= 50 ? '#b9770e' : '#c0392b') + ';">&#x1F697; Kunnen nu op <b>' + pct + '%</b> van hun diensten samen rijden</div>'); }); } catch(e) {}
+      // na het voorstel (als dat er is): dezelfde groepen, maar met de ploegen uit het voorstel
+      var z = window._plvZoek, na = (z && z.nieuw && z.ruilen && z.ruilen.length) ? plvSamenStatus(z.nieuw) : null;
+      var kleur = function(p){ return p === 100 ? '#1a7a40' : p >= 50 ? '#b9770e' : '#c0392b'; };
+      blokken.forEach(function(bl, i){ var s = st[i]; if (!s || s.leden.length < 2) return; var pct = plvMeerijdPct(s.leden, r), n = na && na[i], pctNa = n ? plvMeerijdPct(n.leden, r) : null;
+        bl.insertAdjacentHTML('beforeend', '<div style="font-size:12px;margin-top:3px;">&#x1F697; Samen rijden: <span style="color:' + kleur(pct) + ';">nu <b>' + pct + '%</b>' + (s.apart ? ' (Team ' + s.teams.join(' en Team ') + ')' : '') + '</span>' +
+          (n ? ' &rarr; <span style="color:' + kleur(pctNa) + ';">met het voorstel <b>' + pctNa + '%</b> (' + (n.apart ? 'Team ' + n.teams.join(' en Team ') : 'samen in Team ' + n.teams[0]) + ')</span>' : '') + ' <span style="color:#8795a8;">van hun diensten</span></div>'); });
+      if (na) { var kop = document.querySelector('#plv-samen > div > div:nth-child(2)'); if (kop) kop.insertAdjacentHTML('beforeend', '<div style="margin-top:4px;color:#b9770e;">Rechtsboven staat de stand van <b>nu</b>; daaronder per groep ook het resultaat <b>met het voorstel</b>.</div>'); }
+    } catch(e) {}
     return r0; };
+})();
+</script>
+<script>
+// Dubbele registraties opsporen: dezelfde naam met twee mannummers telt anders als twee mensen
+// (geeft o.a. een ploeg die "4" lijkt maar er 3 is, en iemand die in twee ploegen tegelijk lijkt te staan).
+function plvDubbeleNamen(mensen){ var tel = {}; mensen.forEach(function(p){ var k = String(p.naam || '').toLowerCase().replace(/\s+/g, ' ').trim(); (tel[k] = tel[k] || []).push(p); }); return Object.keys(tel).filter(function(k){ return tel[k].length > 1; }).map(function(k){ return tel[k]; }); }
+(function(){
+  var _v = window.djPloegleiderVerdeling;
+  window.djPloegleiderVerdeling = function(){
+    var r0 = _v.apply(this, arguments);
+    try {
+      var data = window._plvData; if (!data || document.getElementById('plv-dubbel')) return r0;
+      var d = plvDubbeleNamen(data.mensen); if (!d.length) return r0;
+      var bar = document.querySelector('#plv > div > div:nth-child(2)'); if (!bar) return r0;
+      var x = document.createElement('div'); x.id = 'plv-dubbel'; x.style.cssText = 'flex-basis:100%;background:#fdecea;border:1px solid #f1c4c4;border-radius:6px;padding:6px 10px;font-size:12.5px;color:#7b241c;';
+      x.innerHTML = '&#x26A0;&#xFE0F; <b>Dubbel in de medewerkerslijst</b> (zelfde naam, verschillende mannummers): ' + d.map(function(l){ return '<b>' + l[0].naam + '</b> (' + l.map(function(p){ return p.id + ' &middot; Team ' + p.team; }).join(' / ') + ')'; }).join('; ') +
+        '. De verdeling telt ze nu als aparte mensen. Haal het overbodige mannummer weg in de medewerkerslijst van de Maandafsluiting en lees Quinyx opnieuw in.';
+      bar.appendChild(x);
+    } catch(e) {}
+    return r0;
+  };
 })();
 </script>
 </body>
