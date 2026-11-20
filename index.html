@@ -3329,7 +3329,7 @@ async function spOphalenBestandRuw(bestandsnaam){
 //    nog aan vertrouwelijke sleutels in main stond, blijft ongemoeid staan.
 var DJ_VERTR_SLEUTELS = ['dienstjournaal_stena_v1', 'werkoverdracht_ziekmeldingen_v1',
   'personeelsdossier_v1', 'personeelsdossier_actief_v1',
-  'ma_loongroepen_v1', 'ma_medewerkers_v1', 'ma_hvh_v1', 'ma_apart_v1', 'ma_mentor_v1', 'ma_verzonden_v1', 'ma_mail_v1', 'ma_quinyx_namen_v1', 'pd_koppeling_v1', 'pd_team_v1', 'pd_quinyx_extra_v1', 'dj_prullenbak_vertr_v1', 'cin_meldingen_v1', 'plv_samen_v1', 'plv_ploeg4_v1', 'plv_proeffuncties_v1', 'plv_doorgevoerd_v1', 'plan_sv_v1', 'startup_v1', 'kledingpunten_v1', 'bezetting_deeltijd_v1', 'pd_verlof_v1'];
+  'ma_loongroepen_v1', 'ma_medewerkers_v1', 'ma_hvh_v1', 'ma_apart_v1', 'ma_mentor_v1', 'ma_verzonden_v1', 'ma_mail_v1', 'ma_quinyx_namen_v1', 'pd_koppeling_v1', 'pd_team_v1', 'pd_quinyx_extra_v1', 'dj_prullenbak_vertr_v1', 'cin_meldingen_v1', 'plv_samen_v1', 'plv_ploeg4_v1', 'plv_proeffuncties_v1', 'plv_doorgevoerd_v1', 'ma_verwijderd_v1', 'plan_sv_v1', 'startup_v1', 'kledingpunten_v1', 'bezetting_deeltijd_v1', 'pd_verlof_v1'];
 function djIsVertrSleutel(k){ return DJ_VERTR_SLEUTELS.indexOf(String(k).replace(/^(EP|HVH|IMM)_/, '')) >= 0; }
 function djVertrSplits(data){
   var vertr = {}, rest = {};
@@ -7401,6 +7401,7 @@ window.addEventListener('resize', () => {
     'plv_proeffuncties_v1',
     'plv_doorgevoerd_v1',
     'plv_opgelost_v1',
+    'ma_verwijderd_v1',
     'dj_verjaardagen_v1',
     'dagpl_cert_v1',
     'dagpl_cert_v2',
@@ -7789,7 +7790,7 @@ window.addEventListener('resize', () => {
   }
   function djIsPlanningSleutel(k){ return /dagplan_|dagPlanning_v2_state|^ls_/.test(k); }
   // Sleutels die per regel (persoon / registratie / ploeg) worden samengevoegd i.p.v. "wie het laatst opslaat wint"
-  function djIsRegelSleutel(k){ return /(^|_)(personeelsdossier_v1|opleiding_overzicht_v1|organogram_v1|pd_verlof_v1|pd_functies_v1|dj_verjaardagen_v1|kledingpunten_v1|vakantierooster_v1|tugmasters_v1|pd_koppeling_v1|pd_team_v1|pd_quinyx_extra_v1|ma_medewerkers_v1|ma_hvh_v1|ma_apart_v1|ma_mentor_v1|ma_quinyx_namen_v1|ontwikkelgesprek[a-z_]*_v1|bezetting_deeltijd_v1|bezetting_instellingen_v1|dj_toegang_v1|dj_prullenbak_v1|dj_prullenbak_vertr_v1|dj_uitdienst_gepland_v1|dj_rechtencontrole_v1|dm_gelezen_v1|wo_lees_v1|lees_uitgesloten_v1|cal_nummers_v1|cin_formulier_v1|cin_meldingen_v1|lees_ploegleiders_v1|schip_info_v1|schip_alias_v1|schip_verborgen_v1|plv_samen_v1|plv_ploeg4_v1|plv_proeffuncties_v1|plv_opgelost_v1)$/.test(k); }
+  function djIsRegelSleutel(k){ return /(^|_)(personeelsdossier_v1|opleiding_overzicht_v1|organogram_v1|pd_verlof_v1|pd_functies_v1|dj_verjaardagen_v1|kledingpunten_v1|vakantierooster_v1|tugmasters_v1|pd_koppeling_v1|pd_team_v1|pd_quinyx_extra_v1|ma_medewerkers_v1|ma_hvh_v1|ma_apart_v1|ma_mentor_v1|ma_quinyx_namen_v1|ontwikkelgesprek[a-z_]*_v1|bezetting_deeltijd_v1|bezetting_instellingen_v1|dj_toegang_v1|dj_prullenbak_v1|dj_prullenbak_vertr_v1|dj_uitdienst_gepland_v1|dj_rechtencontrole_v1|dm_gelezen_v1|wo_lees_v1|lees_uitgesloten_v1|cal_nummers_v1|cin_formulier_v1|cin_meldingen_v1|lees_ploegleiders_v1|schip_info_v1|schip_alias_v1|schip_verborgen_v1|plv_samen_v1|plv_ploeg4_v1|plv_proeffuncties_v1|plv_opgelost_v1|ma_verwijderd_v1)$/.test(k); }
   // Diepe 3-weg-samenvoeging. Lijsten met herkenbare regels (id / naam / mannr) worden per regel samengevoegd:
   // wat ik toevoeg, wijzig of verwijder telt; wat een collega intussen toevoegde/wijzigde blijft staan.
   function djRegelId(x){ if (!x || typeof x !== 'object' || Array.isArray(x)) return null; var v = x.id != null ? 'id:' + x.id : x.mannr != null ? 'nr:' + x.mannr : x.naam != null ? 'n:' + x.naam : x.persoon != null ? 'p:' + x.persoon : null; return v; }
@@ -24418,7 +24419,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.199';
+var DJ_BUILD = '2026-10-07.201';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -39012,6 +39013,53 @@ window.plvOplossen = function(sl){
   plvWaarschuwVenster(); plvWaarschuwBalk();
 };
 document.addEventListener('DOMContentLoaded', function(){ setTimeout(plvWaarschuwBalk, 10000); setInterval(plvWaarschuwBalk, 10 * 60000); });
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// VERWIJDERD = VERWIJDERD (medewerkerslijsten Maandafsluiting EP/HVH)
+// Haalt iemand een medewerker uit de lijst, dan wordt dat onthouden (ma_verwijderd_v1, per mannummer).
+// Zo kan een collega met een oudere kopie hem niet per ongeluk terugzetten. Opnieuw toevoegen (met de hand)
+// heft dat weer op.
+// ══════════════════════════════════════════════════════════════════
+(function(){
+  var SLEUTELS = ['ma_medewerkers_v1', 'ma_hvh_v1'];
+  function graf(){ try { return JSON.parse(localStorage.getItem('ma_verwijderd_v1') || '{}') || {}; } catch(e) { return {}; } }
+  function nrs(lijst){ var o = {}; (Array.isArray(lijst) ? lijst : []).forEach(function(r){ if (r && r.mannr != null) o[String(r.mannr)] = 1; }); return o; }
+  var _orig = localStorage.setItem;
+  localStorage.setItem = function(k, v){
+    if (SLEUTELS.indexOf(k) >= 0) {
+      try {
+        var nieuw = JSON.parse(v), oud = JSON.parse(localStorage.getItem(k) || '[]'), g = graf(), gw = false, sync = (typeof _djSyncDataToepassen !== 'undefined' && _djSyncDataToepassen);
+        if (Array.isArray(nieuw)) {
+          var o = nrs(oud), n = nrs(nieuw);
+          if (!sync) {
+            Object.keys(o).forEach(function(m){ if (!n[m]) { g[m] = Date.now(); gw = true; } });           // weggehaald → onthouden
+            // Komt een eerder verwijderd mannummer terug? Alleen als iemand dat bewust bevestigt
+            // (een collega-scherm met een oude kopie mag hem niet stilletjes terugzetten).
+            window._maTerugGevraagd = window._maTerugGevraagd || {};
+            Object.keys(n).forEach(function(m){ if (!o[m] && g[m] && !window._maTerugGevraagd[m]) { window._maTerugGevraagd[m] = 1;
+              var r = nieuw.find(function(x){ return String(x.mannr) === m; }) || {};
+              if (confirm('Mannummer ' + m + (r.naam ? ' (' + r.naam + ')' : '') + ' is eerder uit de medewerkerslijst verwijderd (' + new Date(g[m]).toLocaleDateString('nl-NL') + ').\n\nWil je hem echt opnieuw toevoegen?')) { delete g[m]; gw = true; } } });
+          }
+          var gefilterd = nieuw.filter(function(r){ return !(r && r.mannr != null && g[String(r.mannr)]); });
+          if (gefilterd.length !== nieuw.length) v = JSON.stringify(gefilterd);
+          if (gw) _orig.call(localStorage, 'ma_verwijderd_v1', JSON.stringify(g));
+        }
+      } catch(e) {}
+    }
+    return _orig.apply(this, [k, v]);
+  };
+  // Opruimen na synchronisatie (een collega kan intussen iets verwijderd hebben)
+  function opruimen(){
+    var g = graf(); if (!Object.keys(g).length) return;
+    SLEUTELS.forEach(function(k){ try { var l = JSON.parse(localStorage.getItem(k) || 'null'); if (!Array.isArray(l)) return;
+      var f = l.filter(function(r){ return !(r && r.mannr != null && g[String(r.mannr)]); });
+      if (f.length !== l.length) { _orig.call(localStorage, k, JSON.stringify(f)); if (typeof autoCloudOpslaan === 'function') autoCloudOpslaan(); } } catch(e) {} });
+  }
+  window.djMaOpruimen = opruimen;
+  document.addEventListener('DOMContentLoaded', function(){ setTimeout(opruimen, 6000); setInterval(opruimen, 30000); });
+})();
 </script>
 
 </body>
