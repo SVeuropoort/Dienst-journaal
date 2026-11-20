@@ -24416,7 +24416,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.192';
+var DJ_BUILD = '2026-10-07.193';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -38718,7 +38718,14 @@ window.plvMeerijdPct = plvMeerijdPct;
       blokken.forEach(function(bl, i){ var s = st[i]; if (!s || s.leden.length < 2) return; var pct = plvMeerijdPct(s.leden, r), n = na && na[i], pctNa = n ? plvMeerijdPct(n.leden, r) : null;
         bl.insertAdjacentHTML('beforeend', '<div style="font-size:12px;margin-top:3px;">&#x1F697; Samen rijden: <span style="color:' + kleur(pct) + ';">nu <b>' + pct + '%</b>' + (s.apart ? ' (Team ' + s.teams.join(' en Team ') + ')' : '') + '</span>' +
           (n ? ' &rarr; <span style="color:' + kleur(pctNa) + ';">met het voorstel <b>' + pctNa + '%</b> (' + (n.apart ? 'Team ' + n.teams.join(' en Team ') : 'samen in Team ' + n.teams[0]) + ')</span>' : '') + ' <span style="color:#8795a8;">van hun diensten</span></div>'); });
-      if (na) { var kop = document.querySelector('#plv-samen > div > div:nth-child(2)'); if (kop) kop.insertAdjacentHTML('beforeend', '<div style="margin-top:4px;color:#b9770e;">Rechtsboven staat de stand van <b>nu</b>; daaronder per groep ook het resultaat <b>met het voorstel</b>.</div>'); }
+      if (na) {
+        var kop = document.querySelector('#plv-samen > div > div:nth-child(2)'); if (kop) kop.insertAdjacentHTML('beforeend', '<div style="margin-top:4px;color:#0f6cbd;">Je kijkt naar het <b>voorstel</b>: rechtsboven staat waar de groep in het voorstel komt; tussen haakjes hoe het <b>nu</b> is (er verandert pas iets als jullie in Quinyx ruilen).</div>');
+        // rechtsboven: de stand van het voorstel tonen (met "nu" klein erbij)
+        blokken.forEach(function(bl, i){ var s2 = st[i], n2 = na[i]; if (!s2 || !n2) return;
+          var lab = Array.prototype.find.call(bl.querySelectorAll('span'), function(x){ return /^(\u2714 samen in Team|nu in Team)/.test((x.textContent || '').trim()); }); if (!lab) return;
+          var nuTekst = s2.apart ? 'nu Team ' + s2.teams.join(' + ') : 'nu samen in ' + s2.teams[0];
+          lab.innerHTML = (n2.apart ? '<span style="color:#b9770e;">voorstel: Team ' + n2.teams.join(' en Team ') + '</span>' : '<span style="color:#1a7a40;">&#x2714; voorstel: samen in Team ' + n2.teams[0] + '</span>') + ' <span style="font-weight:400;color:#8795a8;font-size:11px;">(' + nuTekst + ')</span>'; });
+      }
     } catch(e) {}
     return r0; };
 })();
