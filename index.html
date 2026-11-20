@@ -24416,7 +24416,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.186';
+var DJ_BUILD = '2026-10-07.187';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -38061,10 +38061,15 @@ window.djPloegleiderVerdeling = function(){
   var dagen = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'], dIdx = [1, 2, 3, 4, 5, 6, 0];
   var raster = function(rk){
     var t = plvTelRol(mensen, rk, r), sc = plvScoreRol(t), rol = PLV_ROLLEN.find(function(x){ return x.k === rk; });
+    // wie heeft deze functie per ploeg (voor de tooltip per vakje)
+    var perTeam = {}; mensen.forEach(function(p){ if (!p.rol[rk]) return; (perTeam[p.team] = perTeam[p.team] || []).push(p.naam + (p.proef && p.proef[rk] ? ' (voorstel)' : '')); });
+    var wie = function(c, d, och){ var uit = []; PLV_TEAMS.forEach(function(T, ti){ var w = (c + ti) % 18; if (!r.werk(w, d) || r.ochtend(w, d) !== och) return; (perTeam[T] || []).forEach(function(nm){ uit.push(nm + ' (Team ' + T + ')'); }); });
+      var dg = ['zondag', 'maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag'][d];
+      return e('Week ' + (c + 1) + ', ' + dg + ' ' + (och ? 'ochtend' : 'middag') + ' — ' + rol.l.toLowerCase() + ':\n' + (uit.length ? uit.join('\n') : 'niemand')); };
     var kl = function(v, act){ if (!act) return '#f3f4f6'; if (!v) return '#f5b7b1'; if (v === 1) return '#fcf3cf'; if (v > Math.ceil(sc.gem) + 1) return '#f8c471'; return '#a9dfbf'; };
     return '<div style="margin-bottom:12px;"><div style="font-weight:800;color:#003366;margin-bottom:3px;">' + rol.l + ' <span style="font-weight:400;font-size:12px;color:#5a6b80;">&mdash; ' + sc.nul + ' zonder &middot; ' + sc.een + ' met maar 1 &middot; max. ' + sc.max + ' &middot; ' + sc.veel + ' (te) veel</span></div>' +
       '<table style="border-collapse:collapse;font-size:10.5px;"><tr><th style="padding:1px 5px;">Wk</th>' + dagen.map(function(d){ return '<th colspan="2">' + d + '</th>'; }).join('') + '</tr>' +
-      t.map(function(wk, c){ return '<tr><td style="padding:1px 5px;font-weight:700;">' + (c + 1) + '</td>' + dIdx.map(function(d){ var x = wk[d]; return '<td style="width:19px;text-align:center;background:' + kl(x.o, x.actO) + ';border:1px solid #fff;">' + (x.actO ? x.o : '') + '</td><td style="width:19px;text-align:center;background:' + kl(x.m, x.actM) + ';border:1px solid #fff;">' + (x.actM ? x.m : '') + '</td>'; }).join('') + '</tr>'; }).join('') + '</table></div>';
+      t.map(function(wk, c){ return '<tr><td style="padding:1px 5px;font-weight:700;">' + (c + 1) + '</td>' + dIdx.map(function(d){ var x = wk[d]; return '<td' + (x.actO ? ' title="' + wie(c, d, true) + '"' : '') + ' style="width:19px;text-align:center;background:' + kl(x.o, x.actO) + ';border:1px solid #fff;' + (x.actO ? 'cursor:help;' : '') + '">' + (x.actO ? x.o : '') + '</td><td' + (x.actM ? ' title="' + wie(c, d, false) + '"' : '') + ' style="width:19px;text-align:center;background:' + kl(x.m, x.actM) + ';border:1px solid #fff;' + (x.actM ? 'cursor:help;' : '') + '">' + (x.actM ? x.m : '') + '</td>'; }).join('') + '</tr>'; }).join('') + '</table></div>';
   };
   var tab = function(lbl, rs){ var aan = JSON.stringify(rs) === JSON.stringify(rollen); return '<button type="button" onclick="window._plvRollen=' + JSON.stringify(rs).replace(/"/g, '&quot;') + ';window._plvVoorstel=null;djPloegleiderVerdeling()" style="padding:5px 12px;border:1px solid #003366;border-radius:6px;font-weight:700;cursor:pointer;background:' + (aan ? '#003366;color:#fff' : '#fff;color:#003366') + ';">' + lbl + '</button>'; };
   var oud = document.getElementById('plv'); if (oud) oud.remove();
