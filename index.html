@@ -24419,7 +24419,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.201';
+var DJ_BUILD = '2026-10-07.202';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -38767,10 +38767,13 @@ function plvDatumsVoor(c, d, aantal){
   var vandaag = new Date(); vandaag.setHours(0, 0, 0, 0);
   var maandag = new Date(PLV_START); maandag.setDate(maandag.getDate() + c * 7);
   var dag = new Date(maandag); dag.setDate(maandag.getDate() + (d === 0 ? 6 : d - 1)); // zondag hoort bij dezelfde roosterweek (ma–zo)
-  while (dag < vandaag) dag.setDate(dag.getDate() + 126); // 18 weken
+  while (dag < vandaag) dag.setDate(dag.getDate() + 126); // 18 weken vooruit tot vandaag
+  while (true) { var eerder = new Date(dag); eerder.setDate(eerder.getDate() - 126); if (eerder >= vandaag) dag = eerder; else break; } // …en terug zolang dat nog vandaag of later is (dus ook datums in 2026)
   var uit = []; for (var i = 0; i < (aantal || 3); i++) { uit.push(new Date(dag)); dag.setDate(dag.getDate() + 126); } return uit;
 }
-function plvFmt(d){ return d.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }); }
+function plvIsoWeek(d){ var t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())), dn = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - dn); var j = new Date(Date.UTC(t.getUTCFullYear(), 0, 1)); return Math.ceil(((t - j) / 864e5 + 1) / 7); }
+window.plvIsoWeek = plvIsoWeek;
+function plvFmt(d){ return d.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) + ' (wk ' + plvIsoWeek(d) + ')'; }
 window.plvCyclusVan = plvCyclusVan; window.plvDatumsVoor = plvDatumsVoor;
 (function(){
   var _v = window.djPloegleiderVerdeling;
@@ -38781,7 +38784,7 @@ window.plvCyclusVan = plvCyclusVan; window.plvDatumsVoor = plvDatumsVoor;
       document.querySelectorAll('#plv table').forEach(function(tab){
         if (tab.dataset.datums || !/Wk/.test((tab.rows[0] || {}).textContent || '')) return; tab.dataset.datums = '1';
         Array.prototype.forEach.call(tab.rows, function(rw, i){ if (i === 0) return; var cel = rw.cells[0]; var wk = parseInt(cel.textContent, 10); if (!wk) return;
-          var ma = plvDatumsVoor(wk - 1, 1, 1)[0]; cel.innerHTML = wk + ' <span style="font-weight:400;color:#8795a8;font-size:9.5px;">' + ma.getDate() + '-' + (ma.getMonth() + 1) + '</span>'; cel.title = 'Roosterweek ' + wk + ' begint eerstvolgend op ' + plvFmt(ma) + ' (daarna elke 18 weken)'; cel.style.whiteSpace = 'nowrap'; });
+          var ma = plvDatumsVoor(wk - 1, 1, 1)[0]; cel.innerHTML = wk + ' <span style="font-weight:400;color:#8795a8;font-size:9.5px;">' + ma.getDate() + '-' + (ma.getMonth() + 1) + ' &middot; wk' + plvIsoWeek(ma) + '</span>'; cel.title = 'Roosterweek ' + wk + ' begint eerstvolgend op ' + plvFmt(ma) + ' (daarna elke 18 weken)'; cel.style.whiteSpace = 'nowrap'; });
       });
       // 2) tooltip per vakje: de eerstvolgende datums erbij
       document.querySelectorAll('#plv td[title]').forEach(function(td){
@@ -38926,7 +38929,7 @@ window.plvOngedaan = function(){
         rij.cells[0].style.background = '#0f6cbd'; rij.cells[0].style.color = '#fff'; rij.cells[0].title = 'Vandaag: roosterweek ' + (cy.c + 1) + '. ' + (rij.cells[0].title || '');
         // de huidige roosterweek: maandag van déze week tonen (niet de volgende keer over 18 weken)
         var nu = new Date(), ma = new Date(nu.getFullYear(), nu.getMonth(), nu.getDate() - ((nu.getDay() + 6) % 7));
-        rij.cells[0].innerHTML = (cy.c + 1) + ' <span style="font-weight:400;font-size:9.5px;color:#dbe9f8;">' + ma.getDate() + '-' + (ma.getMonth() + 1) + '</span>';
+        rij.cells[0].innerHTML = (cy.c + 1) + ' <span style="font-weight:400;font-size:9.5px;color:#dbe9f8;">' + ma.getDate() + '-' + (ma.getMonth() + 1) + ' &middot; wk' + plvIsoWeek(ma) + '</span>';
         [1 + 2 * pos, 2 + 2 * pos].forEach(function(ci){ var cel = rij.cells[ci]; if (!cel) return;
           cel.style.boxShadow = 'inset 0 0 0 2px #0f6cbd'; cel.style.fontWeight = '800'; cel.style.color = '#0b3d75';
           if (cel.title) cel.title = 'VANDAAG \u2014 ' + cel.title; });
