@@ -24421,7 +24421,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.207';
+var DJ_BUILD = '2026-10-07.208';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
@@ -34721,7 +34721,7 @@ function pdVlBadges(naam){
 .pdv{display:flex;flex-direction:column;gap:3px;font-size:10.5px;font-weight:700;color:#5a6b80;text-transform:uppercase;letter-spacing:.3px;margin:0}
 .pdv input[type=text],.pdv input[type=number],.pdv select{width:100%!important;box-sizing:border-box;padding:5px 7px!important;border:1px solid #c8d7e8;border-radius:5px;font-size:12.5px!important;text-transform:none;font-weight:400;color:#24313f;min-height:0!important;height:30px}
 .pdv .wa{font-size:12.5px;font-weight:600;color:#24313f;text-transform:none;letter-spacing:normal;min-height:30px;display:flex;align-items:center;gap:6px}
-.pdv-check{display:flex;align-items:center;gap:6px;font-size:12.5px;color:#24313f;text-transform:none;letter-spacing:normal;font-weight:400;cursor:pointer;min-height:30px;margin-top:16px}
+.pdv-check{display:flex;flex-wrap:wrap;row-gap:3px;min-width:0;align-items:center;gap:6px;font-size:12.5px;color:#24313f;text-transform:none;letter-spacing:normal;font-weight:400;cursor:pointer;min-height:30px;margin-top:16px}
 .pdv-check input{width:auto!important;margin:0}
 .pds-info{grid-column:2;font-size:11.5px;color:#5a6b80;margin-top:-2px}
 @media (max-width:700px){.pds-in{grid-template-columns:1fr}.pds-info{grid-column:1}.pds-t{width:auto}}
@@ -39139,7 +39139,7 @@ function djTelBadge(naam, rk, f){
 function djAlBadge(naam){
   try { var n = (djFunctieTelling().al || {})[djTelSleutel(naam)] || 0; if (!n) return '';
     var m = new Date().toLocaleDateString('nl-NL', { month: 'long' });
-    return ' <span title="Alleen lossen in ' + m + ' (tot en met vandaag), met * op de planning: telt voor de mutatie verloning. Eén keer per dienst." style="font-size:11px;font-weight:800;color:#6c3483;background:#f5eef8;border:1px solid #d2b4de;border-radius:10px;padding:0 6px;margin-left:4px;white-space:nowrap;">Alleen lossen ' + m + ': ' + n + '\u00D7</span>';
+    return '<span style="flex-basis:100%;height:0;"></span><span title="Alleen lossen in ' + m + ' (tot en met vandaag), met * op de planning: telt voor de mutatie verloning. Eén keer per dienst." style="font-size:10.5px;font-weight:800;color:#6c3483;background:#f5eef8;border:1px solid #d2b4de;border-radius:10px;padding:0 6px;margin-left:22px;white-space:nowrap;">Alleen lossen ' + m.slice(0, 3) + ': ' + n + '\u00D7</span>';
   } catch(e) { return ''; }
 }
 window.djTelBadge = djTelBadge;
