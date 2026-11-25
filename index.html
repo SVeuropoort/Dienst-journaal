@@ -16664,7 +16664,19 @@ function oplPersoonNamen(alleenVastEnStage){
       if (alleenVastEnStage && r.groep && !/stag|leerling|bbl|\bbol\b/i.test(r.groep)) return false; // geen inhuur e.d.; stagiaires (ook "Stagaires", "Stage", BBL/BOL) wel
       return true; })
     .map(function(r){ return { v: r.naam, t: (r.dpNaam || r.naam) + (r.groep ? ' (' + r.groep + ')' : '') }; })
+    .concat(oplGroepsledenUitDossier(alleenVastEnStage))
+    .filter(function(x, i, arr){ return arr.findIndex(function(y){ return y.v.toLowerCase() === x.v.toLowerCase(); }) === i; })
     .sort(function(a, b){ return a.t.localeCompare(b.t, 'nl'); });
+}
+// Groepsleden uit het Personeelsdossier ("Naam (Groep)"), bijv. stagiaires die nog niet in het overzicht Certificeringen staan
+function oplGroepsledenUitDossier(alleenVastEnStage){
+  var uit = []; try {
+    var d = JSON.parse(localStorage.getItem(tk('personeelsdossier_v1')) || '{}') || {}, groepen = (typeof PD_GROEPEN !== 'undefined' && Array.isArray(PD_GROEPEN)) ? PD_GROEPEN : [];
+    Object.keys(d).forEach(function(k){ var m = /^(.*) \(([^)]+)\)$/.exec(k); if (!m || groepen.indexOf(m[2]) < 0) return;
+      if (alleenVastEnStage && !/stag|leerling|bbl|\bbol\b/i.test(m[2])) return;
+      uit.push({ v: m[1].trim(), t: m[1].trim() + ' (' + m[2] + ')' }); });
+  } catch(e) {}
+  return uit;
 }
 function oplPersoonKeuzeHtml(formId, veld, label, val, metNummer, alleenVastEnStage){
   var namen = oplPersoonNamen(alleenVastEnStage);
@@ -24421,7 +24433,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.212';
+var DJ_BUILD = '2026-10-07.213';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
