@@ -16661,7 +16661,7 @@ function oplPersoonNamen(alleenVastEnStage){
   var lijst = (typeof oplOverzichtGetData === 'function') ? (oplOverzichtGetData() || []) : [];
   return lijst.filter(function(r){
       if (!r || !r.naam || /\(uit dienst\)\s*$/i.test(r.naam)) return false;
-      if (alleenVastEnStage && r.groep && !/stagiair|stage/i.test(r.groep)) return false; // geen inhuur e.d.
+      if (alleenVastEnStage && r.groep && !/stag|leerling|bbl|\bbol\b/i.test(r.groep)) return false; // geen inhuur e.d.; stagiaires (ook "Stagaires", "Stage", BBL/BOL) wel
       return true; })
     .map(function(r){ return { v: r.naam, t: (r.dpNaam || r.naam) + (r.groep ? ' (' + r.groep + ')' : '') }; })
     .sort(function(a, b){ return a.t.localeCompare(b.t, 'nl'); });
@@ -24421,7 +24421,7 @@ function kpiPieBlokken(colStats, kaart, tolynxHtml, routes, en, rijStijl){
 </script>
 <script>
 // ── Versie van deze app. VERHOGEN BIJ ELKE NIEUWE UITROL, zodat collega's een melding krijgen. ──
-var DJ_BUILD = '2026-10-07.211';
+var DJ_BUILD = '2026-10-07.212';
 // Knop "Nieuwste versie": doet wat Ctrl+F5 doet, maar dan grondig en met één klik.
 // 1) eventuele nog niet opgeslagen wijziging eerst wegschrijven, 2) de service worker en zijn
 // opgeslagen kopieën van de app wissen, 3) de pagina opnieuw laden langs de browsercache heen.
